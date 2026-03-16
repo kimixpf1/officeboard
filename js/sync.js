@@ -1,22 +1,18 @@
 /**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
- * 支持本地模式（无需登录即可使用）
  */
 
 class SyncManager {
     constructor() {
-        // Supabase配置（用户配置）
+        // Supabase配置
         this.supabaseUrl = 'https://ejeiuqcmkznfbglvbkbe.supabase.co';
         this.supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqZWl1cWNta3puZmJnbHZia2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODU4NzIsImV4cCI6MjA4NzE2MTg3Mn0.NfmTSA9DhuP51XKF0qfTuPINtSc7i26u5yIbl69cdAg';
         this.supabase = null;
         this.currentUser = null;
         this.lastSyncTime = localStorage.getItem('lastSyncTime') || null;
-
-        // 默认测试账号（本地模式）
-        this.defaultUsername = 'admin';
-        this.defaultPassword = '123456';
-        this.localMode = false; // 是否使用本地模式
+        this.localMode = false;
+        this.initError = null;
 
         // 初始化Supabase
         this.initSupabase();
@@ -25,67 +21,59 @@ class SyncManager {
     /**
      * 初始化Supabase客户端
      */
-    initSupabase() {
-        console.log('开始初始化Supabase...');
-        console.log('Supabase URL:', this.supabaseUrl);
-        console.log('window.supabase存在:', typeof window.supabase !== 'undefined');
+    async initSupabase() {
+        console.log('=== Supabase 初始化开始 ===');
+        console.log('URL:', this.supabaseUrl);
 
-        if (typeof window.supabase !== 'undefined') {
-            try {
-                this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey);
-                console.log('Supabase客户端已初始化成功');
-                this.localMode = false;
-                this.checkSession();
-            } catch (error) {
-                console.error('Supabase初始化失败:', error);
-                this.enableLocalMode();
-            }
-        } else {
-            console.warn('Supabase库未加载，启用本地模式');
-            this.enableLocalMode();
-        }
-    }
-
-    /**
-     * 启用本地模式
-     */
-    enableLocalMode() {
-        this.localMode = true;
-        this.supabase = null;
-        console.log('已启用本地模式，可使用默认账号登录');
-    }
-
-    /**
-     * 检查当前会话
-     */
-    async checkSession() {
-        if (!this.supabase) {
-            console.log('Supabase客户端不存在，跳过会话检查');
+        if (typeof window.supabase === 'undefined') {
+            this.initError = 'Supabase库未加载';
+            console.error(this.initError);
             return;
         }
+
         try {
-            const { data: { session }, error } = await this.supabase.auth.getSession();
+            this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey, {
+                auth: {
+                    autoRefreshToken: true,
+                    persistSession: true,
+                    detectSessionInUrl: true
+                }
+            });
+            console.log('Supabase客户端创建成功');
+
+            // 测试连接
+            const { data, error } = await this.supabase.auth.getSession();
             if (error) {
-                console.error('检查会话失败:', error);
-                return;
-            }
-            if (session) {
-                this.currentUser = session.user;
-                console.log('已登录用户:', this.currentUser.email);
-                this.updateLoginUI();
+                console.warn('获取会话失败:', error.message);
+            } else {
+                console.log('Supabase连接正常');
+                if (data.session) {
+                    this.currentUser = data.session.user;
+                    console.log('已恢复登录状态:', this.currentUser.email);
+                    this.updateLoginUI();
+                }
             }
         } catch (error) {
-            console.error('检查会话失败:', error);
+            this.initError = error.message;
+            console.error('Supabase初始化异常:', error);
         }
+    }
+
+    /**
+     * 检查Supabase是否可用
+     */
+    isSupabaseReady() {
+        return !!this.supabase;
     }
 
     /**
      * 注册用户
      */
     async register(username, password) {
-        console.log('注册请求:', { username, hasSupabase: !!this.supabase, localMode: this.localMode });
+        console.log('=== 注册请求 ===');
+        console.log('用户名:', username);
+        console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
 
-        // 检查用户名格式
         if (!username || username.length < 2) {
             throw new Error('用户名至少需要2个字符');
         }
@@ -93,59 +81,40 @@ class SyncManager {
             throw new Error('密码至少需要6个字符');
         }
 
-        // 本地模式：保存到localStorage
-        if (this.localMode || !this.supabase) {
-            console.log('使用本地模式注册');
-            const localUsers = JSON.parse(localStorage.getItem('localUsers') || '{}');
-            if (localUsers[username]) {
-                throw new Error('用户名已存在');
-            }
-            localUsers[username] = {
-                username,
-                password,
-                createdAt: new Date().toISOString()
-            };
-            localStorage.setItem('localUsers', JSON.stringify(localUsers));
-            return { success: true, message: '注册成功（本地模式），请登录' };
+        if (!this.isSupabaseReady()) {
+            throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
         }
 
-        // Supabase 注册
-        console.log('使用Supabase注册');
-        try {
-            const email = `${username}@office.local`;
-            console.log('尝试注册:', email);
+        const email = `${username}@office.local`;
+        console.log('注册邮箱:', email);
 
+        try {
             const { data, error } = await this.supabase.auth.signUp({
                 email: email,
                 password: password,
                 options: {
-                    data: { username: username },
-                    emailRedirectTo: window.location.origin
+                    data: { username: username }
                 }
             });
 
-            console.log('注册响应:', { data, error });
+            console.log('注册结果:', { user: data.user?.id, session: !!data.session, error: error?.message });
 
             if (error) {
-                // 处理常见错误
-                if (error.message.includes('already registered')) {
+                if (error.message.includes('already registered') || error.message.includes('already been registered')) {
                     throw new Error('用户名已存在');
                 }
                 if (error.message.includes('password')) {
-                    throw new Error('密码强度不足，请使用更复杂的密码');
+                    throw new Error('密码强度不足，请使用更复杂的密码（至少6位，包含字母和数字）');
                 }
-                throw error;
+                throw new Error('注册失败: ' + error.message);
             }
 
-            // 检查是否需要邮箱验证
+            // 注册成功但需要邮箱验证
             if (data.user && !data.session) {
-                return {
-                    success: true,
-                    message: '注册成功！由于安全设置，请联系管理员激活账号，或稍后尝试登录',
-                    needsConfirmation: true
-                };
+                throw new Error('注册成功，但需要邮箱验证。请在Supabase后台关闭邮箱验证功能，或手动确认用户。');
             }
 
+            // 注册成功并自动登录
             if (data.session) {
                 this.currentUser = data.user;
                 this.updateLoginUI();
@@ -155,7 +124,7 @@ class SyncManager {
             return { success: true, message: '注册成功，请登录' };
         } catch (error) {
             console.error('注册失败:', error);
-            throw new Error('注册失败: ' + (error.message || '请稍后重试'));
+            throw error;
         }
     }
 
@@ -163,73 +132,50 @@ class SyncManager {
      * 用户登录
      */
     async login(username, password) {
-        console.log('登录请求:', { username, hasSupabase: !!this.supabase, localMode: this.localMode });
+        console.log('=== 登录请求 ===');
+        console.log('用户名:', username);
+        console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
 
-        // 本地模式或Supabase不可用时
-        if (this.localMode || !this.supabase) {
-            console.log('使用本地模式登录');
-            // 检查默认账号
-            if (username === this.defaultUsername && password === this.defaultPassword) {
-                this.currentUser = {
-                    id: 'local-admin',
-                    email: 'admin@local',
-                    user_metadata: { username: 'admin' }
-                };
-                this.updateLoginUI();
-                return { success: true, message: '登录成功（本地模式）', user: this.currentUser };
-            }
-
-            // 检查本地注册用户
-            const localUsers = JSON.parse(localStorage.getItem('localUsers') || '{}');
-            if (localUsers[username] && localUsers[username].password === password) {
-                this.currentUser = {
-                    id: 'local-' + username,
-                    email: `${username}@local`,
-                    user_metadata: { username: username }
-                };
-                this.updateLoginUI();
-                return { success: true, message: '登录成功（本地模式）', user: this.currentUser };
-            }
-
-            throw new Error('用户名或密码错误（提示：默认账号 admin/123456）');
+        if (!username || !password) {
+            throw new Error('请输入用户名和密码');
         }
 
-        // Supabase 登录
-        console.log('使用Supabase登录');
-        try {
-            const email = `${username}@office.local`;
-            console.log('尝试登录:', email);
+        if (!this.isSupabaseReady()) {
+            throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
+        }
 
+        const email = `${username}@office.local`;
+        console.log('登录邮箱:', email);
+
+        try {
             const { data, error } = await this.supabase.auth.signInWithPassword({
                 email: email,
                 password: password
             });
 
-            console.log('登录响应:', { data, error });
+            console.log('登录结果:', { user: data.user?.id, session: !!data.session, error: error?.message });
 
             if (error) {
                 if (error.message.includes('Invalid login credentials')) {
                     throw new Error('用户名或密码错误');
                 }
                 if (error.message.includes('Email not confirmed')) {
-                    throw new Error('账号未激活，请联系管理员或重新注册');
+                    throw new Error('账号未激活。请在Supabase后台手动确认用户，或关闭邮箱验证功能。');
                 }
-                throw error;
+                throw new Error('登录失败: ' + error.message);
             }
 
             this.currentUser = data.user;
             console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
 
-            // 异步同步云端数据（不阻塞登录）
-            this.syncFromCloud().catch(syncError => {
-                console.warn('同步数据失败:', syncError);
-            });
+            // 异步同步数据
+            this.syncFromCloud().catch(e => console.warn('同步失败:', e));
 
             return { success: true, message: '登录成功', user: this.currentUser };
         } catch (error) {
             console.error('登录失败:', error);
-            throw new Error(error.message || '登录失败，请检查用户名和密码');
+            throw error;
         }
     }
 
