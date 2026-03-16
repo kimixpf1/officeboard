@@ -313,7 +313,7 @@ class OfficeDashboard {
             return;
         }
 
-        this.showLoading('登录中...');
+        this.showLoading(true, '登录中...');
 
         try {
             const result = await syncManager.login(username, password);
@@ -323,7 +323,7 @@ class OfficeDashboard {
         } catch (error) {
             this.showError(error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
         }
     }
 
@@ -344,15 +344,15 @@ class OfficeDashboard {
             return;
         }
 
-        this.showLoading('注册中...');
+        this.showLoading(true, '注册中...');
 
         try {
             const result = await syncManager.register(username, password);
-            this.showSuccess('注册成功，请登录');
+            this.showSuccess(result.message);
         } catch (error) {
             this.showError(error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
         }
     }
 
@@ -360,7 +360,7 @@ class OfficeDashboard {
      * 处理退出登录
      */
     async handleLogout() {
-        this.showLoading('正在退出...');
+        this.showLoading(true, '正在退出...');
 
         try {
             await syncManager.logout();
@@ -369,7 +369,7 @@ class OfficeDashboard {
         } catch (error) {
             this.showError(error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
         }
     }
 
@@ -387,7 +387,7 @@ class OfficeDashboard {
      * 同步到云端
      */
     async syncToCloud() {
-        this.showLoading('正在上传...');
+        this.showLoading(true, '正在上传...');
 
         try {
             const result = await syncManager.syncToCloud((progress) => {
@@ -399,7 +399,7 @@ class OfficeDashboard {
         } catch (error) {
             this.showError('上传失败: ' + error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
         }
     }
 
@@ -407,7 +407,7 @@ class OfficeDashboard {
      * 从云端同步
      */
     async syncFromCloud() {
-        this.showLoading('正在下载...');
+        this.showLoading(true, '正在下载...');
 
         try {
             const result = await syncManager.syncFromCloud((progress) => {
@@ -420,7 +420,7 @@ class OfficeDashboard {
         } catch (error) {
             this.showError('下载失败: ' + error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
         }
     }
 
@@ -428,7 +428,7 @@ class OfficeDashboard {
      * 导出数据
      */
     async exportData() {
-        this.showLoading('正在导出...');
+        this.showLoading(true, '正在导出...');
 
         try {
             const result = await syncManager.exportToFile();
@@ -436,7 +436,7 @@ class OfficeDashboard {
         } catch (error) {
             this.showError('导出失败: ' + error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
         }
     }
 
@@ -449,7 +449,7 @@ class OfficeDashboard {
 
         const password = prompt('如果文件有密码保护，请输入密码（无密码请留空）：');
 
-        this.showLoading('正在导入...');
+        this.showLoading(true, '正在导入...');
 
         try {
             const result = await syncManager.importFromFile(file, password || null);
@@ -458,7 +458,7 @@ class OfficeDashboard {
         } catch (error) {
             this.showError('导入失败: ' + error.message);
         } finally {
-            this.hideLoading();
+            this.showLoading(false);
             e.target.value = '';
         }
     }
