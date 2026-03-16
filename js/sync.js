@@ -26,10 +26,14 @@ class SyncManager {
      * 初始化Supabase客户端
      */
     initSupabase() {
+        console.log('开始初始化Supabase...');
+        console.log('Supabase URL:', this.supabaseUrl);
+        console.log('window.supabase存在:', typeof window.supabase !== 'undefined');
+
         if (typeof window.supabase !== 'undefined') {
             try {
                 this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey);
-                console.log('Supabase客户端已初始化');
+                console.log('Supabase客户端已初始化成功');
                 this.localMode = false;
                 this.checkSession();
             } catch (error) {
@@ -55,10 +59,16 @@ class SyncManager {
      * 检查当前会话
      */
     async checkSession() {
-        if (!this.supabase) return;
+        if (!this.supabase) {
+            console.log('Supabase客户端不存在，跳过会话检查');
+            return;
+        }
         try {
             const { data: { session }, error } = await this.supabase.auth.getSession();
-            if (error) throw error;
+            if (error) {
+                console.error('检查会话失败:', error);
+                return;
+            }
             if (session) {
                 this.currentUser = session.user;
                 console.log('已登录用户:', this.currentUser.email);
@@ -85,6 +95,7 @@ class SyncManager {
 
         // 本地模式：保存到localStorage
         if (this.localMode || !this.supabase) {
+            console.log('使用本地模式注册');
             const localUsers = JSON.parse(localStorage.getItem('localUsers') || '{}');
             if (localUsers[username]) {
                 throw new Error('用户名已存在');
@@ -99,6 +110,7 @@ class SyncManager {
         }
 
         // Supabase 注册
+        console.log('使用Supabase注册');
         try {
             const email = `${username}@office.local`;
             console.log('尝试注册:', email);
@@ -155,6 +167,7 @@ class SyncManager {
 
         // 本地模式或Supabase不可用时
         if (this.localMode || !this.supabase) {
+            console.log('使用本地模式登录');
             // 检查默认账号
             if (username === this.defaultUsername && password === this.defaultPassword) {
                 this.currentUser = {
@@ -182,6 +195,7 @@ class SyncManager {
         }
 
         // Supabase 登录
+        console.log('使用Supabase登录');
         try {
             const email = `${username}@office.local`;
             console.log('尝试登录:', email);
