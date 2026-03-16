@@ -8,7 +8,7 @@ class SyncManager {
     constructor() {
         // Supabase配置（用户配置）
         this.supabaseUrl = 'https://ejeiuqcmkznfbglvbkbe.supabase.co';
-        this.supabaseKey = 'sb_publishable_akyDKiNsa1ZCQcqpTa-3LQ_6SYEfxGg';
+        this.supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqZWl1cWNta3puZmJnbHZia2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODU4NzIsImV4cCI6MjA4NzE2MTg3Mn0.NfmTSA9DhuP51XKF0qfTuPINtSc7i26u5yIbl69cdAg';
         this.supabase = null;
         this.currentUser = null;
         this.lastSyncTime = localStorage.getItem('lastSyncTime') || null;
