@@ -207,12 +207,10 @@ class SyncManager {
             console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
 
-            // 自动同步云端数据
-            try {
-                await this.syncFromCloud();
-            } catch (syncError) {
+            // 异步同步云端数据（不阻塞登录）
+            this.syncFromCloud().catch(syncError => {
                 console.warn('同步数据失败:', syncError);
-            }
+            });
 
             return { success: true, message: '登录成功', user: this.currentUser };
         } catch (error) {
@@ -227,8 +225,8 @@ class SyncManager {
     async logout() {
         try {
             if (this.supabase && this.currentUser) {
-                await this.syncToCloud();
-                await this.supabase.auth.signOut();
+                await this.syncToCloud().catch(e => console.warn('同步失败:', e));
+                await this.supabase.auth.signOut().catch(e => console.warn('登出失败:', e));
             }
             this.currentUser = null;
             this.updateLoginUI();
@@ -243,7 +241,8 @@ class SyncManager {
      */
     async syncToCloud(progressCallback = null) {
         if (!this.supabase || !this.currentUser) {
-            throw new Error('请先登录');
+            console.warn('未登录，跳过同步');
+            return { success: false, message: '请先登录' };
         }
         try {
             if (progressCallback) progressCallback('正在准备数据...');
@@ -255,6 +254,7 @@ class SyncManager {
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
+
             const { error } = await this.supabase
                 .from('user_data')
                 .upsert({
@@ -262,14 +262,19 @@ class SyncManager {
                     data: syncData,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
-            if (error) throw error;
+
+            if (error) {
+                console.error('上传失败:', error);
+                throw error;
+            }
+
             this.lastSyncTime = new Date().toISOString();
             localStorage.setItem('lastSyncTime', this.lastSyncTime);
             if (progressCallback) progressCallback('上传完成');
             return { success: true, message: `已同步 ${allItems.length} 个事项到云端`, itemCount: allItems.length };
         } catch (error) {
             console.error('同步到云端失败:', error);
-            throw new Error('同步失败: ' + error.message);
+            return { success: false, message: '同步失败: ' + error.message };
         }
     }
 
@@ -278,29 +283,35 @@ class SyncManager {
      */
     async syncFromCloud(progressCallback = null, mergeStrategy = 'merge') {
         if (!this.supabase || !this.currentUser) {
-            throw new Error('请先登录');
+            console.warn('未登录，跳过同步');
+            return { success: false, message: '请先登录' };
         }
         try {
             if (progressCallback) progressCallback('正在从云端获取数据...');
+
             const { data, error } = await this.supabase
                 .from('user_data')
                 .select('*')
                 .eq('user_id', this.currentUser.id)
-                .single();
+                .maybeSingle();  // 使用 maybeSingle 避免无数据时报错
+
             if (error) {
-                if (error.code === 'PGRST116') {
-                    return { success: true, message: '云端暂无数据', itemCount: 0 };
-                }
+                console.error('查询失败:', error);
                 throw error;
             }
+
             if (!data || !data.data || !data.data.items) {
+                console.log('云端暂无数据');
                 return { success: true, message: '云端暂无数据', itemCount: 0 };
             }
+
             if (progressCallback) progressCallback('正在合并数据...');
             const cloudItems = data.data.items;
+
             if (mergeStrategy === 'replace') {
                 await db.clearAllItems();
             }
+
             let importedCount = 0;
             for (const item of cloudItems) {
                 try {
@@ -311,13 +322,14 @@ class SyncManager {
                     console.warn('导入项目失败:', e);
                 }
             }
+
             this.lastSyncTime = new Date().toISOString();
             localStorage.setItem('lastSyncTime', this.lastSyncTime);
             if (progressCallback) progressCallback('同步完成');
             return { success: true, message: `从云端同步了 ${importedCount} 个事项`, itemCount: importedCount };
         } catch (error) {
             console.error('从云端同步失败:', error);
-            throw new Error('同步失败: ' + error.message);
+            return { success: false, message: '同步失败: ' + error.message };
         }
     }
 
