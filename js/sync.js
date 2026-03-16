@@ -247,10 +247,24 @@ class SyncManager {
         try {
             if (progressCallback) progressCallback('正在准备数据...');
             const allItems = await db.getAllItems();
+
+            // 获取设置数据（包括API Key）
+            const settings = {};
+            const kimiKey = await db.getSetting('kimi_api_key_encrypted');
+            const kimiKeySet = await db.getSetting('kimi_api_key_set');
+            const deepseekKey = await db.getSetting('deepseek_api_key_encrypted');
+            const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
+
+            if (kimiKey) settings.kimi_api_key_encrypted = kimiKey;
+            if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
+            if (deepseekKey) settings.deepseek_api_key_encrypted = deepseekKey;
+            if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+
             const syncData = {
                 user_id: this.currentUser.id,
                 sync_time: new Date().toISOString(),
                 items: allItems,
+                settings: settings,
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
@@ -300,14 +314,33 @@ class SyncManager {
                 throw error;
             }
 
-            if (!data || !data.data || !data.data.items) {
+            if (!data || !data.data) {
                 console.log('云端暂无数据');
                 return { success: true, message: '云端暂无数据', itemCount: 0 };
             }
 
             if (progressCallback) progressCallback('正在合并数据...');
-            const cloudItems = data.data.items;
 
+            // 同步设置数据（API Key等）
+            if (data.data.settings) {
+                const settings = data.data.settings;
+                if (settings.kimi_api_key_encrypted) {
+                    await db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted);
+                }
+                if (settings.kimi_api_key_set) {
+                    await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
+                }
+                if (settings.deepseek_api_key_encrypted) {
+                    await db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted);
+                }
+                if (settings.deepseek_api_key_set) {
+                    await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
+                }
+                console.log('已同步API Key设置');
+            }
+
+            // 同步事项数据
+            const cloudItems = data.data.items || [];
             if (mergeStrategy === 'replace') {
                 await db.clearAllItems();
             }
