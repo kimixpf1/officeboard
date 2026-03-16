@@ -245,6 +245,9 @@ class OfficeDashboard {
         document.getElementById('importDataBtn')?.addEventListener('click', () => {
             document.getElementById('importFileInput')?.click();
         });
+        document.getElementById('importDataBtn2')?.addEventListener('click', () => {
+            document.getElementById('importFileInput')?.click();
+        });
         document.getElementById('importFileInput')?.addEventListener('change', (e) => this.importData(e));
 
         // 监听登录状态变化
