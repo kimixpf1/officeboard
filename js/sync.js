@@ -64,9 +64,6 @@ class SyncManager {
                     console.log('已恢复登录状态:', this.currentUser.email);
                     this.updateLoginUI();
 
-                    // 初始化实时订阅
-                    this.initRealtimeSubscription();
-
                     // 自动从云端同步数据
                     console.log('开始自动同步云端数据...');
                     const syncResult = await this.syncFromCloud();
@@ -77,11 +74,54 @@ class SyncManager {
                         detail: { syncResult }
                     });
                     document.dispatchEvent(event);
+
+                    // 启动定时同步（每30秒）
+                    this.startPeriodicSync();
+
+                    // 初始化实时订阅
+                    this.initRealtimeSubscription();
                 }
             }
         } catch (error) {
             this.initError = error.message;
             console.error('Supabase初始化异常:', error);
+        }
+    }
+
+    /**
+     * 启动定时同步
+     */
+    startPeriodicSync() {
+        // 清除已有的定时器
+        if (this.periodicSyncTimer) {
+            clearInterval(this.periodicSyncTimer);
+        }
+
+        // 每30秒同步一次
+        this.periodicSyncTimer = setInterval(async () => {
+            if (this.isLoggedIn()) {
+                console.log('定时同步检查...');
+                const result = await this.silentSyncFromCloud();
+                if (result.success && result.itemCount > 0) {
+                    // 通知应用刷新
+                    const event = new CustomEvent('syncRemoteDataChanged', {
+                        detail: { itemCount: result.itemCount }
+                    });
+                    document.dispatchEvent(event);
+                }
+            }
+        }, 30000); // 30秒
+
+        console.log('定时同步已启动（每30秒）');
+    }
+
+    /**
+     * 停止定时同步
+     */
+    stopPeriodicSync() {
+        if (this.periodicSyncTimer) {
+            clearInterval(this.periodicSyncTimer);
+            this.periodicSyncTimer = null;
         }
     }
 
@@ -366,6 +406,9 @@ class SyncManager {
             console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
 
+            // 启动定时同步
+            this.startPeriodicSync();
+
             // 初始化实时订阅
             this.initRealtimeSubscription();
 
@@ -383,6 +426,7 @@ class SyncManager {
         try {
             if (this.supabase && this.currentUser) {
                 await this.syncToCloud().catch(e => console.warn('同步失败:', e));
+                this.stopPeriodicSync();
                 this.unsubscribeRealtime();
                 await this.supabase.auth.signOut().catch(e => console.warn('登出失败:', e));
             }

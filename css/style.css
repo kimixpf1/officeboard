@@ -1617,13 +1617,126 @@ body {
 }
 
 @media (max-width: 640px) {
+    /* 手机端头部优化 */
     .header {
         flex-direction: column;
-        gap: var(--spacing-3);
+        gap: var(--spacing-2);
         text-align: center;
-        padding: var(--spacing-3);
+        padding: var(--spacing-2);
     }
 
+    .header-left {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .logo {
+        font-size: var(--font-size-lg);
+    }
+
+    .header-center {
+        flex-direction: column;
+        gap: var(--spacing-2);
+        width: 100%;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: center;
+        gap: var(--spacing-3);
+    }
+
+    /* AI输入框优化 */
+    .toolbar-ai {
+        width: 100%;
+        max-width: none;
+    }
+
+    .ai-input {
+        font-size: 13px;
+        padding: var(--spacing-2);
+    }
+
+    /* 视图切换按钮优化 */
+    .toolbar-views {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .view-btn {
+        padding: var(--spacing-1) var(--spacing-3);
+        font-size: 12px;
+    }
+
+    /* 日期导航优化 */
+    .toolbar-date {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .date-picker-sm {
+        width: 120px;
+        font-size: 12px;
+    }
+
+    .btn-text.btn-sm {
+        font-size: 12px;
+        padding: var(--spacing-1) var(--spacing-2);
+    }
+
+    /* 日视图优化 */
+    .board-view {
+        padding: var(--spacing-2);
+    }
+
+    .board-header {
+        margin-bottom: var(--spacing-2);
+    }
+
+    .board-header h2 {
+        font-size: 1rem;
+    }
+
+    .board-container {
+        padding: var(--spacing-1);
+        gap: var(--spacing-2);
+    }
+
+    .board-column {
+        border-radius: var(--border-radius);
+    }
+
+    .column-header {
+        padding: var(--spacing-2);
+    }
+
+    .column-title {
+        font-size: 13px;
+    }
+
+    .column-content {
+        padding: var(--spacing-2);
+    }
+
+    /* 卡片在手机端更紧凑 */
+    .card {
+        padding: var(--spacing-2);
+    }
+
+    .card-title {
+        font-size: 13px;
+    }
+
+    .card-header-row {
+        margin-bottom: 4px;
+    }
+
+    .priority-tag {
+        font-size: 10px;
+        padding: 1px 6px;
+    }
+
+    /* 表单优化 */
     .input-container {
         flex-direction: column;
     }
@@ -1642,36 +1755,75 @@ body {
         justify-content: center;
     }
 
-    /* 手机端看板优化 */
-    .board-container {
-        padding: var(--spacing-2);
-        gap: var(--spacing-3);
+    /* 按钮优化 */
+    .btn-icon {
+        width: 36px;
+        height: 36px;
     }
 
-    .board-column {
-        border-radius: var(--border-radius);
-    }
-
-    .column-header {
-        padding: var(--spacing-3);
-    }
-
-    .column-content {
-        padding: var(--spacing-3);
-    }
-
-    /* 卡片在手机端更紧凑 */
-    .card {
-        padding: var(--spacing-3);
-    }
-
-    .card-title {
-        font-size: 14px;
+    .btn-secondary.btn-sm {
+        font-size: 12px;
+        padding: var(--spacing-1) var(--spacing-2);
     }
 
     /* 确保所有内容可见 */
     .board-column {
         flex-shrink: 0;
+    }
+
+    /* 隐藏报告按钮节省空间 */
+    #reportBtn {
+        display: none;
+    }
+
+    /* 周视图手机端优化 */
+    .week-view {
+        grid-template-columns: 30px repeat(7, 1fr);
+        height: auto;
+        min-height: auto;
+        font-size: 10px;
+    }
+
+    .week-header {
+        padding: var(--spacing-1);
+        font-size: 10px;
+    }
+
+    .week-title {
+        font-size: 11px;
+        padding: var(--spacing-1);
+    }
+
+    .week-cell {
+        min-height: 80px;
+        padding: var(--spacing-1);
+    }
+
+    /* 月视图手机端优化 */
+    .month-view {
+        font-size: 10px;
+    }
+
+    .month-header {
+        padding: var(--spacing-1);
+        font-size: 10px;
+    }
+
+    .month-cell {
+        min-height: 60px;
+        padding: var(--spacing-1);
+    }
+
+    /* 弹窗优化 */
+    .modal-content {
+        width: 95% !important;
+        max-height: 90vh;
+        margin: var(--spacing-2);
+    }
+
+    .sync-modal-content {
+        width: 95% !important;
+        max-height: 90vh;
     }
 }
 
