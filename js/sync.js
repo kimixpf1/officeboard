@@ -215,6 +215,9 @@ class SyncManager {
         try {
             if (progressCallback) progressCallback('正在准备数据...');
             const allItems = await db.getAllItems();
+            console.log('=== 上传数据 ===');
+            console.log('用户ID:', this.currentUser.id);
+            console.log('事项数量:', allItems.length);
 
             // 获取设置数据（包括API Key）
             const settings = {};
@@ -229,7 +232,6 @@ class SyncManager {
             if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
 
             const syncData = {
-                user_id: this.currentUser.id,
                 sync_time: new Date().toISOString(),
                 items: allItems,
                 settings: settings,
@@ -237,13 +239,19 @@ class SyncManager {
             };
             if (progressCallback) progressCallback('正在上传到云端...');
 
-            const { error } = await this.supabase
+            const upsertData = {
+                user_id: this.currentUser.id,
+                data: syncData,
+                updated_at: new Date().toISOString()
+            };
+            console.log('上传数据:', JSON.stringify(upsertData, null, 2));
+
+            const { data, error } = await this.supabase
                 .from('user_data')
-                .upsert({
-                    user_id: this.currentUser.id,
-                    data: syncData,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
+                .upsert(upsertData, { onConflict: 'user_id' })
+                .select();
+
+            console.log('上传响应:', { data, error });
 
             if (error) {
                 console.error('上传失败:', error);
@@ -269,22 +277,40 @@ class SyncManager {
             return { success: false, message: '请先登录' };
         }
         try {
+            console.log('=== 下载数据 ===');
+            console.log('用户ID:', this.currentUser.id);
+            console.log('用户邮箱:', this.currentUser.email);
+
             if (progressCallback) progressCallback('正在从云端获取数据...');
 
+            // 先查询所有数据（调试用）
+            const { data: allData, error: allError } = await this.supabase
+                .from('user_data')
+                .select('*');
+            console.log('表中所有数据:', allData, '错误:', allError);
+
+            // 查询当前用户数据
             const { data, error } = await this.supabase
                 .from('user_data')
                 .select('*')
                 .eq('user_id', this.currentUser.id)
-                .maybeSingle();  // 使用 maybeSingle 避免无数据时报错
+                .maybeSingle();
+
+            console.log('查询结果:', { data, error });
 
             if (error) {
                 console.error('查询失败:', error);
                 throw error;
             }
 
-            if (!data || !data.data) {
-                console.log('云端暂无数据');
+            if (!data) {
+                console.log('云端暂无此用户数据');
                 return { success: true, message: '云端暂无数据', itemCount: 0 };
+            }
+
+            if (!data.data) {
+                console.log('数据字段为空');
+                return { success: true, message: '云端数据为空', itemCount: 0 };
             }
 
             if (progressCallback) progressCallback('正在合并数据...');
@@ -309,6 +335,8 @@ class SyncManager {
 
             // 同步事项数据
             const cloudItems = data.data.items || [];
+            console.log('云端事项数量:', cloudItems.length);
+
             if (mergeStrategy === 'replace') {
                 await db.clearAllItems();
             }
