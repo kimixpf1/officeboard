@@ -36,6 +36,15 @@ class OfficeDashboard {
             await db.init();
             console.log('数据库连接成功');
 
+            // 等待同步管理器初始化完成
+            await syncManager.waitForInit();
+
+            // 检查登录状态，未登录则清除本地数据
+            if (!syncManager.isLoggedIn()) {
+                console.log('未登录，清除本地数据...');
+                await db.clearAllItems();
+            }
+
             // 绑定事件（先绑定事件，让用户可以交互）
             console.log('绑定用户交互事件...');
             this.bindEvents();

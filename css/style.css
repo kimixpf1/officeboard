@@ -541,8 +541,8 @@ body {
 .board-view {
     display: none;
     padding: var(--spacing-5) var(--spacing-6);
-    min-height: calc(100vh - 200px);
-    overflow: visible;
+    height: calc(100vh - 200px);
+    overflow: hidden;
 }
 
 .board-view.active {
@@ -564,7 +564,7 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-5);
-    min-height: 300px;
+    height: calc(100% - 50px);
     max-width: 1600px;
     margin: 0 auto;
 }
@@ -1579,6 +1579,12 @@ body {
 
 /* 响应式布局 */
 @media (max-width: 1024px) {
+    .board-view {
+        height: auto;
+        min-height: calc(100vh - 200px);
+        overflow: visible;
+    }
+
     .board-container {
         grid-template-columns: 1fr;
         height: auto;

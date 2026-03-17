@@ -15,9 +15,19 @@ class SyncManager {
         this.initError = null;
         this.realtimeChannel = null;
         this.syncTimeout = null;
+        this.initPromise = null;
 
         // 初始化Supabase
-        this.initSupabase();
+        this.initPromise = this.initSupabase();
+    }
+
+    /**
+     * 等待初始化完成
+     */
+    async waitForInit() {
+        if (this.initPromise) {
+            await this.initPromise;
+        }
     }
 
     /**
@@ -253,6 +263,9 @@ class SyncManager {
     async register(username, password) {
         console.log('=== 注册请求 ===');
         console.log('用户名:', username);
+
+        // 等待初始化完成
+        await this.waitForInit();
         console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
 
         if (!username || username.length < 2) {
@@ -315,6 +328,9 @@ class SyncManager {
     async login(username, password) {
         console.log('=== 登录请求 ===');
         console.log('用户名:', username);
+
+        // 等待初始化完成
+        await this.waitForInit();
         console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
 
         if (!username || !password) {
