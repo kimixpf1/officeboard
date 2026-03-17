@@ -797,12 +797,17 @@ class OfficeDashboard {
         try {
             // 保存DeepSeek API Key
             if (deepseekKey) {
-                ocrManager.setApiKey(deepseekKey);
+                await ocrManager.setApiKey(deepseekKey);
             }
 
             // 保存Kimi API Key
             if (kimiKey) {
-                ocrManager.setKimiApiKey(kimiKey);
+                await ocrManager.setKimiApiKey(kimiKey);
+            }
+
+            // 如果已登录，同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.silentSyncToCloud();
             }
 
             this.hideModal('apiKeyModal');

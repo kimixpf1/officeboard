@@ -53,34 +53,38 @@ class SyncManager {
             });
             console.log('Supabase客户端创建成功');
 
-            // 测试连接
-            const { data, error } = await this.supabase.auth.getSession();
-            if (error) {
-                console.warn('获取会话失败:', error.message);
-            } else {
-                console.log('Supabase连接正常');
-                if (data.session) {
-                    this.currentUser = data.session.user;
-                    console.log('已恢复登录状态:', this.currentUser.email);
-                    this.updateLoginUI();
+            // 尝试获取会话（不阻塞初始化）
+            try {
+                const { data, error } = await this.supabase.auth.getSession();
+                if (error) {
+                    console.warn('获取会话失败:', error.message);
+                } else {
+                    console.log('Supabase连接正常');
+                    if (data.session) {
+                        this.currentUser = data.session.user;
+                        console.log('已恢复登录状态:', this.currentUser.email);
+                        this.updateLoginUI();
 
-                    // 自动从云端同步数据
-                    console.log('开始自动同步云端数据...');
-                    const syncResult = await this.syncFromCloud();
-                    console.log('自动同步结果:', syncResult);
+                        // 自动从云端同步数据
+                        console.log('开始自动同步云端数据...');
+                        const syncResult = await this.syncFromCloud();
+                        console.log('自动同步结果:', syncResult);
 
-                    // 通知应用刷新数据
-                    const event = new CustomEvent('syncDataLoaded', {
-                        detail: { syncResult }
-                    });
-                    document.dispatchEvent(event);
+                        // 通知应用刷新数据
+                        const event = new CustomEvent('syncDataLoaded', {
+                            detail: { syncResult }
+                        });
+                        document.dispatchEvent(event);
 
-                    // 启动定时同步（每30秒）
-                    this.startPeriodicSync();
+                        // 启动定时同步（每30秒）
+                        this.startPeriodicSync();
 
-                    // 初始化实时订阅
-                    this.initRealtimeSubscription();
+                        // 初始化实时订阅
+                        this.initRealtimeSubscription();
+                    }
                 }
+            } catch (sessionError) {
+                console.warn('会话检查失败，但Supabase客户端可用:', sessionError);
             }
         } catch (error) {
             this.initError = error.message;
@@ -189,14 +193,14 @@ class SyncManager {
                     const allItems = await db.getAllItems();
 
                     const settings = {};
-                    const kimiKey = await db.getSetting('kimi_api_key_encrypted');
+                    const kimiKey = await db.getSetting('kimi_api_key');
                     const kimiKeySet = await db.getSetting('kimi_api_key_set');
-                    const deepseekKey = await db.getSetting('deepseek_api_key_encrypted');
+                    const deepseekKey = await db.getSetting('deepseek_api_key');
                     const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
 
-                    if (kimiKey) settings.kimi_api_key_encrypted = kimiKey;
+                    if (kimiKey) settings.kimi_api_key = kimiKey;
                     if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
-                    if (deepseekKey) settings.deepseek_api_key_encrypted = deepseekKey;
+                    if (deepseekKey) settings.deepseek_api_key = deepseekKey;
                     if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
 
                     const syncData = {
@@ -253,14 +257,16 @@ class SyncManager {
             // 同步设置
             if (data.data.settings) {
                 const settings = data.data.settings;
-                if (settings.kimi_api_key_encrypted) {
-                    await db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted);
+                if (settings.kimi_api_key) {
+                    await db.setSetting('kimi_api_key', settings.kimi_api_key);
+                    localStorage.setItem('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
                     await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
                 }
-                if (settings.deepseek_api_key_encrypted) {
-                    await db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted);
+                if (settings.deepseek_api_key) {
+                    await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
+                    localStorage.setItem('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
@@ -455,14 +461,14 @@ class SyncManager {
 
             // 获取设置数据（包括API Key）
             const settings = {};
-            const kimiKey = await db.getSetting('kimi_api_key_encrypted');
+            const kimiKey = await db.getSetting('kimi_api_key');
             const kimiKeySet = await db.getSetting('kimi_api_key_set');
-            const deepseekKey = await db.getSetting('deepseek_api_key_encrypted');
+            const deepseekKey = await db.getSetting('deepseek_api_key');
             const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
 
-            if (kimiKey) settings.kimi_api_key_encrypted = kimiKey;
+            if (kimiKey) settings.kimi_api_key = kimiKey;
             if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
-            if (deepseekKey) settings.deepseek_api_key_encrypted = deepseekKey;
+            if (deepseekKey) settings.deepseek_api_key = deepseekKey;
             if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
 
             const syncData = {
@@ -552,14 +558,16 @@ class SyncManager {
             // 同步设置数据（API Key等）
             if (data.data.settings) {
                 const settings = data.data.settings;
-                if (settings.kimi_api_key_encrypted) {
-                    await db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted);
+                if (settings.kimi_api_key) {
+                    await db.setSetting('kimi_api_key', settings.kimi_api_key);
+                    localStorage.setItem('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
                     await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
                 }
-                if (settings.deepseek_api_key_encrypted) {
-                    await db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted);
+                if (settings.deepseek_api_key) {
+                    await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
+                    localStorage.setItem('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);

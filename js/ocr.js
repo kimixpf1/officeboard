@@ -22,9 +22,14 @@ class OCRManager {
     /**
      * 设置DeepSeek API Key
      */
-    setApiKey(key) {
+    async setApiKey(key) {
         this.deepseekApiKey = key;
         localStorage.setItem('deepseekApiKey', key);
+        // 同时保存到 IndexedDB 以便跨设备同步
+        if (typeof db !== 'undefined') {
+            await db.setSetting('deepseek_api_key', key);
+            await db.setSetting('deepseek_api_key_set', key ? new Date().toISOString() : null);
+        }
     }
 
     /**
@@ -40,9 +45,14 @@ class OCRManager {
     /**
      * 设置Kimi API Key
      */
-    setKimiApiKey(key) {
+    async setKimiApiKey(key) {
         this.kimiApiKey = key;
         localStorage.setItem('kimiApiKey', key);
+        // 同时保存到 IndexedDB 以便跨设备同步
+        if (typeof db !== 'undefined') {
+            await db.setSetting('kimi_api_key', key);
+            await db.setSetting('kimi_api_key_set', key ? new Date().toISOString() : null);
+        }
     }
 
     /**
@@ -53,6 +63,25 @@ class OCRManager {
             this.kimiApiKey = localStorage.getItem('kimiApiKey');
         }
         return this.kimiApiKey;
+    }
+
+    /**
+     * 从 IndexedDB 加载 API Key（用于同步后恢复）
+     */
+    async loadApiKeysFromDB() {
+        if (typeof db !== 'undefined') {
+            const deepseekKey = await db.getSetting('deepseek_api_key');
+            const kimiKey = await db.getSetting('kimi_api_key');
+
+            if (deepseekKey && !this.deepseekApiKey) {
+                this.deepseekApiKey = deepseekKey;
+                localStorage.setItem('deepseekApiKey', deepseekKey);
+            }
+            if (kimiKey && !this.kimiApiKey) {
+                this.kimiApiKey = kimiKey;
+                localStorage.setItem('kimiApiKey', kimiKey);
+            }
+        }
     }
 
     /**
