@@ -13,6 +13,8 @@ class SyncManager {
         this.lastSyncTime = localStorage.getItem('lastSyncTime') || null;
         this.localMode = false;
         this.initError = null;
+        this.realtimeChannel = null;
+        this.syncTimeout = null;
 
         // 初始化Supabase
         this.initSupabase();
@@ -52,6 +54,9 @@ class SyncManager {
                     console.log('已恢复登录状态:', this.currentUser.email);
                     this.updateLoginUI();
 
+                    // 初始化实时订阅
+                    this.initRealtimeSubscription();
+
                     // 自动从云端同步数据
                     console.log('开始自动同步云端数据...');
                     const syncResult = await this.syncFromCloud();
@@ -67,6 +72,171 @@ class SyncManager {
         } catch (error) {
             this.initError = error.message;
             console.error('Supabase初始化异常:', error);
+        }
+    }
+
+    /**
+     * 初始化实时订阅
+     */
+    initRealtimeSubscription() {
+        if (!this.supabase || !this.currentUser) return;
+
+        console.log('初始化实时订阅...');
+
+        // 订阅 user_data 表的变化
+        this.realtimeChannel = this.supabase
+            .channel(`user_data_changes_${this.currentUser.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'user_data',
+                    filter: `user_id=eq.${this.currentUser.id}`
+                },
+                (payload) => {
+                    console.log('收到数据变更通知:', payload);
+                    if (payload.eventType === 'UPDATE') {
+                        // 触发数据更新事件
+                        const event = new CustomEvent('syncRemoteDataChanged', {
+                            detail: { data: payload.new }
+                        });
+                        document.dispatchEvent(event);
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log('实时订阅状态:', status);
+            });
+    }
+
+    /**
+     * 取消实时订阅
+     */
+    unsubscribeRealtime() {
+        if (this.realtimeChannel) {
+            this.realtimeChannel.unsubscribe();
+            this.realtimeChannel = null;
+        }
+    }
+
+    /**
+     * 静默同步到云端（无进度提示）
+     */
+    async silentSyncToCloud() {
+        if (!this.supabase || !this.currentUser) {
+            return { success: false };
+        }
+
+        // 防抖：延迟500ms执行，避免频繁同步
+        if (this.syncTimeout) {
+            clearTimeout(this.syncTimeout);
+        }
+
+        return new Promise((resolve) => {
+            this.syncTimeout = setTimeout(async () => {
+                try {
+                    const allItems = await db.getAllItems();
+
+                    const settings = {};
+                    const kimiKey = await db.getSetting('kimi_api_key_encrypted');
+                    const kimiKeySet = await db.getSetting('kimi_api_key_set');
+                    const deepseekKey = await db.getSetting('deepseek_api_key_encrypted');
+                    const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
+
+                    if (kimiKey) settings.kimi_api_key_encrypted = kimiKey;
+                    if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
+                    if (deepseekKey) settings.deepseek_api_key_encrypted = deepseekKey;
+                    if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+
+                    const syncData = {
+                        sync_time: new Date().toISOString(),
+                        items: allItems,
+                        settings: settings,
+                        device_info: navigator.userAgent
+                    };
+
+                    const { error } = await this.supabase
+                        .from('user_data')
+                        .upsert({
+                            user_id: this.currentUser.id,
+                            data: syncData,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'user_id' });
+
+                    if (error) {
+                        console.error('静默同步失败:', error);
+                        resolve({ success: false });
+                    } else {
+                        console.log('静默同步成功，共', allItems.length, '个事项');
+                        this.lastSyncTime = new Date().toISOString();
+                        localStorage.setItem('lastSyncTime', this.lastSyncTime);
+                        resolve({ success: true, itemCount: allItems.length });
+                    }
+                } catch (error) {
+                    console.error('静默同步异常:', error);
+                    resolve({ success: false });
+                }
+            }, 500);
+        });
+    }
+
+    /**
+     * 静默从云端同步（无进度提示，用于实时更新）
+     */
+    async silentSyncFromCloud() {
+        if (!this.supabase || !this.currentUser) {
+            return { success: false };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('user_data')
+                .select('*')
+                .eq('user_id', this.currentUser.id)
+                .maybeSingle();
+
+            if (error || !data || !data.data) {
+                return { success: false };
+            }
+
+            // 同步设置
+            if (data.data.settings) {
+                const settings = data.data.settings;
+                if (settings.kimi_api_key_encrypted) {
+                    await db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted);
+                }
+                if (settings.kimi_api_key_set) {
+                    await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
+                }
+                if (settings.deepseek_api_key_encrypted) {
+                    await db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted);
+                }
+                if (settings.deepseek_api_key_set) {
+                    await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
+                }
+            }
+
+            // 同步事项
+            const cloudItems = data.data.items || [];
+            await db.clearAllItems();
+
+            let importedCount = 0;
+            for (const item of cloudItems) {
+                try {
+                    const { id, ...itemData } = item;
+                    await db.addItem(itemData);
+                    importedCount++;
+                } catch (e) {
+                    console.warn('导入项目失败:', e);
+                }
+            }
+
+            console.log('静默下载成功，共', importedCount, '个事项');
+            return { success: true, itemCount: importedCount };
+        } catch (error) {
+            console.error('静默下载异常:', error);
+            return { success: false };
         }
     }
 
@@ -180,6 +350,9 @@ class SyncManager {
             console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
 
+            // 初始化实时订阅
+            this.initRealtimeSubscription();
+
             return { success: true, message: '登录成功', user: this.currentUser };
         } catch (error) {
             console.error('登录失败:', error);
@@ -194,6 +367,7 @@ class SyncManager {
         try {
             if (this.supabase && this.currentUser) {
                 await this.syncToCloud().catch(e => console.warn('同步失败:', e));
+                this.unsubscribeRealtime();
                 await this.supabase.auth.signOut().catch(e => console.warn('登出失败:', e));
             }
             this.currentUser = null;

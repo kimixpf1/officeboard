@@ -263,6 +263,28 @@ class OfficeDashboard {
                 this.showSuccess(`已从云端同步 ${e.detail.syncResult.itemCount} 个事项`);
             }
         });
+
+        // 监听远程数据变更（实时同步）
+        document.addEventListener('syncRemoteDataChanged', async (e) => {
+            console.log('收到远程数据变更通知:', e.detail);
+            const result = await syncManager.silentSyncFromCloud();
+            if (result.success && result.itemCount > 0) {
+                await this.loadItems();
+                this.showSuccess(`已同步 ${result.itemCount} 个事项`);
+            }
+        });
+
+        // 页面获得焦点时自动同步
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && syncManager.isLoggedIn()) {
+                console.log('页面获得焦点，检查同步...');
+                const result = await syncManager.silentSyncFromCloud();
+                if (result.success && result.itemCount > 0) {
+                    await this.loadItems();
+                    this.showSuccess(`已同步 ${result.itemCount} 个事项`);
+                }
+            }
+        });
     }
 
     /**
@@ -1817,6 +1839,11 @@ class OfficeDashboard {
             this.hideModal('itemModal');
             await this.loadItems();
 
+            // 自动同步到云端
+            if (syncManager.isLoggedIn()) {
+                syncManager.silentSyncToCloud();
+            }
+
         } catch (error) {
             console.error('保存失败:', error);
             alert('保存失败: ' + error.message);
@@ -1830,6 +1857,10 @@ class OfficeDashboard {
         try {
             await db.updateItem(id, { completed });
             await this.loadItems();
+            // 自动同步到云端
+            if (syncManager.isLoggedIn()) {
+                syncManager.silentSyncToCloud();
+            }
         } catch (error) {
             console.error('更新失败:', error);
         }
@@ -1847,6 +1878,10 @@ class OfficeDashboard {
                 ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
             });
             await this.loadItems();
+            // 自动同步到云端
+            if (syncManager.isLoggedIn()) {
+                syncManager.silentSyncToCloud();
+            }
         } catch (error) {
             console.error('更新完成状态失败:', error);
             this.showError('更新失败: ' + error.message);
@@ -2009,6 +2044,10 @@ class OfficeDashboard {
             await db.deleteItem(this.deleteItemId);
             this.hideModal('confirmModal');
             await this.loadItems();
+            // 自动同步到云端
+            if (syncManager.isLoggedIn()) {
+                syncManager.silentSyncToCloud();
+            }
         } catch (error) {
             console.error('删除失败:', error);
             alert('删除失败，请重试');
