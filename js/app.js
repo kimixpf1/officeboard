@@ -410,6 +410,10 @@ class OfficeDashboard {
 
         try {
             await syncManager.logout();
+            // 清除本地数据
+            await db.clearAllItems();
+            // 刷新显示
+            await this.loadItems();
             this.showSuccess('已退出登录');
             this.updateLoginUI({ isLoggedIn: false });
         } catch (error) {
