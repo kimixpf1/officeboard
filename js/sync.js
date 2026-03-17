@@ -426,6 +426,69 @@ class SyncManager {
     }
 
     /**
+     * 修改密码
+     */
+    async changePassword(username, oldPassword, newPassword) {
+        console.log('=== 修改密码请求 ===');
+        console.log('用户名:', username);
+
+        // 等待初始化完成
+        await this.waitForInit();
+
+        if (!username || !oldPassword || !newPassword) {
+            throw new Error('请填写完整信息');
+        }
+
+        if (newPassword.length < 6) {
+            throw new Error('新密码至少需要6位');
+        }
+
+        if (!this.isSupabaseReady()) {
+            throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
+        }
+
+        const email = `${username}@office.local`;
+
+        try {
+            // 1. 先验证原密码（尝试登录）
+            console.log('验证原密码...');
+            const { data: loginData, error: loginError } = await this.supabase.auth.signInWithPassword({
+                email: email,
+                password: oldPassword
+            });
+
+            if (loginError) {
+                if (loginError.message.includes('Invalid login credentials')) {
+                    throw new Error('用户名或原密码错误');
+                }
+                throw new Error('验证失败: ' + loginError.message);
+            }
+
+            console.log('原密码验证成功，开始修改密码...');
+
+            // 2. 修改密码
+            const { error: updateError } = await this.supabase.auth.updateUser({
+                password: newPassword
+            });
+
+            if (updateError) {
+                throw new Error('修改密码失败: ' + updateError.message);
+            }
+
+            // 3. 登出（让用户用新密码重新登录）
+            await this.supabase.auth.signOut();
+            this.currentUser = null;
+            this.updateLoginUI();
+
+            console.log('密码修改成功');
+            return { success: true, message: '密码修改成功，请使用新密码登录' };
+        } catch (error) {
+            console.error('修改密码失败:', error);
+            throw error;
+        }
+    }
+
+    /**
      * 退出登录
      */
     async logout() {

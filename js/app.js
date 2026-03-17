@@ -247,6 +247,11 @@ class OfficeDashboard {
         document.getElementById('logoutBtn')?.addEventListener('click', () => this.handleLogout());
         document.getElementById('toggleLoginPassword')?.addEventListener('click', () => this.toggleLoginPasswordVisibility());
 
+        // 修改密码
+        document.getElementById('showChangePasswordBtn')?.addEventListener('click', () => this.showChangePasswordPanel());
+        document.getElementById('cancelChangePasswordBtn')?.addEventListener('click', () => this.hideChangePasswordPanel());
+        document.getElementById('changePasswordBtn')?.addEventListener('click', () => this.handleChangePassword());
+
         // 同步操作
         document.getElementById('syncUploadBtn')?.addEventListener('click', () => this.syncToCloud());
         document.getElementById('syncDownloadBtn')?.addEventListener('click', () => this.syncFromCloud());
@@ -439,6 +444,74 @@ class OfficeDashboard {
         const input = document.getElementById('loginPassword');
         if (input) {
             input.type = input.type === 'password' ? 'text' : 'password';
+        }
+    }
+
+    /**
+     * 显示修改密码面板
+     */
+    showChangePasswordPanel() {
+        const panel = document.getElementById('changePasswordPanel');
+        if (panel) {
+            panel.style.display = 'block';
+            // 预填充当前用户名
+            const usernameInput = document.getElementById('loginUsername');
+            const cpUsernameInput = document.getElementById('cpUsername');
+            if (usernameInput && cpUsernameInput) {
+                cpUsernameInput.value = usernameInput.value;
+            }
+        }
+    }
+
+    /**
+     * 隐藏修改密码面板
+     */
+    hideChangePasswordPanel() {
+        const panel = document.getElementById('changePasswordPanel');
+        if (panel) {
+            panel.style.display = 'none';
+            // 清空输入
+            document.getElementById('cpUsername').value = '';
+            document.getElementById('cpOldPassword').value = '';
+            document.getElementById('cpNewPassword').value = '';
+            document.getElementById('cpConfirmPassword').value = '';
+        }
+    }
+
+    /**
+     * 处理修改密码
+     */
+    async handleChangePassword() {
+        const username = document.getElementById('cpUsername').value.trim();
+        const oldPassword = document.getElementById('cpOldPassword').value;
+        const newPassword = document.getElementById('cpNewPassword').value;
+        const confirmPassword = document.getElementById('cpConfirmPassword').value;
+
+        if (!username || !oldPassword || !newPassword || !confirmPassword) {
+            this.showError('请填写完整信息');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            this.showError('两次输入的新密码不一致');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            this.showError('新密码至少需要6位');
+            return;
+        }
+
+        this.showLoading(true, '正在修改密码...');
+
+        try {
+            const result = await syncManager.changePassword(username, oldPassword, newPassword);
+            this.showSuccess(result.message);
+            this.hideChangePasswordPanel();
+        } catch (error) {
+            this.showError(error.message);
+        } finally {
+            this.showLoading(false);
         }
     }
 

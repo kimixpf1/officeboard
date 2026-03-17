@@ -522,6 +522,35 @@
                     <button id="registerBtn" class="btn-secondary" style="flex: 1;">注册</button>
                 </div>
 
+                <div style="text-align: center; margin-top: 10px;">
+                    <button id="showChangePasswordBtn" class="btn-text btn-sm">修改密码</button>
+                </div>
+
+                <!-- 修改密码面板 -->
+                <div id="changePasswordPanel" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 15px; font-size: 14px; color: var(--gray-700);">修改密码</h4>
+                    <div class="form-group">
+                        <label for="cpUsername">用户名</label>
+                        <input type="text" id="cpUsername" placeholder="请输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label for="cpOldPassword">原密码</label>
+                        <input type="password" id="cpOldPassword" placeholder="请输入原密码">
+                    </div>
+                    <div class="form-group">
+                        <label for="cpNewPassword">新密码</label>
+                        <input type="password" id="cpNewPassword" placeholder="请输入新密码（至少6位）">
+                    </div>
+                    <div class="form-group">
+                        <label for="cpConfirmPassword">确认新密码</label>
+                        <input type="password" id="cpConfirmPassword" placeholder="请再次输入新密码">
+                    </div>
+                    <div class="sync-actions" style="margin-top: 15px;">
+                        <button id="cancelChangePasswordBtn" class="btn-secondary" style="flex: 1;">取消</button>
+                        <button id="changePasswordBtn" class="btn-primary" style="flex: 1;">确认修改</button>
+                    </div>
+                </div>
+
                 <div class="sync-divider"></div>
 
                 <div class="sync-operations" style="grid-template-columns: 1fr 1fr;">
