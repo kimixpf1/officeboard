@@ -149,12 +149,17 @@ class KimiAPI {
 - completed: 是否完成（布尔值，默认false）
 
 【meeting】会议活动字段：
-- title: 会议标题（必填）
+- title: 会议标题（必填，简洁明确，如"研究工作会议"）
 - date: 日期（YYYY-MM-DD格式）
 - time: 时间（HH:MM格式）
 - location: 地点
 - attendees: 参会人员数组（如["张三","李四"]）
 - agenda: 议程摘要
+
+【参会人员和会议名称识别规则 - 非常重要】
+- "X召集Y开会/研究/座谈"：X和Y都是参会人员，会议名称为"研究工作会议"等
+- "X和Y开会讨论Z"：参会人员=[X,Y]，会议名称="Z讨论会"
+- 例如"钱局召集某某处长研究工作"：attendees=["钱局","某某处长"]，title="研究工作会议"
 
 【document】办文情况字段：
 - title: 文件标题（必填）
