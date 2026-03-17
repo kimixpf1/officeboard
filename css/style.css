@@ -541,8 +541,8 @@ body {
 .board-view {
     display: none;
     padding: var(--spacing-5) var(--spacing-6);
-    height: calc(100vh - 200px);
-    overflow: hidden;
+    min-height: calc(100vh - 200px);
+    overflow: visible;
 }
 
 .board-view.active {
@@ -564,7 +564,7 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-5);
-    height: calc(100% - 50px);
+    min-height: 300px;
     max-width: 1600px;
     margin: 0 auto;
 }
@@ -1582,10 +1582,17 @@ body {
     .board-container {
         grid-template-columns: 1fr;
         height: auto;
+        gap: var(--spacing-4);
     }
 
     .board-column {
-        min-height: 300px;
+        min-height: auto;
+        max-height: none;
+    }
+
+    .column-content {
+        max-height: none;
+        overflow: visible;
     }
 
     .view-controls {
@@ -1608,6 +1615,7 @@ body {
         flex-direction: column;
         gap: var(--spacing-3);
         text-align: center;
+        padding: var(--spacing-3);
     }
 
     .input-container {
@@ -1626,6 +1634,38 @@ body {
     .date-navigation {
         flex-wrap: wrap;
         justify-content: center;
+    }
+
+    /* 手机端看板优化 */
+    .board-container {
+        padding: var(--spacing-2);
+        gap: var(--spacing-3);
+    }
+
+    .board-column {
+        border-radius: var(--border-radius);
+    }
+
+    .column-header {
+        padding: var(--spacing-3);
+    }
+
+    .column-content {
+        padding: var(--spacing-3);
+    }
+
+    /* 卡片在手机端更紧凑 */
+    .card {
+        padding: var(--spacing-3);
+    }
+
+    .card-title {
+        font-size: 14px;
+    }
+
+    /* 确保所有内容可见 */
+    .board-column {
+        flex-shrink: 0;
     }
 }
 
