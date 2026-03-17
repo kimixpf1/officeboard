@@ -178,19 +178,26 @@ class SyncManager {
      * 静默同步到云端（无进度提示）
      */
     async silentSyncToCloud() {
+        console.log('=== silentSyncToCloud 被调用 ===');
+        console.log('Supabase:', !!this.supabase, 'currentUser:', !!this.currentUser);
+
         if (!this.supabase || !this.currentUser) {
+            console.warn('未登录或Supabase不可用，跳过同步');
             return { success: false };
         }
 
-        // 防抖：延迟500ms执行，避免频繁同步
+        // 防抖：延迟300ms执行，避免频繁同步
         if (this.syncTimeout) {
             clearTimeout(this.syncTimeout);
+            console.log('清除之前的同步定时器');
         }
 
         return new Promise((resolve) => {
             this.syncTimeout = setTimeout(async () => {
+                console.log('开始执行同步...');
                 try {
                     const allItems = await db.getAllItems();
+                    console.log('本地事项数量:', allItems.length);
 
                     const settings = {};
                     const kimiKey = await db.getSetting('kimi_api_key');
@@ -231,7 +238,7 @@ class SyncManager {
                     console.error('静默同步异常:', error);
                     resolve({ success: false });
                 }
-            }, 500);
+            }, 300);
         });
     }
 

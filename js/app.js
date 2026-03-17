@@ -1935,7 +1935,10 @@ class OfficeDashboard {
 
             // 自动同步到云端
             if (syncManager.isLoggedIn()) {
-                syncManager.silentSyncToCloud();
+                console.log('保存事项后触发同步...');
+                syncManager.silentSyncToCloud().then(result => {
+                    console.log('同步结果:', result);
+                });
             }
 
         } catch (error) {
