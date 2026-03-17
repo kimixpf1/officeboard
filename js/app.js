@@ -254,6 +254,15 @@ class OfficeDashboard {
         document.addEventListener('syncLoginStatusChanged', (e) => {
             this.updateLoginUI(e.detail);
         });
+
+        // 监听云端数据同步完成（恢复会话时）
+        document.addEventListener('syncDataLoaded', async (e) => {
+            console.log('收到云端数据同步通知:', e.detail);
+            await this.loadItems(); // 刷新数据
+            if (e.detail.syncResult && e.detail.syncResult.itemCount > 0) {
+                this.showSuccess(`已从云端同步 ${e.detail.syncResult.itemCount} 个事项`);
+            }
+        });
     }
 
     /**
@@ -322,7 +331,16 @@ class OfficeDashboard {
             const result = await syncManager.login(username, password);
             this.showSuccess(result.message);
             this.updateLoginUI({ isLoggedIn: true, username: username });
+
+            // 登录成功后立即从云端同步数据
+            this.showLoading(true, '正在同步数据...');
+            const syncResult = await syncManager.syncFromCloud((progress) => {
+                this.updateLoadingText(progress);
+            });
+            console.log('同步结果:', syncResult);
+
             await this.loadItems(); // 刷新数据
+            this.showSuccess(`登录成功！${syncResult.message}`);
         } catch (error) {
             this.showError(error.message);
         } finally {

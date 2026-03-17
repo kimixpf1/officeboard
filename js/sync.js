@@ -51,6 +51,17 @@ class SyncManager {
                     this.currentUser = data.session.user;
                     console.log('已恢复登录状态:', this.currentUser.email);
                     this.updateLoginUI();
+
+                    // 自动从云端同步数据
+                    console.log('开始自动同步云端数据...');
+                    const syncResult = await this.syncFromCloud();
+                    console.log('自动同步结果:', syncResult);
+
+                    // 通知应用刷新数据
+                    const event = new CustomEvent('syncDataLoaded', {
+                        detail: { syncResult }
+                    });
+                    document.dispatchEvent(event);
                 }
             }
         } catch (error) {
@@ -168,9 +179,6 @@ class SyncManager {
             this.currentUser = data.user;
             console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
-
-            // 异步同步数据
-            this.syncFromCloud().catch(e => console.warn('同步失败:', e));
 
             return { success: true, message: '登录成功', user: this.currentUser };
         } catch (error) {
