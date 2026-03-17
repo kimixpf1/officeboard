@@ -218,7 +218,7 @@ class CalendarView {
             });
 
             html += `
-                <div class="week-cell ${isToday ? 'today' : ''}" data-date="${dateStr}" onclick="window.calendarView.goToDate('${dateStr}')">
+                <div class="week-cell ${isToday ? 'today' : ''}" data-date="${dayLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
                     ${dayItems.map(item => this.renderCalendarItem(item, true)).join('')}
                 </div>
             `;
@@ -298,8 +298,9 @@ class CalendarView {
                 return false;
             });
 
+            const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
             html += `
-                <div class="month-cell ${isToday ? 'today' : ''}" data-date="${dateStr}" onclick="window.calendarView.goToDate('${dateStr}')">
+                <div class="month-cell ${isToday ? 'today' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
                     <div class="month-cell-date">${day}</div>
                     ${dayItems.map(item => this.renderCalendarItem(item, true)).join('')}
                 </div>
