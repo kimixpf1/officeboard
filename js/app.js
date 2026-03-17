@@ -58,6 +58,9 @@ class OfficeDashboard {
             }, 1000);
 
             console.log('智能工作面板初始化完成');
+
+            // 启动会议自动完成检查
+            this.startMeetingAutoCompleteCheck();
         } catch (error) {
             console.error('初始化失败:', error);
             this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
@@ -1885,6 +1888,74 @@ class OfficeDashboard {
         } catch (error) {
             console.error('更新完成状态失败:', error);
             this.showError('更新失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 启动会议自动完成检查
+     * 会议开始后30分钟自动标记为已完成
+     */
+    startMeetingAutoCompleteCheck() {
+        // 立即检查一次
+        this.checkMeetingAutoComplete();
+
+        // 每分钟检查一次
+        setInterval(() => {
+            this.checkMeetingAutoComplete();
+        }, 60000);
+    }
+
+    /**
+     * 检查是否有会议需要自动完成
+     */
+    async checkMeetingAutoComplete() {
+        try {
+            const now = new Date();
+            const allItems = await db.getAllItems();
+
+            // 筛选未完成的会议
+            const incompleteMeetings = allItems.filter(item =>
+                item.type === 'meeting' && !item.completed
+            );
+
+            for (const meeting of incompleteMeetings) {
+                if (meeting.date && meeting.time) {
+                    // 构建会议开始时间
+                    const meetingStart = new Date(`${meeting.date}T${meeting.time}`);
+
+                    // 计算会议开始后30分钟的时间点
+                    const autoCompleteTime = new Date(meetingStart.getTime() + 30 * 60 * 1000);
+
+                    // 如果当前时间已经超过会议开始后30分钟
+                    if (now >= autoCompleteTime) {
+                        console.log(`会议 "${meeting.title}" 已自动完成`);
+                        await db.updateItem(meeting.id, {
+                            completed: true,
+                            completedAt: now.toISOString()
+                        });
+
+                        // 同步到云端
+                        if (syncManager.isLoggedIn()) {
+                            syncManager.silentSyncToCloud();
+                        }
+                    }
+                }
+            }
+
+            // 如果有会议被标记完成，刷新显示
+            const updatedItems = await db.getAllItems();
+            const hasNewCompleted = updatedItems.some(item =>
+                item.type === 'meeting' &&
+                item.completed &&
+                item.completedAt &&
+                new Date(item.completedAt) > new Date(now.getTime() - 120000) // 2分钟内完成的
+            );
+
+            if (hasNewCompleted) {
+                await this.loadItems();
+            }
+        } catch (error) {
+            console.error('检查会议自动完成失败:', error);
         }
     }
 
