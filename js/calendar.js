@@ -181,7 +181,7 @@ class CalendarView {
         let html = '<div class="week-view">';
 
         // 表头 - 显示x月第x周
-        html += `<div class="week-header week-title" style="grid-column:1;">${monthLabel}</div>`;
+        html += `<div class="week-header week-title">${monthLabel}</div>`;
         for (let i = 0; i < 7; i++) {
             const date = new Date(weekStart);
             date.setDate(date.getDate() + i);
@@ -192,13 +192,13 @@ class CalendarView {
             html += `<div class="week-header ${isToday ? 'today' : ''}">${dayLabel}</div>`;
         }
 
-        // 按天显示事项（不按时间段划分）
-        html += '<div class="week-cell" style="background:#f9fafb;font-weight:500;">全天</div>';
+        // 按天显示事项
         for (let i = 0; i < 7; i++) {
             const date = new Date(weekStart);
             date.setDate(date.getDate() + i);
             const dateStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
             const isToday = dateStr === todayStr;
+            const dayLabel = `${weekDays[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
             // 修复：支持跨天会议显示
             const dayItems = items.filter(item => {
@@ -299,12 +299,22 @@ class CalendarView {
             });
 
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
-            html += `
-                <div class="month-cell ${isToday ? 'today' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
-                    <div class="month-cell-date">${day}</div>
-                    ${dayItems.map(item => this.renderCalendarItem(item, true)).join('')}
-                </div>
-            `;
+            // 只显示有事项的日期，或者今天
+            if (dayItems.length > 0 || isToday) {
+                html += `
+                    <div class="month-cell ${isToday ? 'today' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
+                        <div class="month-cell-date">${day}</div>
+                        ${dayItems.map(item => this.renderCalendarItem(item, true)).join('')}
+                    </div>
+                `;
+            } else {
+                // 空日期只显示日期数字
+                html += `
+                    <div class="month-cell empty-cell" data-date="${fullDateLabel}">
+                        <div class="month-cell-date">${day}</div>
+                    </div>
+                `;
+            }
         }
 
         // 下月空白
@@ -325,6 +335,23 @@ class CalendarView {
         const typeLabels = { todo: '待办', meeting: '会议', document: '文件' };
         const typeLabel = typeLabels[item.type] || item.type;
 
+        // 会议特殊格式：【参会人员】会议名称-时间-地点
+        let displayTitle = item.title;
+        if (item.type === 'meeting') {
+            const parts = [];
+            if (item.attendees && item.attendees.length > 0) {
+                parts.push(`【${item.attendees.join('、')}】`);
+            }
+            parts.push(item.title);
+            if (item.time) {
+                parts.push(`-${item.time}`);
+            }
+            if (item.location) {
+                parts.push(`-${item.location}`);
+            }
+            displayTitle = parts.join('');
+        }
+
         if (compact) {
             return `
                 <div class="calendar-item ${typeClass}" data-id="${item.id}" style="
@@ -335,11 +362,10 @@ class CalendarView {
                     background: ${this.getTypeColor(item.type, 0.1)};
                     border-left: 3px solid ${this.getTypeColor(item.type)};
                     cursor: pointer;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                " title="${item.title}">
-                    [${typeLabel}] ${item.title}
+                    white-space: normal;
+                    line-height: 1.4;
+                " title="${displayTitle}">
+                    [${typeLabel}] ${displayTitle}
                 </div>
             `;
         }
@@ -353,9 +379,9 @@ class CalendarView {
                 border-left: 4px solid ${this.getTypeColor(item.type)};
                 cursor: pointer;
             ">
-                <div style="font-weight:600;font-size:13px;">${item.title}</div>
-                ${item.time ? `<div style="font-size:11px;color:#666;">⏰ ${item.time}</div>` : ''}
-                ${item.location ? `<div style="font-size:11px;color:#666;">📍 ${item.location}</div>` : ''}
+                <div style="font-weight:600;font-size:13px;">${displayTitle}</div>
+                ${item.type !== 'meeting' && item.time ? `<div style="font-size:11px;color:#666;">⏰ ${item.time}</div>` : ''}
+                ${item.type !== 'meeting' && item.location ? `<div style="font-size:11px;color:#666;">📍 ${item.location}</div>` : ''}
             </div>
         `;
     }

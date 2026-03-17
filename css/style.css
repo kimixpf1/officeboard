@@ -1864,15 +1864,17 @@ body {
         display: none;
     }
 
+    .month-cell.empty-cell {
+        display: none;
+    }
+
     .month-cell.today {
         background: var(--primary-light);
         border-color: var(--primary-color);
     }
 
     .month-cell-date {
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: var(--spacing-2);
+        display: none;
     }
 
     .month-cell::before {
