@@ -427,12 +427,17 @@ class SyncManager {
                 }
             }
 
-            // 同步事项
+            // 同步事项 - 带去重逻辑
             const cloudItems = data.data.items || [];
+            
+            // 先对云端数据本身去重
+            const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
+            console.log('云端数据去重:', cloudItems.length, '->', deduplicatedCloudItems.length);
+            
             await db.clearAllItems();
 
             let importedCount = 0;
-            for (const item of cloudItems) {
+            for (const item of deduplicatedCloudItems) {
                 try {
                     const { id, ...itemData } = item;
                     await db.addItem(itemData);
@@ -453,6 +458,62 @@ class SyncManager {
             console.error('静默下载异常:', error);
             return { success: false };
         }
+    }
+
+    /**
+     * 对事项列表进行去重
+     * 用于云端数据本身的去重
+     */
+    deduplicateItems(items) {
+        const result = [];
+        const seen = new Map(); // 用于跟踪已处理的事项
+
+        for (const item of items) {
+            const key = this.getItemDedupKey(item);
+            
+            if (seen.has(key)) {
+                // 已存在相似事项，合并参会人员（如果是会议）
+                const existing = seen.get(key);
+                if (item.type === 'meeting' && item.attendees && existing.attendees) {
+                    const mergedAttendees = [...new Set([...existing.attendees, ...item.attendees])];
+                    existing.attendees = mergedAttendees;
+                    console.log('云端数据去重合并参会人员:', item.title);
+                }
+                continue;
+            }
+            
+            seen.set(key, item);
+            result.push(item);
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取事项的去重键
+     */
+    getItemDedupKey(item) {
+        const title = (item.title || '').trim().toLowerCase();
+        
+        // 提取关键词（去掉常见词）
+        const extractKeywords = (t) => {
+            return t.replace(/会议|研究|工作|座谈|讨论|调研|培训|学习/g, '').trim();
+        };
+
+        if (item.type === 'meeting') {
+            // 会议：关键词 + 日期
+            const keywords = extractKeywords(title);
+            return `meeting:${keywords}:${item.date || ''}`;
+        } else if (item.type === 'todo') {
+            // 待办：标题 + 截止日期
+            return `todo:${title}:${item.deadline || ''}`;
+        } else if (item.type === 'document') {
+            // 办文：文号或标题
+            return `doc:${item.docNumber || title}`;
+        }
+        
+        // 其他类型：类型 + 标题
+        return `${item.type}:${title}`;
     }
 
     /**
@@ -833,14 +894,50 @@ class SyncManager {
             const cloudItems = data.data.items || [];
             console.log('云端事项数量:', cloudItems.length);
 
+            // 先对云端数据本身去重
+            const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
+            console.log('云端数据去重后:', deduplicatedCloudItems.length, '个事项');
+
             if (mergeStrategy === 'replace') {
                 await db.clearAllItems();
             }
 
+            // 获取本地已有数据（用于与云端数据去重）
+            const localItems = mergeStrategy !== 'replace' ? await db.getAllItems() : [];
+            
             let importedCount = 0;
-            for (const item of cloudItems) {
+            let mergedCount = 0;
+            let skippedCount = 0;
+            
+            for (const item of deduplicatedCloudItems) {
                 try {
                     const { id, ...itemData } = item;
+                    
+                    // 检查是否与本地数据重复
+                    if (mergeStrategy !== 'replace' && localItems.length > 0) {
+                        const duplicateInfo = this.checkDuplicateWithLocal(item, localItems);
+                        
+                        if (duplicateInfo.isDuplicate) {
+                            // 会议类型：合并参会人员
+                            if (item.type === 'meeting' && duplicateInfo.existingItem) {
+                                const existing = duplicateInfo.existingItem;
+                                const cloudAttendees = item.attendees || [];
+                                const localAttendees = existing.attendees || [];
+                                const mergedAttendees = [...new Set([...localAttendees, ...cloudAttendees])];
+                                
+                                if (mergedAttendees.length > localAttendees.length) {
+                                    await db.updateItem(existing.id, { attendees: mergedAttendees });
+                                    mergedCount++;
+                                    console.log('合并参会人员:', item.title);
+                                }
+                            } else {
+                                skippedCount++;
+                                console.log('跳过重复事项:', item.title);
+                            }
+                            continue;
+                        }
+                    }
+                    
                     await db.addItem(itemData);
                     importedCount++;
                 } catch (e) {
@@ -851,11 +948,67 @@ class SyncManager {
             this.lastSyncTime = new Date().toISOString();
             localStorage.setItem('lastSyncTime', this.lastSyncTime);
             if (progressCallback) progressCallback('同步完成');
-            return { success: true, message: `从云端同步了 ${importedCount} 个事项`, itemCount: importedCount };
+            
+            let message = `从云端同步了 ${importedCount} 个事项`;
+            if (mergedCount > 0) message += `，合并了 ${mergedCount} 个会议的参会人员`;
+            if (skippedCount > 0) message += `，跳过了 ${skippedCount} 个重复事项`;
+            
+            return { success: true, message, itemCount: importedCount, mergedCount, skippedCount };
         } catch (error) {
             console.error('从云端同步失败:', error);
             return { success: false, message: '同步失败: ' + error.message };
         }
+    }
+
+    /**
+     * 检查云端事项是否与本地数据重复
+     */
+    checkDuplicateWithLocal(cloudItem, localItems) {
+        const cloudTitle = (cloudItem.title || '').trim().toLowerCase();
+        const result = { isDuplicate: false, existingItem: null };
+
+        // 提取关键词
+        const extractKeywords = (t) => {
+            return t.replace(/会议|研究|工作|座谈|讨论|调研|培训|学习/g, '').trim();
+        };
+
+        for (const local of localItems) {
+            if (local.type !== cloudItem.type) continue;
+
+            const localTitle = (local.title || '').trim().toLowerCase();
+
+            if (cloudItem.type === 'meeting') {
+                const cloudKeywords = extractKeywords(cloudTitle);
+                const localKeywords = extractKeywords(localTitle);
+                
+                // 关键词匹配 + 同一天 = 重复
+                const keywordMatch = cloudKeywords === localKeywords ||
+                                     cloudKeywords.includes(localKeywords) ||
+                                     localKeywords.includes(cloudKeywords) ||
+                                     (cloudTitle.length > 2 && localTitle.length > 2 &&
+                                      (cloudTitle.includes(localTitle) || localTitle.includes(cloudTitle)));
+
+                if (keywordMatch && local.date === cloudItem.date) {
+                    return { isDuplicate: true, existingItem: local };
+                }
+            } else if (cloudItem.type === 'todo') {
+                const titleMatch = cloudTitle === localTitle ||
+                                   cloudTitle.includes(localTitle) ||
+                                   localTitle.includes(cloudTitle);
+                if (titleMatch && local.deadline === cloudItem.deadline) {
+                    return { isDuplicate: true, existingItem: local };
+                }
+            } else if (cloudItem.type === 'document') {
+                if (cloudItem.docNumber && local.docNumber === cloudItem.docNumber) {
+                    return { isDuplicate: true, existingItem: local };
+                }
+                if (cloudTitle === localTitle && cloudTitle.length > 3) {
+                    return { isDuplicate: true, existingItem: local };
+                }
+            }
+        }
+
+        return result;
     }
 
     /**
