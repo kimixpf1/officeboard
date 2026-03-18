@@ -17,6 +17,11 @@ class SyncManager {
         this.syncTimeout = null;
         this.initPromise = null;
 
+        // 智能同步标记
+        this.hasLocalChanges = false;  // 本地是否有未同步的改动
+        this.lastLocalChangeTime = null;  // 本地最后改动时间
+        this.lastCloudSyncTime = null;  // 云端最后同步时间
+
         // 初始化Supabase
         this.initPromise = this.initSupabase();
     }
@@ -65,10 +70,19 @@ class SyncManager {
                         console.log('已恢复登录状态:', this.currentUser.email);
                         this.updateLoginUI();
 
-                        // 自动从云端同步数据
-                        console.log('开始自动同步云端数据...');
+                        // 智能同步策略：登录时先上传本地数据，再下载云端数据合并
+                        console.log('开始智能同步...');
+
+                        // 1. 先上传本地数据到云端（保护本地新数据）
+                        const localItems = await db.getAllItems();
+                        if (localItems.length > 0) {
+                            console.log('本地有数据，先上传到云端保护...');
+                            await this.silentSyncToCloud();
+                        }
+
+                        // 2. 再从云端同步数据
                         const syncResult = await this.syncFromCloud();
-                        console.log('自动同步结果:', syncResult);
+                        console.log('同步结果:', syncResult);
 
                         // 通知应用刷新数据
                         const event = new CustomEvent('syncDataLoaded', {
@@ -76,7 +90,7 @@ class SyncManager {
                         });
                         document.dispatchEvent(event);
 
-                        // 启动定时同步（每30秒）
+                        // 启动定时同步
                         this.startPeriodicSync();
 
                         // 初始化实时订阅
@@ -93,7 +107,7 @@ class SyncManager {
     }
 
     /**
-     * 启动定时同步
+     * 启动定时同步（智能同步策略）
      */
     startPeriodicSync() {
         // 清除已有的定时器
@@ -101,22 +115,85 @@ class SyncManager {
             clearInterval(this.periodicSyncTimer);
         }
 
-        // 每30秒同步一次
+        // 每10分钟同步一次（延长同步间隔，避免频繁同步覆盖本地新数据）
         this.periodicSyncTimer = setInterval(async () => {
             if (this.isLoggedIn()) {
                 console.log('定时同步检查...');
-                const result = await this.silentSyncFromCloud();
-                if (result.success && result.itemCount > 0) {
-                    // 通知应用刷新
-                    const event = new CustomEvent('syncRemoteDataChanged', {
-                        detail: { itemCount: result.itemCount }
-                    });
-                    document.dispatchEvent(event);
+
+                // 智能同步策略：
+                // 1. 如果本地有未同步的改动，只上传，不下载（避免覆盖本地新数据）
+                // 2. 如果本地没有改动，检查云端是否有更新，有更新才下载
+                if (this.hasLocalChanges) {
+                    console.log('本地有未同步改动，执行上传...');
+                    await this.silentSyncToCloud();
+                    this.hasLocalChanges = false;
+                } else {
+                    // 检查云端是否有更新
+                    const cloudUpdate = await this.checkCloudUpdate();
+                    if (cloudUpdate.hasUpdate) {
+                        console.log('云端有更新，执行下载...');
+                        const result = await this.silentSyncFromCloud();
+                        if (result.success && result.itemCount > 0) {
+                            // 通知应用刷新
+                            const event = new CustomEvent('syncRemoteDataChanged', {
+                                detail: { itemCount: result.itemCount }
+                            });
+                            document.dispatchEvent(event);
+                        }
+                    } else {
+                        console.log('云端无更新，跳过同步');
+                    }
                 }
             }
-        }, 30000); // 30秒
+        }, 600000); // 10分钟（600000ms）
 
-        console.log('定时同步已启动（每30秒）');
+        console.log('定时同步已启动（每10分钟，智能模式）');
+    }
+
+    /**
+     * 标记本地有改动
+     */
+    markLocalChange() {
+        this.hasLocalChanges = true;
+        this.lastLocalChangeTime = new Date().toISOString();
+        console.log('标记本地改动:', this.lastLocalChangeTime);
+    }
+
+    /**
+     * 检查云端是否有更新
+     */
+    async checkCloudUpdate() {
+        if (!this.supabase || !this.currentUser) {
+            return { hasUpdate: false };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('user_data')
+                .select('updated_at')
+                .eq('user_id', this.currentUser.id)
+                .maybeSingle();
+
+            if (error || !data) {
+                return { hasUpdate: false };
+            }
+
+            const cloudTime = new Date(data.updated_at);
+            const lastSyncTime = this.lastCloudSyncTime ? new Date(this.lastCloudSyncTime) : new Date(0);
+
+            // 如果云端更新时间比上次同步时间新，说明有更新
+            const hasUpdate = cloudTime > lastSyncTime;
+            console.log('云端更新检查:', {
+                cloudTime: data.updated_at,
+                lastSyncTime: this.lastCloudSyncTime,
+                hasUpdate
+            });
+
+            return { hasUpdate, cloudTime: data.updated_at };
+        } catch (error) {
+            console.error('检查云端更新失败:', error);
+            return { hasUpdate: false };
+        }
     }
 
     /**
@@ -186,7 +263,7 @@ class SyncManager {
             return { success: false };
         }
 
-        // 防抖：延迟300ms执行，避免频繁同步
+        // 防抖：延迟500ms执行，避免频繁同步（从300ms增加到500ms）
         if (this.syncTimeout) {
             clearTimeout(this.syncTimeout);
             console.log('清除之前的同步定时器');
@@ -210,8 +287,9 @@ class SyncManager {
                     if (deepseekKey) settings.deepseek_api_key = deepseekKey;
                     if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
 
+                    const syncTime = new Date().toISOString();
                     const syncData = {
-                        sync_time: new Date().toISOString(),
+                        sync_time: syncTime,
                         items: allItems,
                         settings: settings,
                         device_info: navigator.userAgent
@@ -222,7 +300,7 @@ class SyncManager {
                         .upsert({
                             user_id: this.currentUser.id,
                             data: syncData,
-                            updated_at: new Date().toISOString()
+                            updated_at: syncTime
                         }, { onConflict: 'user_id' });
 
                     if (error) {
@@ -230,7 +308,9 @@ class SyncManager {
                         resolve({ success: false });
                     } else {
                         console.log('静默同步成功，共', allItems.length, '个事项');
-                        this.lastSyncTime = new Date().toISOString();
+                        this.lastSyncTime = syncTime;
+                        this.lastCloudSyncTime = syncTime;  // 记录云端同步时间
+                        this.hasLocalChanges = false;  // 清除本地修改标记
                         localStorage.setItem('lastSyncTime', this.lastSyncTime);
                         resolve({ success: true, itemCount: allItems.length });
                     }
@@ -238,7 +318,7 @@ class SyncManager {
                     console.error('静默同步异常:', error);
                     resolve({ success: false });
                 }
-            }, 300);
+            }, 500);  // 从300ms增加到500ms
         });
     }
 
@@ -293,6 +373,11 @@ class SyncManager {
                 } catch (e) {
                     console.warn('导入项目失败:', e);
                 }
+            }
+
+            // 更新云端同步时间
+            if (data.updated_at) {
+                this.lastCloudSyncTime = data.updated_at;
             }
 
             console.log('静默下载成功，共', importedCount, '个事项');
