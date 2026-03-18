@@ -697,67 +697,27 @@
     <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <!-- docx库 - Word文档生成 (备用多个源) -->
     <script src="https://unpkg.com/docx@8.2.0/build/index.umd.js"></script>
-    <!-- Supabase客户端（用于云端同步）- 多个备用源 -->
+    
+    <!-- Supabase客户端（用于云端同步）- 直接同步加载，确保在其他脚本之前 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"
+            onerror="this.onerror=null; this.src='https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js'"></script>
     <script>
-        // 全局标记Supabase加载状态
-        window.supabaseLoaded = false;
-        window.supabaseLoadError = null;
-
-        // 尝试加载 Supabase，使用多个备用源
-        (function() {
-            const sources = [
-                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js',
-                'https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js',
-                'https://cdn.bootcdn.net/ajax/libs/supabase-js/2.39.0/supabase.min.js'
-            ];
-            
-            let attemptCount = 0;
-            const maxAttempts = sources.length;
-            
-            function loadScript(src) {
-                return new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = src;
-                    script.async = false; // 确保按顺序加载
-                    
-                    script.onload = function() {
-                        console.log('Supabase库加载成功:', src);
-                        window.supabaseLoaded = true;
-                        resolve();
-                    };
-                    
-                    script.onerror = function() {
-                        console.warn('加载失败:', src);
-                        attemptCount++;
-                        if (attemptCount < maxAttempts) {
-                            // 尝试下一个源
-                            loadScript(sources[attemptCount]).then(resolve).catch(reject);
-                        } else {
-                            window.supabaseLoadError = '所有CDN源都加载失败';
-                            reject(new Error('所有CDN源都加载失败'));
-                        }
-                    };
-                    
-                    document.head.appendChild(script);
-                });
-            }
-            
-            // 从第一个源开始加载
-            loadScript(sources[0]).catch(function(err) {
-                console.error('Supabase加载失败:', err);
-                window.supabaseLoadError = err.message;
-            });
-        })();
+        // 检查Supabase是否加载成功
+        if (typeof window.supabase !== 'undefined') {
+            console.log('Supabase库加载成功');
+        } else {
+            console.error('Supabase库加载失败');
+        }
     </script>
     
-    <!-- 其他脚本 - 使用defer确保在Supabase之后加载 -->
-    <script defer src="js/db.js?v=5"></script>
-    <script defer src="js/crypto.js?v=5"></script>
-    <script defer src="js/kimi.js?v=5"></script>
-    <script defer src="js/ocr.js?v=5"></script>
-    <script defer src="js/report.js?v=5"></script>
-    <script defer src="js/calendar.js?v=5"></script>
-    <script defer src="js/sync.js?v=5"></script>
-    <script defer src="js/app.js?v=5"></script>
+    <!-- 其他脚本 -->
+    <script src="js/db.js?v=6"></script>
+    <script src="js/crypto.js?v=6"></script>
+    <script src="js/kimi.js?v=6"></script>
+    <script src="js/ocr.js?v=6"></script>
+    <script src="js/report.js?v=6"></script>
+    <script src="js/calendar.js?v=6"></script>
+    <script src="js/sync.js?v=6"></script>
+    <script src="js/app.js?v=6"></script>
 </body>
 </html>

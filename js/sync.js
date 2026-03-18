@@ -54,32 +54,16 @@ class SyncManager {
      */
     async initSupabase() {
         console.log('=== Supabase 初始化开始 ===');
+        console.log('window.supabase 类型:', typeof window.supabase);
 
-        // 等待 Supabase 库加载 - 增加等待时间和检查
-        let retryCount = 0;
-        const maxRetries = 100; // 增加到10秒
-        
-        while (typeof window.supabase === 'undefined' && retryCount < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            retryCount++;
-            
-            // 每10次记录一次日志
-            if (retryCount % 10 === 0) {
-                console.log(`等待Supabase库加载... ${retryCount * 100}ms`);
-            }
-        }
-
+        // 直接检查 Supabase 是否已加载（现在使用同步加载）
         if (typeof window.supabase === 'undefined') {
-            this.initError = window.supabaseLoadError || 'Supabase库未加载，请检查网络连接后刷新页面';
+            this.initError = 'Supabase库未加载，请刷新页面重试。如果问题持续，请检查网络连接。';
             console.error(this.initError);
-            console.log('加载状态:', {
-                supabaseLoaded: window.supabaseLoaded,
-                supabaseLoadError: window.supabaseLoadError
-            });
             return;
         }
 
-        console.log('Supabase库加载完成，等待时间:', retryCount * 100, 'ms');
+        console.log('Supabase库已加载，开始创建客户端...');
 
         try {
             this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey, {
@@ -701,36 +685,18 @@ class SyncManager {
             throw new Error('请输入用户名和密码');
         }
 
+        // 检查Supabase库是否加载
+        if (typeof window.supabase === 'undefined') {
+            throw new Error('网络服务未加载，请刷新页面重试。');
+        }
+
         // 等待初始化完成
         await this.waitForInit();
         console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
-        console.log('初始化错误:', this.initError);
-
-        // 检查Supabase是否加载
-        if (typeof window.supabase === 'undefined') {
-            console.error('Supabase库未加载，尝试重新加载...');
-            
-            // 尝试重新加载
-            await this.initSupabase();
-            
-            // 再次检查
-            if (typeof window.supabase === 'undefined') {
-                throw new Error('网络服务加载失败，请刷新页面重试。如果问题持续，可能是网络连接问题或CDN服务暂时不可用。');
-            }
-        }
 
         if (!this.isSupabaseReady()) {
-            // 提供更详细的错误信息
-            if (this.initError) {
-                throw new Error(this.initError);
-            }
-            // 尝试重新初始化
-            console.log('尝试重新初始化 Supabase...');
-            await this.initSupabase();
-            
-            if (!this.isSupabaseReady()) {
-                throw new Error('网络服务不可用，请刷新页面后重试。如果问题持续，请检查网络连接或尝试使用其他浏览器。');
-            }
+            const errorMsg = this.initError || '网络服务初始化失败，请刷新页面重试。';
+            throw new Error(errorMsg);
         }
 
         const email = `${username}@office.local`;
