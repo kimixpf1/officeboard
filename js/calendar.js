@@ -11,6 +11,44 @@ class CalendarView {
     }
 
     /**
+     * 排序事项：先按类型（待办→会议→文件），再按时间
+     */
+    sortItems(items) {
+        // 类型排序权重
+        const typeOrder = { todo: 1, meeting: 2, document: 3 };
+        
+        return items.sort((a, b) => {
+            // 先按类型排序
+            const typeA = typeOrder[a.type] || 99;
+            const typeB = typeOrder[b.type] || 99;
+            if (typeA !== typeB) {
+                return typeA - typeB;
+            }
+            
+            // 同类型按时间排序
+            const timeA = this.getItemTime(a);
+            const timeB = this.getItemTime(b);
+            return timeA.localeCompare(timeB);
+        });
+    }
+
+    /**
+     * 获取事项的时间字符串用于排序
+     */
+    getItemTime(item) {
+        switch (item.type) {
+            case 'todo':
+                return item.deadline ? item.deadline : '99:99';
+            case 'meeting':
+                return item.time ? item.time : '99:99';
+            case 'document':
+                return item.createdAt ? item.createdAt.substring(11, 16) : '99:99';
+            default:
+                return '99:99';
+        }
+    }
+
+    /**
      * 设置当前日期
      */
     setDate(date) {
@@ -233,11 +271,14 @@ class CalendarView {
                 return false;
             });
 
+            // 排序：待办→会议→文件，再按时间
+            const sortedItems = this.sortItems(dayItems);
+
             html += `
                 <div class="week-cell ${isToday ? 'today' : ''}" 
                      data-date="${dateStr}" 
                      onclick="window.calendarView.goToDate('${dateStr}')">
-                    ${dayItems.length > 0 ? dayItems.map(item => this.renderCalendarItem(item, true)).join('') : '<div style="color: #ccc; text-align: center; padding-top: 20px;">-</div>'}
+                    ${sortedItems.length > 0 ? sortedItems.map(item => this.renderCalendarItem(item, true)).join('') : '<div style="color: #ccc; text-align: center; padding-top: 20px;">-</div>'}
                 </div>
             `;
         }
@@ -332,13 +373,16 @@ class CalendarView {
                 return false;
             });
 
+            // 排序：待办→会议→文件，再按时间
+            const sortedItems = this.sortItems(dayItems);
+
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
             // 只显示有事项的日期，或者今天
-            if (dayItems.length > 0 || isToday) {
+            if (sortedItems.length > 0 || isToday) {
                 html += `
                     <div class="month-cell ${isToday ? 'today' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
                         <div class="month-cell-date">${day}</div>
-                        ${dayItems.map(item => this.renderCalendarItem(item, true)).join('')}
+                        ${sortedItems.map(item => this.renderCalendarItem(item, true)).join('')}
                     </div>
                 `;
             } else {
