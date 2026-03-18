@@ -42,11 +42,22 @@ class SyncManager {
         console.log('=== Supabase 初始化开始 ===');
         console.log('URL:', this.supabaseUrl);
 
+        // 等待 Supabase 库加载
+        let retryCount = 0;
+        const maxRetries = 50; // 最多等待5秒
+        
+        while (typeof window.supabase === 'undefined' && retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retryCount++;
+        }
+
         if (typeof window.supabase === 'undefined') {
-            this.initError = 'Supabase库未加载';
+            this.initError = 'Supabase库未加载，请检查网络连接';
             console.error(this.initError);
             return;
         }
+
+        console.log('Supabase库加载完成，等待时间:', retryCount * 100, 'ms');
 
         try {
             this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey, {
