@@ -534,16 +534,27 @@ class SyncManager {
         console.log('=== 登录请求 ===');
         console.log('用户名:', username);
 
-        // 等待初始化完成
-        await this.waitForInit();
-        console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
-
         if (!username || !password) {
             throw new Error('请输入用户名和密码');
         }
 
+        // 等待初始化完成
+        await this.waitForInit();
+        console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
+        console.log('初始化错误:', this.initError);
+
         if (!this.isSupabaseReady()) {
-            throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
+            // 提供更详细的错误信息
+            if (this.initError) {
+                throw new Error(this.initError);
+            }
+            // 尝试重新初始化
+            console.log('尝试重新初始化 Supabase...');
+            await this.initSupabase();
+            
+            if (!this.isSupabaseReady()) {
+                throw new Error('网络服务不可用，请刷新页面后重试。如果问题持续，请检查网络连接或尝试使用其他浏览器。');
+            }
         }
 
         const email = `${username}@office.local`;

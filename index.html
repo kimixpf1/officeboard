@@ -670,8 +670,36 @@
     <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <!-- docx库 - Word文档生成 (备用多个源) -->
     <script src="https://unpkg.com/docx@8.2.0/build/index.umd.js"></script>
-    <!-- Supabase客户端（用于云端同步） -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <!-- Supabase客户端（用于云端同步）- 多个备用源 -->
+    <script>
+        // 尝试加载 Supabase，使用多个备用源
+        (function() {
+            const sources = [
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js',
+                'https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js',
+                'https://cdn.bootcdn.net/ajax/libs/supabase-js/2.39.0/supabase.min.js'
+            ];
+            
+            function loadScript(src, callback) {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = callback;
+                script.onerror = function() {
+                    console.warn('加载失败:', src);
+                    if (sources.length > 0) {
+                        loadScript(sources.shift(), callback);
+                    }
+                };
+                document.head.appendChild(script);
+            }
+            
+            // 从第一个源开始加载
+            const firstSource = sources.shift();
+            loadScript(firstSource, function() {
+                console.log('Supabase库加载成功');
+            });
+        })();
+    </script>
     <script src="js/db.js?v=4"></script>
     <script src="js/crypto.js?v=4"></script>
     <script src="js/kimi.js?v=4"></script>

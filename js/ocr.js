@@ -1722,8 +1722,27 @@ class OCRManager {
             const mergedItems = [];
             const skippedItems = [];
 
+            // 用于跟踪本次识别中已处理的事项（防止同一图片中的重复）
+            const processedInBatch = [];
+
             for (const item of items) {
-                // 检查是否已存在相似事项
+                // 先检查本次批次中是否已有相似事项
+                const batchDuplicate = this.checkDuplicateInBatch(item, processedInBatch);
+                if (batchDuplicate.isDuplicate) {
+                    // 合并参会人员到批次中的事项
+                    if (item.type === 'meeting' && batchDuplicate.existingItem) {
+                        const existing = batchDuplicate.existingItem;
+                        const newAttendees = item.data.attendees || [];
+                        const existingAttendees = existing.attendees || [];
+                        const mergedAttendees = [...new Set([...existingAttendees, ...newAttendees])];
+                        existing.attendees = mergedAttendees;
+                        console.log('批次内合并参会人员:', item.data.title, newAttendees);
+                    }
+                    skippedItems.push(item.data.title);
+                    continue;
+                }
+
+                // 检查是否已存在相似事项（数据库中）
                 const duplicateInfo = this.checkDuplicateItem(item, existingItems);
 
                 if (duplicateInfo.isDuplicate) {
@@ -1761,10 +1780,13 @@ class OCRManager {
                         source: 'document',
                         sourceFile: file.name
                     });
-                    createdItems.push({ id, ...item.data });
+                    const newItem = { id, type: item.type, ...item.data };
+                    createdItems.push(newItem);
 
                     // 添加到已存在列表，防止后续重复
-                    existingItems.push({ id, type: item.type, ...item.data });
+                    existingItems.push(newItem);
+                    // 添加到批次处理列表
+                    processedInBatch.push(newItem);
                 } catch (error) {
                     console.error('创建卡片失败:', error);
                 }
@@ -1784,6 +1806,68 @@ class OCRManager {
             console.error('文档分析失败:', error);
             throw error;
         }
+    }
+
+    /**
+     * 检查同一批次中的重复事项（用于同一图片识别出的多个事项）
+     * 比数据库去重更宽松，防止同一图片中的相似事项被重复添加
+     */
+    checkDuplicateInBatch(newItem, batchItems) {
+        const newItemData = newItem.data;
+        const newTitle = (newItemData.title || '').trim().toLowerCase();
+        const result = { isDuplicate: false, existingItem: null };
+
+        for (const existing of batchItems) {
+            // 同类型才比较
+            if (existing.type !== newItem.type) continue;
+
+            const existTitle = (existing.title || '').trim().toLowerCase();
+
+            // 会议：比较标题关键词和日期
+            if (newItem.type === 'meeting') {
+                // 提取标题关键词（去掉"会议"、"研究"等常见词）
+                const extractKeywords = (title) => {
+                    return title
+                        .replace(/会议|研究|工作|座谈|讨论|调研/g, '')
+                        .trim();
+                };
+                const newKeywords = extractKeywords(newTitle);
+                const existKeywords = extractKeywords(existTitle);
+
+                // 关键词匹配（更宽松）
+                const keywordMatch = newKeywords === existKeywords ||
+                                     newKeywords.includes(existKeywords) ||
+                                     existKeywords.includes(newKeywords) ||
+                                     // 或者原始标题有较高重叠
+                                     (newTitle.length > 2 && existTitle.length > 2 &&
+                                      (newTitle.includes(existTitle) || existTitle.includes(newTitle)));
+
+                // 同一天 + 关键词匹配 = 重复
+                if (keywordMatch && existing.date === newItemData.date) {
+                    return { isDuplicate: true, existingItem: existing };
+                }
+            }
+
+            // 待办：标题相同且截止日期相同
+            if (newItem.type === 'todo') {
+                if ((newTitle === existTitle || newTitle.includes(existTitle) || existTitle.includes(newTitle)) &&
+                    existing.deadline === newItemData.deadline) {
+                    return { isDuplicate: true, existingItem: existing };
+                }
+            }
+
+            // 办文：文号或标题相同
+            if (newItem.type === 'document') {
+                if (newItemData.docNumber && existing.docNumber === newItemData.docNumber) {
+                    return { isDuplicate: true, existingItem: existing };
+                }
+                if (newTitle === existTitle && newTitle.length > 3) {
+                    return { isDuplicate: true, existingItem: existing };
+                }
+            }
+        }
+
+        return result;
     }
 
     /**
