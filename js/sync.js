@@ -54,18 +54,24 @@ class SyncManager {
      */
     async initSupabase() {
         console.log('=== Supabase 初始化开始 ===');
+
+        // 等待Supabase库加载（最多等待15秒）
+        let waitTime = 0;
+        const maxWait = 15000;
+        while (typeof window.supabase === 'undefined' && waitTime < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            waitTime += 200;
+            if (waitTime % 2000 === 0) {
+                console.log('等待Supabase加载...', waitTime / 1000, '秒');
+            }
+        }
+
         console.log('window.supabase 类型:', typeof window.supabase);
 
-        // 检查 Supabase 是否已加载（同步加载后应该立即可用）
         if (typeof window.supabase === 'undefined') {
-            // 等待一小段时间再检查一次
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            if (typeof window.supabase === 'undefined') {
-                this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。';
-                console.error(this.initError);
-                return;
-            }
+            this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。可能需要VPN访问。';
+            console.error(this.initError);
+            return;
         }
 
         console.log('Supabase库已加载，开始创建客户端...');

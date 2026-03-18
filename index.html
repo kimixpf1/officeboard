@@ -698,17 +698,55 @@
     <!-- docx库 - Word文档生成 -->
     <script src="https://unpkg.com/docx@8.2.0/build/index.umd.js"></script>
 
-    <!-- Supabase客户端 - 使用unpkg CDN (jsdelivr在国内可能被墙) -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- Supabase客户端 - 多CDN备用加载 -->
+    <script>
+        (function() {
+            var loaded = false;
+            var sources = [
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/dist/umd/supabase.min.js',
+                'https://unpkg.com/@supabase/supabase-js@2.38.4/dist/umd/supabase.min.js',
+                'https://esm.sh/@supabase/supabase-js@2.38.4?bundle'
+            ];
+
+            function loadScript(src, callback) {
+                var script = document.createElement('script');
+                script.src = src;
+                script.onload = function() {
+                    loaded = true;
+                    console.log('Supabase加载成功:', src);
+                    callback(true);
+                };
+                script.onerror = function() {
+                    console.warn('加载失败:', src);
+                    callback(false);
+                };
+                document.head.appendChild(script);
+            }
+
+            function tryLoad(index) {
+                if (index >= sources.length) {
+                    console.error('所有Supabase CDN源都加载失败');
+                    return;
+                }
+                loadScript(sources[index], function(success) {
+                    if (!success) {
+                        tryLoad(index + 1);
+                    }
+                });
+            }
+
+            tryLoad(0);
+        })();
+    </script>
 
     <!-- 其他脚本 -->
-    <script src="js/db.js?v=9"></script>
-    <script src="js/crypto.js?v=9"></script>
-    <script src="js/kimi.js?v=9"></script>
-    <script src="js/ocr.js?v=9"></script>
-    <script src="js/report.js?v=9"></script>
-    <script src="js/calendar.js?v=9"></script>
-    <script src="js/sync.js?v=9"></script>
-    <script src="js/app.js?v=9"></script>
+    <script src="js/db.js?v=10"></script>
+    <script src="js/crypto.js?v=10"></script>
+    <script src="js/kimi.js?v=10"></script>
+    <script src="js/ocr.js?v=10"></script>
+    <script src="js/report.js?v=10"></script>
+    <script src="js/calendar.js?v=10"></script>
+    <script src="js/sync.js?v=10"></script>
+    <script src="js/app.js?v=10"></script>
 </body>
 </html>
