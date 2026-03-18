@@ -282,19 +282,19 @@ class OfficeDashboard {
         });
 
         // 监听远程数据变更（实时同步）
-        // 关键修复：不再从云端下载覆盖本地数据
-        // 本地数据只会上传，不会被云端数据覆盖
+        // 使用智能同步，自动判断同步方向
         document.addEventListener('syncRemoteDataChanged', async (e) => {
-            console.log('收到远程数据变更通知，忽略（保护本地数据）');
-            // 不再从云端下载数据，保护本地数据不被覆盖
+            console.log('收到远程数据变更通知，执行智能同步...');
+            if (!syncManager.isSyncing) {
+                await syncManager.smartSync();
+            }
         });
 
-        // 页面获得焦点时自动上传本地数据
-        // 关键修复：只上传不下载，保护本地数据
+        // 页面获得焦点时执行智能同步
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible' && syncManager.isLoggedIn()) {
-                console.log('页面获得焦点，上传本地数据到云端...');
-                await syncManager.immediateSyncToCloud();
+                console.log('页面获得焦点，执行智能同步...');
+                await syncManager.smartSync();
             }
         });
     }
