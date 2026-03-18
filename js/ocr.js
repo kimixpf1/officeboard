@@ -1879,28 +1879,38 @@ class OCRManager {
         const newTitle = (newItemData.title || '').trim().toLowerCase();
         const result = { isDuplicate: false, existingItem: null, shouldMerge: false };
 
+        // 提取关键词函数
+        const extractKeywords = (title) => {
+            return title
+                .replace(/会议|研究|工作|座谈|讨论|调研|培训|学习|协调|推进|落实/g, '')
+                .trim();
+        };
+        const newKeywords = extractKeywords(newTitle);
+
         for (const existing of existingItems) {
             // 同类型才比较
             if (existing.type !== newItem.type) continue;
 
             const existTitle = (existing.title || '').trim().toLowerCase();
+            const existKeywords = extractKeywords(existTitle);
 
-            // 会议：比较标题、日期、时间
+            // 会议：比较关键词和日期（更宽松的匹配）
             if (newItem.type === 'meeting') {
-                // 标题相似度检查（完全相同或包含关系）
-                const titleMatch = newTitle === existTitle ||
-                                   newTitle.includes(existTitle) ||
-                                   existTitle.includes(newTitle);
+                // 关键词匹配检查
+                const keywordMatch = newKeywords === existKeywords ||
+                                     newKeywords.includes(existKeywords) ||
+                                     existKeywords.includes(newKeywords) ||
+                                     // 或者原始标题有包含关系
+                                     (newTitle.length > 2 && existTitle.length > 2 &&
+                                      (newTitle.includes(existTitle) || existTitle.includes(newTitle)));
 
-                // 同一天同一时间 - 合并参会人员
-                if (titleMatch &&
-                    existing.date === newItemData.date &&
-                    existing.time === newItemData.time) {
+                // 关键词匹配 + 同一天 = 重复（合并参会人员）
+                if (keywordMatch && existing.date === newItemData.date) {
                     return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                 }
 
                 // 跨天会议：检查日期范围是否重叠
-                if (newItemData.endDate && titleMatch) {
+                if (keywordMatch && newItemData.endDate) {
                     const newStart = newItemData.date;
                     const newEnd = newItemData.endDate;
                     const existStart = existing.date;
@@ -1910,11 +1920,6 @@ class OCRManager {
                     if (newStart <= existEnd && newEnd >= existStart) {
                         return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                     }
-                }
-
-                // 同一会议名+同一天 - 合并参会人员
-                if (titleMatch && existing.date === newItemData.date) {
-                    return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                 }
             }
 
@@ -1953,6 +1958,7 @@ class OCRManager {
     }
 
     /**
+     * 提取PDF文本（使用pdf.js）
      * 提取PDF文本（使用pdf.js）
      */
     async extractPDFText(file, progressCallback = null) {
