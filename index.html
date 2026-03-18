@@ -698,23 +698,17 @@
     <!-- docx库 - Word文档生成 -->
     <script src="https://unpkg.com/docx@8.2.0/build/index.umd.js"></script>
 
-    <!-- Supabase客户端 - 同步加载确保可用 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script>
-        if (typeof window.supabase === 'undefined') {
-            // 备用CDN
-            document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"><\/script>');
-        }
-    </script>
+    <!-- Supabase客户端 - 使用unpkg CDN (jsdelivr在国内可能被墙) -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- 其他脚本 -->
-    <script src="js/db.js?v=8"></script>
-    <script src="js/crypto.js?v=8"></script>
-    <script src="js/kimi.js?v=8"></script>
-    <script src="js/ocr.js?v=8"></script>
-    <script src="js/report.js?v=8"></script>
-    <script src="js/calendar.js?v=8"></script>
-    <script src="js/sync.js?v=8"></script>
-    <script src="js/app.js?v=8"></script>
+    <script src="js/db.js?v=9"></script>
+    <script src="js/crypto.js?v=9"></script>
+    <script src="js/kimi.js?v=9"></script>
+    <script src="js/ocr.js?v=9"></script>
+    <script src="js/report.js?v=9"></script>
+    <script src="js/calendar.js?v=9"></script>
+    <script src="js/sync.js?v=9"></script>
+    <script src="js/app.js?v=9"></script>
 </body>
 </html>
