@@ -70,25 +70,27 @@ class SyncManager {
                         console.log('已恢复登录状态:', this.currentUser.email);
                         this.updateLoginUI();
 
-                        // 智能同步策略：登录时先上传本地数据，再下载云端数据合并
-                        console.log('开始智能同步...');
-
-                        // 1. 先上传本地数据到云端（保护本地新数据）
+                        // 关键修复：恢复会话时的智能同步策略
                         const localItems = await db.getAllItems();
+                        
                         if (localItems.length > 0) {
-                            console.log('本地有数据，先上传到云端保护...');
-                            await this.silentSyncToCloud();
+                            // 本地有数据：只上传，不从云端下载！
+                            // 这样可以保护本地新数据不被云端老数据覆盖
+                            console.log('本地有', localItems.length, '个事项，立即上传到云端...');
+                            await this.immediateSyncToCloud();
+                            console.log('本地数据已上传到云端');
+                        } else {
+                            // 本地无数据：从云端下载（新设备/清空后登录）
+                            console.log('本地无数据，从云端下载...');
+                            const syncResult = await this.syncFromCloud();
+                            console.log('云端同步结果:', syncResult);
+                            
+                            // 通知应用刷新数据
+                            const event = new CustomEvent('syncDataLoaded', {
+                                detail: { syncResult }
+                            });
+                            document.dispatchEvent(event);
                         }
-
-                        // 2. 再从云端同步数据
-                        const syncResult = await this.syncFromCloud();
-                        console.log('同步结果:', syncResult);
-
-                        // 通知应用刷新数据
-                        const event = new CustomEvent('syncDataLoaded', {
-                            detail: { syncResult }
-                        });
-                        document.dispatchEvent(event);
 
                         // 启动定时同步
                         this.startPeriodicSync();
@@ -107,7 +109,9 @@ class SyncManager {
     }
 
     /**
-     * 启动定时同步（智能同步策略）
+     * 启动定时同步（只上传策略）
+     * 关键修复：定时同步只上传本地数据，不从云端下载
+     * 这样可以确保本地数据永远不会被云端老数据覆盖
      */
     startPeriodicSync() {
         // 清除已有的定时器
@@ -115,39 +119,22 @@ class SyncManager {
             clearInterval(this.periodicSyncTimer);
         }
 
-        // 每10分钟同步一次（延长同步间隔，避免频繁同步覆盖本地新数据）
+        // 每10分钟上传一次本地数据到云端
         this.periodicSyncTimer = setInterval(async () => {
             if (this.isLoggedIn()) {
-                console.log('定时同步检查...');
-
-                // 智能同步策略：
-                // 1. 如果本地有未同步的改动，只上传，不下载（避免覆盖本地新数据）
-                // 2. 如果本地没有改动，检查云端是否有更新，有更新才下载
-                if (this.hasLocalChanges) {
-                    console.log('本地有未同步改动，执行上传...');
-                    await this.silentSyncToCloud();
-                    this.hasLocalChanges = false;
+                console.log('定时同步：上传本地数据到云端...');
+                
+                // 只上传，不下载！
+                const result = await this.immediateSyncToCloud();
+                if (result.success) {
+                    console.log('定时同步完成，已上传', result.itemCount, '个事项');
                 } else {
-                    // 检查云端是否有更新
-                    const cloudUpdate = await this.checkCloudUpdate();
-                    if (cloudUpdate.hasUpdate) {
-                        console.log('云端有更新，执行下载...');
-                        const result = await this.silentSyncFromCloud();
-                        if (result.success && result.itemCount > 0) {
-                            // 通知应用刷新
-                            const event = new CustomEvent('syncRemoteDataChanged', {
-                                detail: { itemCount: result.itemCount }
-                            });
-                            document.dispatchEvent(event);
-                        }
-                    } else {
-                        console.log('云端无更新，跳过同步');
-                    }
+                    console.warn('定时同步失败:', result.error);
                 }
             }
         }, 600000); // 10分钟（600000ms）
 
-        console.log('定时同步已启动（每10分钟，智能模式）');
+        console.log('定时同步已启动（每10分钟，只上传模式）');
     }
 
     /**
@@ -572,6 +559,27 @@ class SyncManager {
             this.currentUser = data.user;
             console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
+
+            // 智能同步策略：登录时根据本地数据情况决定同步方向
+            const localItems = await db.getAllItems();
+            
+            if (localItems.length > 0) {
+                // 本地有数据：只上传，不从云端下载！
+                console.log('本地有', localItems.length, '个事项，立即上传到云端...');
+                await this.immediateSyncToCloud();
+                console.log('本地数据已上传到云端');
+            } else {
+                // 本地无数据：从云端下载
+                console.log('本地无数据，从云端下载...');
+                const syncResult = await this.syncFromCloud();
+                console.log('云端同步结果:', syncResult);
+                
+                // 通知应用刷新数据
+                const event = new CustomEvent('syncDataLoaded', {
+                    detail: { syncResult }
+                });
+                document.dispatchEvent(event);
+            }
 
             // 启动定时同步
             this.startPeriodicSync();
