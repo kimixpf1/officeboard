@@ -880,6 +880,7 @@ class OfficeDashboard {
 
             // 如果已登录，同步到云端
             if (syncManager.isLoggedIn()) {
+                syncManager.markLocalChange();  // 标记本地改动
                 await syncManager.silentSyncToCloud();
             }
 
@@ -1004,6 +1005,12 @@ class OfficeDashboard {
                 // 刷新列表
                 await this.loadItems();
 
+                // 立即同步到云端
+                if (syncManager.isLoggedIn()) {
+                    console.log('自然语言解析后立即同步到云端...');
+                    await syncManager.immediateSyncToCloud();
+                }
+
             } catch (error) {
                 console.error('解析失败:', error);
                 this.showError('解析失败: ' + error.message);
@@ -1086,6 +1093,12 @@ class OfficeDashboard {
 
                 // 刷新列表
                 await this.loadItems();
+
+                // OCR提取后立即同步到云端
+                if (syncManager.isLoggedIn()) {
+                    console.log('文件上传后立即同步到云端...');
+                    await syncManager.immediateSyncToCloud();
+                }
 
             } catch (error) {
                 console.error('文件处理失败:', error);
@@ -1705,6 +1718,11 @@ class OfficeDashboard {
             // 重新加载
             await this.loadItems();
 
+            // 立即同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+
         } catch (error) {
             console.error('移动失败:', error);
             this.showError('移动失败，请重试');
@@ -1933,12 +1951,15 @@ class OfficeDashboard {
             this.hideModal('itemModal');
             await this.loadItems();
 
-            // 自动同步到云端
+            // 立即同步到云端（确保新数据上传）
             if (syncManager.isLoggedIn()) {
-                console.log('保存事项后触发同步...');
-                syncManager.silentSyncToCloud().then(result => {
-                    console.log('同步结果:', result);
-                });
+                console.log('保存事项后立即同步到云端...');
+                const result = await syncManager.immediateSyncToCloud();
+                if (result.success) {
+                    console.log('同步成功，云端数据已更新');
+                } else {
+                    console.error('同步失败:', result.error);
+                }
             }
 
         } catch (error) {
@@ -1954,9 +1975,9 @@ class OfficeDashboard {
         try {
             await db.updateItem(id, { completed });
             await this.loadItems();
-            // 自动同步到云端
+            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
-                syncManager.silentSyncToCloud();
+                await syncManager.immediateSyncToCloud();
             }
         } catch (error) {
             console.error('更新失败:', error);
@@ -1975,9 +1996,9 @@ class OfficeDashboard {
                 ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
             });
             await this.loadItems();
-            // 自动同步到云端
+            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
-                syncManager.silentSyncToCloud();
+                await syncManager.immediateSyncToCloud();
             }
         } catch (error) {
             console.error('更新完成状态失败:', error);
@@ -2028,9 +2049,9 @@ class OfficeDashboard {
                             completedAt: now.toISOString()
                         });
 
-                        // 同步到云端
+                        // 立即同步到云端
                         if (syncManager.isLoggedIn()) {
-                            syncManager.silentSyncToCloud();
+                            await syncManager.immediateSyncToCloud();
                         }
                     }
                 }
@@ -2209,9 +2230,9 @@ class OfficeDashboard {
             await db.deleteItem(this.deleteItemId);
             this.hideModal('confirmModal');
             await this.loadItems();
-            // 自动同步到云端
+            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
-                syncManager.silentSyncToCloud();
+                await syncManager.immediateSyncToCloud();
             }
         } catch (error) {
             console.error('删除失败:', error);

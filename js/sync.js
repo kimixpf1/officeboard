@@ -252,7 +252,76 @@ class SyncManager {
     }
 
     /**
-     * 静默同步到云端（无进度提示）
+     * 立即同步到云端（无防抖延迟，用于新增事项后立即同步）
+     * 这是关键方法：确保本地新数据立即上传到云端
+     */
+    async immediateSyncToCloud() {
+        console.log('=== immediateSyncToCloud 立即同步 ===');
+        console.log('Supabase:', !!this.supabase, 'currentUser:', !!this.currentUser);
+
+        if (!this.supabase || !this.currentUser) {
+            console.warn('未登录或Supabase不可用，跳过同步');
+            return { success: false };
+        }
+
+        // 清除之前的防抖定时器
+        if (this.syncTimeout) {
+            clearTimeout(this.syncTimeout);
+            this.syncTimeout = null;
+        }
+
+        try {
+            const allItems = await db.getAllItems();
+            console.log('本地事项数量:', allItems.length);
+
+            const settings = {};
+            const kimiKey = await db.getSetting('kimi_api_key');
+            const kimiKeySet = await db.getSetting('kimi_api_key_set');
+            const deepseekKey = await db.getSetting('deepseek_api_key');
+            const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
+
+            if (kimiKey) settings.kimi_api_key = kimiKey;
+            if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
+            if (deepseekKey) settings.deepseek_api_key = deepseekKey;
+            if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+
+            const syncTime = new Date().toISOString();
+            const syncData = {
+                sync_time: syncTime,
+                items: allItems,
+                settings: settings,
+                device_info: navigator.userAgent
+            };
+
+            console.log('立即上传数据到云端...');
+            const { error } = await this.supabase
+                .from('user_data')
+                .upsert({
+                    user_id: this.currentUser.id,
+                    data: syncData,
+                    updated_at: syncTime
+                }, { onConflict: 'user_id' });
+
+            if (error) {
+                console.error('立即同步失败:', error);
+                return { success: false, error: error.message };
+            } else {
+                console.log('立即同步成功！共', allItems.length, '个事项已上传');
+                this.lastSyncTime = syncTime;
+                this.lastCloudSyncTime = syncTime;
+                this.hasLocalChanges = false;
+                localStorage.setItem('lastSyncTime', this.lastSyncTime);
+                return { success: true, itemCount: allItems.length };
+            }
+        } catch (error) {
+            console.error('立即同步异常:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 静默同步到云端（无进度提示，带防抖）
+     * 用于频繁操作时的延迟同步
      */
     async silentSyncToCloud() {
         console.log('=== silentSyncToCloud 被调用 ===');
