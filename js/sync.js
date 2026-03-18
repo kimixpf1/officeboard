@@ -55,9 +55,9 @@ class SyncManager {
     async initSupabase() {
         console.log('=== Supabase 初始化开始 ===');
 
-        // 等待Supabase库加载（最多等待15秒）
+        // 等待Supabase库加载（最多等待20秒）
         let waitTime = 0;
-        const maxWait = 15000;
+        const maxWait = 20000;
         while (typeof window.supabase === 'undefined' && waitTime < maxWait) {
             await new Promise(resolve => setTimeout(resolve, 200));
             waitTime += 200;
@@ -69,7 +69,7 @@ class SyncManager {
         console.log('window.supabase 类型:', typeof window.supabase);
 
         if (typeof window.supabase === 'undefined') {
-            this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。可能需要VPN访问。';
+            this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。';
             console.error(this.initError);
             return;
         }
@@ -77,7 +77,14 @@ class SyncManager {
         console.log('Supabase库已加载，开始创建客户端...');
 
         try {
-            this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey, {
+            // ES模块导出的是{ createClient }，需要检查
+            const createClient = window.supabase.createClient || window.supabase.default?.createClient;
+            if (!createClient) {
+                console.error('Supabase模块结构:', Object.keys(window.supabase));
+                throw new Error('createClient函数未找到');
+            }
+
+            this.supabase = createClient(this.supabaseUrl, this.supabaseKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
