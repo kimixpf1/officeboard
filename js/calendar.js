@@ -145,8 +145,8 @@ class CalendarView {
                 const weekStart = this.getWeekStart(this.currentDate);
                 const weekEnd = new Date(weekStart);
                 weekEnd.setDate(weekEnd.getDate() + 6);
-                startDate = weekStart.toISOString().split('T')[0];
-                endDate = weekEnd.toISOString().split('T')[0];
+                startDate = this.formatLocalDate(weekStart);
+                endDate = this.formatLocalDate(weekEnd);
                 break;
             }
             case 'month': {
@@ -154,15 +154,25 @@ class CalendarView {
                 const month = this.currentDate.getMonth();
                 const monthStart = new Date(year, month, 1);
                 const monthEnd = new Date(year, month + 1, 0);
-                startDate = monthStart.toISOString().split('T')[0];
-                endDate = monthEnd.toISOString().split('T')[0];
+                startDate = this.formatLocalDate(monthStart);
+                endDate = this.formatLocalDate(monthEnd);
                 break;
             }
             default:
-                startDate = endDate = this.currentDate.toISOString().split('T')[0];
+                startDate = endDate = this.formatLocalDate(this.currentDate);
         }
 
         return await db.getItemsByDateRange(startDate, endDate);
+    }
+
+    /**
+     * 格式化本地日期（避免时区问题）
+     */
+    formatLocalDate(date) {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     /**
@@ -172,7 +182,7 @@ class CalendarView {
         const weekStart = this.getWeekStart(this.currentDate);
         const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
         const today = new Date();
-        const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+        const todayStr = this.formatLocalDate(today);
 
         // 计算是该月的第几周
         const weekOfMonth = this.getWeekOfMonth(weekStart);
@@ -185,7 +195,7 @@ class CalendarView {
         for (let i = 0; i < 7; i++) {
             const date = new Date(weekStart);
             date.setDate(date.getDate() + i);
-            const dateStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+            const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
             const dayLabel = `${weekDays[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
@@ -196,7 +206,7 @@ class CalendarView {
         for (let i = 0; i < 7; i++) {
             const date = new Date(weekStart);
             date.setDate(date.getDate() + i);
-            const dateStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+            const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
             const dayLabel = `${weekDays[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
@@ -261,7 +271,7 @@ class CalendarView {
 
         const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
         const today = new Date();
-        const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+        const todayStr = this.formatLocalDate(today);
 
         let html = '<div class="month-view">';
 

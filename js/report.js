@@ -456,9 +456,14 @@ class ReportGenerator {
         const month = date.getMonth();
         const day = date.getDate();
 
+        // 辅助函数：格式化为本地日期字符串
+        const formatLocalDate = (d) => {
+            return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+        };
+
         switch (reportType) {
             case 'daily':
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = formatLocalDate(date);
                 return { start: dateStr, end: dateStr };
 
             case 'weekly':
@@ -467,20 +472,20 @@ class ReportGenerator {
                 const weekStart = new Date(date.setDate(diff));
                 const weekEnd = new Date(date.setDate(weekStart.getDate() + 6));
                 return {
-                    start: weekStart.toISOString().split('T')[0],
-                    end: weekEnd.toISOString().split('T')[0]
+                    start: formatLocalDate(weekStart),
+                    end: formatLocalDate(weekEnd)
                 };
 
             case 'monthly':
                 const monthStart = new Date(year, month, 1);
                 const monthEnd = new Date(year, month + 1, 0);
                 return {
-                    start: monthStart.toISOString().split('T')[0],
-                    end: monthEnd.toISOString().split('T')[0]
+                    start: formatLocalDate(monthStart),
+                    end: formatLocalDate(monthEnd)
                 };
 
             default:
-                const defaultStr = date.toISOString().split('T')[0];
+                const defaultStr = formatLocalDate(date);
                 return { start: defaultStr, end: defaultStr };
         }
     }
