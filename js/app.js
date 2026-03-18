@@ -2098,7 +2098,7 @@ class OfficeDashboard {
                     targetDate = this.getNthWorkDayOfMonth(today, i + 1, rule.nthWorkDay);
                     break;
                 case 'weekly_day':
-                    targetDate = this.getWeeklyDay(today, i + 1, rule.weekDay);
+                    targetDate = this.getWeeklyDay(today, i, rule.weekDay);
                     break;
             }
 
@@ -2172,16 +2172,24 @@ class OfficeDashboard {
 
     /**
      * 获取每周固定星期
+     * @param {Date} baseDate - 基准日期
+     * @param {number} weeksAhead - 周数偏移（0=本周，1=下周，以此类推）
+     * @param {number} weekDay - 目标星期几（0=周日，1=周一，...，6=周六）
+     * @returns {Date} 目标日期
      */
     getWeeklyDay(baseDate, weeksAhead, weekDay) {
         const date = new Date(baseDate);
-        // 先调整到本周的周一
         const currentDay = date.getDay();
-        const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
-        date.setDate(date.getDate() + diffToMonday);
-
-        // 然后加上周数偏移和星期几偏移
-        date.setDate(date.getDate() + weeksAhead * 7 + (weekDay - 1));
+        
+        // 计算到目标星期几的偏移量
+        // 如果今天是周三(3)，目标是周五(5)，偏移量是 5-3=2
+        // 如果今天是周六(6)，目标是周五(5)，偏移量是 5-6+7=6（下周）
+        let diff = weekDay - currentDay;
+        
+        // 加上周数偏移
+        diff += weeksAhead * 7;
+        
+        date.setDate(date.getDate() + diff);
         date.setHours(12, 0, 0, 0);
 
         return date;
