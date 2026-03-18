@@ -54,11 +54,19 @@ class SyncManager {
      */
     async initSupabase() {
         console.log('=== Supabase 初始化开始 ===');
+
+        // 等待Supabase库加载（最多等待10秒）
+        let waitTime = 0;
+        const maxWait = 10000;
+        while (typeof window.supabase === 'undefined' && waitTime < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            waitTime += 100;
+        }
+
         console.log('window.supabase 类型:', typeof window.supabase);
 
-        // 直接检查 Supabase 是否已加载（现在使用同步加载）
         if (typeof window.supabase === 'undefined') {
-            this.initError = 'Supabase库未加载，请刷新页面重试。如果问题持续，请检查网络连接。';
+            this.initError = '网络服务未加载，请刷新页面重试。如果问题持续，可能是网络连接问题或CDN服务暂时不可用。';
             console.error(this.initError);
             return;
         }

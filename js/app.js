@@ -350,18 +350,32 @@ class OfficeDashboard {
             return;
         }
 
-        const itemIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.id);
+        const itemIds = Array.from(selectedCheckboxes).map(cb => {
+            const id = parseInt(cb.dataset.id);
+            if (isNaN(id)) {
+                console.error('无效的ID:', cb.dataset.id);
+            }
+            return id;
+        }).filter(id => !isNaN(id));
+
+        if (itemIds.length === 0) {
+            this.showError('未找到有效的事项');
+            return;
+        }
 
         try {
             for (const itemId of itemIds) {
-                await db.updateItem(itemId, {
+                const result = await db.updateItem(itemId, {
                     completed: true,
                     completedAt: new Date().toISOString(),
                     ...(type === 'document' && { progress: 'completed' })
                 });
+                console.log('更新事项成功:', itemId, result);
             }
 
+            // 强制重新加载数据
             await this.loadItems();
+            console.log('loadItems完成');
 
             // 同步到云端
             if (syncManager.isLoggedIn()) {
@@ -392,7 +406,18 @@ class OfficeDashboard {
             return;
         }
 
-        const itemIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.id);
+        const itemIds = Array.from(selectedCheckboxes).map(cb => {
+            const id = parseInt(cb.dataset.id);
+            if (isNaN(id)) {
+                console.error('无效的ID:', cb.dataset.id);
+            }
+            return id;
+        }).filter(id => !isNaN(id));
+
+        if (itemIds.length === 0) {
+            this.showError('未找到有效的事项');
+            return;
+        }
 
         if (!confirm(`确定要删除选中的 ${itemIds.length} 个事项吗？此操作不可恢复。`)) {
             return;
@@ -401,9 +426,12 @@ class OfficeDashboard {
         try {
             for (const itemId of itemIds) {
                 await db.deleteItem(itemId);
+                console.log('删除事项成功:', itemId);
             }
 
+            // 强制重新加载数据
             await this.loadItems();
+            console.log('loadItems完成');
 
             // 同步到云端
             if (syncManager.isLoggedIn()) {
@@ -1445,10 +1473,10 @@ class OfficeDashboard {
                 if (item.type === 'todo' && item.deadline) {
                     return item.deadline.startsWith(this.selectedDate);
                 }
-                // 文件：按创建日期匹配
+                // 文件：按办文日期匹配（优先使用docDate，否则使用createdAt）
                 if (item.type === 'document') {
-                    const createdDate = item.createdAt ? item.createdAt.split('T')[0] : null;
-                    return createdDate === this.selectedDate;
+                    const docDate = item.docDate || (item.createdAt ? item.createdAt.split('T')[0] : null);
+                    return docDate === this.selectedDate;
                 }
                 return false;
             });
@@ -1588,7 +1616,6 @@ class OfficeDashboard {
                     <div class="card-header-row">
                         ${selectCheckboxHtml}
                         <span class="priority-tag ${priorityClass}">${priorityText}</span>
-                        <input type="checkbox" class="complete-checkbox" ${item.completed ? 'checked' : ''} title="${item.completed ? '已完成' : '标记完成'}">
                     </div>
                     <div class="card-title ${item.completed ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
                     ${item.deadline ? `<div class="card-time">${this.formatDeadline(item.deadline)}</div>` : ''}
@@ -1643,7 +1670,6 @@ class OfficeDashboard {
                     <div class="card-header-row">
                         ${selectCheckboxHtml}
                         <span class="doc-type-tag ${docTypeClass}">${docTypeIcon}</span>
-                        <input type="checkbox" class="complete-checkbox" ${isCompleted ? 'checked' : ''} title="${isCompleted ? '已办结' : '标记办结'}">
                     </div>
                     <div class="card-title ${isCompleted ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
                     ${item.handler ? `<div class="card-handler">当前：${this.escapeHtml(item.handler)}</div>` : ''}
@@ -1704,12 +1730,6 @@ class OfficeDashboard {
         completeBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleItemComplete(item.id, item.type, !item.completed);
-        });
-
-        // 绑定完成复选框事件（待办和办文）
-        const checkbox = card.querySelector('.complete-checkbox');
-        checkbox?.addEventListener('change', () => {
-            this.toggleItemComplete(item.id, item.type, checkbox.checked);
         });
 
         // 绑定删除事件
@@ -1989,13 +2009,15 @@ class OfficeDashboard {
         document.querySelectorAll('.type-fields').forEach(el => el.classList.remove('active'));
         document.getElementById(type + 'Fields')?.classList.add('active');
 
-        // 设置默认日期
+        // 使用用户选择的日期作为默认日期
+        console.log('showAddModal - selectedDate:', this.selectedDate);
+        const dateStr = this.selectedDate;
         const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
         const timeStr = now.toTimeString().slice(0, 5);
 
         if (type === 'todo') {
             const deadlineEl = document.getElementById('todoDeadline');
+            console.log('设置待办截止时间:', `${dateStr}T${timeStr}`);
             if (deadlineEl) deadlineEl.value = `${dateStr}T${timeStr}`;
 
             // 重置周期性选项
@@ -2006,6 +2028,7 @@ class OfficeDashboard {
         } else if (type === 'meeting') {
             const dateEl = document.getElementById('meetingDate');
             const timeEl = document.getElementById('meetingTime');
+            console.log('设置会议日期:', dateStr);
             if (dateEl) dateEl.value = dateStr;
             if (timeEl) timeEl.value = timeStr;
         }
@@ -2121,6 +2144,8 @@ class OfficeDashboard {
                 item.handler = document.getElementById('docHandler').value.trim();
                 item.content = document.getElementById('docContent').value.trim();
                 item.progress = item.handler ? 'processing' : 'pending';
+                // 设置办文日期为用户选择的日期
+                item.docDate = this.selectedDate;
                 // 流转历史
                 const existingItem = document.getElementById('itemId').value ? await db.getItem(parseInt(document.getElementById('itemId').value)) : null;
                 item.transferHistory = existingItem?.transferHistory || [];

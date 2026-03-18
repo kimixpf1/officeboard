@@ -793,11 +793,13 @@ body {
     display: flex;
     gap: var(--spacing-1);
     opacity: 0;
-    transition: opacity 0.2s;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
 }
 
 .card:hover .card-actions {
     opacity: 1;
+    visibility: visible;
 }
 
 .card-action-btn {
@@ -2123,7 +2125,7 @@ body {
 
 .card-header-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     margin-bottom: 6px;
     gap: var(--spacing-2);
@@ -2405,10 +2407,11 @@ body {
 .card-header-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     margin-bottom: 4px;
+    gap: 8px;
 }
 
 .card-header-row .item-select-checkbox {
-    margin-right: auto;
+    margin-right: 0;
 }
