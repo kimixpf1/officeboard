@@ -11,6 +11,10 @@ class OfficeDashboard {
         this.draggedItem = null;
         this.deleteItemId = null;
 
+        // 多选功能状态
+        this.selectedItems = new Set(); // 选中的事项ID
+        this.batchMode = false; // 是否处于批量模式
+
         this.init();
     }
 
@@ -213,10 +217,209 @@ class OfficeDashboard {
         // 流转功能
         this.bindTransferEvents();
 
+        // 多选功能
+        this.bindBatchSelectionEvents();
+
         // 监听跳转到日期事件
         document.addEventListener('gotoDate', (e) => {
             this.goToDateView(e.detail.date);
         });
+    }
+
+    /**
+     * 绑定多选功能事件
+     */
+    bindBatchSelectionEvents() {
+        // 全选/取消全选
+        document.querySelectorAll('.select-all-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const type = e.target.dataset.type;
+                const container = document.getElementById(type + 'List');
+                const itemCheckboxes = container.querySelectorAll('.item-select-checkbox');
+
+                itemCheckboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                    const itemId = cb.dataset.id;
+                    if (e.target.checked) {
+                        this.selectedItems.add(itemId);
+                    } else {
+                        this.selectedItems.delete(itemId);
+                    }
+                });
+
+                this.updateBatchButtons(type);
+            });
+        });
+
+        // 批量完成按钮
+        document.querySelectorAll('.btn-batch-complete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const type = e.target.closest('.btn-batch-complete').dataset.type;
+                this.batchComplete(type);
+            });
+        });
+
+        // 批量删除按钮
+        document.querySelectorAll('.btn-batch-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const type = e.target.closest('.btn-batch-delete').dataset.type;
+                this.batchDelete(type);
+            });
+        });
+
+        // 事项选择复选框（事件委托）
+        ['todoList', 'meetingList', 'documentList'].forEach(listId => {
+            const container = document.getElementById(listId);
+            if (container) {
+                container.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('item-select-checkbox')) {
+                        const itemId = e.target.dataset.id;
+                        const type = e.target.dataset.type;
+
+                        if (e.target.checked) {
+                            this.selectedItems.add(itemId);
+                        } else {
+                            this.selectedItems.delete(itemId);
+                        }
+
+                        this.updateBatchButtons(type);
+                        this.updateSelectAllCheckbox(type);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * 更新批量操作按钮显示状态
+     */
+    updateBatchButtons(type) {
+        const container = document.querySelector(`.board-column[data-type="${type}"]`);
+        if (!container) return;
+
+        const completeBtn = container.querySelector('.btn-batch-complete');
+        const deleteBtn = container.querySelector('.btn-batch-delete');
+        const containerElement = document.getElementById(type + 'List');
+
+        // 计算该类型的选中项数量
+        const selectedCount = Array.from(containerElement?.querySelectorAll('.item-select-checkbox:checked') || []).length;
+
+        if (selectedCount > 0) {
+            completeBtn.style.display = 'inline-flex';
+            deleteBtn.style.display = 'inline-flex';
+            completeBtn.title = `完成选中项 (${selectedCount})`;
+            deleteBtn.title = `删除选中项 (${selectedCount})`;
+        } else {
+            completeBtn.style.display = 'none';
+            deleteBtn.style.display = 'none';
+        }
+    }
+
+    /**
+     * 更新全选复选框状态
+     */
+    updateSelectAllCheckbox(type) {
+        const selectAllCheckbox = document.querySelector(`.select-all-checkbox[data-type="${type}"]`);
+        if (!selectAllCheckbox) return;
+
+        const container = document.getElementById(type + 'List');
+        const itemCheckboxes = container?.querySelectorAll('.item-select-checkbox') || [];
+        const checkedCheckboxes = container?.querySelectorAll('.item-select-checkbox:checked') || [];
+
+        if (checkedCheckboxes.length === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCheckboxes.length === itemCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+
+    /**
+     * 批量完成
+     */
+    async batchComplete(type) {
+        const container = document.getElementById(type + 'List');
+        const selectedCheckboxes = container?.querySelectorAll('.item-select-checkbox:checked') || [];
+
+        if (selectedCheckboxes.length === 0) {
+            this.showError('请先选择要完成的项');
+            return;
+        }
+
+        const itemIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.id);
+
+        try {
+            for (const itemId of itemIds) {
+                await db.updateItem(itemId, {
+                    completed: true,
+                    completedAt: new Date().toISOString(),
+                    ...(type === 'document' && { progress: 'completed' })
+                });
+            }
+
+            await this.loadItems();
+
+            // 同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+
+            // 清除选中状态
+            this.selectedItems.clear();
+            this.updateBatchButtons(type);
+            this.updateSelectAllCheckbox(type);
+
+            this.showSuccess(`已完成 ${itemIds.length} 个事项`);
+        } catch (error) {
+            console.error('批量完成失败:', error);
+            this.showError('批量完成失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 批量删除
+     */
+    async batchDelete(type) {
+        const container = document.getElementById(type + 'List');
+        const selectedCheckboxes = container?.querySelectorAll('.item-select-checkbox:checked') || [];
+
+        if (selectedCheckboxes.length === 0) {
+            this.showError('请先选择要删除的项');
+            return;
+        }
+
+        const itemIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.id);
+
+        if (!confirm(`确定要删除选中的 ${itemIds.length} 个事项吗？此操作不可恢复。`)) {
+            return;
+        }
+
+        try {
+            for (const itemId of itemIds) {
+                await db.deleteItem(itemId);
+            }
+
+            await this.loadItems();
+
+            // 同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+
+            // 清除选中状态
+            this.selectedItems.clear();
+            this.updateBatchButtons(type);
+            this.updateSelectAllCheckbox(type);
+
+            this.showSuccess(`已删除 ${itemIds.length} 个事项`);
+        } catch (error) {
+            console.error('批量删除失败:', error);
+            this.showError('批量删除失败: ' + error.message);
+        }
     }
 
     /**
@@ -1372,12 +1575,18 @@ class OfficeDashboard {
         let contentHtml = '';
         let detailHtml = '';
 
+        // 多选复选框（所有类型都显示）
+        const selectCheckboxHtml = `
+            <input type="checkbox" class="item-select-checkbox" data-id="${item.id}" data-type="${item.type}" title="选择">
+        `;
+
         switch (item.type) {
             case 'todo':
                 const priorityClass = `priority-${item.priority || 'medium'}`;
                 const priorityText = { high: '急', medium: '中', low: '低' }[item.priority] || '中';
                 contentHtml = `
                     <div class="card-header-row">
+                        ${selectCheckboxHtml}
                         <span class="priority-tag ${priorityClass}">${priorityText}</span>
                         <input type="checkbox" class="complete-checkbox" ${item.completed ? 'checked' : ''} title="${item.completed ? '已完成' : '标记完成'}">
                     </div>
@@ -1409,6 +1618,9 @@ class OfficeDashboard {
                 const timeLoc = [timeStr, item.location].filter(Boolean).join(' ');
 
                 contentHtml = `
+                    <div class="card-header-row">
+                        ${selectCheckboxHtml}
+                    </div>
                     <div class="card-title meeting-title ${item.completed ? 'completed-text' : ''}">${this.escapeHtml(meetingTitle)}</div>
                     ${dateDisplay ? `<div class="card-date-range">${dateDisplay}</div>` : ''}
                     ${timeLoc ? `<div class="card-time">${timeLoc}</div>` : ''}

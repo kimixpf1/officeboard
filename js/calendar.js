@@ -179,63 +179,88 @@ class CalendarView {
      * 渲染周视图
      */
     renderWeekView(items) {
-        const weekStart = this.getWeekStart(this.currentDate);
-        const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        // 获取本周的日期范围（周一到周日）
+        const weekDates = this.getWeekDates(this.currentDate);
         const today = new Date();
         const todayStr = this.formatLocalDate(today);
 
         // 计算是该月的第几周
+        const weekStart = weekDates[0];
         const weekOfMonth = this.getWeekOfMonth(weekStart);
         const monthLabel = `${weekStart.getMonth() + 1}月第${weekOfMonth}周`;
 
-        let html = '<div class="week-view">';
+        let html = '<div class="week-view" style="font-size: 14px;">'; // 放大字体
 
-        // 表头 - 显示x月第x周
-        html += `<div class="week-header week-title">${monthLabel}</div>`;
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(weekStart);
-            date.setDate(date.getDate() + i);
+        // 第一行：周标题
+        html += `<div class="week-title" style="grid-column: 1 / -1; text-align: center; font-size: 18px; font-weight: bold; padding: 10px; background: #f0f0f0;">${monthLabel}</div>`;
+
+        // 第二行：星期表头
+        weekDates.forEach((date, i) => {
+            const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
             const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
-            const dayLabel = `${weekDays[i]} ${date.getMonth() + 1}/${date.getDate()}`;
+            const dayLabel = `${weekDayNames[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
-            html += `<div class="week-header ${isToday ? 'today' : ''}">${dayLabel}</div>`;
-        }
+            html += `<div class="week-header ${isToday ? 'today' : ''}" style="text-align: center; padding: 10px; font-weight: bold; font-size: 15px; ${isToday ? 'background: #e3f2fd;' : 'background: #f5f5f5;'} border-bottom: 2px solid #ddd;">${dayLabel}</div>`;
+        });
 
-        // 按天显示事项
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(weekStart);
-            date.setDate(date.getDate() + i);
+        // 第三行起：每天的事项
+        weekDates.forEach((date, i) => {
+            const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
             const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
-            const dayLabel = `${weekDays[i]} ${date.getMonth() + 1}/${date.getDate()}`;
+            const dayLabel = `${weekDayNames[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
-            // 修复：支持跨天会议显示
+            // 筛选当天的事项
             const dayItems = items.filter(item => {
                 // 会议：检查日期范围
                 if (item.type === 'meeting' && item.date) {
                     if (item.endDate) {
-                        // 跨天会议：检查当前日期是否在范围内
                         return dateStr >= item.date && dateStr <= item.endDate;
                     }
                     return item.date === dateStr;
                 }
                 // 待办：按截止日期
-                if (item.deadline) return item.deadline.startsWith(dateStr);
+                if (item.deadline) {
+                    const deadlineDate = item.deadline.split('T')[0];
+                    return deadlineDate === dateStr;
+                }
                 // 文件：按创建日期
-                if (item.createdAt) return item.createdAt.startsWith(dateStr);
+                if (item.createdAt) {
+                    const createdDate = item.createdAt.split('T')[0];
+                    return createdDate === dateStr;
+                }
                 return false;
             });
 
             html += `
-                <div class="week-cell ${isToday ? 'today' : ''}" data-date="${dayLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
-                    ${dayItems.map(item => this.renderCalendarItem(item, true)).join('')}
+                <div class="week-cell ${isToday ? 'today' : ''}" 
+                     data-date="${dayLabel}" 
+                     onclick="window.calendarView.goToDate('${dateStr}')"
+                     style="min-height: 100px; padding: 8px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; ${isToday ? 'background: #fffde7;' : ''}">
+                    ${dayItems.length > 0 ? dayItems.map(item => this.renderCalendarItem(item, true)).join('') : '<div style="color: #ccc; text-align: center; padding-top: 20px;">-</div>'}
                 </div>
             `;
-        }
+        });
 
         html += '</div>';
         this.container.innerHTML = html;
+    }
+
+    /**
+     * 获取一周的所有日期（周一到周日）
+     */
+    getWeekDates(baseDate) {
+        const dates = [];
+        const weekStart = this.getWeekStart(baseDate);
+
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(weekStart);
+            date.setDate(weekStart.getDate() + i);
+            dates.push(date);
+        }
+
+        return dates;
     }
 
     /**
@@ -365,17 +390,18 @@ class CalendarView {
         if (compact) {
             return `
                 <div class="calendar-item ${typeClass}" data-id="${item.id}" style="
-                    padding: 2px 6px;
-                    margin: 2px 0;
-                    border-radius: 4px;
-                    font-size: 11px;
+                    padding: 6px 8px;
+                    margin: 4px 0;
+                    border-radius: 6px;
+                    font-size: 13px;
                     background: ${this.getTypeColor(item.type, 0.1)};
-                    border-left: 3px solid ${this.getTypeColor(item.type)};
+                    border-left: 4px solid ${this.getTypeColor(item.type)};
                     cursor: pointer;
                     white-space: normal;
                     line-height: 1.4;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
                 " title="${displayTitle}">
-                    [${typeLabel}] ${displayTitle}
+                    <strong>[${typeLabel}]</strong> ${displayTitle}
                 </div>
             `;
         }

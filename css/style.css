@@ -2339,3 +2339,73 @@ body {
     border-radius: 3px;
     margin-left: 6px;
 }
+
+/* 多选功能样式 */
+.item-select-checkbox {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+/* 全选复选框 */
+.select-all-checkbox {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+/* 列操作按钮容器 */
+.column-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 批量操作按钮 */
+.btn-batch-complete,
+.btn-batch-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+}
+
+.btn-batch-complete {
+    color: var(--success-color);
+}
+
+.btn-batch-complete:hover {
+    background: var(--success-color);
+    color: white;
+}
+
+.btn-batch-delete {
+    color: var(--danger-color);
+}
+
+.btn-batch-delete:hover {
+    background: var(--danger-color);
+    color: white;
+}
+
+/* 卡片头部行 - 调整布局以容纳复选框 */
+.card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.card-header-row .item-select-checkbox {
+    margin-right: auto;
+}
