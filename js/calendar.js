@@ -189,27 +189,27 @@ class CalendarView {
         const weekOfMonth = this.getWeekOfMonth(weekStart);
         const monthLabel = `${weekStart.getMonth() + 1}月第${weekOfMonth}周`;
 
-        let html = '<div class="week-view" style="font-size: 14px;">'; // 放大字体
+        let html = '<div class="week-view">';
 
-        // 第一行：周标题
-        html += `<div class="week-title" style="grid-column: 1 / -1; text-align: center; font-size: 18px; font-weight: bold; padding: 10px; background: #f0f0f0;">${monthLabel}</div>`;
+        // 第一行：周标题（跨7列）
+        html += `<div class="week-title" style="grid-column: 1 / span 7; text-align: center;">${monthLabel}</div>`;
 
-        // 第二行：星期表头
-        weekDates.forEach((date, i) => {
-            const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        // 第二行：星期表头（7列）
+        const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        for (let i = 0; i < 7; i++) {
+            const date = weekDates[i];
             const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
             const dayLabel = `${weekDayNames[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
-            html += `<div class="week-header ${isToday ? 'today' : ''}" style="text-align: center; padding: 10px; font-weight: bold; font-size: 15px; ${isToday ? 'background: #e3f2fd;' : 'background: #f5f5f5;'} border-bottom: 2px solid #ddd;">${dayLabel}</div>`;
-        });
+            html += `<div class="week-header ${isToday ? 'today' : ''}">${dayLabel}</div>`;
+        }
 
-        // 第三行起：每天的事项
-        weekDates.forEach((date, i) => {
-            const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        // 第三行起：每天的事项（7列）
+        for (let i = 0; i < 7; i++) {
+            const date = weekDates[i];
             const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
-            const dayLabel = `${weekDayNames[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
             // 筛选当天的事项
             const dayItems = items.filter(item => {
@@ -235,13 +235,12 @@ class CalendarView {
 
             html += `
                 <div class="week-cell ${isToday ? 'today' : ''}" 
-                     data-date="${dayLabel}" 
-                     onclick="window.calendarView.goToDate('${dateStr}')"
-                     style="min-height: 100px; padding: 8px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; ${isToday ? 'background: #fffde7;' : ''}">
+                     data-date="${dateStr}" 
+                     onclick="window.calendarView.goToDate('${dateStr}')">
                     ${dayItems.length > 0 ? dayItems.map(item => this.renderCalendarItem(item, true)).join('') : '<div style="color: #ccc; text-align: center; padding-top: 20px;">-</div>'}
                 </div>
             `;
-        });
+        }
 
         html += '</div>';
         this.container.innerHTML = html;

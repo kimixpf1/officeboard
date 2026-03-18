@@ -1641,6 +1641,7 @@ class OfficeDashboard {
 
                 contentHtml = `
                     <div class="card-header-row">
+                        ${selectCheckboxHtml}
                         <span class="doc-type-tag ${docTypeClass}">${docTypeIcon}</span>
                         <input type="checkbox" class="complete-checkbox" ${isCompleted ? 'checked' : ''} title="${isCompleted ? '已办结' : '标记办结'}">
                     </div>
