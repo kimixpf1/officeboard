@@ -201,7 +201,7 @@ class SyncManager {
             if (cloudHasUpdate && localHasModify) {
                 // 两边都有更新：合并数据
                 console.log('两边都有更新，执行智能合并');
-                await this.mergeData(localItems, cloudItems);
+                await this.mergeData(localItems, cloudData);
             } else if (cloudHasUpdate) {
                 // 只有云端有更新：下载
                 console.log('云端有更新，下载');
@@ -211,8 +211,19 @@ class SyncManager {
                 console.log('本地有修改，上传');
                 await this.uploadToCloud();
             } else {
-                // 两边都没变化
-                console.log('数据已是最新，无需同步');
+                // 两边都没变化 - 但仍需同步备忘录
+                console.log('数据已是最新，检查备忘录同步...');
+                if (cloudData?.data?.memo !== undefined) {
+                    const localMemo = localStorage.getItem('office_memo_content') || '';
+                    const cloudMemo = cloudData.data.memo;
+                    if (cloudMemo !== localMemo) {
+                        console.log('同步备忘录（云端较新）');
+                        localStorage.setItem('office_memo_content', cloudMemo);
+                        document.dispatchEvent(new CustomEvent('memoSynced', { 
+                            detail: { content: cloudMemo } 
+                        }));
+                    }
+                }
             }
 
         } catch (error) {
@@ -353,8 +364,9 @@ class SyncManager {
     /**
      * 智能合并本地和云端数据
      */
-    async mergeData(localItems, cloudItems) {
+    async mergeData(localItems, cloudData) {
         console.log('=== 智能合并数据 ===');
+        const cloudItems = cloudData.data.items || [];
         console.log('本地:', localItems.length, '云端:', cloudItems.length);
 
         try {
@@ -400,6 +412,19 @@ class SyncManager {
                     await db.addItem(itemData);
                 } catch (e) {
                     console.warn('保存失败:', e);
+                }
+            }
+
+            // 同步备忘录（云端优先）
+            if (cloudData.data.memo !== undefined) {
+                const cloudMemo = cloudData.data.memo;
+                const localMemo = localStorage.getItem('office_memo_content') || '';
+                if (cloudMemo !== localMemo) {
+                    console.log('同步备忘录（云端版本）');
+                    localStorage.setItem('office_memo_content', cloudMemo);
+                    document.dispatchEvent(new CustomEvent('memoSynced', { 
+                        detail: { content: cloudMemo } 
+                    }));
                 }
             }
 
