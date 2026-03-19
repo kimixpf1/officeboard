@@ -263,7 +263,6 @@ class OfficeDashboard {
 
         // 自动保存（防抖）+ 云端同步
         let saveTimeout = null;
-        let syncTimeout = null;
         
         memoText.addEventListener('input', () => {
             if (memoStatus) {
@@ -275,29 +274,52 @@ class OfficeDashboard {
                 clearTimeout(saveTimeout);
             }
 
-            saveTimeout = setTimeout(() => {
+            saveTimeout = setTimeout(async () => {
+                // 1. 先保存到本地
                 localStorage.setItem('office_memo_content', memoText.value);
-                if (memoStatus) {
-                    memoStatus.textContent = '已保存';
-                    memoStatus.classList.remove('saving');
-                }
-
-                // 3秒后恢复默认状态
-                setTimeout(() => {
-                    if (memoStatus) {
-                        memoStatus.textContent = '自动保存';
-                    }
-                }, 3000);
-
-                // 云端同步（已登录时）
+                
+                // 2. 检查是否已登录，已登录则同步到云端
                 if (syncManager.isLoggedIn()) {
-                    if (syncTimeout) {
-                        clearTimeout(syncTimeout);
+                    if (memoStatus) {
+                        memoStatus.textContent = '同步中...';
                     }
-                    syncTimeout = setTimeout(() => {
-                        syncManager.immediateSyncToCloud();
+                    
+                    try {
+                        const result = await syncManager.immediateSyncToCloud();
+                        if (result && result.success) {
+                            if (memoStatus) {
+                                memoStatus.textContent = '已同步到云端';
+                                memoStatus.classList.remove('saving');
+                            }
+                            console.log('备忘录已同步到云端');
+                        } else {
+                            if (memoStatus) {
+                                memoStatus.textContent = '同步失败';
+                            }
+                            console.warn('备忘录同步失败:', result);
+                        }
+                    } catch (e) {
+                        console.error('备忘录同步异常:', e);
                         if (memoStatus) {
-                            memoStatus.textContent = '已同步到云端';
+                            memoStatus.textContent = '同步失败';
+                        }
+                    }
+                    
+                    // 3秒后恢复默认状态
+                    setTimeout(() => {
+                        if (memoStatus) {
+                            memoStatus.textContent = '自动保存';
+                        }
+                    }, 3000);
+                } else {
+                    // 未登录，只保存本地
+                    if (memoStatus) {
+                        memoStatus.textContent = '已保存到本地';
+                        memoStatus.classList.remove('saving');
+                    }
+                    setTimeout(() => {
+                        if (memoStatus) {
+                            memoStatus.textContent = '登录后可同步云端';
                         }
                     }, 2000);
                 }
