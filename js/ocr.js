@@ -1246,93 +1246,195 @@ class OCRManager {
     /**
      * 提取地点（增强版，支持更多格式）
      */
+    /**
+     * 提取地点（增强版）
+     */
     extractLocation(text) {
-        // 优先匹配完整格式 "X号楼X号会议室"、"X号楼大会议室"
-        const fullLocationMatch = text.match(/[一二三四五六七八九十\d]+号楼[一二三四五六七八九十\d]*(?:号)?(?:大|小)?会议室/);
+        // 0. 预处理：移除时间信息干扰
+        let cleanedText = text.replace(/\d{1,2}[点时：:]\d{0,2}分?/g, ' ');
+        cleanedText = cleanedText.replace(/\d{1,2}[:：]\d{2}/g, ' ');
+        cleanedText = cleanedText.replace(/[上下]午|晚上?|中午|早晨/g, ' ');
+
+        // 1. 优先匹配"地点："格式
+        const labelMatch = text.match(/(?:地点|场所|位置|地址|在哪)[是为：:\s]*([^\n，,。！？]+)/);
+        if (labelMatch) {
+            const loc = labelMatch[1].trim();
+            if (loc.length >= 2 && loc.length <= 20) {
+                return loc;
+            }
+        }
+
+        // 2. 匹配"在XXX"格式
+        const atMatch = text.match(/在\s*([A-Za-z0-9一二三四五六七八九十楼室厅]+(?:会议室|房间|大厅|中心|办公室|接待室|研讨室|培训室|报告厅))/);
+        if (atMatch) {
+            return atMatch[1].trim();
+        }
+
+        // 3. 匹配完整格式 "X号楼X号会议室"、"X号楼大会议室"
+        const fullLocationMatch = text.match(/[一二三四五六七八九十\d]+号楼[一二三四五六七八九十\d]*(?:号)?(?:大|小|视频|多功能)?会议室/);
         if (fullLocationMatch) {
             return fullLocationMatch[0];
         }
 
-        // 匹配 "X楼X会议室" 格式（如"二楼会议室"、"三楼大会议室"）
-        const floorRoomMatch = text.match(/[一二三四五六七八九十\d]+楼(?:大|小)?会议室[A-Za-z0-9一二三四五六七八九十]*/);
+        // 4. 匹配 "X楼X会议室" 格式
+        const floorRoomMatch = text.match(/[一二三四五六七八九十\d]+楼(?:大|小|视频|多功能)?会议室[A-Za-z0-9一二三四五六七八九十]*/);
         if (floorRoomMatch) {
             return floorRoomMatch[0];
         }
 
-        // 匹配 "第一会议室"、"第二会议室" 等序号格式
-        const ordinalRoomMatch = text.match(/第[一二三四五六七八九十\d]+(?:号)?(?:大|小)?会议室/);
+        // 5. 匹配 "第一会议室"、"第二会议室" 等序号格式
+        const ordinalRoomMatch = text.match(/第[一二三四五六七八九十\d]+(?:号)?(?:大|小|视频|多功能)?会议室/);
         if (ordinalRoomMatch) {
             return ordinalRoomMatch[0];
         }
 
-        // 匹配独立 "会议室X" 格式
-        // 先清理时间相关文本再匹配，避免"3点会议室A"匹配到"点会议室A"
-        let cleanedText = text.replace(/\d{1,2}[点时：:]\d{0,2}分?/g, ' ');
-        cleanedText = cleanedText.replace(/\d{1,2}[:：]\d{2}/g, ' ');
+        // 6. 匹配独立 "会议室X" 格式
         const meetingRoomMatch = cleanedText.match(/会议室[：:]*\s*[A-Za-z一二三四五六七八九十]+/);
         if (meetingRoomMatch) {
             return meetingRoomMatch[0].trim();
         }
 
-        // 匹配 "在X会议室"
-        const inRoomMatch = text.match(/在\s*([A-Za-z0-9一二三四五六七八九十楼]+(?:大|小)?(?:会议室|房间|大厅))/);
-        if (inRoomMatch) {
-            return inRoomMatch[1].trim();
+        // 7. 匹配各种类型的会议室/房间
+        const roomMatch = text.match(/([A-Za-z0-9一二三四五六七八九十楼]+(?:大|小|视频|多功能|VIP|研讨|培训|接待|报告)?(?:会议室|室|厅|房间|中心))/);
+        if (roomMatch) {
+            const loc = roomMatch[1].trim();
+            if (loc.length >= 3 && !loc.includes('点')) {
+                return loc;
+            }
         }
 
-        // 匹配 "地点：X"
-        const locationLabelMatch = text.match(/(?:地点|场所|位置)[是为：:]*\s*([A-Za-z0-9一二三四五六七八九十楼室]+(?:大|小)?(?:会议室|房间|大厅|楼)?)/);
-        if (locationLabelMatch) {
-            return locationLabelMatch[1].trim();
+        // 8. 匹配办公楼/行政楼等
+        const buildingMatch = text.match(/([A-Za-z一二三四五六七八九十]+(?:行政|办公|综合|培训)?楼(?:\d*(?:大|小)?会议室)?)/);
+        if (buildingMatch) {
+            return buildingMatch[1].trim();
+        }
+
+        // 9. 匹配线上会议平台
+        const onlineMatch = text.match(/(腾讯会议|钉钉会议|Zoom|Teams|飞书会议|线上会议|视频会议)/);
+        if (onlineMatch) {
+            return onlineMatch[1];
         }
 
         return null;
     }
 
     /**
-     * 提取参会人员（增强版）
+     * 提取参会人员（增强版 - 更智能）
      */
     extractAttendees(text) {
         const attendees = [];
 
-        // 常见姓氏列表
-        const surnames = '王李张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎易常武乔贺赖龚文';
+        // 常见姓氏列表（扩展）
+        const surnames = '王李张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎易常武乔贺赖龚文庞樊兰殷施陶洪翟安颜倪严牛温芦季俞章鲁葛伍韦申尚董傅';
 
-        // 1. 提取人名（X总、X经理、X主任等）
-        const titlePattern = new RegExp(`[${surnames}](?:总|经理|主任|处长|科长|局长|书记|部长|组长|主管)`, 'g');
-        const titleMatches = text.match(titlePattern);
-        if (titleMatches) {
-            for (const name of titleMatches) {
-                const cleanName = name.trim();
-                if (cleanName && !attendees.includes(cleanName)) {
-                    attendees.push(cleanName);
+        // 1. 提取"参会人员：XXX"格式的名单
+        const attendeesPatterns = [
+            /(?:参会|参加|与会|出席|列席)(?:人员|代表)[：:]*\s*([^\n]+?)(?=[，,。！？]|$)/,
+            /(?:参加|出席)[者员][：:]*\s*([^\n]+?)(?=[，,。！？]|$)/,
+        ];
+
+        for (const pattern of attendeesPatterns) {
+            const match = text.match(pattern);
+            if (match) {
+                const names = match[1].split(/[、，,和与跟及\s]+/);
+                for (const name of names) {
+                    const cleanName = name.trim();
+                    if (cleanName && cleanName.length >= 2 && cleanName.length <= 10 && !attendees.includes(cleanName)) {
+                        attendees.push(cleanName);
+                    }
                 }
             }
         }
 
-        // 2. 提取部门名称
-        const deptPattern = /(?:和|与|跟|组织|召集)\s*([^和与跟，,。！？\d点时半分上午下午晚上中午早晨会议室楼号]{2,8}(?:部|处|科|室|中心|组|单位))/g;
-        let deptMatch;
-        while ((deptMatch = deptPattern.exec(text)) !== null) {
-            const dept = deptMatch[1].trim();
-            if (dept && !attendees.includes(dept)) {
-                attendees.push(dept);
-            }
-        }
+        // 2. 提取人名（X总、X经理、X主任等职位）
+        const titlePatterns = [
+            new RegExp(`([${surnames}][\\u4e00-\\u9fa5]{0,2}(?:总|经理|主任|处长|科长|局长|书记|部长|组长|主管|总监|董事|行长|校长|院长|所长))`, 'g'),
+            new RegExp(`([${surnames}][\\u4e00-\\u9fa5]{0,2}(?:工|师|员|助|秘))`, 'g'),
+        ];
 
-        // 3. 提取"参会人员"后的名单
-        const attendeesMatch = text.match(/(?:参会人员|参加人员|与会人员|出席人员)[：:]*\s*([^，,。！？\n]+)/);
-        if (attendeesMatch) {
-            const names = attendeesMatch[1].split(/[、，,和与跟]/);
-            for (const name of names) {
-                const cleanName = name.trim();
-                if (cleanName && cleanName.length >= 2 && !attendees.includes(cleanName)) {
-                    attendees.push(cleanName);
+        for (const pattern of titlePatterns) {
+            const matches = text.match(pattern);
+            if (matches) {
+                for (const name of matches) {
+                    const cleanName = name.trim();
+                    if (cleanName && !attendees.includes(cleanName)) {
+                        attendees.push(cleanName);
+                    }
                 }
             }
         }
 
-        return [...new Set(attendees)];
+        // 3. 提取"和/与/跟 XXX"格式的人名或部门
+        const withPatterns = [
+            /[和与跟]\s*([^\s，,。！？]{2,4}(?:总|经理|主任|处长|科长|局长|书记))/g,
+            /[和与跟]\s*([^\s，,。！？]{2,8}(?:部|处|科|室|中心|组|单位|公司))/g,
+            /[和与跟]\s*([^\s，,。！？]{2,4}(?:先生|女士|同志))/g,
+        ];
+
+        for (const pattern of withPatterns) {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                const name = match[1].trim();
+                if (name && !attendees.includes(name)) {
+                    attendees.push(name);
+                }
+            }
+        }
+
+        // 4. 提取部门名称（独立出现或配合动词）
+        const deptPatterns = [
+            /([^\s，,。！？]{2,6}(?:部|处|科|室|中心|组|单位|公司))/g,
+            /(组织|召集|召开)\s*([^\s，,。！？]{2,6}(?:部|处|科|室|中心|组|单位))/g,
+        ];
+
+        for (const pattern of deptPatterns) {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                // 取最后一个捕获组或整个匹配
+                const dept = match[match.length - 1].trim();
+                // 过滤掉常见的非部门词
+                const excludeWords = ['会议室', '办公室', '时间', '地点', '内容', '主题', '要求'];
+                if (dept && !excludeWords.some(w => dept.includes(w)) && !attendees.includes(dept)) {
+                    attendees.push(dept);
+                }
+            }
+        }
+
+        // 5. 提取特殊参会对象
+        const specialPatterns = [
+            /(全体员工|全体人员|全体职工|全体干部|各部门负责人|领导班子|中层干部|党员代表|职工代表)/,
+            /(相关部门|有关部门|各科室|各部门|各处室)/,
+        ];
+
+        for (const pattern of specialPatterns) {
+            const match = text.match(pattern);
+            if (match && !attendees.includes(match[1])) {
+                attendees.push(match[1]);
+            }
+        }
+
+        // 6. 提取姓名（2-3个字，后面没有职位）
+        // 先找出所有可能是姓名的词
+        const nameMatch = text.match(new RegExp(`[${surnames}][\\u4e00-\\u9fa5]{1,2}`, 'g'));
+        if (nameMatch) {
+            for (const name of nameMatch) {
+                // 过滤掉常见的非人名词
+                const excludeWords = ['会议', '文件', '工作', '学习', '培训', '总结', '汇报', '讨论'];
+                if (name && name.length >= 2 && name.length <= 3) {
+                    if (!excludeWords.some(w => name.includes(w)) && !attendees.includes(name)) {
+                        // 检查上下文是否表示人名
+                        const idx = text.indexOf(name);
+                        const context = text.substring(Math.max(0, idx - 2), Math.min(text.length, idx + name.length + 2));
+                        if (/[和与跟叫请叫]/.test(context) || /参会|出席|参加/.test(context)) {
+                            attendees.push(name);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 去重并返回
+        return [...new Set(attendees)].slice(0, 10); // 最多返回10个
     }
 
     /**
