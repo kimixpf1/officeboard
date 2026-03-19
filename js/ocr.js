@@ -460,6 +460,11 @@ class OCRManager {
     parseWithRules(text) {
         const items = [];
 
+        // 初始化模板匹配器
+        if (!this.templateMatcher && window.TemplateMatcher) {
+            this.templateMatcher = new window.TemplateMatcher();
+        }
+
         // 按多种分隔符分行处理
         let lines = text.split(/[\n\r]+/);
 
@@ -473,13 +478,6 @@ class OCRManager {
 
         lines = lines.filter(line => line.trim());
 
-        // 会议关键词
-        const meetingKeywords = ['会议', '座谈', '研讨', '讨论', '会谈', '例会', '周会', '月会', '沟通', '交流', '视频会议', '培训', '讲座'];
-        // 待办关键词（动词）
-        const todoKeywords = ['待办', '任务', '完成', '提交', '汇报', '准备', '撰写', '整理', '处理', '审批', '审核', '修改', '制定', '编写', '发送', '回复', '确认', '安排', '通知', '跟进'];
-        // 文件关键词
-        const docKeywords = ['文件', '通知', '函件', '请示', '批复', '批示', '传阅件', '收文', '发文'];
-
         for (const line of lines) {
             const trimmedLine = line.trim();
             if (!trimmedLine || trimmedLine.length < 2) continue;
@@ -487,65 +485,107 @@ class OCRManager {
             let type = null;
             let data = {};
 
-            // 提取日期（可能跨天）
-            const dateInfo = this.extractDateWithRange(trimmedLine);
+            // 首先尝试模板匹配
+            if (this.templateMatcher) {
+                const templateMatch = this.templateMatcher.match(trimmedLine);
+                if (templateMatch) {
+                    type = templateMatch.type;
+                    data.title = templateMatch.title || trimmedLine.substring(0, 30);
 
-            // 提取时间（可能有时间段）
-            const timeInfo = this.extractTimeWithRange(trimmedLine);
+                    if (templateMatch.type === 'meeting') {
+                        data.priority = templateMatch.priority || 'medium';
+                    } else if (templateMatch.type === 'todo') {
+                        data.priority = templateMatch.priority || 'medium';
+                    } else if (templateMatch.type === 'document') {
+                        data.docType = templateMatch.docType || '文件';
+                        data.progress = templateMatch.progress || 'pending';
+                    }
+                }
+            }
 
-            // 提取地点
-            const locationInfo = this.extractLocation(trimmedLine);
+            // 如果模板没有匹配，使用原有规则
+            if (!type) {
+                // 会议关键词
+                const meetingKeywords = ['会议', '座谈', '研讨', '讨论', '会谈', '例会', '周会', '月会', '沟通', '交流', '视频会议', '培训', '讲座'];
+                // 待办关键词（动词）
+                const todoKeywords = ['待办', '任务', '完成', '提交', '汇报', '准备', '撰写', '整理', '处理', '审批', '审核', '修改', '制定', '编写', '发送', '回复', '确认', '安排', '通知', '跟进'];
+                // 文件关键词
+                const docKeywords = ['文件', '通知', '函件', '请示', '批复', '批示', '传阅件', '收文', '发文'];
 
-            // 提取参会人员
-            const attendeesInfo = this.extractAttendees(trimmedLine);
+                // 提取日期（可能跨天）
+                const dateInfo = this.extractDateWithRange(trimmedLine);
+                // 提取时间（可能有时间段）
+                const timeInfo = this.extractTimeWithRange(trimmedLine);
+                // 提取地点
+                const locationInfo = this.extractLocation(trimmedLine);
+                // 提取参会人员
+                const attendeesInfo = this.extractAttendees(trimmedLine);
+                // 提取会议标题
+                const meetingTitle = this.extractMeetingTitle(trimmedLine);
 
-            // 提取会议标题
-            const meetingTitle = this.extractMeetingTitle(trimmedLine);
-
-            // 判断类型
-            if (meetingKeywords.some(kw => trimmedLine.includes(kw)) ||
-                (dateInfo.date && timeInfo.time && (locationInfo || attendeesInfo.length > 0))) {
-                type = 'meeting';
-                data.date = dateInfo.date;
-                if (dateInfo.endDate) data.endDate = dateInfo.endDate;
-                data.time = timeInfo.time;
-                if (timeInfo.endTime) data.endTime = timeInfo.endTime;
-                if (locationInfo) data.location = locationInfo;
-                if (attendeesInfo.length > 0) data.attendees = attendeesInfo;
-                // 使用提取的会议标题或生成默认标题
-                data.title = meetingTitle || this.generateMeetingTitle(trimmedLine, data);
-                // 生成格式化显示标题
-                data.displayTitle = this.formatMeetingTitle(data);
-
-            } else if (todoKeywords.some(kw => trimmedLine.includes(kw))) {
-                type = 'todo';
-                data.priority = 'medium';
-                if (dateInfo.date) {
+                if (meetingKeywords.some(kw => trimmedLine.includes(kw)) ||
+                    (dateInfo.date && timeInfo.time && (locationInfo || attendeesInfo.length > 0))) {
+                    type = 'meeting';
+                    data.date = dateInfo.date;
+                    if (dateInfo.endDate) data.endDate = dateInfo.endDate;
+                    data.time = timeInfo.time;
+                    if (timeInfo.endTime) data.endTime = timeInfo.endTime;
+                    if (locationInfo) data.location = locationInfo;
+                    if (attendeesInfo.length > 0) data.attendees = attendeesInfo;
+                    data.title = meetingTitle || this.generateMeetingTitle(trimmedLine, data);
+                } else if (todoKeywords.some(kw => trimmedLine.includes(kw))) {
+                    type = 'todo';
+                    data.priority = 'medium';
+                    if (dateInfo.date) {
+                        data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
+                    }
+                    data.title = this.generateTodoTitle(trimmedLine);
+                } else if (docKeywords.some(kw => trimmedLine.includes(kw))) {
+                    type = 'document';
+                    data.progress = 'pending';
+                    const docNumMatch = trimmedLine.match(/[〔\[【][^\]】〕]+[〕\]】]\d+号?|[\u4e00-\u9fa5]+字\d+号/);
+                    if (docNumMatch) {
+                        data.docNumber = docNumMatch[0];
+                    }
+                    data.title = this.generateDocumentTitle(trimmedLine, data);
+                } else if (dateInfo.date) {
+                    type = 'todo';
+                    data.priority = 'medium';
                     data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
+                    data.title = this.generateTodoTitle(trimmedLine);
+                } else {
+                    type = 'todo';
+                    data.priority = 'medium';
+                    data.title = this.generateTodoTitle(trimmedLine);
                 }
-                data.title = this.generateTodoTitle(trimmedLine);
-
-            } else if (docKeywords.some(kw => trimmedLine.includes(kw))) {
-                type = 'document';
-                data.progress = 'pending';
-                const docNumMatch = trimmedLine.match(/[〔\[【][^\]】〕]+[〕\]】]\d+号?|[\u4e00-\u9fa5]+字\d+号/);
-                if (docNumMatch) {
-                    data.docNumber = docNumMatch[0];
-                }
-                data.title = this.generateDocumentTitle(trimmedLine, data);
-
-            } else if (dateInfo.date) {
-                // 有日期但没有明确类型，默认为待办
-                type = 'todo';
-                data.priority = 'medium';
-                data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
-                data.title = this.generateTodoTitle(trimmedLine);
-
             } else {
-                // 默认作为待办
-                type = 'todo';
-                data.priority = 'medium';
-                data.title = this.generateTodoTitle(trimmedLine);
+                // 模板匹配成功后，还需要提取日期时间等信息
+                const dateInfo = this.extractDateWithRange(trimmedLine);
+                const timeInfo = this.extractTimeWithRange(trimmedLine);
+                const locationInfo = this.extractLocation(trimmedLine);
+                const attendeesInfo = this.extractAttendees(trimmedLine);
+
+                if (type === 'meeting') {
+                    data.date = dateInfo.date;
+                    if (dateInfo.endDate) data.endDate = dateInfo.endDate;
+                    data.time = timeInfo.time;
+                    if (timeInfo.endTime) data.endTime = timeInfo.endTime;
+                    if (locationInfo) data.location = locationInfo;
+                    if (attendeesInfo.length > 0) data.attendees = attendeesInfo;
+                } else if (type === 'todo') {
+                    if (dateInfo.date) {
+                        data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
+                    }
+                }
+            }
+
+            // 格式化显示标题
+            if (type === 'meeting') {
+                data.displayTitle = this.formatMeetingTitle(data);
+            } else if (type === 'todo') {
+                data.displayTitle = this.formatTodoTitle(data);
+            } else if (type === 'document') {
+                data.displayTitle = this.formatDocumentTitle(data);
             }
 
             items.push({ type, data });
