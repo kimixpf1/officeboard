@@ -247,6 +247,7 @@ class SyncManager {
                 sync_time: syncTime,
                 items: allItems,
                 settings: settings,
+                memo: localStorage.getItem('office_memo_content') || '',  // 添加备忘录同步
                 device_info: navigator.userAgent
             };
 
@@ -300,6 +301,14 @@ class SyncManager {
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
                 }
+            }
+
+            // 同步备忘录
+            if (cloudData.data.memo !== undefined) {
+                localStorage.setItem('office_memo_content', cloudData.data.memo);
+                document.dispatchEvent(new CustomEvent('memoSynced', { 
+                    detail: { content: cloudData.data.memo } 
+                }));
             }
 
             // 同步事项（带去重）
@@ -587,6 +596,14 @@ class SyncManager {
                 }
             }
 
+            // 同步备忘录
+            if (data.data.memo !== undefined) {
+                localStorage.setItem('office_memo_content', data.data.memo);
+                document.dispatchEvent(new CustomEvent('memoSynced', { 
+                    detail: { content: data.data.memo } 
+                }));
+            }
+
             // 同步事项 - 带去重逻辑
             const cloudItems = data.data.items || [];
             
@@ -871,6 +888,7 @@ class SyncManager {
                 sync_time: new Date().toISOString(),
                 items: allItems,
                 settings: settings,
+                memo: localStorage.getItem('office_memo_content') || '',
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
@@ -969,6 +987,15 @@ class SyncManager {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
                 }
                 console.log('已同步API Key设置');
+            }
+
+            // 同步备忘录
+            if (data.data.memo !== undefined) {
+                localStorage.setItem('office_memo_content', data.data.memo);
+                document.dispatchEvent(new CustomEvent('memoSynced', { 
+                    detail: { content: data.data.memo } 
+                }));
+                console.log('已同步备忘录');
             }
 
             // 同步事项数据

@@ -261,8 +261,10 @@ class OfficeDashboard {
             memoPanel.classList.remove('expanded');
         });
 
-        // 自动保存（防抖）
+        // 自动保存（防抖）+ 云端同步
         let saveTimeout = null;
+        let syncTimeout = null;
+        
         memoText.addEventListener('input', () => {
             if (memoStatus) {
                 memoStatus.textContent = '保存中...';
@@ -286,7 +288,35 @@ class OfficeDashboard {
                         memoStatus.textContent = '自动保存';
                     }
                 }, 3000);
+
+                // 云端同步（已登录时）
+                if (syncManager.isLoggedIn()) {
+                    if (syncTimeout) {
+                        clearTimeout(syncTimeout);
+                    }
+                    syncTimeout = setTimeout(() => {
+                        syncManager.immediateSyncToCloud();
+                        if (memoStatus) {
+                            memoStatus.textContent = '已同步到云端';
+                        }
+                    }, 2000);
+                }
             }, 500);
+        });
+
+        // 监听云端同步事件（其他设备更新时）
+        document.addEventListener('memoSynced', (e) => {
+            const newContent = e.detail.content;
+            if (newContent !== memoText.value) {
+                memoText.value = newContent;
+                localStorage.setItem('office_memo_content', newContent);
+                if (memoStatus) {
+                    memoStatus.textContent = '已从云端同步';
+                    setTimeout(() => {
+                        memoStatus.textContent = '自动保存';
+                    }, 3000);
+                }
+            }
         });
 
         // 键盘快捷键：Escape 关闭面板

@@ -2608,10 +2608,25 @@ body {
 
 /* 手机端便签样式 */
 @media (max-width: 640px) {
+    .memo-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: auto;
+        height: 100vh;
+    }
+
+    .memo-panel.expanded {
+        width: 100vw;
+    }
+
     .memo-panel.expanded .memo-content {
         width: 100vw;
-        position: absolute;
+        position: fixed;
         right: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 1001;
     }
 
     .memo-panel.expanded .memo-toggle {
@@ -2621,10 +2636,47 @@ body {
     }
 
     .memo-toggle {
-        width: 32px;
+        width: 28px;
+        padding: 10px 0;
+        border-radius: 6px 0 0 6px;
     }
 
     .memo-toggle-text {
+        font-size: 10px;
+        letter-spacing: 1px;
+    }
+
+    .memo-header {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .memo-header h3 {
+        font-size: 15px;
+    }
+
+    .memo-body {
+        padding: var(--spacing-3);
+    }
+
+    .memo-body textarea {
+        padding: var(--spacing-3);
+        font-size: 15px;
+        line-height: 1.7;
+    }
+
+    .memo-footer {
+        padding: var(--spacing-2) var(--spacing-4);
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .memo-status, .memo-hint {
         font-size: 11px;
+    }
+
+    .memo-close {
+        width: 36px;
+        height: 36px;
+        background: var(--gray-100);
     }
 }
