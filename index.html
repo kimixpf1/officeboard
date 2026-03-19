@@ -691,6 +691,43 @@
         <span class="loading-text">处理中...</span>
     </div>
 
+    <!-- 右侧便签备忘录 -->
+    <div id="memoPanel" class="memo-panel">
+        <div class="memo-toggle" id="memoToggle" title="便签备忘录">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span class="memo-toggle-text">备忘</span>
+        </div>
+        <div class="memo-content">
+            <div class="memo-header">
+                <h3>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    便签备忘录
+                </h3>
+                <button class="memo-close" id="memoClose" title="收起">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+            <div class="memo-body">
+                <textarea id="memoText" placeholder="记录重要事项、待确认的会议、临时想法...&#10;&#10;此便签跨日期保存，不属于任何特定日期。"></textarea>
+            </div>
+            <div class="memo-footer">
+                <span class="memo-status" id="memoStatus">自动保存</span>
+                <span class="memo-hint">内容自动保存到本地</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 脚本引用 -->
     <!-- Tesseract.js OCR引擎 v4 - 稳定版本 -->
     <script src="https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js"></script>

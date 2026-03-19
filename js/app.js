@@ -224,6 +224,77 @@ class OfficeDashboard {
         document.addEventListener('gotoDate', (e) => {
             this.goToDateView(e.detail.date);
         });
+
+        // 便签备忘录功能
+        this.initMemoPanel();
+    }
+
+    /**
+     * 初始化便签备忘录
+     */
+    initMemoPanel() {
+        const memoPanel = document.getElementById('memoPanel');
+        const memoToggle = document.getElementById('memoToggle');
+        const memoClose = document.getElementById('memoClose');
+        const memoText = document.getElementById('memoText');
+        const memoStatus = document.getElementById('memoStatus');
+
+        if (!memoPanel || !memoToggle || !memoText) return;
+
+        // 加载保存的内容
+        const savedMemo = localStorage.getItem('office_memo_content');
+        if (savedMemo) {
+            memoText.value = savedMemo;
+        }
+
+        // 切换面板展开/收起
+        memoToggle.addEventListener('click', () => {
+            if (memoPanel.classList.contains('expanded')) {
+                memoPanel.classList.remove('expanded');
+            } else {
+                memoPanel.classList.add('expanded');
+                memoText.focus();
+            }
+        });
+
+        memoClose.addEventListener('click', () => {
+            memoPanel.classList.remove('expanded');
+        });
+
+        // 自动保存（防抖）
+        let saveTimeout = null;
+        memoText.addEventListener('input', () => {
+            if (memoStatus) {
+                memoStatus.textContent = '保存中...';
+                memoStatus.classList.add('saving');
+            }
+
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+
+            saveTimeout = setTimeout(() => {
+                localStorage.setItem('office_memo_content', memoText.value);
+                if (memoStatus) {
+                    memoStatus.textContent = '已保存';
+                    memoStatus.classList.remove('saving');
+                }
+
+                // 3秒后恢复默认状态
+                setTimeout(() => {
+                    if (memoStatus) {
+                        memoStatus.textContent = '自动保存';
+                    }
+                }, 3000);
+            }, 500);
+        });
+
+        // 键盘快捷键：Escape 关闭面板
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && memoPanel.classList.contains('expanded')) {
+                memoPanel.classList.remove('expanded');
+            }
+        });
     }
 
     /**

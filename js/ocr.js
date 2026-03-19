@@ -499,7 +499,7 @@ class OCRManager {
 
             // ========== 判断事项类型 ==========
             // 会议关键词（扩展）
-            const meetingKeywords = ['会议', '座谈', '研讨', '讨论', '会谈', '例会', '周会', '月会', '沟通', '交流', '视频会议', '培训', '讲座', '召见', '约谈'];
+            const meetingKeywords = ['会议', '座谈', '研讨', '讨论', '会谈', '例会', '周会', '月会', '沟通', '交流', '视频会议', '培训', '讲座', '召见', '约谈', '开会'];
             // 会议动词
             const meetingVerbs = ['召开', '举行', '组织', '召集', '主持', '开展', '进行'];
             // 待办关键词
@@ -570,125 +570,83 @@ class OCRManager {
     }
 
     /**
-     * 增强版参会人员提取
+     * 增强版参会人员提取（完全重写 - 解决匹配错误和重复问题）
      */
     extractAttendeesEnhanced(text) {
-        const attendees = [];
-        const addedNames = new Set(); // 用于去重
+        const result = [];
+        const surnames = '王李张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎易常武乔贺赖龚文';
 
-        // 常见姓氏列表
-        const surnames = '王李张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎易常武乔贺赖龚文庞樊兰殷施陶洪翟安颜倪严牛温芦季俞章鲁葛伍韦申尚董傅欧';
+        // 已添加的人员，用于去重
+        const added = new Set();
 
-        // 辅助函数：添加人员并去重
-        const addPerson = (name) => {
-            if (!name || name.length < 2) return;
-            
-            // 过滤掉不应出现的字
-            const excludeSuffixes = ['等', '及', '共', '、', '，', '。', '的'];
-            for (const suffix of excludeSuffixes) {
-                if (name.endsWith(suffix)) {
-                    name = name.slice(0, -1);
+        // 辅助函数 - 智能添加，避免重复
+        const add = (name) => {
+            if (!name || name.length < 2 || name.length > 5) return;
+            name = name.trim();
+            if (!name || added.has(name)) return;
+
+            // 检查重叠，保留更完整的
+            for (const existing of added) {
+                if (existing.includes(name)) return; // 已有更完整的
+                if (name.includes(existing)) {
+                    // 新名字更完整，替换旧的
+                    added.delete(existing);
+                    const idx = result.indexOf(existing);
+                    if (idx > -1) result.splice(idx, 1);
+                    break;
                 }
             }
-            
-            if (!name || name.length < 2) return;
-            
-            // 检查是否是子串关系（避免"张处"和"张处长"同时出现）
-            for (const existing of addedNames) {
-                if (existing.includes(name) || name.includes(existing)) {
-                    // 保留较长的那个
-                    if (name.length > existing.length) {
-                        addedNames.delete(existing);
-                        addedNames.add(name);
-                        // 更新数组
-                        const idx = attendees.indexOf(existing);
-                        if (idx > -1) {
-                            attendees.splice(idx, 1);
-                        }
-                        attendees.push(name);
-                    }
-                    return;
-                }
-            }
-            
-            // 检查是否已存在
-            if (!addedNames.has(name)) {
-                addedNames.add(name);
-                attendees.push(name);
-            }
+            added.add(name);
+            result.push(name);
         };
 
-        // ========== 1. 提取"XXX召集/主持XXX"格式 ==========
-        const conveneMatch = text.match(new RegExp(`([${surnames}][\\u4e00-\\u9fa5]{0,3}(?:局|处|科|厅|部|室|校|所|委)?)\\s*(?:召集|主持|组织|召开)`));
-        if (conveneMatch) {
-            const convener = conveneMatch[1].trim();
-            addPerson(convener);
+        // ========== 1. 匹配完整职位（如"张处长"、"王局长"）==========
+        // 移除前瞻断言，直接匹配
+        const fullPattern = new RegExp(`[${surnames}][\\u4e00-\\u9fa5]{0,1}(?:局长|处长|科长|厅长|部长|主任|书记|院长|校长|所长|市长|县长|经理|总监|主管)`, 'g');
+        let match;
+        while ((match = fullPattern.exec(text)) !== null) {
+            add(match[0]);
         }
 
-        // ========== 2. 提取姓+职位简称（王局、李处、张科等）==========
-        const shortTitlePattern = new RegExp(`[${surnames}][局处科厅部室院校所市省县乡镇村党委常委](?![长员工师])`, 'g');
-        const shortTitleMatches = text.match(shortTitlePattern);
-        if (shortTitleMatches) {
-            for (const name of shortTitleMatches) {
-                addPerson(name);
+        // ========== 2. 匹配简称（如"王局"、"张处"）==========
+        const shortPattern = new RegExp(`[${surnames}](?:局|处|科|厅|部|委)`, 'g');
+        while ((match = shortPattern.exec(text)) !== null) {
+            const name = match[0];
+            // 检查是否已有对应的全称（如"王局"对应"王局长"）
+            const fullVersion = name + '长';
+            if (!added.has(fullVersion) && ![...added].some(a => a.startsWith(name))) {
+                add(name);
             }
         }
 
-        // ========== 3. 提取姓+完整职位 ==========
-        const fullTitlePattern = new RegExp(`[${surnames}][\\u4e00-\\u9fa5]{0,2}(?:局长|处长|科长|厅长|部长|主任|书记|院长|校长|所长|市长|县长|乡长|镇长|村长|队长|组长|主管|经理|总监|董事|行长)`, 'g');
-        const fullTitleMatches = text.match(fullTitlePattern);
-        if (fullTitleMatches) {
-            for (const name of fullTitleMatches) {
-                addPerson(name);
+        // ========== 3. 匹配"召集XXX"格式 ==========
+        // "王局召集张处长" -> 提取"王局"
+        const conveneBeforePattern = new RegExp(`([${surnames}](?:局|处|科|厅|部|委)[\\u4e00-\\u9fa5]{0,1}(?:长)?)召集`, 'g');
+        while ((match = conveneBeforePattern.exec(text)) !== null) {
+            add(match[1]);
+        }
+
+        // ========== 4. 匹配"和/与/跟 XXX"格式 ==========
+        const withPattern = new RegExp(`[和与跟]\\s*([${surnames}][\\u4e00-\\u9fa5]{0,2}(?:长|总|经理|主任))(?=[^\\u4e00-\\u9fa5]|$)`, 'g');
+        while ((match = withPattern.exec(text)) !== null) {
+            add(match[1]);
+        }
+
+        // ========== 5. 匹配部门 ==========
+        const deptPattern = /([\u4e00-\u9fa5]{2,4}(?:部|科室|中心|组))(?![室])/g;
+        while ((match = deptPattern.exec(text)) !== null) {
+            const dept = match[1];
+            if (!['会议室', '办公室', '会议室A', '会议室B'].includes(dept)) {
+                add(dept);
             }
         }
 
-        // ========== 4. 提取"和/与/跟 XXX"格式的人名 ==========
-        const withPattern = new RegExp(`[和与跟]\\s*([${surnames}][\\u4e00-\\u9fa5]{1,4}(?:总|经理|主任|处长|科长|局长|书记|部长|组长|主管|总监)?)`, 'g');
-        let withMatch;
-        while ((withMatch = withPattern.exec(text)) !== null) {
-            const name = withMatch[1].trim();
-            addPerson(name);
-        }
+        // ========== 6. 特殊对象 ==========
+        if (text.includes('全体员工')) add('全体员工');
+        if (text.includes('各部门负责人')) add('各部门负责人');
+        if (text.includes('领导班子')) add('领导班子');
 
-        // ========== 5. 提取"参会人员："后的名单 ==========
-        const attendeesLabelMatch = text.match(/(?:参会|参加|与会|出席|列席)(?:人员|代表)?[：:]*\s*([^，,。！？\n]+)/);
-        if (attendeesLabelMatch) {
-            const names = attendeesLabelMatch[1].split(/[、，,和与跟及\s]+/);
-            for (const name of names) {
-                const cleanName = name.trim();
-                if (cleanName && cleanName.length >= 2) {
-                    addPerson(cleanName);
-                }
-            }
-        }
-
-        // ========== 6. 提取部门名称 ==========
-        const deptPattern = /([^\s，,。！？\d点时半分]{2,8}(?:部|处|科|室|中心|组|单位|局|厅|委|办|院|校|所))/g;
-        let deptMatch;
-        while ((deptMatch = deptPattern.exec(text)) !== null) {
-            const dept = deptMatch[1].trim();
-            // 过滤掉非部门词
-            const excludeWords = ['会议室', '办公室', '时间', '地点', '内容', '主题', '要求', '召开', '组织', '工作'];
-            if (!excludeWords.some(w => dept.includes(w))) {
-                addPerson(dept);
-            }
-        }
-
-        // ========== 7. 提取特殊参会对象 ==========
-        const specialPatterns = [
-            /(全体员工|全体人员|全体职工|全体干部|各部门负责人|领导班子|中层干部|党员代表|职工代表)/,
-            /(相关部门|有关部门|各科室|各部门|各处室|全体同志)/,
-        ];
-
-        for (const pattern of specialPatterns) {
-            const match = text.match(pattern);
-            if (match) {
-                addPerson(match[1]);
-            }
-        }
-
-        return attendees.slice(0, 10);
+        return result.slice(0, 8);
     }
 
     /**
