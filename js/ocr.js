@@ -485,98 +485,73 @@ class OCRManager {
             let type = null;
             let data = {};
 
-            // 首先尝试模板匹配
-            if (this.templateMatcher) {
-                const templateMatch = this.templateMatcher.match(trimmedLine);
-                if (templateMatch) {
-                    type = templateMatch.type;
-                    data.title = templateMatch.title || trimmedLine.substring(0, 30);
+            // ========== 统一提取所有信息 ==========
+            // 提取日期（可能跨天）
+            const dateInfo = this.extractDateWithRange(trimmedLine);
+            // 提取时间（可能有时间段）
+            const timeInfo = this.extractTimeWithRange(trimmedLine);
+            // 提取地点
+            const locationInfo = this.extractLocation(trimmedLine);
+            // 提取参会人员（增强版）
+            const attendeesInfo = this.extractAttendeesEnhanced(trimmedLine);
+            // 提取会议标题（增强版）
+            const meetingTitle = this.extractMeetingTitleEnhanced(trimmedLine);
 
-                    if (templateMatch.type === 'meeting') {
-                        data.priority = templateMatch.priority || 'medium';
-                    } else if (templateMatch.type === 'todo') {
-                        data.priority = templateMatch.priority || 'medium';
-                    } else if (templateMatch.type === 'document') {
-                        data.docType = templateMatch.docType || '文件';
-                        data.progress = templateMatch.progress || 'pending';
-                    }
-                }
-            }
+            // ========== 判断事项类型 ==========
+            // 会议关键词（扩展）
+            const meetingKeywords = ['会议', '座谈', '研讨', '讨论', '会谈', '例会', '周会', '月会', '沟通', '交流', '视频会议', '培训', '讲座', '召见', '约谈'];
+            // 会议动词
+            const meetingVerbs = ['召开', '举行', '组织', '召集', '主持', '开展', '进行'];
+            // 待办关键词
+            const todoKeywords = ['待办', '任务', '完成', '提交', '汇报', '准备', '撰写', '整理', '处理', '审批', '审核', '修改', '制定', '编写', '发送', '回复', '确认', '安排', '通知', '跟进'];
+            // 文件关键词
+            const docKeywords = ['文件', '通知', '函件', '请示', '批复', '批示', '传阅件', '收文', '发文'];
 
-            // 如果模板没有匹配，使用原有规则
-            if (!type) {
-                // 会议关键词
-                const meetingKeywords = ['会议', '座谈', '研讨', '讨论', '会谈', '例会', '周会', '月会', '沟通', '交流', '视频会议', '培训', '讲座'];
-                // 待办关键词（动词）
-                const todoKeywords = ['待办', '任务', '完成', '提交', '汇报', '准备', '撰写', '整理', '处理', '审批', '审核', '修改', '制定', '编写', '发送', '回复', '确认', '安排', '通知', '跟进'];
-                // 文件关键词
-                const docKeywords = ['文件', '通知', '函件', '请示', '批复', '批示', '传阅件', '收文', '发文'];
+            // 判断是否为会议
+            const isMeeting = meetingKeywords.some(kw => trimmedLine.includes(kw)) ||
+                              meetingVerbs.some(v => trimmedLine.includes(v)) ||
+                              (dateInfo.date && timeInfo.time && (locationInfo || attendeesInfo.length > 0));
 
-                // 提取日期（可能跨天）
-                const dateInfo = this.extractDateWithRange(trimmedLine);
-                // 提取时间（可能有时间段）
-                const timeInfo = this.extractTimeWithRange(trimmedLine);
-                // 提取地点
-                const locationInfo = this.extractLocation(trimmedLine);
-                // 提取参会人员
-                const attendeesInfo = this.extractAttendees(trimmedLine);
-                // 提取会议标题
-                const meetingTitle = this.extractMeetingTitle(trimmedLine);
+            if (isMeeting) {
+                type = 'meeting';
+                data.date = dateInfo.date;
+                if (dateInfo.endDate) data.endDate = dateInfo.endDate;
+                data.time = timeInfo.time;
+                if (timeInfo.endTime) data.endTime = timeInfo.endTime;
+                if (locationInfo) data.location = locationInfo;
+                if (attendeesInfo.length > 0) data.attendees = attendeesInfo;
+                data.title = meetingTitle || this.generateMeetingTitle(trimmedLine, data);
+                data.priority = 'medium';
 
-                if (meetingKeywords.some(kw => trimmedLine.includes(kw)) ||
-                    (dateInfo.date && timeInfo.time && (locationInfo || attendeesInfo.length > 0))) {
-                    type = 'meeting';
-                    data.date = dateInfo.date;
-                    if (dateInfo.endDate) data.endDate = dateInfo.endDate;
-                    data.time = timeInfo.time;
-                    if (timeInfo.endTime) data.endTime = timeInfo.endTime;
-                    if (locationInfo) data.location = locationInfo;
-                    if (attendeesInfo.length > 0) data.attendees = attendeesInfo;
-                    data.title = meetingTitle || this.generateMeetingTitle(trimmedLine, data);
-                } else if (todoKeywords.some(kw => trimmedLine.includes(kw))) {
-                    type = 'todo';
-                    data.priority = 'medium';
-                    if (dateInfo.date) {
-                        data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
-                    }
-                    data.title = this.generateTodoTitle(trimmedLine);
-                } else if (docKeywords.some(kw => trimmedLine.includes(kw))) {
-                    type = 'document';
-                    data.progress = 'pending';
-                    const docNumMatch = trimmedLine.match(/[〔\[【][^\]】〕]+[〕\]】]\d+号?|[\u4e00-\u9fa5]+字\d+号/);
-                    if (docNumMatch) {
-                        data.docNumber = docNumMatch[0];
-                    }
-                    data.title = this.generateDocumentTitle(trimmedLine, data);
-                } else if (dateInfo.date) {
-                    type = 'todo';
-                    data.priority = 'medium';
+            } else if (todoKeywords.some(kw => trimmedLine.includes(kw))) {
+                type = 'todo';
+                data.priority = 'medium';
+                if (dateInfo.date) {
                     data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
-                    data.title = this.generateTodoTitle(trimmedLine);
-                } else {
-                    type = 'todo';
-                    data.priority = 'medium';
-                    data.title = this.generateTodoTitle(trimmedLine);
                 }
-            } else {
-                // 模板匹配成功后，还需要提取日期时间等信息
-                const dateInfo = this.extractDateWithRange(trimmedLine);
-                const timeInfo = this.extractTimeWithRange(trimmedLine);
-                const locationInfo = this.extractLocation(trimmedLine);
-                const attendeesInfo = this.extractAttendees(trimmedLine);
+                data.title = this.generateTodoTitle(trimmedLine);
 
-                if (type === 'meeting') {
-                    data.date = dateInfo.date;
-                    if (dateInfo.endDate) data.endDate = dateInfo.endDate;
-                    data.time = timeInfo.time;
-                    if (timeInfo.endTime) data.endTime = timeInfo.endTime;
-                    if (locationInfo) data.location = locationInfo;
-                    if (attendeesInfo.length > 0) data.attendees = attendeesInfo;
-                } else if (type === 'todo') {
-                    if (dateInfo.date) {
-                        data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
-                    }
+            } else if (docKeywords.some(kw => trimmedLine.includes(kw))) {
+                type = 'document';
+                data.progress = 'pending';
+                const docNumMatch = trimmedLine.match(/[〔\[【][^\]】〕]+[〕\]】]\d+号?|[\u4e00-\u9fa5]+字\d+号/);
+                if (docNumMatch) {
+                    data.docNumber = docNumMatch[0];
                 }
+                data.title = this.generateDocumentTitle(trimmedLine, data);
+
+            } else if (dateInfo.date) {
+                // 有日期但没有明确类型，默认为待办
+                type = 'todo';
+                data.priority = 'medium';
+                data.deadline = dateInfo.date + (timeInfo.time ? 'T' + timeInfo.time : '');
+                data.title = this.generateTodoTitle(trimmedLine);
+
+            } else {
+                // 默认作为待办
+                type = 'todo';
+                data.priority = 'medium';
+                data.title = this.generateTodoTitle(trimmedLine);
             }
 
             // 格式化显示标题
@@ -592,6 +567,212 @@ class OCRManager {
         }
 
         return items;
+    }
+
+    /**
+     * 增强版参会人员提取
+     */
+    extractAttendeesEnhanced(text) {
+        const attendees = [];
+
+        // 常见姓氏列表
+        const surnames = '王李张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎易常武乔贺赖龚文庞樊兰殷施陶洪翟安颜倪严牛温芦季俞章鲁葛伍韦申尚董傅欧';
+
+        // ========== 1. 提取"XXX召集/主持XXX"格式 ==========
+        const conveneMatch = text.match(new RegExp(`([${surnames}][局处科厅部室院校所市省县乡镇村党委常委]?)\\s*(?:召集|主持|组织|召开)\\s*(.+)`));
+        if (conveneMatch) {
+            // 第一个人（召集人）
+            const convener = conveneMatch[1].trim();
+            if (convener && convener.length >= 2) {
+                attendees.push(convener);
+            }
+            // 后面的人
+            const remaining = conveneMatch[2];
+            const morePeople = this.extractPeopleFromText(remaining);
+            attendees.push(...morePeople);
+        }
+
+        // ========== 2. 提取姓+职位简称（王局、李处、张科等）==========
+        const shortTitlePattern = new RegExp(`[${surnames}][局处科厅部室院校所市省县乡镇村党委常委]`, 'g');
+        const shortTitleMatches = text.match(shortTitlePattern);
+        if (shortTitleMatches) {
+            for (const name of shortTitleMatches) {
+                if (!attendees.includes(name)) {
+                    attendees.push(name);
+                }
+            }
+        }
+
+        // ========== 3. 提取姓+完整职位 ==========
+        const fullTitlePattern = new RegExp(`[${surnames}][\\u4e00-\\u9fa5]{0,2}(?:局长|处长|科长|厅长|部长|主任|书记|院长|校长|所长|市长|县长|乡长|镇长|村长|队长|组长|主管|经理|总监|董事|行长|处长|局长)`, 'g');
+        const fullTitleMatches = text.match(fullTitlePattern);
+        if (fullTitleMatches) {
+            for (const name of fullTitleMatches) {
+                if (!attendees.includes(name)) {
+                    attendees.push(name);
+                }
+            }
+        }
+
+        // ========== 4. 提取姓+职称简称（XX长、XX员等）==========
+        const simpleTitlePattern = new RegExp(`[${surnames}][\\u4e00-\\u9fa5]{0,2}(?:长|员|工|师|助|秘|总)`, 'g');
+        const simpleMatches = text.match(simpleTitlePattern);
+        if (simpleMatches) {
+            for (const name of simpleMatches) {
+                // 过滤掉非人名词
+                if (!['会议', '文件', '工作', '学习', '培训'].some(w => name.includes(w))) {
+                    if (!attendees.includes(name)) {
+                        attendees.push(name);
+                    }
+                }
+            }
+        }
+
+        // ========== 5. 提取"和/与/跟 XXX"格式的人名 ==========
+        const withPattern = new RegExp(`[和与跟]\\s*([${surnames}][\\u4e00-\\u9fa5]{1,3})`, 'g');
+        let withMatch;
+        while ((withMatch = withPattern.exec(text)) !== null) {
+            const name = withMatch[1].trim();
+            if (name && name.length >= 2 && !attendees.includes(name)) {
+                attendees.push(name);
+            }
+        }
+
+        // ========== 6. 提取"参会人员："后的名单 ==========
+        const attendeesLabelMatch = text.match(/(?:参会|参加|与会|出席|列席)(?:人员|代表)?[：:]*\s*([^，,。！？\n]+)/);
+        if (attendeesLabelMatch) {
+            const names = attendeesLabelMatch[1].split(/[、，,和与跟及\s]+/);
+            for (const name of names) {
+                const cleanName = name.trim();
+                if (cleanName && cleanName.length >= 2 && !attendees.includes(cleanName)) {
+                    attendees.push(cleanName);
+                }
+            }
+        }
+
+        // ========== 7. 提取部门名称 ==========
+        const deptPattern = /([^\s，,。！？\d点时半分]{2,8}(?:部|处|科|室|中心|组|单位|局|厅|委|办|院|校|所))/g;
+        let deptMatch;
+        while ((deptMatch = deptPattern.exec(text)) !== null) {
+            const dept = deptMatch[1].trim();
+            // 过滤掉非部门词
+            const excludeWords = ['会议室', '办公室', '时间', '地点', '内容', '主题', '要求', '召开', '组织'];
+            if (!excludeWords.some(w => dept.includes(w)) && !attendees.includes(dept)) {
+                attendees.push(dept);
+            }
+        }
+
+        // ========== 8. 提取特殊参会对象 ==========
+        const specialPatterns = [
+            /(全体员工|全体人员|全体职工|全体干部|各部门负责人|领导班子|中层干部|党员代表|职工代表)/,
+            /(相关部门|有关部门|各科室|各部门|各处室|全体同志)/,
+        ];
+
+        for (const pattern of specialPatterns) {
+            const match = text.match(pattern);
+            if (match && !attendees.includes(match[1])) {
+                attendees.push(match[1]);
+            }
+        }
+
+        // 去重并返回
+        return [...new Set(attendees)].slice(0, 15);
+    }
+
+    /**
+     * 从文本中提取人名
+     */
+    extractPeopleFromText(text) {
+        const people = [];
+        const surnames = '王李张刘陈杨赵黄周吴徐孙胡朱高林何郭马罗梁宋郑谢韩唐冯于董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪田任姜范方石姚谭廖邹熊金陆郝孔白崔康毛邱秦江史顾侯邵孟龙万段雷钱汤尹黎易常武乔贺赖龚文';
+
+        // 姓+职位
+        const titlePattern = new RegExp(`[${surnames}][\\u4e00-\\u9fa5]{0,3}(?:总|经理|主任|处长|科长|局长|书记|部长|组长|主管|总监|长)`, 'g');
+        const matches = text.match(titlePattern);
+        if (matches) {
+            for (const m of matches) {
+                if (!people.includes(m)) {
+                    people.push(m);
+                }
+            }
+        }
+
+        // 用顿号分隔的人名
+        const parts = text.split(/[、，,和与跟]/);
+        for (const part of parts) {
+            const trimmed = part.trim();
+            // 2-4个字的可能是人名
+            if (trimmed.length >= 2 && trimmed.length <= 4) {
+                // 检查是否以姓氏开头
+                if (surnames.includes(trimmed[0])) {
+                    if (!people.includes(trimmed)) {
+                        people.push(trimmed);
+                    }
+                }
+            }
+        }
+
+        return people;
+    }
+
+    /**
+     * 增强版会议标题提取
+     */
+    extractMeetingTitleEnhanced(text) {
+        // ========== 1. 提取"召开XXX会议"格式 ==========
+        const conveneMeetingMatch = text.match(/召开\s*([^，,。！？\n]{2,20}(?:会议|座谈|研讨|讨论|会谈))/);
+        if (conveneMeetingMatch) {
+            return conveneMeetingMatch[1].trim();
+        }
+
+        // ========== 2. 提取"举行XXX会议"格式 ==========
+        const holdMeetingMatch = text.match(/举行\s*([^，,。！？\n]{2,20}(?:会议|座谈|研讨|讨论|会谈))/);
+        if (holdMeetingMatch) {
+            return holdMeetingMatch[1].trim();
+        }
+
+        // ========== 3. 提取"进行XXX"格式 ==========
+        const conductMatch = text.match(/进行\s*([^，,。！？\n]{2,15}(?:会议|座谈|研讨|讨论|培训|学习|交流|汇报))/);
+        if (conductMatch) {
+            return conductMatch[1].trim();
+        }
+
+        // ========== 4. 提取"XXX会议"格式（会议词结尾）==========
+        const meetingEndMatch = text.match(/([^，,。！？\n]{2,15}(?:会议|座谈会|研讨会|讨论会|汇报会|培训会|工作会|协调会|推进会|部署会|动员会|总结会|分析会|评审会|论证会|听证会|通气会|例会|周会|月会|年会))/);
+        if (meetingEndMatch) {
+            return meetingEndMatch[1].trim();
+        }
+
+        // ========== 5. 提取主题+会议类型 ==========
+        const themeKeywords = ['预算', '项目', '方案', '工作', '计划', '总结', '汇报', '培训', '学习', '安全', '质量', '进度', '协调', '部署', '人事', '财务', '运营', '党建', '廉政', '发展', '战略', '产品', '技术', '市场', '销售', '客服', '行政'];
+        const meetingTypes = ['会议', '座谈会', '研讨会', '讨论会', '汇报会', '培训会', '工作会', '协调会', '推进会', '部署会', '动员会', '总结会', '分析会', '评审会'];
+
+        for (const theme of themeKeywords) {
+            for (const type of meetingTypes) {
+                const pattern = new RegExp(`(${theme}[^，,。！？\\n]{0,8}${type})`);
+                const match = text.match(pattern);
+                if (match) {
+                    return match[1].trim();
+                }
+            }
+        }
+
+        // ========== 6. 提取"XXX座谈/研讨/讨论"格式 ==========
+        const discussMatch = text.match(/([^，,。！？\n]{2,12}(?:座谈|研讨|讨论|交流|沟通))/);
+        if (discussMatch) {
+            return discussMatch[1].trim();
+        }
+
+        // ========== 7. 特殊会议类型 ==========
+        const specialMeetings = ['党组会', '常务会', '办公会', '专题会', '协调会', '调度会', '现场会', '座谈会', '研讨会', '论证会', '评审会', '通气会', '汇报会', '总结会', '动员会', '部署会', '推进会', '新闻发布会', '听证会', '民主生活会', '组织生活会', '中心组学习', '三会一课', '主题党日', '例会', '周会', '月会', '年会', '晨会', '夕会'];
+
+        for (const sm of specialMeetings) {
+            if (text.includes(sm)) {
+                return sm;
+            }
+        }
+
+        return null;
     }
 
     /**
