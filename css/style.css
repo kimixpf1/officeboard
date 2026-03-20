@@ -2640,44 +2640,93 @@ body {
     margin-bottom: 12px;
     max-height: calc(100vh - 200px);
     overflow-y: auto;
+    padding-right: 4px;
+}
+
+.links-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.links-list::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 2px;
 }
 
 .link-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 10px 12px;
-    background: var(--bg-secondary);
-    border-radius: 6px;
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-primary));
+    border-radius: 8px;
     color: var(--gray-700);
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     position: relative;
     cursor: pointer;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .link-item:hover {
+    background: linear-gradient(135deg, var(--primary-light), #e0f2fe);
+    transform: translateX(-3px);
+    border-color: var(--primary-color);
+    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.15);
+}
+
+.link-item.dragging {
+    opacity: 0.5;
     background: var(--primary-light);
-    transform: translateX(-2px);
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+.link-item.drag-over {
+    border-top: 2px solid var(--primary-color);
+}
+
+.link-drag {
+    color: var(--gray-400);
+    font-size: 12px;
+    cursor: grab;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    user-select: none;
+}
+
+.link-item:hover .link-drag {
+    opacity: 1;
+}
+
+.link-drag:active {
+    cursor: grabbing;
 }
 
 .link-icon {
     font-size: 18px;
+    width: 24px;
+    text-align: center;
 }
 
 .link-name {
     flex: 1;
     font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .link-delete {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: none;
-    border-radius: 4px;
+    border-radius: 50%;
     cursor: pointer;
     color: var(--gray-400);
     font-size: 14px;
@@ -2692,6 +2741,7 @@ body {
 .link-delete:hover {
     background: #fee2e2;
     color: #ef4444;
+    transform: scale(1.1);
 }
 
 /* 添加网站 */

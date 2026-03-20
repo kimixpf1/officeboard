@@ -347,10 +347,14 @@ class OfficeDashboard {
     loadLinks() {
         let links;
         const saved = localStorage.getItem('office_links');
-        if (saved) {
+        
+        // 检查是否需要更新默认网站
+        const needsUpdate = this.checkLinksNeedUpdate(saved);
+        
+        if (saved && !needsUpdate) {
             try {
                 links = JSON.parse(saved);
-                if (!Array.isArray(links)) {
+                if (!Array.isArray(links) || links.length === 0) {
                     links = this.getDefaultLinks();
                 }
             } catch (e) {
@@ -358,11 +362,41 @@ class OfficeDashboard {
                 links = this.getDefaultLinks();
             }
         } else {
+            // 需要更新或无数据，使用新的默认列表
             links = this.getDefaultLinks();
         }
+        
         // 确保数据保存到localStorage
         localStorage.setItem('office_links', JSON.stringify(links));
         this.renderLinks(links);
+    }
+
+    /**
+     * 检查网站列表是否需要更新
+     */
+    checkLinksNeedUpdate(saved) {
+        if (!saved) return true;
+        
+        try {
+            const links = JSON.parse(saved);
+            if (!Array.isArray(links) || links.length === 0) return true;
+            
+            // 检查是否包含旧的默认网站（微信读书）
+            const hasOldDefault = links.some(l => 
+                l.url && l.url.includes('weread.qq.com')
+            );
+            
+            // 检查是否缺少新的默认网站
+            const defaultLinks = this.getDefaultLinks();
+            const hasNewDefaults = defaultLinks.every(defaultLink => 
+                links.some(l => l.url === defaultLink.url)
+            );
+            
+            // 如果有旧默认网站或缺少新默认网站，需要更新
+            return hasOldDefault || !hasNewDefaults;
+        } catch (e) {
+            return true;
+        }
     }
 
     /**
@@ -379,14 +413,15 @@ class OfficeDashboard {
     }
 
     /**
-     * 渲染网站列表
+     * 渲染网站列表（支持拖动排序）
      */
     renderLinks(links) {
         const linksList = document.getElementById('linksList');
         if (!linksList) return;
 
         linksList.innerHTML = links.map((link, index) => `
-            <div class="link-item" data-url="${link.url}">
+            <div class="link-item" data-index="${index}" data-url="${link.url}" draggable="true">
+                <span class="link-drag" title="拖动排序">⋮⋮</span>
                 <span class="link-icon">${link.icon || '🔗'}</span>
                 <span class="link-name">${link.name}</span>
                 <button class="link-delete" data-index="${index}" title="删除">×</button>
@@ -396,7 +431,7 @@ class OfficeDashboard {
         // 绑定点击跳转事件
         linksList.querySelectorAll('.link-item').forEach(item => {
             item.addEventListener('click', (e) => {
-                if (e.target.classList.contains('link-delete')) return;
+                if (e.target.classList.contains('link-delete') || e.target.classList.contains('link-drag')) return;
                 const url = item.dataset.url;
                 if (url) {
                     window.open(url, '_blank');
@@ -410,6 +445,66 @@ class OfficeDashboard {
                 e.stopPropagation();
                 const index = parseInt(btn.dataset.index);
                 this.deleteLink(index);
+            });
+        });
+
+        // 绑定拖动排序事件
+        this.initLinksDragSort(linksList);
+    }
+
+    /**
+     * 初始化网站拖动排序
+     */
+    initLinksDragSort(container) {
+        let draggedItem = null;
+        let draggedIndex = -1;
+
+        container.querySelectorAll('.link-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                draggedItem = item;
+                draggedIndex = parseInt(item.dataset.index);
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                container.querySelectorAll('.link-item').forEach(i => {
+                    i.classList.remove('drag-over');
+                });
+                draggedItem = null;
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                const draggingItem = container.querySelector('.dragging');
+                if (draggingItem && draggingItem !== item) {
+                    const rect = item.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    if (e.clientY < midY) {
+                        item.parentNode.insertBefore(draggingItem, item);
+                    } else {
+                        item.parentNode.insertBefore(draggingItem, item.nextSibling);
+                    }
+                }
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                // 重新计算顺序并保存
+                const newOrder = [];
+                container.querySelectorAll('.link-item').forEach((el, idx) => {
+                    const url = el.dataset.url;
+                    const icon = el.querySelector('.link-icon')?.textContent || '🔗';
+                    const name = el.querySelector('.link-name')?.textContent || '';
+                    newOrder.push({ name, url, icon });
+                    el.dataset.index = idx;
+                });
+                localStorage.setItem('office_links', JSON.stringify(newOrder));
+                this.syncLinksToCloud(newOrder);
             });
         });
     }
