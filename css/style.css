@@ -2582,6 +2582,8 @@ body {
     flex: 1;
     padding: 12px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 /* 工具网格 */
@@ -2669,9 +2671,10 @@ body {
     flex-direction: column;
     gap: 6px;
     margin-bottom: 12px;
-    max-height: calc(100vh - 200px);
+    flex: 1;
     overflow-y: auto;
     padding-right: 4px;
+    min-height: 0;
 }
 
 .links-list::-webkit-scrollbar {
@@ -3299,7 +3302,8 @@ body {
     }
 
     .links-list {
-        max-height: 150px;
+        flex: 1;
+        min-height: 0;
     }
 
     .links-add {
@@ -3312,5 +3316,11 @@ body {
 
     .btn-add-link {
         flex: 1 1 100%;
+    }
+
+    /* 手机端面板主体撑满 */
+    .side-panel.expanded .panel-body {
+        flex: 1;
+        min-height: 0;
     }
 }
