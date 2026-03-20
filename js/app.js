@@ -337,16 +337,30 @@ class OfficeDashboard {
      */
     initToolsDragSort(container) {
         let draggedItem = null;
+        let currentTools = []; // 缓存当前工具列表
+
+        // 获取当前工具列表
+        const saved = localStorage.getItem('office_tools');
+        if (saved) {
+            try {
+                currentTools = JSON.parse(saved);
+            } catch (e) {
+                currentTools = this.getDefaultTools();
+            }
+        }
 
         container.querySelectorAll('.tool-item').forEach(item => {
+            // <a>标签需要设置draggable属性
+            if (item.tagName === 'A') {
+                item.setAttribute('draggable', 'true');
+            }
+
             item.addEventListener('dragstart', (e) => {
                 draggedItem = item;
                 item.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
-                // 如果是<a>标签，阻止默认跳转
-                if (item.tagName === 'A') {
-                    e.preventDefault();
-                }
+                // 阻止<a>标签的默认点击行为
+                e.stopPropagation();
             });
 
             item.addEventListener('dragend', () => {
@@ -376,19 +390,22 @@ class OfficeDashboard {
 
             item.addEventListener('drop', (e) => {
                 e.preventDefault();
-                // 重新计算顺序并保存
+                
+                // 根据当前DOM顺序重新构建工具列表
                 const newOrder = [];
-                container.querySelectorAll('.tool-item').forEach((el, idx) => {
-                    const index = parseInt(el.dataset.index);
-                    const saved = localStorage.getItem('office_tools');
-                    if (saved) {
-                        const tools = JSON.parse(saved);
-                        if (tools[index]) {
-                            newOrder.push(tools[index]);
-                        }
+                const items = container.querySelectorAll('.tool-item');
+                
+                items.forEach((el, newIdx) => {
+                    const oldIdx = parseInt(el.dataset.index);
+                    if (currentTools[oldIdx]) {
+                        newOrder.push(currentTools[oldIdx]);
                     }
-                    el.dataset.index = idx;
+                    // 更新索引
+                    el.dataset.index = newIdx;
                 });
+                
+                // 更新缓存和localStorage
+                currentTools = newOrder;
                 localStorage.setItem('office_tools', JSON.stringify(newOrder));
             });
         });
@@ -591,12 +608,21 @@ class OfficeDashboard {
      */
     initLinksDragSort(container) {
         let draggedItem = null;
-        let draggedIndex = -1;
+        let currentLinks = []; // 缓存当前链接列表
+
+        // 获取当前链接列表
+        const saved = localStorage.getItem('office_links');
+        if (saved) {
+            try {
+                currentLinks = JSON.parse(saved);
+            } catch (e) {
+                currentLinks = [];
+            }
+        }
 
         container.querySelectorAll('.link-item').forEach(item => {
             item.addEventListener('dragstart', (e) => {
                 draggedItem = item;
-                draggedIndex = parseInt(item.dataset.index);
                 item.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
             });
@@ -628,15 +654,22 @@ class OfficeDashboard {
 
             item.addEventListener('drop', (e) => {
                 e.preventDefault();
-                // 重新计算顺序并保存
+                
+                // 根据当前DOM顺序重新构建链接列表
                 const newOrder = [];
-                container.querySelectorAll('.link-item').forEach((el, idx) => {
-                    const url = el.dataset.url;
-                    const icon = el.querySelector('.link-icon')?.textContent || '🔗';
-                    const name = el.querySelector('.link-name')?.textContent || '';
-                    newOrder.push({ name, url, icon });
-                    el.dataset.index = idx;
+                const items = container.querySelectorAll('.link-item');
+                
+                items.forEach((el, newIdx) => {
+                    const oldIdx = parseInt(el.dataset.index);
+                    if (currentLinks[oldIdx]) {
+                        newOrder.push(currentLinks[oldIdx]);
+                    }
+                    // 更新索引
+                    el.dataset.index = newIdx;
                 });
+                
+                // 更新缓存和localStorage
+                currentLinks = newOrder;
                 localStorage.setItem('office_links', JSON.stringify(newOrder));
                 this.syncLinksToCloud(newOrder);
             });
