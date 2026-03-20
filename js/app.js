@@ -288,24 +288,50 @@ class OfficeDashboard {
             });
         }
 
-        // 添加网站
+        // 添加网站的处理函数
+        const handleAddLink = () => {
+            const name = nameInput ? nameInput.value.trim() : '';
+            let url = urlInput ? urlInput.value.trim() : '';
+
+            if (!name || !url) {
+                this.showError('请输入网站名称和网址');
+                return;
+            }
+
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            this.addLink(name, url);
+            if (nameInput) nameInput.value = '';
+            if (urlInput) urlInput.value = '';
+            if (nameInput) nameInput.focus();
+        };
+
+        // 点击按钮添加
         if (addBtn) {
-            addBtn.addEventListener('click', () => {
-                const name = nameInput.value.trim();
-                let url = urlInput.value.trim();
+            addBtn.addEventListener('click', handleAddLink);
+        }
 
-                if (!name || !url) {
-                    alert('请输入网站名称和网址');
-                    return;
+        // 回车键添加
+        if (urlInput) {
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddLink();
                 }
-
-                if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'https://' + url;
+            });
+        }
+        if (nameInput) {
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (urlInput && !urlInput.value.trim()) {
+                        urlInput.focus();
+                    } else {
+                        handleAddLink();
+                    }
                 }
-
-                this.addLink(name, url);
-                nameInput.value = '';
-                urlInput.value = '';
             });
         }
 
@@ -319,8 +345,23 @@ class OfficeDashboard {
      * 加载网站列表
      */
     loadLinks() {
+        let links;
         const saved = localStorage.getItem('office_links');
-        const links = saved ? JSON.parse(saved) : this.getDefaultLinks();
+        if (saved) {
+            try {
+                links = JSON.parse(saved);
+                if (!Array.isArray(links)) {
+                    links = this.getDefaultLinks();
+                }
+            } catch (e) {
+                console.error('解析网站数据失败:', e);
+                links = this.getDefaultLinks();
+            }
+        } else {
+            links = this.getDefaultLinks();
+        }
+        // 确保数据保存到localStorage
+        localStorage.setItem('office_links', JSON.stringify(links));
         this.renderLinks(links);
     }
 
@@ -330,8 +371,10 @@ class OfficeDashboard {
     getDefaultLinks() {
         return [
             { name: '中国政府网', url: 'https://www.gov.cn/', icon: '🏛️' },
-            { name: '百度', url: 'https://www.baidu.com/', icon: '🔍' },
-            { name: '微信读书', url: 'https://weread.qq.com/', icon: '📚' }
+            { name: '江苏政府网', url: 'https://www.jiangsu.gov.cn/', icon: '🏛️' },
+            { name: '苏州政府网', url: 'https://www.suzhou.gov.cn/', icon: '🏛️' },
+            { name: '苏州统计局', url: 'https://tjj.suzhou.gov.cn/', icon: '📊' },
+            { name: '百度', url: 'https://www.baidu.com/', icon: '🔍' }
         ];
     }
 
@@ -375,22 +418,23 @@ class OfficeDashboard {
      * 添加网站
      */
     addLink(name, url) {
-        const saved = localStorage.getItem('office_links');
         let links = [];
-        
-        if (saved) {
-            try {
-                links = JSON.parse(saved);
-            } catch (e) {
-                links = this.getDefaultLinks();
+        try {
+            const saved = localStorage.getItem('office_links');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    links = parsed;
+                }
             }
-        } else {
-            links = this.getDefaultLinks();
+        } catch (e) {
+            console.error('读取网站列表失败:', e);
         }
         
         links.push({ name, url, icon: '🔗' });
         localStorage.setItem('office_links', JSON.stringify(links));
         this.renderLinks(links);
+        this.showSuccess('网站已添加: ' + name);
 
         // 云端同步
         this.syncLinksToCloud(links);
@@ -529,22 +573,21 @@ class OfficeDashboard {
         weatherBody.innerHTML = '<div class="weather-loading">正在获取天气...</div>';
 
         try {
-            // 尝试获取位置
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const { latitude, longitude } = position.coords;
-                        await this.fetchWeather(latitude, longitude, '当前位置');
-                    },
-                    async () => {
-                        // 位置获取失败，使用默认城市
-                        await this.fetchWeather(39.9042, 116.4074, '北京');
-                    },
-                    { timeout: 5000 }
-                );
-            } else {
-                await this.fetchWeather(39.9042, 116.4074, '北京');
+            // 读取用户保存的城市设置，默认苏州
+            const savedCity = localStorage.getItem('office_weather_city');
+            let cityConfig;
+            if (savedCity) {
+                try {
+                    cityConfig = JSON.parse(savedCity);
+                } catch (e) {
+                    cityConfig = null;
+                }
             }
+            if (!cityConfig) {
+                cityConfig = { name: '苏州', lat: 31.2989, lon: 120.5853 };
+            }
+
+            await this.fetchWeather(cityConfig.lat, cityConfig.lon, cityConfig.name);
         } catch (e) {
             console.error('天气加载失败:', e);
             weatherBody.innerHTML = '<div class="weather-loading">获取天气失败</div>';
@@ -560,13 +603,18 @@ class OfficeDashboard {
         try {
             weatherBody.innerHTML = '<div class="weather-loading">正在加载天气...</div>';
             
-            // 使用免费的天气API (open-meteo)
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
+            // 使用 open-meteo 免费天气API（无需key，国内可访问）
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FShanghai&forecast_days=3`;
+            
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
             
             const response = await fetch(url, {
                 method: 'GET',
-                headers: { 'Accept': 'application/json' }
+                headers: { 'Accept': 'application/json' },
+                signal: controller.signal
             });
+            clearTimeout(timeout);
             
             if (!response.ok) {
                 throw new Error('API请求失败');
@@ -579,18 +627,46 @@ class OfficeDashboard {
             }
             
             const temp = Math.round(data.current.temperature_2m);
+            const humidity = data.current.relative_humidity_2m;
+            const windSpeed = Math.round(data.current.wind_speed_10m);
             const code = data.current.weather_code;
             const desc = this.getWeatherDesc(code);
             const icon = this.getWeatherIcon(code);
+            
+            // 未来3天预报
+            let forecastHtml = '';
+            if (data.daily && data.daily.time) {
+                forecastHtml = '<div class="weather-forecast">';
+                const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                for (let i = 0; i < Math.min(3, data.daily.time.length); i++) {
+                    const d = new Date(data.daily.time[i]);
+                    const dayName = i === 0 ? '今天' : dayNames[d.getDay()];
+                    const maxT = Math.round(data.daily.temperature_2m_max[i]);
+                    const minT = Math.round(data.daily.temperature_2m_min[i]);
+                    const dayIcon = this.getWeatherIcon(data.daily.weather_code[i]);
+                    forecastHtml += `<div class="forecast-day"><span class="forecast-name">${dayName}</span><span class="forecast-icon">${dayIcon}</span><span class="forecast-temp">${minT}~${maxT}°</span></div>`;
+                }
+                forecastHtml += '</div>';
+            }
             
             weatherBody.innerHTML = `
                 <div class="weather-info">
                     <div class="weather-icon">${icon}</div>
                     <div class="weather-temp">${temp}°C</div>
                     <div class="weather-desc">${desc}</div>
-                    <div class="weather-city">${cityName}</div>
+                    <div class="weather-detail">湿度 ${humidity}% · 风速 ${windSpeed}km/h</div>
+                    <div class="weather-city-row">
+                        <span class="weather-city">${cityName}</span>
+                        <button class="weather-change-btn" id="weatherChangeBtn">切换城市</button>
+                    </div>
+                    ${forecastHtml}
                 </div>
             `;
+            
+            // 绑定切换城市按钮
+            document.getElementById('weatherChangeBtn')?.addEventListener('click', () => {
+                this.showCitySelector();
+            });
         } catch (e) {
             console.error('天气获取失败:', e);
             weatherBody.innerHTML = `
@@ -598,9 +674,77 @@ class OfficeDashboard {
                     <div>🌤️</div>
                     <div>天气获取失败</div>
                     <div style="font-size:12px;color:var(--gray-500);margin-top:8px;">请检查网络连接</div>
+                    <button class="weather-change-btn" id="weatherRetryChangeBtn" style="margin-top:10px;">切换城市</button>
                 </div>
             `;
+            document.getElementById('weatherRetryChangeBtn')?.addEventListener('click', () => {
+                this.showCitySelector();
+            });
         }
+    }
+
+    /**
+     * 显示城市选择器
+     */
+    showCitySelector() {
+        const weatherBody = document.getElementById('weatherBody');
+        if (!weatherBody) return;
+
+        const cities = [
+            { name: '苏州', lat: 31.2989, lon: 120.5853 },
+            { name: '上海', lat: 31.2304, lon: 121.4737 },
+            { name: '南京', lat: 32.0603, lon: 118.7969 },
+            { name: '北京', lat: 39.9042, lon: 116.4074 },
+            { name: '杭州', lat: 30.2741, lon: 120.1551 },
+            { name: '广州', lat: 23.1291, lon: 113.2644 },
+            { name: '深圳', lat: 22.5431, lon: 114.0579 },
+            { name: '成都', lat: 30.5728, lon: 104.0668 },
+            { name: '武汉', lat: 30.5928, lon: 114.3055 },
+            { name: '无锡', lat: 31.4912, lon: 120.3119 },
+            { name: '常州', lat: 31.8106, lon: 119.9741 },
+            { name: '昆山', lat: 31.3848, lon: 120.9580 }
+        ];
+
+        weatherBody.innerHTML = `
+            <div class="city-selector">
+                <div class="city-selector-title">选择城市</div>
+                <div class="city-grid">
+                    ${cities.map(c => `<button class="city-btn" data-city='${JSON.stringify(c)}'>${c.name}</button>`).join('')}
+                </div>
+                <div class="city-custom" style="margin-top:10px;">
+                    <input type="text" id="customCityName" placeholder="自定义城市名" style="width:45%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;">
+                    <input type="text" id="customCityCoords" placeholder="纬度,经度" style="width:35%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;">
+                    <button class="city-btn" id="customCityBtn" style="width:18%;">确定</button>
+                </div>
+            </div>
+        `;
+
+        // 绑定城市按钮
+        weatherBody.querySelectorAll('.city-btn[data-city]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const city = JSON.parse(btn.dataset.city);
+                localStorage.setItem('office_weather_city', JSON.stringify(city));
+                this.fetchWeather(city.lat, city.lon, city.name);
+            });
+        });
+
+        // 自定义城市
+        document.getElementById('customCityBtn')?.addEventListener('click', () => {
+            const name = document.getElementById('customCityName')?.value.trim();
+            const coords = document.getElementById('customCityCoords')?.value.trim();
+            if (!name || !coords) {
+                this.showError('请输入城市名和坐标（纬度,经度）');
+                return;
+            }
+            const parts = coords.split(',').map(s => parseFloat(s.trim()));
+            if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+                this.showError('坐标格式错误，请输入: 纬度,经度');
+                return;
+            }
+            const city = { name, lat: parts[0], lon: parts[1] };
+            localStorage.setItem('office_weather_city', JSON.stringify(city));
+            this.fetchWeather(city.lat, city.lon, city.name);
+        });
     }
 
     /**
