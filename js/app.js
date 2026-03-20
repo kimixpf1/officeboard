@@ -343,17 +343,27 @@ class OfficeDashboard {
         if (!linksList) return;
 
         linksList.innerHTML = links.map((link, index) => `
-            <a href="${link.url}" target="_blank" class="link-item">
+            <div class="link-item" data-url="${link.url}">
                 <span class="link-icon">${link.icon || '🔗'}</span>
                 <span class="link-name">${link.name}</span>
                 <button class="link-delete" data-index="${index}" title="删除">×</button>
-            </a>
+            </div>
         `).join('');
+
+        // 绑定点击跳转事件
+        linksList.querySelectorAll('.link-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('link-delete')) return;
+                const url = item.dataset.url;
+                if (url) {
+                    window.open(url, '_blank');
+                }
+            });
+        });
 
         // 绑定删除事件
         linksList.querySelectorAll('.link-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.preventDefault();
                 e.stopPropagation();
                 const index = parseInt(btn.dataset.index);
                 this.deleteLink(index);
@@ -366,7 +376,17 @@ class OfficeDashboard {
      */
     addLink(name, url) {
         const saved = localStorage.getItem('office_links');
-        const links = saved ? JSON.parse(saved) : this.getDefaultLinks();
+        let links = [];
+        
+        if (saved) {
+            try {
+                links = JSON.parse(saved);
+            } catch (e) {
+                links = this.getDefaultLinks();
+            }
+        } else {
+            links = this.getDefaultLinks();
+        }
         
         links.push({ name, url, icon: '🔗' });
         localStorage.setItem('office_links', JSON.stringify(links));
@@ -381,7 +401,15 @@ class OfficeDashboard {
      */
     deleteLink(index) {
         const saved = localStorage.getItem('office_links');
-        const links = saved ? JSON.parse(saved) : [];
+        let links = [];
+        
+        if (saved) {
+            try {
+                links = JSON.parse(saved);
+            } catch (e) {
+                links = [];
+            }
+        }
         
         links.splice(index, 1);
         localStorage.setItem('office_links', JSON.stringify(links));

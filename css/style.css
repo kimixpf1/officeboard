@@ -2425,22 +2425,26 @@ body {
     display: flex;
     align-items: stretch;
     pointer-events: none;
+    height: 100vh;
+    top: 0;
 }
 
-/* 面板切换按钮 */
+/* 面板切换按钮 - 书签式设计 */
 .panel-toggle {
     position: absolute;
     right: 0;
-    width: 32px;
-    padding: 10px 0;
+    width: 36px;
+    height: 100px;
+    padding: 12px 0;
     color: white;
-    border-radius: 6px 0 0 6px;
+    border-radius: 8px 0 0 8px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+    box-shadow: -3px 0 10px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
     pointer-events: auto;
     writing-mode: vertical-rl;
@@ -2448,82 +2452,73 @@ body {
 }
 
 .panel-toggle:hover {
-    width: 38px;
-    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
+    width: 44px;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
 }
 
 .panel-toggle-text {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 3px;
 }
 
-/* 工具面板（上）- 橙色 */
+/* 工具面板（上）- 橙色，错开 */
 .tools-panel {
-    top: calc(50% - 75px);
+    z-index: 1002;
 }
 .tools-toggle {
     background: linear-gradient(135deg, #f97316, #ea580c);
-    top: 0;
+    top: 80px;
 }
 .tools-toggle:hover {
     background: linear-gradient(135deg, #fb923c, #f97316);
 }
-.tools-panel .panel-content {
-    height: 320px;
-}
 
-/* 网站面板（中）- 蓝色 */
+/* 网站面板（中）- 蓝色，居中偏上 */
 .links-panel {
-    top: 50%;
-    transform: translateY(-50%);
+    z-index: 1001;
 }
 .links-toggle {
     background: linear-gradient(135deg, #0ea5e9, #0284c7);
-    top: 0;
+    top: calc(50% - 50px);
 }
 .links-toggle:hover {
     background: linear-gradient(135deg, #38bdf8, #0ea5e9);
 }
-.links-panel .panel-content {
-    height: 380px;
-}
 
-/* 备忘录面板（下）- 紫色 */
+/* 备忘录面板（下）- 紫色，靠下 */
 .memo-panel {
-    top: calc(50% + 75px);
+    z-index: 1000;
 }
 .memo-toggle {
     background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-    top: 0;
+    bottom: 80px;
+    top: auto;
 }
 .memo-toggle:hover {
     background: linear-gradient(135deg, #a78bfa, #8b5cf6);
 }
-.memo-panel .panel-content {
-    height: 400px;
-}
 
-/* 面板内容区 */
+/* 面板内容区 - 全屏高度 */
 .panel-content {
     width: 0;
+    height: 100vh;
     background: var(--bg-primary);
     border-left: 1px solid var(--border-color);
-    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     transition: width 0.3s ease;
     pointer-events: auto;
-    border-radius: 8px 0 0 8px;
 }
 
 .side-panel.expanded .panel-content {
-    width: 320px;
+    width: 360px;
 }
 
 .side-panel.expanded .panel-toggle {
-    right: 320px;
+    right: 360px;
 }
 
 /* 面板头部 */
@@ -2636,14 +2631,15 @@ body {
     padding: 10px 12px;
     background: var(--bg-secondary);
     border-radius: 6px;
-    text-decoration: none;
     color: var(--gray-700);
     transition: all 0.2s;
     position: relative;
+    cursor: pointer;
 }
 
 .link-item:hover {
     background: var(--primary-light);
+    transform: translateX(-2px);
 }
 
 .link-icon {
@@ -3066,15 +3062,33 @@ body {
 
     .panel-toggle {
         width: 28px;
-        padding: 8px 0;
+        height: 80px;
+        padding: 6px 0;
     }
 
     .panel-toggle-text {
         font-size: 10px;
+        letter-spacing: 2px;
+    }
+
+    .tools-toggle {
+        top: 60px;
+    }
+
+    .links-toggle {
+        top: calc(50% - 40px);
+    }
+
+    .memo-toggle {
+        bottom: 60px;
     }
 
     .tools-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .links-list {
+        max-height: 150px;
     }
 
     .links-add {
