@@ -224,6 +224,18 @@ class SyncManager {
                         }));
                     }
                 }
+                // 同步网站
+                if (cloudData?.data?.links !== undefined) {
+                    const localLinks = localStorage.getItem('office_links') || '';
+                    const cloudLinks = cloudData.data.links;
+                    if (cloudLinks !== localLinks) {
+                        console.log('同步网站（云端较新）');
+                        localStorage.setItem('office_links', cloudLinks);
+                        document.dispatchEvent(new CustomEvent('linksSynced', { 
+                            detail: { links: JSON.parse(cloudLinks || '[]') } 
+                        }));
+                    }
+                }
             }
 
         } catch (error) {
@@ -258,7 +270,9 @@ class SyncManager {
                 sync_time: syncTime,
                 items: allItems,
                 settings: settings,
-                memo: localStorage.getItem('office_memo_content') || '',  // 添加备忘录同步
+                memo: localStorage.getItem('office_memo_content') || '',
+                links: localStorage.getItem('office_links') || '',
+                links: localStorage.getItem('office_links') || '',
                 device_info: navigator.userAgent
             };
 
@@ -319,6 +333,14 @@ class SyncManager {
                 localStorage.setItem('office_memo_content', cloudData.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: cloudData.data.memo } 
+                }));
+            }
+
+            // 同步网站
+            if (cloudData.data.links !== undefined) {
+                localStorage.setItem('office_links', cloudData.data.links);
+                document.dispatchEvent(new CustomEvent('linksSynced', { 
+                    detail: { links: JSON.parse(cloudData.data.links || '[]') } 
                 }));
             }
 
@@ -424,6 +446,19 @@ class SyncManager {
                     localStorage.setItem('office_memo_content', cloudMemo);
                     document.dispatchEvent(new CustomEvent('memoSynced', { 
                         detail: { content: cloudMemo } 
+                    }));
+                }
+            }
+
+            // 同步网站（云端优先）
+            if (cloudData.data.links !== undefined) {
+                const cloudLinks = cloudData.data.links;
+                const localLinks = localStorage.getItem('office_links') || '';
+                if (cloudLinks !== localLinks) {
+                    console.log('同步网站（云端版本）');
+                    localStorage.setItem('office_links', cloudLinks);
+                    document.dispatchEvent(new CustomEvent('linksSynced', { 
+                        detail: { links: JSON.parse(cloudLinks || '[]') } 
                     }));
                 }
             }
@@ -626,6 +661,14 @@ class SyncManager {
                 localStorage.setItem('office_memo_content', data.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: data.data.memo } 
+                }));
+            }
+
+            // 同步网站
+            if (data.data.links !== undefined) {
+                localStorage.setItem('office_links', data.data.links);
+                document.dispatchEvent(new CustomEvent('linksSynced', { 
+                    detail: { links: JSON.parse(data.data.links || '[]') } 
                 }));
             }
 
@@ -914,6 +957,7 @@ class SyncManager {
                 items: allItems,
                 settings: settings,
                 memo: localStorage.getItem('office_memo_content') || '',
+                links: localStorage.getItem('office_links') || '',
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
@@ -1021,6 +1065,15 @@ class SyncManager {
                     detail: { content: data.data.memo } 
                 }));
                 console.log('已同步备忘录');
+            }
+
+            // 同步网站
+            if (data.data.links !== undefined) {
+                localStorage.setItem('office_links', data.data.links);
+                document.dispatchEvent(new CustomEvent('linksSynced', { 
+                    detail: { links: JSON.parse(data.data.links || '[]') } 
+                }));
+                console.log('已同步网站');
             }
 
             // 同步事项数据

@@ -691,39 +691,170 @@
         <span class="loading-text">处理中...</span>
     </div>
 
-    <!-- 右侧便签备忘录 -->
-    <div id="memoPanel" class="memo-panel">
-        <div class="memo-toggle" id="memoToggle" title="便签备忘录">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <!-- 右侧工具折叠框（上） -->
+    <div id="toolsPanel" class="side-panel tools-panel">
+        <div class="panel-toggle tools-toggle" id="toolsToggle" title="常用工具">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span class="panel-toggle-text">工具</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>常用工具</h3>
+                <button class="panel-close" id="toolsClose" title="收起">×</button>
+            </div>
+            <div class="panel-body">
+                <div class="tools-grid">
+                    <a href="https://kimi.moonshot.cn/" target="_blank" class="tool-item">
+                        <div class="tool-icon ai">K</div>
+                        <span>Kimi</span>
+                    </a>
+                    <a href="https://chat.deepseek.com/" target="_blank" class="tool-item">
+                        <div class="tool-icon ai">D</div>
+                        <span>DeepSeek</span>
+                    </a>
+                    <a href="https://www.doubao.com/chat/" target="_blank" class="tool-item">
+                        <div class="tool-icon ai">豆</div>
+                        <span>豆包</span>
+                    </a>
+                    <div class="tool-item" data-tool="calculator">
+                        <div class="tool-icon calc">计</div>
+                        <span>计算器</span>
+                    </div>
+                    <div class="tool-item" data-tool="weather">
+                        <div class="tool-icon weather">天</div>
+                        <span>天气</span>
+                    </div>
+                    <div class="tool-item" data-tool="timer">
+                        <div class="tool-icon timer">时</div>
+                        <span>倒计时</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧网站折叠框（中） -->
+    <div id="linksPanel" class="side-panel links-panel">
+        <div class="panel-toggle links-toggle" id="linksToggle" title="常用网站">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span class="panel-toggle-text">网站</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>常用网站</h3>
+                <button class="panel-close" id="linksClose" title="收起">×</button>
+            </div>
+            <div class="panel-body">
+                <div class="links-list" id="linksList"></div>
+                <div class="links-add">
+                    <input type="text" id="newLinkName" placeholder="名称" maxlength="15">
+                    <input type="url" id="newLinkUrl" placeholder="网址">
+                    <button id="addLinkBtn" class="btn-add-link">+ 添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧备忘录折叠框（下） -->
+    <div id="memoPanel" class="side-panel memo-panel">
+        <div class="panel-toggle memo-toggle" id="memoToggle" title="便签备忘录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
                 <line x1="16" y1="13" x2="8" y2="13"></line>
                 <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            <span class="memo-toggle-text">备忘</span>
+            <span class="panel-toggle-text">备忘</span>
         </div>
-        <div class="memo-content">
-            <div class="memo-header">
-                <h3>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                    便签备忘录
-                </h3>
-                <button class="memo-close" id="memoClose" title="收起">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </button>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>便签备忘录</h3>
+                <button class="panel-close" id="memoClose" title="收起">×</button>
             </div>
-            <div class="memo-body">
+            <div class="panel-body memo-body">
                 <textarea id="memoText" placeholder="记录重要事项、待确认的会议、临时想法...&#10;&#10;此便签跨日期保存，不属于任何特定日期。"></textarea>
             </div>
-            <div class="memo-footer">
-                <span class="memo-status" id="memoStatus">自动保存</span>
-                <span class="memo-hint">内容自动保存到本地</span>
+            <div class="panel-footer">
+                <span class="panel-status" id="memoStatus">自动保存</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 计算器弹窗 -->
+    <div id="calculatorModal" class="tool-modal">
+        <div class="tool-modal-content calculator-content">
+            <div class="tool-modal-header">
+                <h4>计算器</h4>
+                <button class="tool-modal-close" data-close="calculatorModal">×</button>
+            </div>
+            <div class="calculator">
+                <input type="text" id="calcDisplay" class="calc-display" readonly>
+                <div class="calc-buttons">
+                    <button class="calc-btn" data-calc="C">C</button>
+                    <button class="calc-btn" data-calc="±">±</button>
+                    <button class="calc-btn" data-calc="%">%</button>
+                    <button class="calc-btn op" data-calc="/">÷</button>
+                    <button class="calc-btn" data-calc="7">7</button>
+                    <button class="calc-btn" data-calc="8">8</button>
+                    <button class="calc-btn" data-calc="9">9</button>
+                    <button class="calc-btn op" data-calc="*">×</button>
+                    <button class="calc-btn" data-calc="4">4</button>
+                    <button class="calc-btn" data-calc="5">5</button>
+                    <button class="calc-btn" data-calc="6">6</button>
+                    <button class="calc-btn op" data-calc="-">−</button>
+                    <button class="calc-btn" data-calc="1">1</button>
+                    <button class="calc-btn" data-calc="2">2</button>
+                    <button class="calc-btn" data-calc="3">3</button>
+                    <button class="calc-btn op" data-calc="+">+</button>
+                    <button class="calc-btn zero" data-calc="0">0</button>
+                    <button class="calc-btn" data-calc=".">.</button>
+                    <button class="calc-btn eq" data-calc="=">=</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 天气弹窗 -->
+    <div id="weatherModal" class="tool-modal">
+        <div class="tool-modal-content weather-content">
+            <div class="tool-modal-header">
+                <h4>天气预报</h4>
+                <button class="tool-modal-close" data-close="weatherModal">×</button>
+            </div>
+            <div class="weather-body" id="weatherBody">
+                <div class="weather-loading">正在获取天气...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 倒计时弹窗 -->
+    <div id="timerModal" class="tool-modal">
+        <div class="tool-modal-content timer-content">
+            <div class="tool-modal-header">
+                <h4>倒计时</h4>
+                <button class="tool-modal-close" data-close="timerModal">×</button>
+            </div>
+            <div class="timer-body">
+                <div class="timer-display" id="timerDisplay">00:00:00</div>
+                <div class="timer-inputs">
+                    <input type="number" id="timerHours" placeholder="时" min="0" max="99" value="0">
+                    <span>:</span>
+                    <input type="number" id="timerMinutes" placeholder="分" min="0" max="59" value="5">
+                    <span>:</span>
+                    <input type="number" id="timerSeconds" placeholder="秒" min="0" max="59" value="0">
+                </div>
+                <div class="timer-buttons">
+                    <button id="timerStart" class="timer-btn start">开始</button>
+                    <button id="timerPause" class="timer-btn pause" disabled>暂停</button>
+                    <button id="timerReset" class="timer-btn reset">重置</button>
+                </div>
             </div>
         </div>
     </div>

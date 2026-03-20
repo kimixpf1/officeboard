@@ -225,8 +225,418 @@ class OfficeDashboard {
             this.goToDateView(e.detail.date);
         });
 
-        // 便签备忘录功能
+        // 初始化右侧折叠面板
+        this.initSidePanels();
+    }
+
+    /**
+     * 初始化所有右侧折叠面板
+     */
+    initSidePanels() {
+        this.initToolsPanel();
+        this.initLinksPanel();
         this.initMemoPanel();
+        this.initToolModals();
+    }
+
+    /**
+     * 初始化工具面板
+     */
+    initToolsPanel() {
+        const panel = document.getElementById('toolsPanel');
+        const toggle = document.getElementById('toolsToggle');
+        const close = document.getElementById('toolsClose');
+
+        if (!panel || !toggle) return;
+
+        toggle.addEventListener('click', () => {
+            panel.classList.toggle('expanded');
+        });
+
+        if (close) {
+            close.addEventListener('click', () => {
+                panel.classList.remove('expanded');
+            });
+        }
+    }
+
+    /**
+     * 初始化网站面板
+     */
+    initLinksPanel() {
+        const panel = document.getElementById('linksPanel');
+        const toggle = document.getElementById('linksToggle');
+        const close = document.getElementById('linksClose');
+        const linksList = document.getElementById('linksList');
+        const addBtn = document.getElementById('addLinkBtn');
+        const nameInput = document.getElementById('newLinkName');
+        const urlInput = document.getElementById('newLinkUrl');
+
+        if (!panel || !toggle) return;
+
+        // 加载保存的网站
+        this.loadLinks();
+
+        // 切换面板
+        toggle.addEventListener('click', () => {
+            panel.classList.toggle('expanded');
+        });
+
+        if (close) {
+            close.addEventListener('click', () => {
+                panel.classList.remove('expanded');
+            });
+        }
+
+        // 添加网站
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                const name = nameInput.value.trim();
+                let url = urlInput.value.trim();
+
+                if (!name || !url) {
+                    alert('请输入网站名称和网址');
+                    return;
+                }
+
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    url = 'https://' + url;
+                }
+
+                this.addLink(name, url);
+                nameInput.value = '';
+                urlInput.value = '';
+            });
+        }
+
+        // 监听网站同步事件
+        document.addEventListener('linksSynced', (e) => {
+            this.renderLinks(e.detail.links);
+        });
+    }
+
+    /**
+     * 加载网站列表
+     */
+    loadLinks() {
+        const saved = localStorage.getItem('office_links');
+        const links = saved ? JSON.parse(saved) : this.getDefaultLinks();
+        this.renderLinks(links);
+    }
+
+    /**
+     * 获取默认网站
+     */
+    getDefaultLinks() {
+        return [
+            { name: '中国政府网', url: 'https://www.gov.cn/', icon: '🏛️' },
+            { name: '百度', url: 'https://www.baidu.com/', icon: '🔍' },
+            { name: '微信读书', url: 'https://weread.qq.com/', icon: '📚' }
+        ];
+    }
+
+    /**
+     * 渲染网站列表
+     */
+    renderLinks(links) {
+        const linksList = document.getElementById('linksList');
+        if (!linksList) return;
+
+        linksList.innerHTML = links.map((link, index) => `
+            <a href="${link.url}" target="_blank" class="link-item">
+                <span class="link-icon">${link.icon || '🔗'}</span>
+                <span class="link-name">${link.name}</span>
+                <button class="link-delete" data-index="${index}" title="删除">×</button>
+            </a>
+        `).join('');
+
+        // 绑定删除事件
+        linksList.querySelectorAll('.link-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const index = parseInt(btn.dataset.index);
+                this.deleteLink(index);
+            });
+        });
+    }
+
+    /**
+     * 添加网站
+     */
+    addLink(name, url) {
+        const saved = localStorage.getItem('office_links');
+        const links = saved ? JSON.parse(saved) : this.getDefaultLinks();
+        
+        links.push({ name, url, icon: '🔗' });
+        localStorage.setItem('office_links', JSON.stringify(links));
+        this.renderLinks(links);
+
+        // 云端同步
+        this.syncLinksToCloud(links);
+    }
+
+    /**
+     * 删除网站
+     */
+    deleteLink(index) {
+        const saved = localStorage.getItem('office_links');
+        const links = saved ? JSON.parse(saved) : [];
+        
+        links.splice(index, 1);
+        localStorage.setItem('office_links', JSON.stringify(links));
+        this.renderLinks(links);
+
+        // 云端同步
+        this.syncLinksToCloud(links);
+    }
+
+    /**
+     * 同步网站到云端
+     */
+    async syncLinksToCloud(links) {
+        if (syncManager.isLoggedIn()) {
+            // 更新syncData中的links
+            localStorage.setItem('office_links', JSON.stringify(links));
+            await syncManager.immediateSyncToCloud();
+        }
+    }
+
+    /**
+     * 初始化工具弹窗
+     */
+    initToolModals() {
+        // 关闭弹窗按钮
+        document.querySelectorAll('.tool-modal-close').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modalId = btn.dataset.close;
+                if (modalId) {
+                    document.getElementById(modalId).classList.remove('active');
+                }
+            });
+        });
+
+        // 点击遮罩关闭
+        document.querySelectorAll('.tool-modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // 工具项点击
+        document.querySelectorAll('.tool-item[data-tool]').forEach(item => {
+            item.addEventListener('click', () => {
+                const tool = item.dataset.tool;
+                this.openTool(tool);
+            });
+        });
+
+        // 计算器按钮
+        document.querySelectorAll('.calc-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const val = btn.dataset.calc;
+                this.calcInput(val);
+            });
+        });
+
+        // 倒计时
+        this.initTimer();
+    }
+
+    /**
+     * 打开工具
+     */
+    openTool(tool) {
+        const modal = document.getElementById(tool + 'Modal');
+        if (modal) {
+            modal.classList.add('active');
+            
+            if (tool === 'weather') {
+                this.loadWeather();
+            }
+        }
+    }
+
+    /**
+     * 计算器输入
+     */
+    calcInput(val) {
+        const display = document.getElementById('calcDisplay');
+        if (!display) return;
+
+        let current = display.value;
+
+        if (val === 'C') {
+            display.value = '';
+        } else if (val === '±') {
+            if (current.startsWith('-')) {
+                display.value = current.substring(1);
+            } else if (current) {
+                display.value = '-' + current;
+            }
+        } else if (val === '%') {
+            try {
+                display.value = parseFloat(eval(current)) / 100;
+            } catch (e) {}
+        } else if (val === '=') {
+            try {
+                display.value = eval(current);
+            } catch (e) {
+                display.value = 'Error';
+            }
+        } else {
+            display.value = current + val;
+        }
+    }
+
+    /**
+     * 加载天气
+     */
+    async loadWeather() {
+        const weatherBody = document.getElementById('weatherBody');
+        if (!weatherBody) return;
+
+        weatherBody.innerHTML = '<div class="weather-loading">正在获取位置...</div>';
+
+        try {
+            // 尝试获取位置
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        await this.fetchWeather(latitude, longitude);
+                    },
+                    () => {
+                        // 位置获取失败，使用默认城市
+                        this.fetchWeather(39.9042, 116.4074); // 北京
+                    }
+                );
+            } else {
+                this.fetchWeather(39.9042, 116.4074);
+            }
+        } catch (e) {
+            weatherBody.innerHTML = '<div class="weather-loading">获取天气失败</div>';
+        }
+    }
+
+    /**
+     * 获取天气数据
+     */
+    async fetchWeather(lat, lon) {
+        const weatherBody = document.getElementById('weatherBody');
+        
+        try {
+            // 使用免费的天气API
+            const response = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`
+            );
+            const data = await response.json();
+            
+            const temp = Math.round(data.current.temperature_2m);
+            const code = data.current.weather_code;
+            const desc = this.getWeatherDesc(code);
+            
+            weatherBody.innerHTML = `
+                <div class="weather-info">
+                    <div class="weather-temp">${temp}°C</div>
+                    <div class="weather-desc">${desc}</div>
+                </div>
+            `;
+        } catch (e) {
+            weatherBody.innerHTML = '<div class="weather-loading">天气获取失败，请稍后重试</div>';
+        }
+    }
+
+    /**
+     * 天气代码转描述
+     */
+    getWeatherDesc(code) {
+        const map = {
+            0: '晴', 1: '晴', 2: '少云', 3: '多云',
+            45: '雾', 48: '雾凇',
+            51: '小雨', 53: '小雨', 55: '中雨',
+            61: '小雨', 63: '中雨', 65: '大雨',
+            71: '小雪', 73: '中雪', 75: '大雪',
+            80: '阵雨', 81: '阵雨', 82: '暴雨',
+            95: '雷暴', 96: '雷暴冰雹', 99: '强雷暴'
+        };
+        return map[code] || '未知';
+    }
+
+    /**
+     * 初始化倒计时
+     */
+    initTimer() {
+        const display = document.getElementById('timerDisplay');
+        const startBtn = document.getElementById('timerStart');
+        const pauseBtn = document.getElementById('timerPause');
+        const resetBtn = document.getElementById('timerReset');
+        const hoursInput = document.getElementById('timerHours');
+        const minutesInput = document.getElementById('timerMinutes');
+        const secondsInput = document.getElementById('timerSeconds');
+
+        if (!display || !startBtn) return;
+
+        let timer = null;
+        let remaining = 0;
+
+        const updateDisplay = () => {
+            const h = Math.floor(remaining / 3600);
+            const m = Math.floor((remaining % 3600) / 60);
+            const s = remaining % 60;
+            display.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+
+        startBtn.addEventListener('click', () => {
+            if (timer) return;
+            
+            if (remaining === 0) {
+                const h = parseInt(hoursInput.value) || 0;
+                const m = parseInt(minutesInput.value) || 0;
+                const s = parseInt(secondsInput.value) || 0;
+                remaining = h * 3600 + m * 60 + s;
+            }
+
+            if (remaining <= 0) return;
+
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+
+            timer = setInterval(() => {
+                remaining--;
+                updateDisplay();
+
+                if (remaining <= 0) {
+                    clearInterval(timer);
+                    timer = null;
+                    startBtn.disabled = false;
+                    pauseBtn.disabled = true;
+                    alert('时间到！');
+                }
+            }, 1000);
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+            remaining = 0;
+            updateDisplay();
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+        });
     }
 
     /**
@@ -343,8 +753,15 @@ class OfficeDashboard {
 
         // 键盘快捷键：Escape 关闭面板
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && memoPanel.classList.contains('expanded')) {
-                memoPanel.classList.remove('expanded');
+            if (e.key === 'Escape') {
+                // 关闭所有面板
+                document.querySelectorAll('.side-panel.expanded').forEach(p => {
+                    p.classList.remove('expanded');
+                });
+                // 关闭所有弹窗
+                document.querySelectorAll('.tool-modal.active').forEach(m => {
+                    m.classList.remove('active');
+                });
             }
         });
     }

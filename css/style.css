@@ -2416,33 +2416,30 @@ body {
     margin-right: 0;
 }
 
-/* ========== 右侧便签备忘录样式 ========== */
-.memo-panel {
+/* ========== 右侧独立折叠面板样式 ========== */
+/* 通用面板样式 */
+.side-panel {
     position: fixed;
-    top: 0;
     right: 0;
-    height: 100vh;
     z-index: 1000;
     display: flex;
     align-items: stretch;
     pointer-events: none;
 }
 
-.memo-toggle {
+/* 面板切换按钮 */
+.panel-toggle {
     position: absolute;
     right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 36px;
-    padding: 12px 0;
-    background: var(--primary-color);
+    width: 32px;
+    padding: 10px 0;
     color: white;
-    border-radius: var(--border-radius) 0 0 var(--border-radius);
+    border-radius: 6px 0 0 6px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
     transition: all 0.3s ease;
     pointer-events: auto;
@@ -2450,19 +2447,67 @@ body {
     text-orientation: mixed;
 }
 
-.memo-toggle:hover {
-    width: 42px;
-    background: var(--primary-hover);
+.panel-toggle:hover {
+    width: 38px;
     box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
 }
 
-.memo-toggle-text {
-    font-size: 13px;
+.panel-toggle-text {
+    font-size: 12px;
     font-weight: 500;
     letter-spacing: 2px;
 }
 
-.memo-content {
+/* 工具面板（上）- 橙色 */
+.tools-panel {
+    top: 15%;
+    transform: translateY(-50%);
+}
+.tools-toggle {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    top: 0;
+}
+.tools-toggle:hover {
+    background: linear-gradient(135deg, #fb923c, #f97316);
+}
+.tools-panel .panel-content {
+    height: 320px;
+}
+
+/* 网站面板（中）- 蓝色 */
+.links-panel {
+    top: 50%;
+    transform: translateY(-50%);
+}
+.links-toggle {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    top: 0;
+}
+.links-toggle:hover {
+    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+}
+.links-panel .panel-content {
+    height: 380px;
+}
+
+/* 备忘录面板（下）- 紫色 */
+.memo-panel {
+    top: 85%;
+    transform: translateY(-50%);
+}
+.memo-toggle {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    top: 0;
+}
+.memo-toggle:hover {
+    background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+}
+.memo-panel .panel-content {
+    height: 400px;
+}
+
+/* 面板内容区 */
+.panel-content {
     width: 0;
     background: var(--bg-primary);
     border-left: 1px solid var(--border-color);
@@ -2472,95 +2517,238 @@ body {
     overflow: hidden;
     transition: width 0.3s ease;
     pointer-events: auto;
+    border-radius: 8px 0 0 8px;
 }
 
-.memo-panel.expanded .memo-content {
-    width: 360px;
+.side-panel.expanded .panel-content {
+    width: 320px;
 }
 
-.memo-panel.expanded .memo-toggle {
-    right: 360px;
+.side-panel.expanded .panel-toggle {
+    right: 320px;
 }
 
-.memo-header {
+/* 面板头部 */
+.panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--spacing-4) var(--spacing-5);
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
     flex-shrink: 0;
 }
 
-.memo-header h3 {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-2);
-    font-size: 16px;
+.panel-header h3 {
+    font-size: 15px;
     font-weight: 600;
     color: var(--gray-800);
     margin: 0;
 }
 
-.memo-header h3 svg {
-    color: var(--primary-color);
+.panel-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--gray-600);
+    font-size: 18px;
+    transition: all 0.2s;
 }
 
-.memo-close {
-    width: 32px;
-    height: 32px;
+.panel-close:hover {
+    background: var(--gray-200);
+    color: var(--gray-800);
+}
+
+/* 面板主体 */
+.panel-body {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+/* 工具网格 */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.tool-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--gray-700);
+    transition: all 0.2s;
+}
+
+.tool-item:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+}
+
+.tool-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+}
+
+.tool-icon.ai { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+.tool-icon.calc { background: linear-gradient(135deg, #10b981, #059669); }
+.tool-icon.weather { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+.tool-icon.timer { background: linear-gradient(135deg, #f97316, #ea580c); }
+
+.tool-item span {
+    font-size: 12px;
+    color: var(--gray-600);
+}
+
+/* 网站列表 */
+.links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.link-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--gray-700);
+    transition: all 0.2s;
+    position: relative;
+}
+
+.link-item:hover {
+    background: var(--primary-light);
+}
+
+.link-icon {
+    font-size: 18px;
+}
+
+.link-name {
+    flex: 1;
+    font-size: 13px;
+}
+
+.link-delete {
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: none;
-    border-radius: var(--border-radius-sm);
+    border-radius: 4px;
     cursor: pointer;
-    color: var(--gray-500);
+    color: var(--gray-400);
+    font-size: 14px;
+    opacity: 0;
     transition: all 0.2s;
 }
 
-.memo-close:hover {
-    background: var(--gray-200);
+.link-item:hover .link-delete {
+    opacity: 1;
+}
+
+.link-delete:hover {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+/* 添加网站 */
+.links-add {
+    display: flex;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.links-add input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 12px;
+    background: var(--bg-primary);
     color: var(--gray-700);
 }
 
+.links-add input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.btn-add-link {
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-add-link:hover {
+    background: var(--primary-hover);
+}
+
+/* 备忘录文本区 */
 .memo-body {
-    flex: 1;
-    padding: var(--spacing-4);
-    overflow: hidden;
-    display: flex;
+    padding: 12px;
 }
 
 .memo-body textarea {
-    flex: 1;
     width: 100%;
     height: 100%;
-    padding: var(--spacing-4);
+    min-height: 250px;
+    padding: 12px;
     font-family: var(--font-family);
-    font-size: var(--font-size-sm);
-    line-height: 1.8;
+    font-size: 13px;
+    line-height: 1.7;
     color: var(--gray-700);
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
+    border-radius: 6px;
     resize: none;
     outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.2s;
 }
 
 .memo-body textarea:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--primary-light);
 }
 
-.memo-body textarea::placeholder {
-    color: var(--gray-400);
-    line-height: 1.8;
-}
-
-.memo-footer {
-    padding: var(--spacing-3) var(--spacing-5);
+/* 面板底部 */
+.panel-footer {
+    padding: 8px 16px;
     border-top: 1px solid var(--border-color);
     background: var(--bg-secondary);
     display: flex;
@@ -2569,114 +2757,316 @@ body {
     flex-shrink: 0;
 }
 
-.memo-status {
-    font-size: var(--font-size-xs);
+.panel-status {
+    font-size: 11px;
     color: var(--success-color);
-    display: flex;
-    align-items: center;
-    gap: 4px;
 }
 
-.memo-status.saving {
+.panel-status.saving {
     color: var(--warning-color);
 }
 
-.memo-hint {
-    font-size: var(--font-size-xs);
-    color: var(--gray-400);
+/* ========== 工具弹窗样式 ========== */
+.tool-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s;
 }
 
-/* 深色主题便签样式 */
-[data-theme="dark"] .memo-panel .memo-content {
+.tool-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.tool-modal-content {
     background: var(--bg-primary);
-    border-color: var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
 }
 
-[data-theme="dark"] .memo-panel .memo-header {
+.tool-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tool-modal-header h4 {
+    margin: 0;
+    font-size: 15px;
+    color: var(--gray-800);
+}
+
+.tool-modal-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--gray-500);
+    font-size: 20px;
+}
+
+.tool-modal-close:hover {
+    background: var(--gray-200);
+}
+
+/* 计算器 */
+.calculator-content {
+    width: 280px;
+}
+
+.calculator {
+    padding: 12px;
+}
+
+.calc-display {
+    width: 100%;
+    padding: 15px;
+    font-size: 24px;
+    text-align: right;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.calc-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.calc-btn {
+    padding: 14px;
+    font-size: 16px;
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--gray-700);
+    transition: all 0.2s;
+}
+
+.calc-btn:hover {
+    background: var(--gray-200);
+}
+
+.calc-btn.zero {
+    grid-column: span 2;
+}
+
+.calc-btn.op {
+    background: #e0e7ff;
+    color: var(--primary-color);
+}
+
+.calc-btn.op:hover {
+    background: #c7d2fe;
+}
+
+.calc-btn.eq {
+    background: var(--primary-color);
+    color: white;
+}
+
+.calc-btn.eq:hover {
+    background: var(--primary-hover);
+}
+
+/* 天气 */
+.weather-content {
+    width: 300px;
+}
+
+.weather-body {
+    padding: 16px;
+    min-height: 150px;
+}
+
+.weather-loading {
+    text-align: center;
+    color: var(--gray-500);
+    padding: 30px;
+}
+
+.weather-info {
+    text-align: center;
+}
+
+.weather-temp {
+    font-size: 48px;
+    font-weight: 300;
+    color: var(--gray-800);
+}
+
+.weather-desc {
+    font-size: 16px;
+    color: var(--gray-600);
+    margin-top: 8px;
+}
+
+.weather-city {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-top: 4px;
+}
+
+/* 倒计时 */
+.timer-content {
+    width: 280px;
+}
+
+.timer-body {
+    padding: 20px;
+    text-align: center;
+}
+
+.timer-display {
+    font-size: 40px;
+    font-weight: 300;
+    color: var(--gray-800);
+    font-family: monospace;
+    margin-bottom: 20px;
+}
+
+.timer-inputs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.timer-inputs input {
+    width: 50px;
+    padding: 8px;
+    text-align: center;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+}
+
+.timer-inputs span {
+    font-size: 18px;
+    color: var(--gray-500);
+}
+
+.timer-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.timer-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.timer-btn.start {
+    background: var(--success-color);
+    color: white;
+}
+
+.timer-btn.pause {
+    background: var(--warning-color);
+    color: white;
+}
+
+.timer-btn.reset {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.timer-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 深色主题 */
+[data-theme="dark"] .panel-content,
+[data-theme="dark"] .tool-modal-content {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .panel-header,
+[data-theme="dark"] .tool-modal-header {
     background: var(--bg-tertiary);
 }
 
-[data-theme="dark"] .memo-panel .memo-body textarea {
+[data-theme="dark"] .tool-item,
+[data-theme="dark"] .link-item,
+[data-theme="dark"] .calc-btn,
+[data-theme="dark"] .calc-display {
     background: var(--bg-tertiary);
-    border-color: var(--border-color);
     color: var(--gray-600);
 }
 
-[data-theme="dark"] .memo-panel .memo-footer {
+[data-theme="dark"] .memo-body textarea {
     background: var(--bg-tertiary);
+    color: var(--gray-600);
 }
 
-/* 手机端便签样式 */
+/* 手机端适配 */
 @media (max-width: 640px) {
-    .memo-panel {
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: auto;
-        height: 100vh;
-    }
-
-    .memo-panel.expanded {
-        width: 100vw;
-    }
-
-    .memo-panel.expanded .memo-content {
+    .side-panel.expanded .panel-content {
         width: 100vw;
         position: fixed;
         right: 0;
         top: 0;
-        height: 100vh;
-        z-index: 1001;
+        height: 100vh !important;
+        border-radius: 0;
     }
 
-    .memo-panel.expanded .memo-toggle {
+    .side-panel.expanded .panel-toggle {
         right: 100vw;
         opacity: 0;
-        pointer-events: none;
     }
 
-    .memo-toggle {
+    .panel-toggle {
         width: 28px;
-        padding: 10px 0;
-        border-radius: 6px 0 0 6px;
+        padding: 8px 0;
     }
 
-    .memo-toggle-text {
+    .panel-toggle-text {
         font-size: 10px;
-        letter-spacing: 1px;
     }
 
-    .memo-header {
-        padding: var(--spacing-3) var(--spacing-4);
+    .tools-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
-    .memo-header h3 {
-        font-size: 15px;
-    }
-
-    .memo-body {
-        padding: var(--spacing-3);
-    }
-
-    .memo-body textarea {
-        padding: var(--spacing-3);
-        font-size: 15px;
-        line-height: 1.7;
-    }
-
-    .memo-footer {
-        padding: var(--spacing-2) var(--spacing-4);
+    .links-add {
         flex-wrap: wrap;
-        gap: 4px;
     }
 
-    .memo-status, .memo-hint {
-        font-size: 11px;
+    .links-add input {
+        flex: 1 1 40%;
     }
 
-    .memo-close {
-        width: 36px;
-        height: 36px;
-        background: var(--gray-100);
+    .btn-add-link {
+        flex: 1 1 100%;
     }
 }
