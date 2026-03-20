@@ -558,9 +558,106 @@ class OfficeDashboard {
             { name: '中国政府网', url: 'https://www.gov.cn/', icon: '🏛️' },
             { name: '江苏政府网', url: 'https://www.jiangsu.gov.cn/', icon: '🏛️' },
             { name: '苏州政府网', url: 'https://www.suzhou.gov.cn/', icon: '🏛️' },
-            { name: '苏州统计局', url: 'https://tjj.suzhou.gov.cn/', icon: '📊' },
-            { name: '百度', url: 'https://www.baidu.com/', icon: '🔍' }
+            { name: '苏州统计局', url: 'https://tjj.suzhou.gov.cn/', icon: '📈' },
+            { name: '百度', url: 'https://www.baidu.com/', icon: '🔎' }
         ];
+    }
+
+    /**
+     * 根据URL自动识别图标
+     */
+    getAutoIcon(url) {
+        if (!url) return '🔗';
+        
+        const urlLower = url.toLowerCase();
+        
+        // 政府网站
+        if (urlLower.includes('.gov.') || urlLower.includes('政府')) {
+            return '🏛️';
+        }
+        
+        // 统计、数据类
+        if (urlLower.includes('stat') || urlLower.includes('统计') || urlLower.includes('data')) {
+            return '📈';
+        }
+        
+        // 搜索引擎
+        if (urlLower.includes('baidu') || urlLower.includes('google') || urlLower.includes('bing') || 
+            urlLower.includes('sogou') || urlLower.includes('360') || urlLower.includes('search')) {
+            return '🔎';
+        }
+        
+        // 社交媒体
+        if (urlLower.includes('weibo') || urlLower.includes('微博')) {
+            return '📱';
+        }
+        if (urlLower.includes('weixin') || urlLower.includes('微信') || urlLower.includes('wechat')) {
+            return '💬';
+        }
+        if (urlLower.includes('douyin') || urlLower.includes('tiktok') || urlLower.includes('抖音')) {
+            return '🎵';
+        }
+        
+        // 视频网站
+        if (urlLower.includes('bilibili') || urlLower.includes('哔哩')) {
+            return '📺';
+        }
+        if (urlLower.includes('youku') || urlLower.includes('优酷') || urlLower.includes('iqiyi') || 
+            urlLower.includes('爱奇艺') || urlLower.includes('video')) {
+            return '🎬';
+        }
+        
+        // 新闻资讯
+        if (urlLower.includes('news') || urlLower.includes('新闻') || urlLower.includes('xinwen')) {
+            return '📰';
+        }
+        
+        // 购物电商
+        if (urlLower.includes('taobao') || urlLower.includes('淘宝') || urlLower.includes('jd') || 
+            urlLower.includes('京东') || urlLower.includes('shop') || urlLower.includes('商城')) {
+            return '🛒';
+        }
+        
+        // 邮箱
+        if (urlLower.includes('mail') || urlLower.includes('邮箱') || urlLower.includes('email')) {
+            return '📧';
+        }
+        
+        // 文档/办公
+        if (urlLower.includes('doc') || urlLower.includes('文档') || urlLower.includes('office')) {
+            return '📄';
+        }
+        if (urlLower.includes('sheet') || urlLower.includes('表格') || urlLower.includes('excel')) {
+            return '📊';
+        }
+        
+        // 教育/学习
+        if (urlLower.includes('edu') || urlLower.includes('学') || urlLower.includes('课')) {
+            return '🎓';
+        }
+        
+        // 银行/金融
+        if (urlLower.includes('bank') || urlLower.includes('银行') || urlLower.includes('金融') || 
+            urlLower.includes('fund') || urlLower.includes('基金')) {
+            return '🏦';
+        }
+        
+        // 工具/开发
+        if (urlLower.includes('github') || urlLower.includes('git') || urlLower.includes('code')) {
+            return '💻';
+        }
+        if (urlLower.includes('tool') || urlLower.includes('工具')) {
+            return '🔧';
+        }
+        
+        // AI相关
+        if (urlLower.includes('ai') || urlLower.includes('gpt') || urlLower.includes('chat') || 
+            urlLower.includes('kimi') || urlLower.includes('deepseek')) {
+            return '🤖';
+        }
+        
+        // 默认
+        return '🔗';
     }
 
     /**
@@ -693,7 +790,7 @@ class OfficeDashboard {
             console.error('读取网站列表失败:', e);
         }
         
-        links.push({ name, url, icon: '🔗' });
+        links.push({ name, url, icon: this.getAutoIcon(url) });
         localStorage.setItem('office_links', JSON.stringify(links));
         this.renderLinks(links);
         this.showSuccess('网站已添加: ' + name);
