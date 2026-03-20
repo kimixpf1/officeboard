@@ -2460,8 +2460,7 @@ body {
 
 /* 工具面板（上）- 橙色 */
 .tools-panel {
-    top: 15%;
-    transform: translateY(-50%);
+    top: calc(50% - 75px);
 }
 .tools-toggle {
     background: linear-gradient(135deg, #f97316, #ea580c);
@@ -2492,8 +2491,7 @@ body {
 
 /* 备忘录面板（下）- 紫色 */
 .memo-panel {
-    top: 85%;
-    transform: translateY(-50%);
+    top: calc(50% + 75px);
 }
 .memo-toggle {
     background: linear-gradient(135deg, #8b5cf6, #7c3aed);
@@ -2907,19 +2905,31 @@ body {
     padding: 30px;
 }
 
+.weather-error {
+    text-align: center;
+    padding: 20px;
+    color: var(--gray-600);
+}
+
 .weather-info {
     text-align: center;
+    padding: 10px;
+}
+
+.weather-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
 }
 
 .weather-temp {
     font-size: 48px;
     font-weight: 300;
-    color: var(--gray-800);
+    color: var(--primary-color);
 }
 
 .weather-desc {
     font-size: 16px;
-    color: var(--gray-600);
+    color: var(--gray-700);
     margin-top: 8px;
 }
 
@@ -2942,9 +2952,12 @@ body {
 .timer-display {
     font-size: 40px;
     font-weight: 300;
-    color: var(--gray-800);
+    color: var(--primary-color);
     font-family: monospace;
     margin-bottom: 20px;
+    background: var(--bg-secondary);
+    padding: 15px;
+    border-radius: 8px;
 }
 
 .timer-inputs {
@@ -2963,11 +2976,17 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: var(--bg-secondary);
+    color: var(--gray-800);
+}
+
+.timer-inputs input:focus {
+    outline: none;
+    border-color: var(--primary-color);
 }
 
 .timer-inputs span {
     font-size: 18px;
-    color: var(--gray-500);
+    color: var(--gray-600);
 }
 
 .timer-buttons {

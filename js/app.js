@@ -498,7 +498,7 @@ class OfficeDashboard {
         const weatherBody = document.getElementById('weatherBody');
         if (!weatherBody) return;
 
-        weatherBody.innerHTML = '<div class="weather-loading">正在获取位置...</div>';
+        weatherBody.innerHTML = '<div class="weather-loading">正在获取天气...</div>';
 
         try {
             // 尝试获取位置
@@ -506,17 +506,19 @@ class OfficeDashboard {
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         const { latitude, longitude } = position.coords;
-                        await this.fetchWeather(latitude, longitude);
+                        await this.fetchWeather(latitude, longitude, '当前位置');
                     },
-                    () => {
+                    async () => {
                         // 位置获取失败，使用默认城市
-                        this.fetchWeather(39.9042, 116.4074); // 北京
-                    }
+                        await this.fetchWeather(39.9042, 116.4074, '北京');
+                    },
+                    { timeout: 5000 }
                 );
             } else {
-                this.fetchWeather(39.9042, 116.4074);
+                await this.fetchWeather(39.9042, 116.4074, '北京');
             }
         } catch (e) {
+            console.error('天气加载失败:', e);
             weatherBody.innerHTML = '<div class="weather-loading">获取天气失败</div>';
         }
     }
@@ -524,29 +526,67 @@ class OfficeDashboard {
     /**
      * 获取天气数据
      */
-    async fetchWeather(lat, lon) {
+    async fetchWeather(lat, lon, cityName) {
         const weatherBody = document.getElementById('weatherBody');
         
         try {
-            // 使用免费的天气API
-            const response = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`
-            );
+            weatherBody.innerHTML = '<div class="weather-loading">正在加载天气...</div>';
+            
+            // 使用免费的天气API (open-meteo)
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                throw new Error('API请求失败');
+            }
+            
             const data = await response.json();
+            
+            if (!data.current) {
+                throw new Error('数据格式错误');
+            }
             
             const temp = Math.round(data.current.temperature_2m);
             const code = data.current.weather_code;
             const desc = this.getWeatherDesc(code);
+            const icon = this.getWeatherIcon(code);
             
             weatherBody.innerHTML = `
                 <div class="weather-info">
+                    <div class="weather-icon">${icon}</div>
                     <div class="weather-temp">${temp}°C</div>
                     <div class="weather-desc">${desc}</div>
+                    <div class="weather-city">${cityName}</div>
                 </div>
             `;
         } catch (e) {
-            weatherBody.innerHTML = '<div class="weather-loading">天气获取失败，请稍后重试</div>';
+            console.error('天气获取失败:', e);
+            weatherBody.innerHTML = `
+                <div class="weather-error">
+                    <div>🌤️</div>
+                    <div>天气获取失败</div>
+                    <div style="font-size:12px;color:var(--gray-500);margin-top:8px;">请检查网络连接</div>
+                </div>
+            `;
         }
+    }
+
+    /**
+     * 获取天气图标
+     */
+    getWeatherIcon(code) {
+        if (code === 0 || code === 1) return '☀️';
+        if (code === 2 || code === 3) return '⛅';
+        if (code >= 45 && code <= 48) return '🌫️';
+        if (code >= 51 && code <= 67) return '🌧️';
+        if (code >= 71 && code <= 77) return '❄️';
+        if (code >= 80 && code <= 82) return '🌦️';
+        if (code >= 95 && code <= 99) return '⛈️';
+        return '🌤️';
     }
 
     /**
