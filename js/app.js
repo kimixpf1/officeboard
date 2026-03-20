@@ -249,6 +249,9 @@ class OfficeDashboard {
 
         if (!panel || !toggle) return;
 
+        // 加载并渲染工具
+        this.loadTools();
+
         toggle.addEventListener('click', () => {
             panel.classList.toggle('expanded');
         });
@@ -258,6 +261,137 @@ class OfficeDashboard {
                 panel.classList.remove('expanded');
             });
         }
+    }
+
+    /**
+     * 获取默认工具列表
+     */
+    getDefaultTools() {
+        return [
+            { id: 'kimi', name: 'Kimi', icon: 'K', type: 'link', url: 'https://kimi.moonshot.cn/', iconClass: 'ai' },
+            { id: 'deepseek', name: 'DeepSeek', icon: 'D', type: 'link', url: 'https://chat.deepseek.com/', iconClass: 'ai' },
+            { id: 'doubao', name: '豆包', icon: '豆', type: 'link', url: 'https://www.doubao.com/chat/', iconClass: 'ai' },
+            { id: 'calculator', name: '计算器', icon: '计', type: 'tool', iconClass: 'calc' },
+            { id: 'weather', name: '天气', icon: '天', type: 'tool', iconClass: 'weather' },
+            { id: 'timer', name: '倒计时', icon: '时', type: 'tool', iconClass: 'timer' }
+        ];
+    }
+
+    /**
+     * 加载工具列表
+     */
+    loadTools() {
+        let tools;
+        const saved = localStorage.getItem('office_tools');
+        if (saved) {
+            try {
+                tools = JSON.parse(saved);
+                if (!Array.isArray(tools) || tools.length === 0) {
+                    tools = this.getDefaultTools();
+                }
+            } catch (e) {
+                tools = this.getDefaultTools();
+            }
+        } else {
+            tools = this.getDefaultTools();
+        }
+        localStorage.setItem('office_tools', JSON.stringify(tools));
+        this.renderTools(tools);
+    }
+
+    /**
+     * 渲染工具列表
+     */
+    renderTools(tools) {
+        const grid = document.getElementById('toolsGrid');
+        if (!grid) return;
+
+        grid.innerHTML = tools.map((tool, index) => {
+            const isLink = tool.type === 'link';
+            const tag = isLink ? 'a' : 'div';
+            const linkAttrs = isLink ? `href="${tool.url}" target="_blank"` : `data-tool="${tool.id}"`;
+            
+            return `
+                <${tag} ${linkAttrs} class="tool-item" data-index="${index}" draggable="true">
+                    <span class="tool-drag" title="拖动排序">⋮⋮</span>
+                    <div class="tool-icon ${tool.iconClass}">${tool.icon}</div>
+                    <span>${tool.name}</span>
+                </${tag}>
+            `;
+        }).join('');
+
+        // 绑定工具点击事件（非链接类型）
+        grid.querySelectorAll('.tool-item[data-tool]').forEach(item => {
+            item.addEventListener('click', () => {
+                const toolId = item.dataset.tool;
+                this.openTool(toolId);
+            });
+        });
+
+        // 初始化拖动排序
+        this.initToolsDragSort(grid);
+    }
+
+    /**
+     * 初始化工具拖动排序
+     */
+    initToolsDragSort(container) {
+        let draggedItem = null;
+
+        container.querySelectorAll('.tool-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                draggedItem = item;
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                // 如果是<a>标签，阻止默认跳转
+                if (item.tagName === 'A') {
+                    e.preventDefault();
+                }
+            });
+
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                container.querySelectorAll('.tool-item').forEach(i => {
+                    i.classList.remove('drag-over');
+                });
+                draggedItem = null;
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                const draggingItem = container.querySelector('.dragging');
+                if (draggingItem && draggingItem !== item) {
+                    const rect = item.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    if (e.clientY < midY) {
+                        item.parentNode.insertBefore(draggingItem, item);
+                    } else {
+                        item.parentNode.insertBefore(draggingItem, item.nextSibling);
+                    }
+                }
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                // 重新计算顺序并保存
+                const newOrder = [];
+                container.querySelectorAll('.tool-item').forEach((el, idx) => {
+                    const index = parseInt(el.dataset.index);
+                    const saved = localStorage.getItem('office_tools');
+                    if (saved) {
+                        const tools = JSON.parse(saved);
+                        if (tools[index]) {
+                            newOrder.push(tools[index]);
+                        }
+                    }
+                    el.dataset.index = idx;
+                });
+                localStorage.setItem('office_tools', JSON.stringify(newOrder));
+            });
+        });
     }
 
     /**
