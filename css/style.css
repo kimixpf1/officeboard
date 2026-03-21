@@ -1462,34 +1462,67 @@ body {
 }
 
 /* 主题变量 */
+/* 天蓝色 - 清新明亮 */
 [data-theme="blue"] {
-    --primary-color: #0ea5e9;
-    --primary-hover: #0284c7;
-    --primary-light: #e0f2fe;
+    --primary-color: #0284c7;
+    --primary-hover: #0369a1;
+    --primary-light: #bae6fd;
 }
 
+/* 翠绿色 - 生机活力 */
 [data-theme="green"] {
-    --primary-color: #10b981;
-    --primary-hover: #059669;
-    --primary-light: #d1fae5;
+    --primary-color: #059669;
+    --primary-hover: #047857;
+    --primary-light: #a7f3d0;
 }
 
+/* 中国红 - 热情经典 */
 [data-theme="red"] {
-    --primary-color: #ef4444;
-    --primary-hover: #dc2626;
-    --primary-light: #fee2e2;
+    --primary-color: #dc2626;
+    --primary-hover: #b91c1c;
+    --primary-light: #fecaca;
 }
 
+/* 琥珀橙 - 温暖活力 */
 [data-theme="orange"] {
-    --primary-color: #f97316;
-    --primary-hover: #ea580c;
-    --primary-light: #ffedd5;
+    --primary-color: #ea580c;
+    --primary-hover: #c2410c;
+    --primary-light: #fed7aa;
 }
 
+/* 玫瑰粉 - 优雅浪漫 */
+[data-theme="rose"] {
+    --primary-color: #e11d48;
+    --primary-hover: #be123c;
+    --primary-light: #fecdd3;
+}
+
+/* 靛青紫 - 神秘高贵 */
+[data-theme="violet"] {
+    --primary-color: #7c3aed;
+    --primary-hover: #6d28d9;
+    --primary-light: #ddd6fe;
+}
+
+/* 青色 - 现代科技 */
+[data-theme="teal"] {
+    --primary-color: #0d9488;
+    --primary-hover: #0f766e;
+    --primary-light: #99f6e4;
+}
+
+/* 深邃蓝 - 稳重商务 */
+[data-theme="indigo"] {
+    --primary-color: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-light: #c7d2fe;
+}
+
+/* 深色主题 */
 [data-theme="dark"] {
-    --primary-color: #6366f1;
-    --primary-hover: #4f46e5;
-    --primary-light: #312e81;
+    --primary-color: #818cf8;
+    --primary-hover: #6366f1;
+    --primary-light: #4f46e5;
 
     --gray-50: #1f2937;
     --gray-100: #374151;
@@ -1507,6 +1540,40 @@ body {
     --bg-tertiary: #374151;
 
     --border-color: #4b5563;
+}
+
+/* 深色主题表单控件修复 */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+    color: #9ca3af;
+}
+
+[data-theme="dark"] select option {
+    background-color: #374151;
+    color: #f3f4f6;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+}
+
+[data-theme="dark"] .checkbox-label span {
+    color: #e5e7eb;
+}
+
+[data-theme="dark"] .form-group label {
+    color: #d1d5db;
 }
 
 /* 深色主题特殊样式 */
