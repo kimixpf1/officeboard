@@ -225,7 +225,7 @@ class CalendarView {
         // 计算是该月的第几周
         const weekStart = weekDates[0];
         const weekOfMonth = this.getWeekOfMonth(weekStart);
-        const monthLabel = `${weekStart.getMonth() + 1}月第${weekOfMonth}周`;
+        const monthLabel = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月第${weekOfMonth}周`;
 
         let html = '<div class="week-view">';
 

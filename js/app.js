@@ -2743,7 +2743,7 @@ class OfficeDashboard {
                 const today = new Date();
                 const isToday = this.formatDateLocal(today) === this.selectedDate;
                 const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                const dateStr = `${date.getMonth() + 1}月${date.getDate()}日 ${weekDays[date.getDay()]}`;
+                const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekDays[date.getDay()]}`;
                 boardDateTitle.textContent = isToday ? `今日事项 (${dateStr})` : `${dateStr}事项`;
             }
         } else if (window.calendarView) {
