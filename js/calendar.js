@@ -340,6 +340,9 @@ class CalendarView {
 
         let html = '<div class="month-view">';
 
+        // 月份标题
+        html += `<div class="month-title" style="grid-column: 1 / span 7; text-align: center;">${year}年${month + 1}月</div>`;
+
         // 表头
         weekDays.forEach(day => {
             html += `<div class="month-header">周${day}</div>`;
