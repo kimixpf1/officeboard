@@ -3327,10 +3327,34 @@ class OfficeDashboard {
                 const monthlyDateGroup = document.getElementById('monthlyDateGroup');
                 const nthWorkDayGroup = document.getElementById('nthWorkDayGroup');
                 const weekDayGroup = document.getElementById('weekDayGroup');
+                const weekMultiGroup = document.getElementById('weekMultiGroup');
+                const monthlyWeekDayGroup = document.getElementById('monthlyWeekDayGroup');
 
-                if (monthlyDateGroup) monthlyDateGroup.style.display = type === 'monthly_date' ? 'block' : 'none';
-                if (nthWorkDayGroup) nthWorkDayGroup.style.display = type === 'monthly_workday' ? 'block' : 'none';
-                if (weekDayGroup) weekDayGroup.style.display = type === 'weekly_day' ? 'block' : 'none';
+                // 隐藏所有组
+                if (monthlyDateGroup) monthlyDateGroup.style.display = 'none';
+                if (nthWorkDayGroup) nthWorkDayGroup.style.display = 'none';
+                if (weekDayGroup) weekDayGroup.style.display = 'none';
+                if (weekMultiGroup) weekMultiGroup.style.display = 'none';
+                if (monthlyWeekDayGroup) monthlyWeekDayGroup.style.display = 'none';
+
+                // 根据类型显示对应组
+                switch (type) {
+                    case 'monthly_date':
+                        if (monthlyDateGroup) monthlyDateGroup.style.display = 'block';
+                        break;
+                    case 'monthly_workday':
+                        if (nthWorkDayGroup) nthWorkDayGroup.style.display = 'block';
+                        break;
+                    case 'weekly_day':
+                        if (weekDayGroup) weekDayGroup.style.display = 'block';
+                        break;
+                    case 'weekly_multi':
+                        if (weekMultiGroup) weekMultiGroup.style.display = 'block';
+                        break;
+                    case 'monthly_weekday':
+                        if (monthlyWeekDayGroup) monthlyWeekDayGroup.style.display = 'block';
+                        break;
+                }
             };
         }
     }
@@ -3384,7 +3408,18 @@ class OfficeDashboard {
                         rule.nthWorkDay = nthWorkDay;
                     } else if (recurringType === 'weekly_day') {
                         rule.weekDay = parseInt(document.getElementById('weekDay').value);
+                    } else if (recurringType === 'weekly_multi') {
+                        const checkedDays = Array.from(document.querySelectorAll('input[name="weekDays"]:checked')).map(cb => parseInt(cb.value));
+                        if (checkedDays.length === 0) {
+                            alert('请至少选择一个星期');
+                            return;
+                        }
+                        rule.weekDays = checkedDays.sort((a, b) => a - b);
+                    } else if (recurringType === 'monthly_weekday') {
+                        rule.nthWeek = parseInt(document.getElementById('monthlyNthWeek').value);
+                        rule.weekDay = parseInt(document.getElementById('monthlyWeekDayValue').value);
                     }
+                    // daily 和 workday_daily 不需要额外参数
 
                     item.isRecurring = true;
                     item.recurringRule = rule;
@@ -3582,6 +3617,7 @@ class OfficeDashboard {
         const items = [];
         const groupId = 'recurring_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         const today = new Date();
+        today.setHours(12, 0, 0, 0);
 
         console.log('生成周期性任务:', { baseItem, rule, count });
 
@@ -3590,40 +3626,104 @@ class OfficeDashboard {
         delete cleanItem.isRecurring;
         delete cleanItem.recurringRule;
         delete cleanItem.recurringCount;
-        delete cleanItem.displayTitle;  // 删除显示标题，让显示时根据新日期重新生成
-        delete cleanItem.deadline;      // 删除旧截止时间，使用新生成的
+        delete cleanItem.displayTitle;
+        delete cleanItem.deadline;
 
-        for (let i = 0; i < count; i++) {
-            let targetDate;
+        switch (rule.type) {
+            case 'daily':
+                // 每天
+                for (let i = 0; i < count; i++) {
+                    const date = new Date(today);
+                    date.setDate(date.getDate() + i);
+                    if (rule.skipWeekends && this.isWeekend(date)) {
+                        continue;
+                    }
+                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, items.length + 1));
+                }
+                break;
 
-            switch (rule.type) {
-                case 'monthly_date':
-                    targetDate = this.getMonthlyDate(today, i + 1, rule.day, rule.skipWeekends);
-                    break;
-                case 'monthly_workday':
-                    targetDate = this.getNthWorkDayOfMonth(today, i + 1, rule.nthWorkDay);
-                    break;
-                case 'weekly_day':
-                    targetDate = this.getWeeklyDay(today, i, rule.weekDay);
-                    break;
-            }
+            case 'workday_daily':
+                // 工作日每天（周一至周五）
+                let workdayCount1 = 0;
+                let currentDate1 = new Date(today);
+                while (workdayCount1 < count) {
+                    if (!this.isWeekend(currentDate1)) {
+                        items.push(this.createRecurringItem(cleanItem, currentDate1, rule, groupId, items.length + 1));
+                        workdayCount1++;
+                    }
+                    currentDate1 = new Date(currentDate1);
+                    currentDate1.setDate(currentDate1.getDate() + 1);
+                }
+                break;
 
-            console.log(`第${i + 1}个任务日期:`, targetDate);
+            case 'weekly_day':
+                // 每周固定星期
+                for (let i = 0; i < count; i++) {
+                    const date = this.getWeeklyDay(today, i, rule.weekDay);
+                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                }
+                break;
 
-            if (targetDate) {
-                items.push({
-                    ...cleanItem,
-                    deadline: this.formatDateForInput(targetDate),
-                    isRecurring: true,
-                    recurringRule: rule,
-                    recurringGroupId: groupId,
-                    occurrenceIndex: i + 1
-                });
-            }
+            case 'weekly_multi':
+                // 每周多天（如一二三）
+                const weekDays = rule.weekDays || [];
+                let weekOffset = 0;
+                let itemsGenerated = 0;
+                while (itemsGenerated < count) {
+                    for (const day of weekDays) {
+                        if (itemsGenerated >= count) break;
+                        const date = this.getWeeklyDay(today, weekOffset, day);
+                        // 确保日期不早于今天
+                        if (date >= today) {
+                            items.push(this.createRecurringItem(cleanItem, date, rule, groupId, itemsGenerated + 1));
+                            itemsGenerated++;
+                        }
+                    }
+                    weekOffset++;
+                }
+                break;
+
+            case 'monthly_date':
+                // 每月固定日期
+                for (let i = 0; i < count; i++) {
+                    const date = this.getMonthlyDate(today, i + 1, rule.day, rule.skipWeekends);
+                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                }
+                break;
+
+            case 'monthly_workday':
+                // 每月第N个工作日
+                for (let i = 0; i < count; i++) {
+                    const date = this.getNthWorkDayOfMonth(today, i + 1, rule.nthWorkDay);
+                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                }
+                break;
+
+            case 'monthly_weekday':
+                // 每月第N个星期X（如每月第一个周一）
+                for (let i = 0; i < count; i++) {
+                    const date = this.getNthWeekDayOfMonth(today, i + 1, rule.nthWeek, rule.weekDay);
+                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                }
+                break;
         }
 
         console.log('生成的周期性任务:', items);
         return items;
+    }
+
+    /**
+     * 创建单个周期性任务项
+     */
+    createRecurringItem(baseItem, date, rule, groupId, index) {
+        return {
+            ...baseItem,
+            deadline: this.formatDateForInput(date),
+            isRecurring: true,
+            recurringRule: rule,
+            recurringGroupId: groupId,
+            occurrenceIndex: index
+        };
     }
 
     /**
@@ -3707,6 +3807,37 @@ class OfficeDashboard {
     isWeekend(date) {
         const day = date.getDay();
         return day === 0 || day === 6;
+    }
+
+    /**
+     * 获取每月第N个星期X（如每月第一个周一）
+     * @param {Date} baseDate - 基准日期
+     * @param {number} monthsAhead - 月数偏移
+     * @param {number} nthWeek - 第几个（1-5）
+     * @param {number} weekDay - 星期几（1-7，1=周一，7=周日）
+     * @returns {Date} 目标日期
+     */
+    getNthWeekDayOfMonth(baseDate, monthsAhead, nthWeek, weekDay) {
+        const date = new Date(baseDate);
+        date.setDate(1);
+        date.setMonth(date.getMonth() + monthsAhead);
+        date.setHours(12, 0, 0, 0);
+
+        // 找到该月第一个目标星期几
+        const firstDayOfMonth = date.getDay();
+        // 将JS的周日=0转换为我们的周一=1...周日=7
+        const jsWeekDay = weekDay === 7 ? 0 : weekDay;
+        
+        // 计算第一个目标星期几的日期
+        let daysUntilFirst = jsWeekDay - firstDayOfMonth;
+        if (daysUntilFirst < 0) daysUntilFirst += 7;
+        
+        date.setDate(1 + daysUntilFirst);
+        
+        // 加上 (nthWeek - 1) 周
+        date.setDate(date.getDate() + (nthWeek - 1) * 7);
+
+        return date;
     }
 
     /**

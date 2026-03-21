@@ -215,12 +215,27 @@ class OCRManager {
 
 【周期性任务识别 - 非常重要】
 如果用户描述包含周期性含义，识别为周期性任务：
-- "每月X号"或"每个月X号" → isRecurring: true, recurringRule: { type: 'monthly_date', day: X }
-- "每月第X个工作日" → isRecurring: true, recurringRule: { type: 'monthly_workday', nthWorkDay: X }
+
+【每日类】
+- "每天"或"每日" → isRecurring: true, recurringRule: { type: 'daily' }
+- "工作日每天"、"每个工作日"、"每天（工作日）" → isRecurring: true, recurringRule: { type: 'workday_daily' }
+
+【每周类】
 - "每周X"或"每星期X" → isRecurring: true, recurringRule: { type: 'weekly_day', weekDay: 1-7 }
   （周一=1, 周二=2, 周三=3, 周四=4, 周五=5, 周六=6, 周日=7）
+- "每周一三五"或"每周一二三" → isRecurring: true, recurringRule: { type: 'weekly_multi', weekDays: [1,3,5] }
+  （多个星期用数组表示）
+
+【每月类】
+- "每月X号"或"每个月X号" → isRecurring: true, recurringRule: { type: 'monthly_date', day: X }
+- "每月第X个工作日" → isRecurring: true, recurringRule: { type: 'monthly_workday', nthWorkDay: X }
+- "每月第一个周一"、"每月第二个周二"等 → isRecurring: true, recurringRule: { type: 'monthly_weekday', nthWeek: 1-5, weekDay: 1-7 }
+  （nthWeek: 第几个，1=第一个，2=第二个...）
+
+【通用规则】
 - 如果提到"非节假日"、"非周末"、"工作日"，设置 skipWeekends: true
-- 默认生成6个实例，用户可指定数量
+- 默认生成20个实例（约一个月工作日），用户可指定数量
+- 周期性任务标题要体现周期性，如"每周例会"、"月度汇报"
 
 【日期转换规则 - 重要！】
 - 今天 = ${todayStr}
