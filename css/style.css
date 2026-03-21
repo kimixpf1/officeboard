@@ -1461,61 +1461,259 @@ body {
     flex-shrink: 0;
 }
 
-/* 主题变量 */
-/* 天蓝色 - 清新明亮 */
+/* ========================================
+   主题配色方案
+   每个主题包含：主色调、按钮颜色、整体风格
+   ======================================== */
+
+/* ========== 天际蓝 - 商务清新 ========== */
 [data-theme="blue"] {
-    --primary-color: #0284c7;
-    --primary-hover: #0369a1;
-    --primary-light: #bae6fd;
+    --primary-color: #0369a1;
+    --primary-hover: #075985;
+    --primary-light: #e0f2fe;
+    --header-bg: linear-gradient(135deg, #0284c7, #0369a1);
+    --tools-btn: linear-gradient(180deg, #38bdf8, #0284c7);
+    --links-btn: linear-gradient(180deg, #60a5fa, #2563eb);
+    --memo-btn: linear-gradient(180deg, #818cf8, #4f46e5);
 }
 
-/* 翠绿色 - 生机活力 */
+[data-theme="blue"] .header {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+}
+
+[data-theme="blue"] .tools-toggle {
+    background: linear-gradient(180deg, #38bdf8, #0284c7);
+}
+
+[data-theme="blue"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #7dd3fc, #0ea5e9);
+}
+
+[data-theme="blue"] .links-toggle {
+    background: linear-gradient(180deg, #60a5fa, #2563eb);
+}
+
+[data-theme="blue"] .links-toggle:hover {
+    background: linear-gradient(180deg, #93c5fd, #3b82f6);
+}
+
+[data-theme="blue"] .memo-toggle {
+    background: linear-gradient(180deg, #818cf8, #4f46e5);
+}
+
+[data-theme="blue"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #a5b4fc, #6366f1);
+}
+
+/* ========== 青瓷色 - 古典雅致 ========== */
+[data-theme="teal"] {
+    --primary-color: #0f766e;
+    --primary-hover: #115e59;
+    --primary-light: #ccfbf1;
+    --header-bg: linear-gradient(135deg, #0d9488, #0f766e);
+}
+
+[data-theme="teal"] .header {
+    background: linear-gradient(135deg, #0d9488, #0f766e);
+}
+
+[data-theme="teal"] .tools-toggle {
+    background: linear-gradient(180deg, #2dd4bf, #0d9488);
+}
+
+[data-theme="teal"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #5eead4, #14b8a6);
+}
+
+[data-theme="teal"] .links-toggle {
+    background: linear-gradient(180deg, #34d399, #059669);
+}
+
+[data-theme="teal"] .links-toggle:hover {
+    background: linear-gradient(180deg, #6ee7b7, #10b981);
+}
+
+[data-theme="teal"] .memo-toggle {
+    background: linear-gradient(180deg, #a3e635, #65a30d);
+}
+
+[data-theme="teal"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #bef264, #84cc16);
+}
+
+/* ========== 翠竹绿 - 自然生机 ========== */
 [data-theme="green"] {
-    --primary-color: #059669;
-    --primary-hover: #047857;
-    --primary-light: #a7f3d0;
+    --primary-color: #15803d;
+    --primary-hover: #166534;
+    --primary-light: #dcfce7;
 }
 
-/* 中国红 - 热情经典 */
+[data-theme="green"] .header {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+[data-theme="green"] .tools-toggle {
+    background: linear-gradient(180deg, #4ade80, #16a34a);
+}
+
+[data-theme="green"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #86efac, #22c55e);
+}
+
+[data-theme="green"] .links-toggle {
+    background: linear-gradient(180deg, #a3e635, #65a30d);
+}
+
+[data-theme="green"] .links-toggle:hover {
+    background: linear-gradient(180deg, #bef264, #84cc16);
+}
+
+[data-theme="green"] .memo-toggle {
+    background: linear-gradient(180deg, #fbbf24, #d97706);
+}
+
+[data-theme="green"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #fcd34d, #f59e0b);
+}
+
+/* ========== 玫瑰红 - 优雅浪漫 ========== */
+[data-theme="rose"] {
+    --primary-color: #be123c;
+    --primary-hover: #9f1239;
+    --primary-light: #ffe4e6;
+}
+
+[data-theme="rose"] .header {
+    background: linear-gradient(135deg, #e11d48, #be123c);
+}
+
+[data-theme="rose"] .tools-toggle {
+    background: linear-gradient(180deg, #fb7185, #e11d48);
+}
+
+[data-theme="rose"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #fda4af, #f43f5e);
+}
+
+[data-theme="rose"] .links-toggle {
+    background: linear-gradient(180deg, #f472b6, #db2777);
+}
+
+[data-theme="rose"] .links-toggle:hover {
+    background: linear-gradient(180deg, #f9a8d4, #ec4899);
+}
+
+[data-theme="rose"] .memo-toggle {
+    background: linear-gradient(180deg, #c084fc, #9333ea);
+}
+
+[data-theme="rose"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #d8b4fe, #a855f7);
+}
+
+/* ========== 中国红 - 经典庄重 ========== */
 [data-theme="red"] {
-    --primary-color: #dc2626;
-    --primary-hover: #b91c1c;
+    --primary-color: #b91c1c;
+    --primary-hover: #991b1b;
     --primary-light: #fecaca;
 }
 
-/* 琥珀橙 - 温暖活力 */
+[data-theme="red"] .header {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+[data-theme="red"] .tools-toggle {
+    background: linear-gradient(180deg, #f87171, #dc2626);
+}
+
+[data-theme="red"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #fca5a5, #ef4444);
+}
+
+[data-theme="red"] .links-toggle {
+    background: linear-gradient(180deg, #fb923c, #ea580c);
+}
+
+[data-theme="red"] .links-toggle:hover {
+    background: linear-gradient(180deg, #fdba74, #f97316);
+}
+
+[data-theme="red"] .memo-toggle {
+    background: linear-gradient(180deg, #fbbf24, #d97706);
+}
+
+[data-theme="red"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #fcd34d, #f59e0b);
+}
+
+/* ========== 琥珀橙 - 温暖活力 ========== */
 [data-theme="orange"] {
-    --primary-color: #ea580c;
-    --primary-hover: #c2410c;
-    --primary-light: #fed7aa;
+    --primary-color: #c2410c;
+    --primary-hover: #9a3412;
+    --primary-light: #ffedd5;
 }
 
-/* 玫瑰粉 - 优雅浪漫 */
-[data-theme="rose"] {
-    --primary-color: #e11d48;
-    --primary-hover: #be123c;
-    --primary-light: #fecdd3;
+[data-theme="orange"] .header {
+    background: linear-gradient(135deg, #ea580c, #c2410c);
 }
 
-/* 靛青紫 - 神秘高贵 */
+[data-theme="orange"] .tools-toggle {
+    background: linear-gradient(180deg, #fb923c, #ea580c);
+}
+
+[data-theme="orange"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #fdba74, #f97316);
+}
+
+[data-theme="orange"] .links-toggle {
+    background: linear-gradient(180deg, #fbbf24, #d97706);
+}
+
+[data-theme="orange"] .links-toggle:hover {
+    background: linear-gradient(180deg, #fcd34d, #f59e0b);
+}
+
+[data-theme="orange"] .memo-toggle {
+    background: linear-gradient(180deg, #a3e635, #65a30d);
+}
+
+[data-theme="orange"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #bef264, #84cc16);
+}
+
+/* ========== 幻影紫 - 神秘高贵 ========== */
 [data-theme="violet"] {
-    --primary-color: #7c3aed;
-    --primary-hover: #6d28d9;
-    --primary-light: #ddd6fe;
+    --primary-color: #6d28d9;
+    --primary-hover: #5b21b6;
+    --primary-light: #ede9fe;
 }
 
-/* 青色 - 现代科技 */
-[data-theme="teal"] {
-    --primary-color: #0d9488;
-    --primary-hover: #0f766e;
-    --primary-light: #99f6e4;
+[data-theme="violet"] .header {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
 }
 
-/* 深邃蓝 - 稳重商务 */
-[data-theme="indigo"] {
-    --primary-color: #4f46e5;
-    --primary-hover: #4338ca;
-    --primary-light: #c7d2fe;
+[data-theme="violet"] .tools-toggle {
+    background: linear-gradient(180deg, #a78bfa, #7c3aed);
+}
+
+[data-theme="violet"] .tools-toggle:hover {
+    background: linear-gradient(180deg, #c4b5fd, #8b5cf6);
+}
+
+[data-theme="violet"] .links-toggle {
+    background: linear-gradient(180deg, #f472b6, #db2777);
+}
+
+[data-theme="violet"] .links-toggle:hover {
+    background: linear-gradient(180deg, #f9a8d4, #ec4899);
+}
+
+[data-theme="violet"] .memo-toggle {
+    background: linear-gradient(180deg, #38bdf8, #0284c7);
+}
+
+[data-theme="violet"] .memo-toggle:hover {
+    background: linear-gradient(180deg, #7dd3fc, #0ea5e9);
 }
 
 /* 深色主题 */
