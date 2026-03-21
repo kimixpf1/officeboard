@@ -1,7 +1,90 @@
 /**
  * 办公室智能工作面板 - 主应用
  * 整合所有模块，处理用户交互
+ * 
+ * 版权声明：Copyright © 2024-2026 kimixpf1. All Rights Reserved.
+ * 用户可免费使用本软件，但不得用于商业用途。
  */
+
+// ========== 安全工具函数 ==========
+const SecurityUtils = {
+    /**
+     * XSS防护：转义HTML特殊字符
+     */
+    escapeHtml(str) {
+        if (typeof str !== 'string') return str;
+        const escapeMap = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '/': '&#x2F;'
+        };
+        return str.replace(/[&<>"'\/]/g, char => escapeMap[char]);
+    },
+
+    /**
+     * 输入验证：检查是否包含危险字符
+     */
+    sanitizeInput(str, maxLength = 1000) {
+        if (typeof str !== 'string') return '';
+        // 截断过长输入
+        str = str.slice(0, maxLength);
+        // 移除潜在的脚本注入
+        str = str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        str = str.replace(/javascript:/gi, '');
+        str = str.replace(/on\w+\s*=/gi, '');
+        return str.trim();
+    },
+
+    /**
+     * URL验证：只允许http/https协议
+     */
+    isValidUrl(url) {
+        if (!url || typeof url !== 'string') return false;
+        try {
+            const parsed = new URL(url);
+            return ['http:', 'https:'].includes(parsed.protocol);
+        } catch {
+            return false;
+        }
+    },
+
+    /**
+     * 安全的JSON解析
+     */
+    safeJsonParse(str, defaultValue = null) {
+        if (!str || typeof str !== 'string') return defaultValue;
+        try {
+            return JSON.parse(str);
+        } catch {
+            console.warn('JSON解析失败');
+            return defaultValue;
+        }
+    },
+
+    /**
+     * 生成安全的随机ID
+     */
+    generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2);
+    },
+
+    /**
+     * 内容安全策略检查
+     */
+    checkContentSafety(content) {
+        const dangerousPatterns = [
+            /<script\b/i,
+            /javascript:/i,
+            /on\w+\s*=/i,
+            /data:\s*text\/html/i,
+            /vbscript:/i
+        ];
+        return !dangerousPatterns.some(pattern => pattern.test(content));
+    }
+};
 
 class OfficeDashboard {
     constructor() {
@@ -668,10 +751,10 @@ class OfficeDashboard {
         if (!linksList) return;
 
         linksList.innerHTML = links.map((link, index) => `
-            <div class="link-item" data-index="${index}" data-url="${link.url}" draggable="true">
+            <div class="link-item" data-index="${index}" data-url="${SecurityUtils.escapeHtml(link.url)}" draggable="true">
                 <span class="link-drag" title="拖动排序">⋮⋮</span>
                 <span class="link-icon">${link.icon || '🔗'}</span>
-                <span class="link-name">${link.name}</span>
+                <span class="link-name">${SecurityUtils.escapeHtml(link.name)}</span>
                 <button class="link-delete" data-index="${index}" title="删除">×</button>
             </div>
         `).join('');
@@ -777,11 +860,25 @@ class OfficeDashboard {
      * 添加网站
      */
     addLink(name, url) {
+        // 安全验证
+        name = SecurityUtils.sanitizeInput(name, 50);
+        url = SecurityUtils.sanitizeInput(url, 500);
+        
+        if (!name) {
+            this.showError('请输入有效的网站名称');
+            return;
+        }
+        
+        if (!SecurityUtils.isValidUrl(url)) {
+            this.showError('请输入有效的网址（以http://或https://开头）');
+            return;
+        }
+        
         let links = [];
         try {
             const saved = localStorage.getItem('office_links');
             if (saved) {
-                const parsed = JSON.parse(saved);
+                const parsed = SecurityUtils.safeJsonParse(saved, []);
                 if (Array.isArray(parsed)) {
                     links = parsed;
                 }
