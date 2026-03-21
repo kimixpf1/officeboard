@@ -377,22 +377,13 @@ class CalendarView {
             const sortedItems = this.sortItems(dayItems);
 
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
-            // 只显示有事项的日期，或者今天
-            if (sortedItems.length > 0 || isToday) {
-                html += `
-                    <div class="month-cell ${isToday ? 'today' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
-                        <div class="month-cell-date">${day}</div>
-                        ${sortedItems.map(item => this.renderCalendarItem(item, true)).join('')}
-                    </div>
-                `;
-            } else {
-                // 空日期只显示日期数字
-                html += `
-                    <div class="month-cell empty-cell" data-date="${fullDateLabel}">
-                        <div class="month-cell-date">${day}</div>
-                    </div>
-                `;
-            }
+            // 所有日期都可以点击进入日视图
+            html += `
+                <div class="month-cell ${isToday ? 'today' : ''} ${sortedItems.length === 0 ? 'empty-cell' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
+                    <div class="month-cell-date">${day}</div>
+                    ${sortedItems.map(item => this.renderCalendarItem(item, true)).join('')}
+                </div>
+            `;
         }
 
         // 下月空白

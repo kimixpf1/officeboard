@@ -3384,12 +3384,14 @@ class OfficeDashboard {
                 const isRecurring = document.getElementById('isRecurring')?.checked;
                 if (isRecurring) {
                     const recurringType = document.getElementById('recurringType').value;
-                    const recurringCount = parseInt(document.getElementById('recurringCount').value) || 6;
+                    const recurringCount = parseInt(document.getElementById('recurringCount').value) || 20;
                     const skipWeekends = document.getElementById('skipWeekends')?.checked || false;
+                    const skipHolidays = document.getElementById('skipHolidays')?.checked || false;
 
                     const rule = {
                         type: recurringType,
-                        skipWeekends: skipWeekends
+                        skipWeekends: skipWeekends,
+                        skipHolidays: skipHolidays
                     };
 
                     if (recurringType === 'monthly_date') {
@@ -3629,25 +3631,38 @@ class OfficeDashboard {
         delete cleanItem.displayTitle;
         delete cleanItem.deadline;
 
+        const skipHolidays = rule.skipHolidays || false;
+
         switch (rule.type) {
             case 'daily':
                 // 每天
-                for (let i = 0; i < count; i++) {
-                    const date = new Date(today);
-                    date.setDate(date.getDate() + i);
-                    if (rule.skipWeekends && this.isWeekend(date)) {
+                let dailyCount = 0;
+                let dailyDate = new Date(today);
+                while (dailyCount < count) {
+                    if (rule.skipWeekends && this.isWeekend(dailyDate)) {
+                        dailyDate.setDate(dailyDate.getDate() + 1);
                         continue;
                     }
-                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, items.length + 1));
+                    if (skipHolidays && this.isHoliday(dailyDate)) {
+                        dailyDate.setDate(dailyDate.getDate() + 1);
+                        continue;
+                    }
+                    items.push(this.createRecurringItem(cleanItem, dailyDate, rule, groupId, items.length + 1));
+                    dailyCount++;
+                    dailyDate = new Date(dailyDate);
+                    dailyDate.setDate(dailyDate.getDate() + 1);
                 }
                 break;
 
             case 'workday_daily':
-                // 工作日每天（周一至周五）
+                // 工作日每天（周一至周五，跳过周末和节假日）
                 let workdayCount1 = 0;
                 let currentDate1 = new Date(today);
                 while (workdayCount1 < count) {
-                    if (!this.isWeekend(currentDate1)) {
+                    const isWeekendDay = this.isWeekend(currentDate1);
+                    const isHolidayDay = skipHolidays && this.isHoliday(currentDate1);
+                    
+                    if (!isWeekendDay && !isHolidayDay) {
                         items.push(this.createRecurringItem(cleanItem, currentDate1, rule, groupId, items.length + 1));
                         workdayCount1++;
                     }
@@ -3658,9 +3673,24 @@ class OfficeDashboard {
 
             case 'weekly_day':
                 // 每周固定星期
-                for (let i = 0; i < count; i++) {
-                    const date = this.getWeeklyDay(today, i, rule.weekDay);
-                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                let weeklyCount = 0;
+                let weekNum = 0;
+                while (weeklyCount < count) {
+                    const date = this.getWeeklyDay(today, weekNum, rule.weekDay);
+                    if (date >= today) {
+                        let shouldSkip = false;
+                        if (rule.skipWeekends && this.isWeekend(date)) {
+                            shouldSkip = true;
+                        }
+                        if (skipHolidays && this.isHoliday(date)) {
+                            shouldSkip = true;
+                        }
+                        if (!shouldSkip) {
+                            items.push(this.createRecurringItem(cleanItem, date, rule, groupId, items.length + 1));
+                            weeklyCount++;
+                        }
+                    }
+                    weekNum++;
                 }
                 break;
 
@@ -3675,8 +3705,17 @@ class OfficeDashboard {
                         const date = this.getWeeklyDay(today, weekOffset, day);
                         // 确保日期不早于今天
                         if (date >= today) {
-                            items.push(this.createRecurringItem(cleanItem, date, rule, groupId, itemsGenerated + 1));
-                            itemsGenerated++;
+                            let shouldSkip = false;
+                            if (rule.skipWeekends && this.isWeekend(date)) {
+                                shouldSkip = true;
+                            }
+                            if (skipHolidays && this.isHoliday(date)) {
+                                shouldSkip = true;
+                            }
+                            if (!shouldSkip) {
+                                items.push(this.createRecurringItem(cleanItem, date, rule, groupId, itemsGenerated + 1));
+                                itemsGenerated++;
+                            }
                         }
                     }
                     weekOffset++;
@@ -3685,17 +3724,36 @@ class OfficeDashboard {
 
             case 'monthly_date':
                 // 每月固定日期
-                for (let i = 0; i < count; i++) {
-                    const date = this.getMonthlyDate(today, i + 1, rule.day, rule.skipWeekends);
-                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                let monthlyDateCount = 0;
+                let monthNum = 1;
+                while (monthlyDateCount < count) {
+                    const date = this.getMonthlyDate(today, monthNum, rule.day, false);
+                    let shouldSkip = false;
+                    if (rule.skipWeekends && this.isWeekend(date)) {
+                        shouldSkip = true;
+                    }
+                    if (skipHolidays && this.isHoliday(date)) {
+                        shouldSkip = true;
+                    }
+                    if (shouldSkip) {
+                        // 顺延到下一个工作日
+                        while (this.isWeekend(date) || (skipHolidays && this.isHoliday(date))) {
+                            date.setDate(date.getDate() + 1);
+                        }
+                    }
+                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, items.length + 1));
+                    monthlyDateCount++;
+                    monthNum++;
                 }
                 break;
 
             case 'monthly_workday':
                 // 每月第N个工作日
                 for (let i = 0; i < count; i++) {
-                    const date = this.getNthWorkDayOfMonth(today, i + 1, rule.nthWorkDay);
-                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                    const date = this.getNthWorkDayOfMonth(today, i + 1, rule.nthWorkDay, skipHolidays);
+                    if (date) {
+                        items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                    }
                 }
                 break;
 
@@ -3807,6 +3865,78 @@ class OfficeDashboard {
     isWeekend(date) {
         const day = date.getDay();
         return day === 0 || day === 6;
+    }
+
+    /**
+     * 判断是否中国法定节假日
+     * 包含：元旦、春节、清明、劳动节、端午、中秋、国庆
+     */
+    isHoliday(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        
+        // 2024-2026年中国法定节假日（可根据需要扩展）
+        const holidays = {
+            // 2024年
+            2024: [
+                '2024-01-01', // 元旦
+                '2024-02-10', '2024-02-11', '2024-02-12', '2024-02-13', '2024-02-14', '2024-02-15', '2024-02-16', '2024-02-17', // 春节
+                '2024-04-04', '2024-04-05', '2024-04-06', // 清明
+                '2024-05-01', '2024-05-02', '2024-05-03', '2024-05-04', '2024-05-05', // 劳动节
+                '2024-06-08', '2024-06-09', '2024-06-10', // 端午
+                '2024-09-15', '2024-09-16', '2024-09-17', // 中秋
+                '2024-10-01', '2024-10-02', '2024-10-03', '2024-10-04', '2024-10-05', '2024-10-06', '2024-10-07', // 国庆
+            ],
+            // 2025年
+            2025: [
+                '2025-01-01', // 元旦
+                '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-01', '2025-02-02', '2025-02-03', '2025-02-04', // 春节
+                '2025-04-04', '2025-04-05', '2025-04-06', // 清明
+                '2025-05-01', '2025-05-02', '2025-05-03', '2025-05-04', '2025-05-05', // 劳动节
+                '2025-05-31', '2025-06-01', '2025-06-02', // 端午
+                '2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05', '2025-10-06', '2025-10-07', '2025-10-08', // 国庆+中秋
+            ],
+            // 2026年
+            2026: [
+                '2026-01-01', '2026-01-02', '2026-01-03', // 元旦
+                '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23', // 春节
+                '2026-04-05', '2026-04-06', '2026-04-07', // 清明
+                '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05', // 劳动节
+                '2026-05-31', '2026-06-01', '2026-06-02', // 端午
+                '2026-09-25', '2026-09-26', '2026-09-27', // 中秋
+                '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', // 国庆
+            ]
+        };
+        
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const yearHolidays = holidays[year] || [];
+        
+        return yearHolidays.includes(dateStr);
+    }
+
+    /**
+     * 获取每月第N个工作日（支持跳过节假日）
+     */
+    getNthWorkDayOfMonth(baseDate, monthsAhead, n, skipHolidays = false) {
+        const date = new Date(baseDate);
+        date.setDate(1);
+        date.setMonth(date.getMonth() + monthsAhead);
+        date.setHours(12, 0, 0, 0);
+
+        let workDayCount = 0;
+        while (workDayCount < n) {
+            const isWeekendDay = this.isWeekend(date);
+            const isHolidayDay = skipHolidays && this.isHoliday(date);
+            
+            if (!isWeekendDay && !isHolidayDay) {
+                workDayCount++;
+            }
+            if (workDayCount < n) {
+                date.setDate(date.getDate() + 1);
+            }
+        }
+        return date;
     }
 
     /**
