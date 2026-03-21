@@ -3050,6 +3050,45 @@ class OfficeDashboard {
             case 'todo':
                 document.getElementById('todoPriority').value = item.priority || 'medium';
                 document.getElementById('todoDeadline').value = item.deadline || '';
+                
+                // 周期性任务设置
+                const isRecurringCheckbox = document.getElementById('isRecurring');
+                const recurringFields = document.getElementById('recurringFields');
+                const recurringTypeSelect = document.getElementById('recurringType');
+                
+                if (item.isRecurring && item.recurringRule) {
+                    isRecurringCheckbox.checked = true;
+                    recurringFields.style.display = 'block';
+                    recurringTypeSelect.value = item.recurringRule.type || 'weekly_day';
+                    document.getElementById('recurringCount').value = item.recurringCount || 20;
+                    document.getElementById('skipWeekends').checked = item.recurringRule.skipWeekends || false;
+                    document.getElementById('skipHolidays').checked = item.recurringRule.skipHolidays || false;
+                    
+                    // 触发类型切换以显示对应字段
+                    recurringTypeSelect.dispatchEvent(new Event('change'));
+                    
+                    // 填充具体的周期参数
+                    setTimeout(() => {
+                        if (item.recurringRule.type === 'monthly_date') {
+                            document.getElementById('recurringDay').value = item.recurringRule.day || '';
+                        } else if (item.recurringRule.type === 'monthly_workday') {
+                            document.getElementById('nthWorkDay').value = item.recurringRule.nthWorkDay || '';
+                        } else if (item.recurringRule.type === 'weekly_day') {
+                            document.getElementById('weekDay').value = item.recurringRule.weekDay || 1;
+                        } else if (item.recurringRule.type === 'weekly_multi') {
+                            const checkboxes = document.querySelectorAll('input[name="weekDays"]');
+                            checkboxes.forEach(cb => {
+                                cb.checked = (item.recurringRule.weekDays || []).includes(parseInt(cb.value));
+                            });
+                        } else if (item.recurringRule.type === 'monthly_weekday') {
+                            document.getElementById('monthlyNthWeek').value = item.recurringRule.nthWeek || 1;
+                            document.getElementById('monthlyWeekDayValue').value = item.recurringRule.weekDay || 1;
+                        }
+                    }, 50);
+                } else {
+                    isRecurringCheckbox.checked = false;
+                    recurringFields.style.display = 'none';
+                }
                 break;
 
             case 'meeting':
@@ -3459,14 +3498,38 @@ class OfficeDashboard {
 
         try {
             if (id) {
-                await db.updateItem(parseInt(id), item);
+                // 编辑模式
+                if (item.isRecurring && item.recurringRule) {
+                    // 编辑时转为周期性任务，询问用户
+                    const confirm = window.confirm('将此事项转为周期性任务将删除当前事项并生成多个周期性任务，是否继续？');
+                    if (!confirm) {
+                        return;
+                    }
+                    
+                    // 删除原事项
+                    await db.deleteItem(parseInt(id));
+                    
+                    // 生成周期性任务
+                    const recurringItems = this.generateRecurringItems(item, item.recurringRule, item.recurringCount || 20);
+                    if (recurringItems.length > 0) {
+                        for (const recurringItem of recurringItems) {
+                            await db.addItem(recurringItem);
+                        }
+                        this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
+                    }
+                } else {
+                    // 普通编辑，直接更新
+                    await db.updateItem(parseInt(id), item);
+                    this.showSuccess('事项已更新');
+                }
             } else {
+                // 新建模式
                 // 检查是否是周期性任务
                 console.log('检查周期性任务:', { isRecurring: item.isRecurring, recurringRule: item.recurringRule });
 
                 if (item.isRecurring && item.recurringRule) {
                     console.log('开始生成周期性任务...');
-                    const recurringItems = this.generateRecurringItems(item, item.recurringRule, item.recurringCount || 6);
+                    const recurringItems = this.generateRecurringItems(item, item.recurringRule, item.recurringCount || 20);
 
                     console.log('生成的任务列表:', recurringItems);
 
