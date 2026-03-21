@@ -1650,6 +1650,34 @@ class OfficeDashboard {
             username: syncManager.getUsername()
         });
         this.showModal('syncModal');
+        
+        // 自动填充记住的密码
+        this.loadRememberedLogin();
+    }
+
+    /**
+     * 加载记住的登录信息
+     */
+    loadRememberedLogin() {
+        const remembered = localStorage.getItem('office_remembered_login');
+        if (remembered) {
+            try {
+                const data = JSON.parse(remembered);
+                // 检查是否是相同设备
+                const currentDevice = navigator.userAgent.slice(0, 50);
+                if (data.device === currentDevice) {
+                    const usernameInput = document.getElementById('loginUsername');
+                    const passwordInput = document.getElementById('loginPassword');
+                    const rememberCheckbox = document.getElementById('rememberPassword');
+                    
+                    if (usernameInput) usernameInput.value = data.username || '';
+                    if (passwordInput) passwordInput.value = data.password ? atob(data.password) : '';
+                    if (rememberCheckbox) rememberCheckbox.checked = true;
+                }
+            } catch (e) {
+                console.warn('加载记住的登录信息失败:', e);
+            }
+        }
     }
 
     /**
@@ -1695,6 +1723,7 @@ class OfficeDashboard {
     async handleLogin() {
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
+        const rememberPassword = document.getElementById('rememberPassword')?.checked;
 
         if (!username || !password) {
             this.showError('请输入用户名和密码');
@@ -1707,6 +1736,17 @@ class OfficeDashboard {
             const result = await syncManager.login(username, password);
             this.showSuccess(result.message);
             this.updateLoginUI({ isLoggedIn: true, username: username });
+
+            // 处理记住密码
+            if (rememberPassword) {
+                localStorage.setItem('office_remembered_login', JSON.stringify({
+                    username: username,
+                    password: btoa(password), // 简单编码，非加密
+                    device: navigator.userAgent.slice(0, 50)
+                }));
+            } else {
+                localStorage.removeItem('office_remembered_login');
+            }
 
             // 登录成功后立即从云端同步数据
             this.showLoading(true, '正在同步数据...');
@@ -1763,6 +1803,26 @@ class OfficeDashboard {
             await syncManager.logout();
             // 清除本地数据
             await db.clearAllItems();
+            // 清除网站和工具数据
+            localStorage.removeItem('office_links');
+            localStorage.removeItem('office_tools');
+            localStorage.removeItem('office_weather_city');
+            // 清除记住的登录信息（退出时不删除，让用户下次还能免输入）
+            // localStorage.removeItem('office_remembered_login');
+            // 清空登录表单
+            const usernameInput = document.getElementById('loginUsername');
+            const passwordInput = document.getElementById('loginPassword');
+            const rememberCheckbox = document.getElementById('rememberPassword');
+            // 如果记住了密码，保留填充；否则清空
+            const remembered = localStorage.getItem('office_remembered_login');
+            if (!remembered) {
+                if (usernameInput) usernameInput.value = '';
+                if (passwordInput) passwordInput.value = '';
+                if (rememberCheckbox) rememberCheckbox.checked = false;
+            }
+            // 重新加载默认数据
+            this.loadLinks();
+            this.loadTools();
             // 刷新显示
             await this.loadItems();
             this.showSuccess('已退出登录');
