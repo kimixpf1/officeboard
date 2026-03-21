@@ -581,10 +581,10 @@ class OfficeDashboard {
     loadLinks() {
         let links;
         const saved = localStorage.getItem('office_links');
-        
+
         // 检查是否需要更新默认网站
         const needsUpdate = this.checkLinksNeedUpdate(saved);
-        
+
         if (saved && !needsUpdate) {
             try {
                 links = JSON.parse(saved);
@@ -595,11 +595,38 @@ class OfficeDashboard {
                 console.error('解析网站数据失败:', e);
                 links = this.getDefaultLinks();
             }
+        } else if (saved && needsUpdate) {
+            // 需要更新但保留用户添加的网站
+            try {
+                links = JSON.parse(saved);
+                if (!Array.isArray(links)) {
+                    links = this.getDefaultLinks();
+                } else {
+                    // 更新默认网站的图标，并添加缺失的默认网站
+                    const defaultLinks = this.getDefaultLinks();
+                    defaultLinks.forEach(defaultLink => {
+                        const existingIndex = links.findIndex(l => l.url === defaultLink.url);
+                        if (existingIndex >= 0) {
+                            // 更新图标
+                            links[existingIndex].icon = defaultLink.icon;
+                            links[existingIndex].name = defaultLink.name;
+                        } else {
+                            // 添加缺失的默认网站
+                            links.push(defaultLink);
+                        }
+                    });
+                    // 移除旧的默认网站（微信读书）
+                    links = links.filter(l => !l.url || !l.url.includes('weread.qq.com'));
+                }
+            } catch (e) {
+                console.error('处理网站数据失败:', e);
+                links = this.getDefaultLinks();
+            }
         } else {
-            // 需要更新或无数据，使用新的默认列表
+            // 无数据，使用新的默认列表
             links = this.getDefaultLinks();
         }
-        
+
         // 确保数据保存到localStorage
         localStorage.setItem('office_links', JSON.stringify(links));
         this.renderLinks(links);
@@ -610,24 +637,30 @@ class OfficeDashboard {
      */
     checkLinksNeedUpdate(saved) {
         if (!saved) return true;
-        
+
         try {
             const links = JSON.parse(saved);
             if (!Array.isArray(links) || links.length === 0) return true;
-            
+
             // 检查是否包含旧的默认网站（微信读书）
-            const hasOldDefault = links.some(l => 
+            const hasOldDefault = links.some(l =>
                 l.url && l.url.includes('weread.qq.com')
             );
-            
+
             // 检查是否缺少新的默认网站
             const defaultLinks = this.getDefaultLinks();
-            const hasNewDefaults = defaultLinks.every(defaultLink => 
+            const hasNewDefaults = defaultLinks.every(defaultLink =>
                 links.some(l => l.url === defaultLink.url)
             );
-            
-            // 如果有旧默认网站或缺少新默认网站，需要更新
-            return hasOldDefault || !hasNewDefaults;
+
+            // 检查默认网站的图标是否正确
+            const hasWrongIcon = defaultLinks.some(defaultLink => {
+                const existingLink = links.find(l => l.url === defaultLink.url);
+                return existingLink && existingLink.icon !== defaultLink.icon;
+            });
+
+            // 如果有旧默认网站、缺少新默认网站、或图标不正确，需要更新
+            return hasOldDefault || !hasNewDefaults || hasWrongIcon;
         } catch (e) {
             return true;
         }
