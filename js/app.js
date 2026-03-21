@@ -2886,7 +2886,7 @@ class OfficeDashboard {
                         <span class="priority-tag ${priorityClass}">${priorityText}</span>
                     </div>
                     <div class="card-title ${item.completed ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
-                    ${item.deadline ? `<div class="card-time">${this.formatDeadline(item.deadline)}</div>` : ''}
+                    <div class="card-time">${this.formatDeadline(item.deadline, item.completed)}</div>
                 `;
                 detailHtml = `
                     ${item.description ? `<div class="card-detail-section"><div class="detail-label">备注</div><div class="detail-content">${this.escapeHtml(item.description)}</div></div>` : ''}
@@ -3115,14 +3115,23 @@ class OfficeDashboard {
 
     /**
      * 格式化截止时间显示
+     * @param {string} deadline - 截止时间
+     * @param {boolean} completed - 是否已完成
      */
-    formatDeadline(deadline) {
-        if (!deadline) return '';
+    formatDeadline(deadline, completed = false) {
+        if (!deadline) {
+            return completed ? '<span class="status-completed">✓ 已完成</span>' : '';
+        }
+        
         const date = new Date(deadline);
         const now = new Date();
-        const isOverdue = date < now;
         const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
-        return isOverdue ? `⚠️ 已逾期 ${dateStr}` : `${dateStr}截止`;
+        
+        if (completed) {
+            return `<span class="status-completed">✓ 已完成</span> ${dateStr}`;
+        }
+        
+        return `${dateStr}截止`;
     }
 
     /**

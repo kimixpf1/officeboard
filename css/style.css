@@ -3686,3 +3686,72 @@ body {
     font-weight: normal;
     color: var(--gray-700);
 }
+
+/* ========== 已完成状态样式 ========== */
+.status-completed {
+    color: #10b981;
+    font-weight: 500;
+}
+
+.completed-text {
+    text-decoration: line-through;
+    color: var(--gray-400);
+}
+
+/* ========== 主题色显示框优化 ========== */
+/* 降低显示框亮度，确保文字清晰 */
+[data-theme="blue"] .card,
+[data-theme="blue"] .modal-content,
+[data-theme="blue"] .panel-content,
+[data-theme="blue"] .tool-item,
+[data-theme="blue"] .link-item {
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+}
+
+[data-theme="teal"] .card,
+[data-theme="teal"] .modal-content,
+[data-theme="teal"] .panel-content,
+[data-theme="teal"] .tool-item,
+[data-theme="teal"] .link-item {
+    background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+}
+
+[data-theme="green"] .card,
+[data-theme="green"] .modal-content,
+[data-theme="green"] .panel-content,
+[data-theme="green"] .tool-item,
+[data-theme="green"] .link-item {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+}
+
+[data-theme="rose"] .card,
+[data-theme="rose"] .modal-content,
+[data-theme="rose"] .panel-content,
+[data-theme="rose"] .tool-item,
+[data-theme="rose"] .link-item {
+    background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+}
+
+[data-theme="red"] .card,
+[data-theme="red"] .modal-content,
+[data-theme="red"] .panel-content,
+[data-theme="red"] .tool-item,
+[data-theme="red"] .link-item {
+    background: linear-gradient(135deg, #fef2f2, #fecaca);
+}
+
+[data-theme="orange"] .card,
+[data-theme="orange"] .modal-content,
+[data-theme="orange"] .panel-content,
+[data-theme="orange"] .tool-item,
+[data-theme="orange"] .link-item {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+}
+
+[data-theme="violet"] .card,
+[data-theme="violet"] .modal-content,
+[data-theme="violet"] .panel-content,
+[data-theme="violet"] .tool-item,
+[data-theme="violet"] .link-item {
+    background: linear-gradient(135deg, #faf5ff, #ede9fe);
+}
