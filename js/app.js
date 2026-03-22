@@ -2796,38 +2796,7 @@ class OfficeDashboard {
             }
         });
 
-        // 排序（按order字段，如果没有则按创建时间倒序）
-        Object.keys(grouped).forEach(type => {
-            grouped[type].sort((a, b) => {
-                if (a.order !== undefined && b.order !== undefined) {
-                    return a.order - b.order;
-                }
-                return new Date(b.createdAt) - new Date(a.createdAt);
-            });
-        });
-
-        // 会议特殊排序：置顶优先 > 已完成沉底 > 级别排序（钱局 > 局长 > 处室） > 时间
-        grouped.meeting.sort((a, b) => {
-            // 置顶的排最前
-            if (a.pinned !== b.pinned) {
-                return a.pinned ? -1 : 1;
-            }
-            // 已完成的沉底
-            if (a.completed !== b.completed) {
-                return a.completed ? 1 : -1;
-            }
-            const levelA = this.getMeetingLevel(a);
-            const levelB = this.getMeetingLevel(b);
-            if (levelA !== levelB) {
-                return levelA - levelB;
-            }
-            // 同级别按时间排序
-            const timeA = a.time || '99:99';
-            const timeB = b.time || '99:99';
-            return timeA.localeCompare(timeB);
-        });
-
-        // 渲染各列
+        // 渲染各列（排序在renderColumn中处理）
         this.renderColumn('todo', grouped.todo);
         this.renderColumn('meeting', grouped.meeting);
         this.renderColumn('document', grouped.document);
@@ -2877,7 +2846,7 @@ class OfficeDashboard {
         // 清空容器
         container.innerHTML = '';
 
-        // 排序：置顶优先 > 未完成在前 > 已完成沉底
+        // 排序：置顶优先 > 未完成在前 > 已完成沉底 > order > 创建时间
         items.sort((a, b) => {
             // 置顶的排最前
             if (a.pinned !== b.pinned) {
@@ -2890,7 +2859,11 @@ class OfficeDashboard {
             // 同状态按order排序
             const orderA = a.order ?? 999999;
             const orderB = b.order ?? 999999;
-            return orderA - orderB;
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+            // order相同时按创建时间排序（稳定的次序）
+            return new Date(a.createdAt) - new Date(b.createdAt);
         });
 
         // 渲染卡片
@@ -3336,31 +3309,69 @@ class OfficeDashboard {
 
     /**
      * 更新事项排序
+     * 拖拽排序只在同状态组内生效（置顶组/未完成组/已完成组）
      */
     async updateItemOrder(type, draggedId, afterId) {
-        const items = await db.getItemsByType(type);
+        const allItems = await db.getItemsByType(type);
         
-        // 找到拖拽项和目标位置
-        const draggedIndex = items.findIndex(i => i.id == draggedId);
+        // 找到拖拽项
+        const draggedItem = allItems.find(i => i.id == draggedId);
+        if (!draggedItem) return;
+        
+        // 确定拖拽项的状态组
+        const draggedGroup = this.getItemGroup(draggedItem);
+        
+        // 筛选同状态组的项
+        let groupItems = allItems.filter(item => this.getItemGroup(item) === draggedGroup);
+        
+        // 按 order 排序，order相同时按创建时间排序（确保稳定排序）
+        groupItems.sort((a, b) => {
+            const orderA = a.order ?? 999999;
+            const orderB = b.order ?? 999999;
+            if (orderA !== orderB) return orderA - orderB;
+            return new Date(a.createdAt) - new Date(b.createdAt);
+        });
+        
+        // 从组内移除拖拽项
+        const draggedIndex = groupItems.findIndex(i => i.id == draggedId);
         if (draggedIndex === -1) return;
-
-        const draggedItem = items.splice(draggedIndex, 1)[0];
+        groupItems.splice(draggedIndex, 1);
         
-        // 插入到新位置
-        let insertIndex = items.length;
+        // 计算插入位置
+        let insertIndex = groupItems.length; // 默认放到最后
         if (afterId) {
-            insertIndex = items.findIndex(i => i.id == afterId);
-            if (insertIndex === -1) insertIndex = items.length;
-        }
-
-        items.splice(insertIndex, 0, draggedItem);
-
-        // 更新所有项的order
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].order !== i) {
-                await db.updateItem(items[i].id, { order: i });
+            const afterItem = allItems.find(i => i.id == afterId);
+            if (afterItem && this.getItemGroup(afterItem) === draggedGroup) {
+                // 目标项在同组内，找到它的位置
+                const afterIndex = groupItems.findIndex(i => i.id == afterId);
+                if (afterIndex !== -1) {
+                    insertIndex = afterIndex;
+                }
             }
         }
+        
+        // 插入到新位置
+        groupItems.splice(insertIndex, 0, draggedItem);
+        
+        // 批量更新同组内所有项的 order
+        const updates = [];
+        for (let i = 0; i < groupItems.length; i++) {
+            if (groupItems[i].order !== i) {
+                updates.push(db.updateItem(groupItems[i].id, { order: i }));
+            }
+        }
+        
+        await Promise.all(updates);
+    }
+
+    /**
+     * 获取事项的状态组（用于拖拽排序分组）
+     * 返回: 'pinned' | 'active' | 'completed'
+     */
+    getItemGroup(item) {
+        if (item.pinned) return 'pinned';
+        if (item.completed) return 'completed';
+        return 'active';
     }
 
     /**
