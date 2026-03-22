@@ -2818,15 +2818,20 @@ class OfficeDashboard {
         if (allText.includes('钱局') || allText.includes('钱某某')) {
             return 1;
         }
-        // 局长们
-        if (allText.includes('局长') || /李局|王局|张局|刘局|陈局|杨局|赵局|黄局|周局|吴局/.test(allText)) {
-            return 2;
+        // 局领导按特定顺序：吴局、盛局、陈主任/陈局、房局
+        if (allText.includes('吴局')) return 2;
+        if (allText.includes('盛局')) return 3;
+        if (allText.includes('陈主任') || allText.includes('陈局')) return 4;
+        if (allText.includes('房局')) return 5;
+        // 其他局长
+        if (/李局|王局|张局|刘局|杨局|赵局|黄局|周局/.test(allText)) {
+            return 6;
         }
         // 处室
         if (allText.includes('处') || allText.includes('室') || allText.includes('科')) {
-            return 3;
+            return 7;
         }
-        return 4;
+        return 8;
     }
 
     /**
@@ -2846,7 +2851,7 @@ class OfficeDashboard {
         // 清空容器
         container.innerHTML = '';
 
-        // 排序：置顶优先 > 未完成在前 > 已完成沉底 > order > 创建时间
+        // 排序逻辑
         items.sort((a, b) => {
             // 置顶的排最前
             if (a.pinned !== b.pinned) {
@@ -2856,7 +2861,23 @@ class OfficeDashboard {
             if (a.completed !== b.completed) {
                 return a.completed ? 1 : -1;
             }
-            // 同状态按order排序
+
+            // 会议类型：按领导级别排序，同级别按时间
+            if (type === 'meeting') {
+                const levelA = this.getMeetingLevel(a);
+                const levelB = this.getMeetingLevel(b);
+                if (levelA !== levelB) {
+                    return levelA - levelB;
+                }
+                // 同级别按会议时间排序
+                const timeA = a.time || '99:99';
+                const timeB = b.time || '99:99';
+                if (timeA !== timeB) {
+                    return timeA.localeCompare(timeB);
+                }
+            }
+
+            // 其他类型或同级别：按order排序
             const orderA = a.order ?? 999999;
             const orderB = b.order ?? 999999;
             if (orderA !== orderB) {
@@ -3227,18 +3248,28 @@ class OfficeDashboard {
         e.dataTransfer.dropEffect = 'move';
         e.currentTarget.classList.add('drag-over');
 
-        // 节流：限制指示器更新频率
+        // 节流：限制更新频率
         const now = Date.now();
-        if (this._lastDragOverTime && now - this._lastDragOverTime < 50) return;
+        if (this._lastDragOverTime && now - this._lastDragOverTime < 30) return;
         this._lastDragOverTime = now;
 
-        // 高亮显示插入位置
-        const afterElement = this.getDragAfterElement(e.currentTarget, e.clientY);
-        document.querySelectorAll('.card').forEach(card => {
-            card.classList.remove('drag-above', 'drag-below');
-        });
-        if (afterElement) {
-            afterElement.classList.add('drag-above');
+        const container = e.currentTarget;
+        const afterElement = this.getDragAfterElement(container, e.clientY);
+
+        // 实时移动卡片预览：拖动时其他卡片实时移动
+        const draggedCard = this.draggedElement;
+        if (draggedCard) {
+            if (afterElement) {
+                // 插入到目标位置之前
+                if (draggedCard.nextSibling !== afterElement) {
+                    container.insertBefore(draggedCard, afterElement);
+                }
+            } else {
+                // 插入到末尾
+                if (draggedCard !== container.lastElementChild) {
+                    container.appendChild(draggedCard);
+                }
+            }
         }
     }
 
