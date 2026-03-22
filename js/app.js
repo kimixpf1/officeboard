@@ -3251,6 +3251,8 @@ class OfficeDashboard {
 
     /**
      * 获取拖拽后的元素位置
+     * 返回：插入位置之后的那张卡片（鼠标在其上半部分时返回它）
+     * 核心逻辑：鼠标在卡片上半部分=插入到它前面；下半部分=继续往下找
      */
     getDragAfterElement(container, y) {
         const draggableElements = [...container.querySelectorAll('.card:not(.dragging)')];
@@ -3259,7 +3261,8 @@ class OfficeDashboard {
             const box = child.getBoundingClientRect();
             const offset = y - box.top - box.height / 2;
 
-            if (offset < 0 && offset > closest.offset) {
+            // 使用 <= 0 确保鼠标在卡片中心时也能正确识别
+            if (offset <= 0 && offset > closest.offset) {
                 return { offset: offset, element: child };
             } else {
                 return closest;
