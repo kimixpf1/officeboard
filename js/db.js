@@ -264,7 +264,7 @@ class Database {
     }
 
     /**
-     * 更新事项排序
+     * 更新事项排序（单事务，oncomplete后才resolve确保数据已提交）
      */
     async updateItemOrder(type, itemIds) {
         const db = await this.init();
@@ -273,25 +273,25 @@ class Database {
             const transaction = db.transaction(STORES.ITEMS, 'readwrite');
             const store = transaction.objectStore(STORES.ITEMS);
 
-            let completed = 0;
             itemIds.forEach((id, index) => {
                 const getRequest = store.get(id);
                 getRequest.onsuccess = () => {
                     const item = getRequest.result;
                     if (item && item.type === type) {
                         item.order = index;
+                        item.updatedAt = new Date().toISOString();
                         store.put(item);
-                    }
-                    completed++;
-                    if (completed === itemIds.length) {
-                        resolve();
                     }
                 };
                 getRequest.onerror = () => reject(getRequest.error);
             });
 
-            if (itemIds.length === 0) resolve();
+            // 在事务完成（所有put已提交）后才resolve
+            transaction.oncomplete = () => resolve();
             transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(new Error('排序事务被中止'));
+
+            if (itemIds.length === 0) resolve();
         });
     }
 
