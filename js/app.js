@@ -3332,40 +3332,46 @@ class OfficeDashboard {
         if (!this.draggedItem) return;
 
         // ====== 同步阶段：在任何await之前捕获所有必要数据 ======
-        // （handleDragEnd会在第一个await后执行，清空this.draggedItem并移除.dragging类）
         const container = e.currentTarget;
         const newType = container.id.replace('List', '');
         const isSameColumn = newType === this.draggedItem.type;
-        const draggedId = this.draggedItem.id; // 数字类型，来自IndexedDB
+        const draggedId = this.draggedItem.id;
+        const draggedCard = this.draggedElement;
 
-        // 获取插入位置（此时.dragging类还在，getDragAfterElement正确排除拖动元素）
-        const afterElement = this.getDragAfterElement(container, e.clientY);
-        const afterId = afterElement ? parseInt(afterElement.dataset.id) : null;
-
-        // 获取当前列中所有非拖动中的卡片ID（转为数字匹配IndexedDB主键）
-        const existingCards = [...container.querySelectorAll('.card:not(.dragging)')];
-        const existingIds = existingCards.map(card => parseInt(card.dataset.id));
-
-        // 构建新顺序：移除拖动项（处理同列拖动），然后在目标位置插入
-        const orderedIds = existingIds.filter(id => id !== draggedId);
-        let insertIndex = orderedIds.length; // 默认末尾
-        if (afterId !== null) {
-            const idx = orderedIds.indexOf(afterId);
-            if (idx !== -1) insertIndex = idx;
+        // 直接读取当前 DOM 顺序（handleDragOver 已经实时移动了卡片）
+        // 这是用户看到的最终位置，直接用它作为新的排序
+        let orderedIds;
+        if (isSameColumn && draggedCard && draggedCard.parentElement === container) {
+            // 同列拖动：直接读取当前 DOM 顺序（用户看到的位置）
+            const allCards = [...container.querySelectorAll('.card')];
+            orderedIds = allCards.map(card => parseInt(card.dataset.id));
+        } else {
+            // 跨列拖动：目标列没有 draggedCard，需要计算插入位置
+            const existingCards = [...container.querySelectorAll('.card')];
+            const existingIds = existingCards.map(card => parseInt(card.dataset.id));
+            const afterElement = this.getDragAfterElement(container, e.clientY);
+            const afterId = afterElement ? parseInt(afterElement.dataset.id) : null;
+            
+            orderedIds = [...existingIds];
+            let insertIndex = orderedIds.length;
+            if (afterId !== null) {
+                const idx = orderedIds.indexOf(afterId);
+                if (idx !== -1) insertIndex = idx;
+            }
+            orderedIds.splice(insertIndex, 0, draggedId);
         }
-        orderedIds.splice(insertIndex, 0, draggedId);
 
-        // ====== 异步阶段：此后handleDragEnd可能已执行 ======
+        // ====== 异步阶段 ======
         try {
             // 跨列移动：先更新类型
             if (!isSameColumn) {
                 await db.updateItem(draggedId, { type: newType });
             }
 
-            // 使用单事务批量更新排序（oncomplete后才resolve，确保数据已提交）
+            // 使用单事务批量更新排序
             await db.updateItemOrder(newType, orderedIds);
 
-            // 重新渲染（此时DB数据已完全提交）
+            // 重新渲染
             await this.loadItems();
 
             // 同步到云端
@@ -3376,7 +3382,6 @@ class OfficeDashboard {
         } catch (error) {
             console.error('移动失败:', error);
             this.showError('移动失败，请重试');
-            // 出错时尝试恢复显示
             try { await this.loadItems(); } catch(e) {}
         }
 
