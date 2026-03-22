@@ -3310,8 +3310,17 @@ class OfficeDashboard {
     /**
      * 更新事项排序
      * 拖拽排序只在同状态组内生效（置顶组/未完成组/已完成组）
+     * @param {string} type - 事项类型
+     * @param {string} draggedId - 被拖拽事项的ID
+     * @param {string|null} afterId - 目标位置后面的事项ID（null表示放到最后）
      */
     async updateItemOrder(type, draggedId, afterId) {
+        // 获取当前DOM中卡片的实际顺序（这是用户看到的顺序）
+        const container = document.getElementById(type + 'List');
+        const domCards = container ? [...container.querySelectorAll('.card')] : [];
+        const domOrder = domCards.map(card => card.dataset.id);
+        
+        // 从数据库获取所有同类型事项
         const allItems = await db.getItemsByType(type);
         
         // 找到拖拽项
@@ -3322,17 +3331,23 @@ class OfficeDashboard {
         const draggedGroup = this.getItemGroup(draggedItem);
         
         // 筛选同状态组的项
-        let groupItems = allItems.filter(item => this.getItemGroup(item) === draggedGroup);
+        const groupItems = allItems.filter(item => this.getItemGroup(item) === draggedGroup);
         
-        // 按 order 排序，order相同时按创建时间排序（确保稳定排序）
+        // 按当前DOM顺序排序（而不是数据库中的order）
+        // 这样可以保留之前拖拽的结果
         groupItems.sort((a, b) => {
+            const indexA = domOrder.indexOf(a.id);
+            const indexB = domOrder.indexOf(b.id);
+            // 如果都在DOM中，按DOM顺序
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            // 如果都不在DOM中，按数据库order
             const orderA = a.order ?? 999999;
             const orderB = b.order ?? 999999;
             if (orderA !== orderB) return orderA - orderB;
             return new Date(a.createdAt) - new Date(b.createdAt);
         });
         
-        // 从组内移除拖拽项
+        // 从列表中移除拖拽项
         const draggedIndex = groupItems.findIndex(i => i.id == draggedId);
         if (draggedIndex === -1) return;
         groupItems.splice(draggedIndex, 1);
@@ -3340,9 +3355,9 @@ class OfficeDashboard {
         // 计算插入位置
         let insertIndex = groupItems.length; // 默认放到最后
         if (afterId) {
+            // 找到afterId对应的事项在groupItems中的位置
             const afterItem = allItems.find(i => i.id == afterId);
             if (afterItem && this.getItemGroup(afterItem) === draggedGroup) {
-                // 目标项在同组内，找到它的位置
                 const afterIndex = groupItems.findIndex(i => i.id == afterId);
                 if (afterIndex !== -1) {
                     insertIndex = afterIndex;
@@ -3356,9 +3371,7 @@ class OfficeDashboard {
         // 批量更新同组内所有项的 order
         const updates = [];
         for (let i = 0; i < groupItems.length; i++) {
-            if (groupItems[i].order !== i) {
-                updates.push(db.updateItem(groupItems[i].id, { order: i }));
-            }
+            updates.push(db.updateItem(groupItems[i].id, { order: i }));
         }
         
         await Promise.all(updates);
