@@ -2862,13 +2862,33 @@ class OfficeDashboard {
                 return a.completed ? 1 : -1;
             }
 
-            // 会议类型：按领导级别排序，同级别按时间
+            // 会议类型特殊排序：
+            // 1. 钱局参会(level=1)永远在最顶部
+            // 2. 其他会议：用户拖动的order优先，无order时按领导级别+时间
             if (type === 'meeting') {
                 const levelA = this.getMeetingLevel(a);
                 const levelB = this.getMeetingLevel(b);
+                const orderA = a.order;
+                const orderB = b.order;
+                
+                // 钱局参会永远在最前（level=1），不可被拖动改变
+                if (levelA === 1 && levelB !== 1) return -1;
+                if (levelB === 1 && levelA !== 1) return 1;
+                
+                // 如果两个都有用户设置的order，按order排序（尊重用户拖动）
+                if (orderA !== undefined && orderA !== null && orderB !== undefined && orderB !== null) {
+                    if (orderA !== orderB) return orderA - orderB;
+                }
+                
+                // 如果只有一个有order，有order的排前面
+                if (orderA !== undefined && orderA !== null && (orderB === undefined || orderB === null)) return -1;
+                if (orderB !== undefined && orderB !== null && (orderA === undefined || orderA === null)) return 1;
+                
+                // 都没有order时：按领导级别排序
                 if (levelA !== levelB) {
                     return levelA - levelB;
                 }
+                
                 // 同级别按会议时间排序
                 const timeA = a.time || '99:99';
                 const timeB = b.time || '99:99';
@@ -2877,7 +2897,7 @@ class OfficeDashboard {
                 }
             }
 
-            // 其他类型或同级别：按order排序
+            // 其他类型：按order排序
             const orderA = a.order ?? 999999;
             const orderB = b.order ?? 999999;
             if (orderA !== orderB) {
