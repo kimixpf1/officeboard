@@ -677,19 +677,23 @@ body {
 }
 
 .card.dragging {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: grabbing;
+    transform: scale(0.95);
+    transition: opacity 0.15s, transform 0.15s;
 }
 
 /* 拖拽插入位置指示 */
 .card.drag-above {
     border-top: 3px solid var(--primary-color);
     margin-top: -3px;
+    transition: border-top 0.15s, margin-top 0.15s;
 }
 
 .card.drag-below {
     border-bottom: 3px solid var(--primary-color);
     margin-bottom: -3px;
+    transition: border-bottom 0.15s, margin-bottom 0.15s;
 }
 
 .card.todo-card {
@@ -843,6 +847,34 @@ body {
 .card-action-btn.complete-btn.completed:hover {
     background: var(--gray-400);
     border-color: var(--gray-400);
+}
+
+/* 置顶按钮样式 */
+.card-action-btn.pin-btn {
+    color: var(--gray-400);
+}
+
+.card-action-btn.pin-btn:hover {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.card-action-btn.pin-btn.pinned {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.card-action-btn.pin-btn.pinned:hover {
+    background: var(--gray-400);
+    border-color: var(--gray-400);
+}
+
+/* 置顶卡片样式 */
+.card.pinned {
+    border-left: 3px solid #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, var(--bg-primary) 30%);
 }
 
 /* 已完成文字样式 */

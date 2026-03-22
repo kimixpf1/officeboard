@@ -2806,8 +2806,12 @@ class OfficeDashboard {
             });
         });
 
-        // 会议特殊排序：已完成沉底，然后按级别排序（钱局 > 局长 > 处室），最后按时间
+        // 会议特殊排序：置顶优先 > 已完成沉底 > 级别排序（钱局 > 局长 > 处室） > 时间
         grouped.meeting.sort((a, b) => {
+            // 置顶的排最前
+            if (a.pinned !== b.pinned) {
+                return a.pinned ? -1 : 1;
+            }
             // 已完成的沉底
             if (a.completed !== b.completed) {
                 return a.completed ? 1 : -1;
@@ -2873,8 +2877,12 @@ class OfficeDashboard {
         // 清空容器
         container.innerHTML = '';
 
-        // 排序：未完成在前，已完成沉底
+        // 排序：置顶优先 > 未完成在前 > 已完成沉底
         items.sort((a, b) => {
+            // 置顶的排最前
+            if (a.pinned !== b.pinned) {
+                return a.pinned ? -1 : 1;
+            }
             // 已完成的沉底
             if (a.completed !== b.completed) {
                 return a.completed ? 1 : -1;
@@ -2897,7 +2905,7 @@ class OfficeDashboard {
      */
     createCard(item) {
         const card = document.createElement('div');
-        card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}`;
+        card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}${item.pinned ? ' pinned' : ''}`;
         card.dataset.id = item.id;
         card.draggable = true;
 
@@ -2989,6 +2997,11 @@ class OfficeDashboard {
             <div class="card-main">${contentHtml}</div>
             <div class="card-detail" style="display: none;">${detailHtml}</div>
             <div class="card-actions">
+                <button class="card-action-btn pin-btn ${item.pinned ? 'pinned' : ''}" title="${item.pinned ? '取消置顶' : '置顶'}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>
+                    </svg>
+                </button>
                 <button class="card-action-btn complete-btn ${item.completed ? 'completed' : ''}" title="${item.completed ? '已完成' : '标记完成'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
@@ -3031,6 +3044,13 @@ class OfficeDashboard {
         completeBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleItemComplete(item.id, item.type, !item.completed);
+        });
+
+        // 绑定置顶按钮事件
+        const pinBtn = card.querySelector('.pin-btn');
+        pinBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleItemPin(item.id, item.type, !item.pinned);
         });
 
         // 绑定删除事件
@@ -3227,11 +3247,17 @@ class OfficeDashboard {
     }
 
     /**
-     * 拖拽悬停
+     * 拖拽悬停（节流优化，减少闪烁）
      */
     handleDragOver(e) {
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
         e.currentTarget.classList.add('drag-over');
+
+        // 节流：限制指示器更新频率
+        const now = Date.now();
+        if (this._lastDragOverTime && now - this._lastDragOverTime < 50) return;
+        this._lastDragOverTime = now;
 
         // 高亮显示插入位置
         const afterElement = this.getDragAfterElement(e.currentTarget, e.clientY);
@@ -3645,6 +3671,24 @@ class OfficeDashboard {
             }
         } catch (error) {
             console.error('更新完成状态失败:', error);
+            this.showError('更新失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 通用切换置顶状态（所有类型）
+     */
+    async toggleItemPin(id, type, pinned) {
+        try {
+            await db.updateItem(id, { pinned });
+            await this.loadItems();
+            // 立即同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+            this.showSuccess(pinned ? '已置顶' : '已取消置顶');
+        } catch (error) {
+            console.error('更新置顶状态失败:', error);
             this.showError('更新失败: ' + error.message);
         }
     }
