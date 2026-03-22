@@ -3269,32 +3269,56 @@ class OfficeDashboard {
 
     /**
      * 放置
+     * 简化的拖放逻辑：直接从DOM计算新顺序，使用单事务批量更新
      */
     async handleDrop(e) {
         e.preventDefault();
         e.currentTarget.classList.remove('drag-over');
 
-        if (!this.draggedItem) return;
+        if (!this.draggedItem || this._isProcessingDrop) return;
+        this._isProcessingDrop = true;
 
-        const newType = e.currentTarget.id.replace('List', '');
+        const container = e.currentTarget;
+        const newType = container.id.replace('List', '');
         const isSameColumn = newType === this.draggedItem.type;
 
-        // 获取插入位置
-        const afterElement = this.getDragAfterElement(e.currentTarget, e.clientY);
-
         try {
+            // 跨列移动：先更新类型
             if (!isSameColumn) {
-                // 跨列移动：更新类型
                 await db.updateItem(this.draggedItem.id, { type: newType });
             }
 
-            // 更新排序
-            await this.updateItemOrder(newType, this.draggedItem.id, afterElement?.dataset.id);
+            // 获取插入位置（在哪个元素之前）
+            const afterElement = this.getDragAfterElement(container, e.clientY);
 
-            // 重新加载
+            // 获取当前列中所有非拖动中的卡片ID（数字类型，匹配IndexedDB主键）
+            const existingCards = [...container.querySelectorAll('.card:not(.dragging)')];
+            const existingIds = existingCards.map(card => parseInt(card.dataset.id));
+
+            // 从列表中移除拖动项ID（处理同列拖动的情况）
+            const draggedId = this.draggedItem.id;
+            const orderedIds = existingIds.filter(id => id !== draggedId);
+
+            // 计算插入位置
+            let insertIndex = orderedIds.length; // 默认放到末尾
+            if (afterElement) {
+                const afterId = parseInt(afterElement.dataset.id);
+                const afterIdx = orderedIds.indexOf(afterId);
+                if (afterIdx !== -1) {
+                    insertIndex = afterIdx;
+                }
+            }
+
+            // 在新位置插入拖动项
+            orderedIds.splice(insertIndex, 0, draggedId);
+
+            // 使用db.updateItemOrder单事务批量更新（更高效、更可靠）
+            await db.updateItemOrder(newType, orderedIds);
+
+            // 重新渲染
             await this.loadItems();
 
-            // 立即同步到云端
+            // 同步到云端
             if (syncManager.isLoggedIn()) {
                 await syncManager.immediateSyncToCloud();
             }
@@ -3302,79 +3326,11 @@ class OfficeDashboard {
         } catch (error) {
             console.error('移动失败:', error);
             this.showError('移动失败，请重试');
+        } finally {
+            this._isProcessingDrop = false;
         }
 
         this.draggedItem = null;
-    }
-
-    /**
-     * 更新事项排序
-     * 拖拽排序只在同状态组内生效（置顶组/未完成组/已完成组）
-     * @param {string} type - 事项类型
-     * @param {string} draggedId - 被拖拽事项的ID
-     * @param {string|null} afterId - 目标位置后面的事项ID（null表示放到最后）
-     */
-    async updateItemOrder(type, draggedId, afterId) {
-        // 获取当前DOM中卡片的实际顺序（这是用户看到的顺序）
-        const container = document.getElementById(type + 'List');
-        const domCards = container ? [...container.querySelectorAll('.card')] : [];
-        const domOrder = domCards.map(card => card.dataset.id);
-        
-        // 从数据库获取所有同类型事项
-        const allItems = await db.getItemsByType(type);
-        
-        // 找到拖拽项
-        const draggedItem = allItems.find(i => i.id == draggedId);
-        if (!draggedItem) return;
-        
-        // 确定拖拽项的状态组
-        const draggedGroup = this.getItemGroup(draggedItem);
-        
-        // 筛选同状态组的项
-        const groupItems = allItems.filter(item => this.getItemGroup(item) === draggedGroup);
-        
-        // 按当前DOM顺序排序（而不是数据库中的order）
-        // 这样可以保留之前拖拽的结果
-        groupItems.sort((a, b) => {
-            const indexA = domOrder.indexOf(a.id);
-            const indexB = domOrder.indexOf(b.id);
-            // 如果都在DOM中，按DOM顺序
-            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-            // 如果都不在DOM中，按数据库order
-            const orderA = a.order ?? 999999;
-            const orderB = b.order ?? 999999;
-            if (orderA !== orderB) return orderA - orderB;
-            return new Date(a.createdAt) - new Date(b.createdAt);
-        });
-        
-        // 从列表中移除拖拽项
-        const draggedIndex = groupItems.findIndex(i => i.id == draggedId);
-        if (draggedIndex === -1) return;
-        groupItems.splice(draggedIndex, 1);
-        
-        // 计算插入位置
-        let insertIndex = groupItems.length; // 默认放到最后
-        if (afterId) {
-            // 找到afterId对应的事项在groupItems中的位置
-            const afterItem = allItems.find(i => i.id == afterId);
-            if (afterItem && this.getItemGroup(afterItem) === draggedGroup) {
-                const afterIndex = groupItems.findIndex(i => i.id == afterId);
-                if (afterIndex !== -1) {
-                    insertIndex = afterIndex;
-                }
-            }
-        }
-        
-        // 插入到新位置
-        groupItems.splice(insertIndex, 0, draggedItem);
-        
-        // 批量更新同组内所有项的 order
-        const updates = [];
-        for (let i = 0; i < groupItems.length; i++) {
-            updates.push(db.updateItem(groupItems[i].id, { order: i }));
-        }
-        
-        await Promise.all(updates);
     }
 
     /**
