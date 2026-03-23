@@ -677,7 +677,6 @@ class OfficeDashboard {
             { name: '中国政府网', url: 'https://www.gov.cn/', icon: '🏢' },
             { name: '江苏政府网', url: 'https://www.jiangsu.gov.cn/', icon: '🏢' },
             { name: '苏州政府网', url: 'https://www.suzhou.gov.cn/', icon: '🏢' },
-            { name: '苏州统计局', url: 'https://tjj.suzhou.gov.cn/', icon: '📈' },
             { name: '百度', url: 'https://www.baidu.com/', icon: '🔎' }
         ];
     }
