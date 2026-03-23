@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=22">
+    <link rel="stylesheet" href="css/style.css?v=23">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -869,6 +869,8 @@
                 <!-- 搜索框 -->
                 <div class="contacts-search">
                     <input type="text" id="contactsSearchInput" placeholder="搜索姓名或电话...">
+                    <button id="contactsSearchBtn" class="btn-search">🔍</button>
+                    <button id="contactsClearSearchBtn" class="btn-clear" style="display:none;">✕</button>
                 </div>
                 <!-- 添加联系人表单 -->
                 <div class="contacts-add-form">
@@ -879,7 +881,7 @@
                 <!-- 导入按钮 -->
                 <div class="contacts-import">
                     <label for="importContactsFile" class="btn-import-contacts">
-                        📥 导入Excel
+                        📥 导入Excel（姓名、电话两列）
                     </label>
                     <input type="file" id="importContactsFile" accept=".xlsx,.xls,.csv" style="display:none;">
                 </div>
@@ -1032,7 +1034,7 @@
     <script src="js/templates.js?v=13"></script>
     <script src="js/ocr.js?v=22"></script>
     <script src="js/report.js?v=13"></script>
-    <script src="js/calendar.js?v=13"></script>
+    <script src="js/calendar.js?v=14"></script>
     <script src="js/sync.js?v=13"></script>
     <script src="js/app.js?v=49"></script>
     

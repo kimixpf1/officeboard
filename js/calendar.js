@@ -259,14 +259,26 @@ class CalendarView {
                     return item.date === dateStr;
                 }
                 // 待办：按截止日期
-                if (item.deadline) {
+                if (item.type === 'todo' && item.deadline) {
                     const deadlineDate = item.deadline.split('T')[0];
                     return deadlineDate === dateStr;
                 }
-                // 文件：按创建日期
-                if (item.createdAt) {
-                    const createdDate = item.createdAt.split('T')[0];
-                    return createdDate === dateStr;
+                // 办文：按办文日期范围（支持跨天）
+                if (item.type === 'document') {
+                    const startDate = item.docStartDate || item.docDate;
+                    const endDate = item.docEndDate;
+                    if (startDate && endDate) {
+                        // 跨天办文：检查日期范围
+                        return dateStr >= startDate && dateStr <= endDate;
+                    }
+                    if (startDate) {
+                        return startDate === dateStr;
+                    }
+                    // 兼容旧数据：按创建日期
+                    if (item.createdAt) {
+                        const createdDate = item.createdAt.split('T')[0];
+                        return createdDate === dateStr;
+                    }
                 }
                 return false;
             });
@@ -370,9 +382,25 @@ class CalendarView {
                     return item.date === dateStr;
                 }
                 // 待办：按截止日期
-                if (item.deadline) return item.deadline.startsWith(dateStr);
-                // 文件：按创建日期
-                if (item.createdAt) return item.createdAt.startsWith(dateStr);
+                if (item.type === 'todo' && item.deadline) {
+                    return item.deadline.startsWith(dateStr);
+                }
+                // 办文：按办文日期范围（支持跨天）
+                if (item.type === 'document') {
+                    const startDate = item.docStartDate || item.docDate;
+                    const endDate = item.docEndDate;
+                    if (startDate && endDate) {
+                        // 跨天办文：检查日期范围
+                        return dateStr >= startDate && dateStr <= endDate;
+                    }
+                    if (startDate) {
+                        return startDate === dateStr;
+                    }
+                    // 兼容旧数据：按创建日期
+                    if (item.createdAt) {
+                        return item.createdAt.startsWith(dateStr);
+                    }
+                }
                 return false;
             });
 

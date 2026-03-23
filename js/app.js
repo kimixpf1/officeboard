@@ -1430,6 +1430,8 @@ class OfficeDashboard {
         const toggle = document.getElementById('contactsToggle');
         const close = document.getElementById('contactsClose');
         const searchInput = document.getElementById('contactsSearchInput');
+        const searchBtn = document.getElementById('contactsSearchBtn');
+        const clearSearchBtn = document.getElementById('contactsClearSearchBtn');
         const addBtn = document.getElementById('addContactBtn');
         const importFile = document.getElementById('importContactsFile');
         const nameInput = document.getElementById('newContactName');
@@ -1467,10 +1469,36 @@ class OfficeDashboard {
             });
         }
 
-        // 搜索
+        // 搜索按钮
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => {
+                this.filterContacts(searchInput?.value || '');
+            });
+        }
+
+        // 回车搜索
         if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.filterContacts(searchInput.value);
+                }
+            });
+            // 输入时显示/隐藏清除按钮
             searchInput.addEventListener('input', () => {
-                this.filterContacts(searchInput.value);
+                if (searchInput.value && clearSearchBtn) {
+                    clearSearchBtn.style.display = 'block';
+                } else if (clearSearchBtn) {
+                    clearSearchBtn.style.display = 'none';
+                }
+            });
+        }
+
+        // 清除搜索
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                clearSearchBtn.style.display = 'none';
+                this.renderContacts(this.contacts);
             });
         }
 
@@ -1616,14 +1644,29 @@ class OfficeDashboard {
      * 保存通讯录
      */
     async saveContacts() {
+        const status = document.getElementById('contactsStatus');
+        
         // 保存到本地
         localStorage.setItem('office_contacts', JSON.stringify(this.contacts));
 
         // 同步到云端
         if (syncManager.isLoggedIn()) {
+            if (status) status.textContent = '同步中...';
             try {
                 await syncManager.immediateSyncToCloud();
                 console.log('通讯录已同步到云端');
+                if (status) status.textContent = `共 ${this.contacts.length} 个联系人 ✓ 已同步`;
+                setTimeout(() => {
+                    if (status) status.textContent = `共 ${this.contacts.length} 个联系人`;
+                }, 2000);
+            } catch (e) {
+                console.error('通讯录同步失败:', e);
+                if (status) status.textContent = `共 ${this.contacts.length} 个联系人 (同步失败)`;
+            }
+        } else {
+            if (status) status.textContent = `共 ${this.contacts.length} 个联系人`;
+        }
+    }
             } catch (e) {
                 console.error('通讯录同步失败:', e);
             }

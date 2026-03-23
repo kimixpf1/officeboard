@@ -2850,28 +2850,29 @@ body {
 }
 .tools-toggle {
     background: linear-gradient(180deg, #fb923c, #ea580c);
-    top: calc(50% - 120px);
+    top: calc(50% - 132px);
+    right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
 .tools-toggle:hover {
     background: linear-gradient(180deg, #fdba74, #f97316);
 }
 
-/* 网站面板（中）- 蓝色，错落右移2px */
+/* 网站面板（中）- 蓝色 */
 .links-panel {
     z-index: 1001;
 }
 .links-toggle {
     background: linear-gradient(180deg, #38bdf8, #0284c7);
-    top: calc(50% - 38px);
-    right: 2px;
+    top: calc(50% - 44px);
+    right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
 .links-toggle:hover {
     background: linear-gradient(180deg, #7dd3fc, #0ea5e9);
 }
 
-/* 备忘录面板（下）- 紫色，错落右移4px */
+/* 备忘录面板 - 紫色 */
 .memo-panel {
     z-index: 1000;
 }
@@ -2885,13 +2886,13 @@ body {
     background: linear-gradient(180deg, #c4b5fd, #8b5cf6);
 }
 
-/* 通讯录面板 */
+/* 通讯录面板 - 绿色 */
 .contacts-panel {
-    z-index: 1000;
+    z-index: 999;
 }
 .contacts-toggle {
     background: linear-gradient(180deg, #34d399, #059669);
-    top: calc(50% + 88px);
+    top: calc(50% + 132px);
     right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
@@ -2908,10 +2909,12 @@ body {
 
 .contacts-search {
     padding: 0 4px;
+    display: flex;
+    gap: 6px;
 }
 
 .contacts-search input {
-    width: 100%;
+    flex: 1;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -2923,6 +2926,30 @@ body {
 .contacts-search input:focus {
     outline: none;
     border-color: var(--primary-color);
+}
+
+.btn-search, .btn-clear {
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.btn-search:hover {
+    background: var(--primary-light);
+    border-color: var(--primary-color);
+}
+
+.btn-clear {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+.btn-clear:hover {
+    background: #fecaca;
 }
 
 .contacts-add-form {
