@@ -2786,6 +2786,17 @@ class OfficeDashboard {
     async loadItems() {
         const allItems = await db.getAllItems();
 
+        // 调试：打印会议的 completed 状态
+        const meetings = allItems.filter(i => i.type === 'meeting');
+        if (meetings.length > 0) {
+            console.log('loadItems - 会议数据:', meetings.map(m => ({
+                title: m.title,
+                completed: m.completed,
+                completedType: typeof m.completed,
+                order: m.order
+            })));
+        }
+
         // 日视图：按选中日期筛选
         let items = allItems;
         if (this.currentView === 'board') {
@@ -3760,13 +3771,15 @@ class OfficeDashboard {
      * 通用切换完成状态（所有类型）
      */
     async toggleItemComplete(id, type, completed) {
+        console.log(`toggleItemComplete: id=${id}, type=${type}, completed=${completed}`);
         try {
-            await db.updateItem(id, {
+            const result = await db.updateItem(id, {
                 completed,
                 completedAt: completed ? new Date().toISOString() : null,
                 // 办文类型额外更新progress字段
                 ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
             });
+            console.log('updateItem 结果:', result);
             await this.loadItems();
             // 立即同步到云端
             if (syncManager.isLoggedIn()) {
