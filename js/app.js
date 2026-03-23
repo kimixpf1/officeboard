@@ -1016,6 +1016,32 @@ class OfficeDashboard {
             });
         });
 
+        // 计算器键盘支持
+        document.addEventListener('keydown', (e) => {
+            const calculatorModal = document.getElementById('calculatorModal');
+            if (!calculatorModal || !calculatorModal.classList.contains('active')) return;
+
+            const key = e.key;
+            const keyMap = {
+                '0': '0', '1': '1', '2': '2', '3': '3', '4': '4',
+                '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
+                '+': '+', '-': '-', '*': '*', '/': '/', '.': '.',
+                'Enter': '=', '=': '=', 'Escape': 'C', 'c': 'C', 'C': 'C',
+                'Backspace': 'backspace', '%': '%'
+            };
+
+            if (keyMap[key]) {
+                e.preventDefault();
+                if (keyMap[key] === 'backspace') {
+                    // 退格删除最后一个字符
+                    const display = document.getElementById('calcDisplay');
+                    if (display) display.value = display.value.slice(0, -1);
+                } else {
+                    this.calcInput(keyMap[key]);
+                }
+            }
+        });
+
         // 倒计时
         this.initTimer();
     }
@@ -2888,26 +2914,29 @@ class OfficeDashboard {
         // 排序逻辑
         const hasOrder = (item) => item.order !== undefined && item.order !== null;
 
+        // 调试：打印排序前的状态
+        console.log('排序前项目:', items.map(i => ({
+            title: i.title,
+            pinned: !!i.pinned,
+            sunk: !!i.sunk,
+            completed: !!i.completed
+        })));
+
         items.sort((a, b) => {
-            // 1. 置顶的排最前（确保转为布尔值比较）
-            const aPinned = !!a.pinned;
-            const bPinned = !!b.pinned;
-            if (aPinned !== bPinned) {
-                return aPinned ? -1 : 1;
-            }
+            // 计算优先级分数：分数小的排前面
+            // 置顶=0, 正常=1, 沉底=2, 已完成=3
+            const getPriority = (item) => {
+                if (item.pinned) return 0;
+                if (item.completed) return 3;
+                if (item.sunk) return 2;
+                return 1;
+            };
 
-            // 2. 已完成的排最底部（确保转为布尔值比较）
-            const aCompleted = !!a.completed;
-            const bCompleted = !!b.completed;
-            if (aCompleted !== bCompleted) {
-                return aCompleted ? 1 : -1;
-            }
+            const priorityA = getPriority(a);
+            const priorityB = getPriority(b);
 
-            // 3. 沉底的排在已完成的上面（即正常项的最后）
-            const aSunk = !!a.sunk;
-            const bSunk = !!b.sunk;
-            if (aSunk !== bSunk) {
-                return aSunk ? 1 : -1;
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB;
             }
 
             // 核心排序：有 order 值的一律按 order 排（用户拖拽的结果）
