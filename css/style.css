@@ -2477,6 +2477,13 @@ body {
     color: #059669;
 }
 
+/* 周期性任务标志 */
+.recurring-badge {
+    font-size: 12px;
+    margin-left: 4px;
+    opacity: 0.7;
+}
+
 .doc-type-tag {
     font-size: 11px;
     width: 20px;

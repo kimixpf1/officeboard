@@ -2834,9 +2834,16 @@ class OfficeDashboard {
                 if (item.type === 'todo' && item.deadline) {
                     return item.deadline.startsWith(this.selectedDate);
                 }
-                // 文件：按办文日期匹配（优先使用docDate，否则使用createdAt）
+                // 文件：按办文日期范围匹配（支持跨天流转）
                 if (item.type === 'document') {
-                    const docDate = item.docDate || (item.createdAt ? item.createdAt.split('T')[0] : null);
+                    const startDate = item.docStartDate || item.docDate;
+                    const endDate = item.docEndDate;
+                    if (startDate && endDate) {
+                        // 跨天办文：检查选中日期是否在日期范围内
+                        return this.selectedDate >= startDate && this.selectedDate <= endDate;
+                    }
+                    // 单天办文
+                    const docDate = startDate || (item.createdAt ? item.createdAt.split('T')[0] : null);
                     return docDate === this.selectedDate;
                 }
                 return false;
@@ -3008,10 +3015,13 @@ class OfficeDashboard {
             case 'todo':
                 const priorityClass = `priority-${item.priority || 'medium'}`;
                 const priorityText = { high: '急', medium: '中', low: '低' }[item.priority] || '中';
+                // 周期性任务标志
+                const recurringBadge = item.isRecurring ? '<span class="recurring-badge" title="周期性任务">🔄</span>' : '';
                 contentHtml = `
                     <div class="card-header-row">
                         ${selectCheckboxHtml}
                         <span class="priority-tag ${priorityClass}">${priorityText}</span>
+                        ${recurringBadge}
                     </div>
                     <div class="card-title ${item.completed ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
                     <div class="card-time">${this.formatDeadline(item.deadline, item.completed)}</div>
@@ -3062,17 +3072,29 @@ class OfficeDashboard {
                 const docTypeClass = item.docType || 'receive';
                 const isCompleted = item.progress === 'completed';
 
+                // 办文日期范围显示
+                let docDateDisplay = '';
+                const docStartDate = item.docStartDate || item.docDate;
+                if (docStartDate && item.docEndDate) {
+                    // 跨天办文
+                    const start = docStartDate.substring(5).replace('-', '/');
+                    const end = item.docEndDate.substring(5).replace('-', '/');
+                    docDateDisplay = `${start}-${end}`;
+                }
+
                 contentHtml = `
                     <div class="card-header-row">
                         ${selectCheckboxHtml}
                         <span class="doc-type-tag ${docTypeClass}">${docTypeIcon}</span>
                     </div>
                     <div class="card-title ${isCompleted ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
+                    ${docDateDisplay ? `<div class="card-date-range">${docDateDisplay}</div>` : ''}
                     ${item.handler ? `<div class="card-handler">当前：${this.escapeHtml(item.handler)}</div>` : ''}
                 `;
                 detailHtml = `
                     ${item.docNumber ? `<div class="card-detail-section"><div class="detail-label">文号</div><div class="detail-content">${this.escapeHtml(item.docNumber)}</div></div>` : ''}
                     ${item.source ? `<div class="card-detail-section"><div class="detail-label">来文单位</div><div class="detail-content">${this.escapeHtml(item.source)}</div></div>` : ''}
+                    ${docStartDate ? `<div class="card-detail-section"><div class="detail-label">日期</div><div class="detail-content">${docStartDate}${item.docEndDate ? ' 至 ' + item.docEndDate : ''}</div></div>` : ''}
                     ${item.handler ? `<div class="card-detail-section"><div class="detail-label">当前处理人</div><div class="detail-content">${this.escapeHtml(item.handler)}</div></div>` : ''}
                     ${item.transferHistory?.length ? `<div class="card-detail-section"><div class="detail-label">流转记录</div><div class="detail-content transfer-list">${item.transferHistory.map(t => `<div>${t.time} → ${t.to}</div>`).join('')}</div></div>` : ''}
                     ${item.content ? `<div class="card-detail-section"><div class="detail-label">内容摘要</div><div class="detail-content">${this.escapeHtml(item.content)}</div></div>` : ''}
@@ -3259,6 +3281,8 @@ class OfficeDashboard {
                 document.getElementById('docSource').value = item.source || '';
                 document.getElementById('docHandler').value = item.handler || '';
                 document.getElementById('docContent').value = item.content || '';
+                document.getElementById('docStartDate').value = item.docStartDate || item.docDate || '';
+                document.getElementById('docEndDate').value = item.docEndDate || '';
                 break;
         }
 
@@ -3728,8 +3752,10 @@ class OfficeDashboard {
                 item.handler = document.getElementById('docHandler').value.trim();
                 item.content = document.getElementById('docContent').value.trim();
                 item.progress = item.handler ? 'processing' : 'pending';
-                // 设置办文日期为用户选择的日期
-                item.docDate = this.selectedDate;
+                // 办文日期范围
+                item.docStartDate = document.getElementById('docStartDate').value || this.selectedDate;
+                item.docEndDate = document.getElementById('docEndDate').value || null;
+                item.docDate = item.docStartDate; // 兼容旧数据
                 // 流转历史
                 const existingItem = document.getElementById('itemId').value ? await db.getItem(parseInt(document.getElementById('itemId').value)) : null;
                 item.transferHistory = existingItem?.transferHistory || [];
