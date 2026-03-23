@@ -2884,13 +2884,18 @@ class OfficeDashboard {
         const hasOrder = (item) => item.order !== undefined && item.order !== null;
 
         items.sort((a, b) => {
-            // 置顶的排最前
-            if (a.pinned !== b.pinned) {
-                return a.pinned ? -1 : 1;
+            // 置顶的排最前（确保转为布尔值比较）
+            const aPinned = !!a.pinned;
+            const bPinned = !!b.pinned;
+            if (aPinned !== bPinned) {
+                return aPinned ? -1 : 1;
             }
-            // 已完成的沉底
-            if (a.completed !== b.completed) {
-                return a.completed ? 1 : -1;
+
+            // 已完成的沉底（确保转为布尔值比较）
+            const aCompleted = !!a.completed;
+            const bCompleted = !!b.completed;
+            if (aCompleted !== bCompleted) {
+                return aCompleted ? 1 : -1;
             }
 
             // 核心排序：有 order 值的一律按 order 排（用户拖拽的结果）
@@ -2929,9 +2934,9 @@ class OfficeDashboard {
             return new Date(a.createdAt) - new Date(b.createdAt);
         });
 
-        // 调试：打印排序后的项目 order 值
+        // 调试：打印排序后的项目状态
         if (type === 'meeting' && items.length > 0) {
-            console.log(`${type} 排序后顺序:`, items.map(i => `${i.title}(order:${i.order})`));
+            console.log(`${type} 排序后顺序:`, items.map(i => `${i.title}(completed:${!!i.completed},order:${i.order})`));
         }
 
         // 渲染卡片
