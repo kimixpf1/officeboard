@@ -2168,21 +2168,20 @@ class OCRManager {
 
             // 会议：比较关键词和日期（更宽松的匹配）
             if (newItem.type === 'meeting') {
-                // 关键词匹配检查
-                const keywordMatch = newKeywords === existKeywords ||
-                                     newKeywords.includes(existKeywords) ||
-                                     existKeywords.includes(newKeywords) ||
-                                     // 或者原始标题有包含关系
-                                     (newTitle.length > 2 && existTitle.length > 2 &&
-                                      (newTitle.includes(existTitle) || existTitle.includes(newTitle)));
+                // 标题完全匹配才考虑合并
+                const titleExactMatch = newTitle === existTitle;
+                const titleSimilarMatch = newKeywords === existKeywords && newKeywords.length > 2;
 
-                // 关键词匹配 + 同一天 = 重复（合并参会人员）
-                if (keywordMatch && existing.date === newItemData.date) {
+                // 时间也要匹配
+                const timeMatch = newItemData.time === existing.time;
+
+                // 只有标题完全匹配且时间相同才合并参会人员
+                if ((titleExactMatch || titleSimilarMatch) && existing.date === newItemData.date && timeMatch) {
                     return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                 }
 
-                // 跨天会议：检查日期范围是否重叠
-                if (keywordMatch && newItemData.endDate) {
+                // 跨天会议：检查日期范围是否重叠（标题需要完全匹配）
+                if (titleExactMatch && newItemData.endDate) {
                     const newStart = newItemData.date;
                     const newEnd = newItemData.endDate;
                     const existStart = existing.date;
@@ -2355,13 +2354,19 @@ class OCRManager {
 3. 看时间/地点：每行有不同时间/地点的是表格形式
 4. 如果只有一个标题、一组参会人员、一个时间地点，但有多个议题 → 单个会议
 
-【参会人员识别 - 非常重要】
+【参会人员识别 - 极其重要！错误率最高的地方！】
 1. 提取"参会人员"、"出席人员"、"通知对象"后的人名
 2. 多个名字用顿号、逗号分隔时，分别提取每个人
 3. "全体员工"、"各部门负责人"等集体称呼也要提取
 4. 部门名称如"财务部"、"人事部"也算参会方
-5. 表格合并单元格：一个名字跨越多行，表示该人员参加所有对应会议
-6. 仔细识别每个人名，不要遗漏！
+
+【表格参会人员 - 特别注意，容易出错！】
+⚠️ 表格中每行的参会人员是独立的！
+⚠️ 不要把上一行的人混到下一行！
+⚠️ 仔细看每行对应的参会人员列，只提取该行对应的参会人员！
+⚠️ 如果某行没有明确标注参会人员，填空数组[]，不要猜测！
+⚠️ 表格合并单元格：一个名字跨越多行，表示该人员参加所有对应会议
+⚠️ 再次强调：每行的attendees数组只包含该行对应的参会人员！
 
 【输出格式】严格返回JSON：
 {
@@ -2374,7 +2379,7 @@ class OCRManager {
       "time": "HH:MM",
       "endTime": "HH:MM",
       "location": "会议地点",
-      "attendees": ["参会人员数组 - 必须完整提取！"],
+      "attendees": ["参会人员数组 - 必须完整且准确提取，只包含该会议的参会人员！"],
       "agenda": "议程1\\n议程2（仅单个会议多议程时填写）"
     }
   }]
@@ -2388,9 +2393,10 @@ class OCRManager {
 如果图片中明确是独立的待办任务（非会议议程），识别为todo类型。
 
 【重要提醒】
-- 表格形式：每行一个会议，参会人员要仔细提取！
+- 表格形式：每行一个会议，参会人员要仔细提取，不要把上一行的人混到下一行！
 - 单会议多议程：合并为一个会议，议程放agenda字段！
 - 宁可多识别不要漏识别！
+- 参会人员必须准确，这是最容易出错的地方！
 
 只返回JSON，不要解释。`;
 
@@ -2413,7 +2419,7 @@ class OCRManager {
                                 },
                                 {
                                     type: 'text',
-                                    text: '请识别这张图片。先判断：是"单个会议多议程"还是"表格多会议"？如果是表格，每行一个会议，仔细提取每行的参会人员；如果是单个会议多议程，合并为一个会议，议程放agenda字段。参会人员必须完整提取，不要遗漏！'
+                                    text: '请识别这张图片。先判断：是"单个会议多议程"还是"表格多会议"？\n\n如果是表格：\n- 每行一个会议\n- ⚠️ 每行的参会人员只包含该行对应的参会人员，不要把其他行的人员混进来！\n- 仔细看每行的参会人员列\n\n如果是单个会议多议程：\n- 合并为一个会议\n- 议程放agenda字段\n\n参会人员必须准确，这是最容易出错的地方！'
                                 }
                             ]
                         }

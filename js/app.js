@@ -2648,23 +2648,47 @@ class OfficeDashboard {
                         continue;
                     }
 
-                    // 显示结果
-                    let message = '';
+                    // 显示结果 - 弹出详细的识别日志
+                    let logHtml = `<div style="text-align:left; max-height:400px; overflow-y:auto;">`;
+                    logHtml += `<h4 style="margin-bottom:12px;">📄 文件：${file.name}</h4>`;
+
                     if (result.items && result.items.length > 0) {
-                        message = `从"${file.name}"提取了${result.items.length}个事项`;
-                    }
-                    if (result.mergedItems && result.mergedItems.length > 0) {
-                        if (message) message += '，';
-                        message += `合并了${result.mergedItems.length}个会议的参会人员`;
+                        logHtml += `<div style="margin-bottom:12px;">`;
+                        logHtml += `<h5 style="color:#10b981;margin-bottom:8px;">✅ 新增事项 (${result.items.length}个)</h5>`;
+                        logHtml += `<ul style="margin:0;padding-left:20px;font-size:13px;">`;
+                        result.items.forEach(item => {
+                            const typeIcon = { meeting: '📅', todo: '☑️', document: '📄' }[item.type] || '📌';
+                            const attendees = item.data.attendees?.length ? ` (参会: ${item.data.attendees.slice(0,3).join('、')}${item.data.attendees.length > 3 ? '等' : ''})` : '';
+                            logHtml += `<li style="margin:4px 0;">${typeIcon} ${item.data.title}${attendees}</li>`;
+                        });
+                        logHtml += `</ul></div>`;
                     }
 
-                    if (message) {
-                        this.showSuccess(message);
-                    } else if (result.skippedCount > 0) {
-                        this.showSuccess(`已处理，跳过${result.skippedCount}个重复事项`);
-                    } else {
-                        this.showError(`未能从"${file.name}"提取到有效事项，请确保内容清晰`);
+                    if (result.mergedItems && result.mergedItems.length > 0) {
+                        logHtml += `<div style="margin-bottom:12px;">`;
+                        logHtml += `<h5 style="color:#f59e0b;margin-bottom:8px;">🔄 合并参会人员 (${result.mergedItems.length}个)</h5>`;
+                        logHtml += `<ul style="margin:0;padding-left:20px;font-size:13px;">`;
+                        result.mergedItems.forEach(item => {
+                            const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '无新增';
+                            logHtml += `<li style="margin:4px 0;">📅 ${item.title}<br><span style="color:#666;font-size:12px;">&nbsp;&nbsp;新增参会: ${addedStr}</span></li>`;
+                        });
+                        logHtml += `</ul></div>`;
                     }
+
+                    if (result.skippedItems && result.skippedItems.length > 0) {
+                        logHtml += `<div style="margin-bottom:12px;">`;
+                        logHtml += `<h5 style="color:#6b7280;margin-bottom:8px;">⏭️ 跳过重复 (${result.skippedItems.length}个)</h5>`;
+                        logHtml += `<ul style="margin:0;padding-left:20px;font-size:12px;color:#888;">`;
+                        result.skippedItems.forEach(title => {
+                            logHtml += `<li style="margin:2px 0;">${title}</li>`;
+                        });
+                        logHtml += `</ul></div>`;
+                    }
+
+                    logHtml += `</div>`;
+
+                    // 显示日志弹窗
+                    this.showRecognitionLog('识别结果', logHtml);
                 }
 
                 // 刷新列表
@@ -4878,6 +4902,36 @@ class OfficeDashboard {
      */
     showError(message) {
         this.showMessage(message, 'error');
+    }
+
+    /**
+     * 显示识别日志弹窗
+     */
+    showRecognitionLog(title, content) {
+        // 创建日志弹窗
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'recognitionLogModal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>${title}</h3>
+                    <button class="btn-close" onclick="this.closest('.modal').remove()">×</button>
+                </div>
+                <div class="modal-body" style="padding: 16px;">
+                    ${content}
+                </div>
+                <div class="modal-actions" style="justify-content: center;">
+                    <button class="btn-primary" onclick="this.closest('.modal').remove()">确定</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // 点击背景关闭
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
     }
 
     /**
