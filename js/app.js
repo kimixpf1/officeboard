@@ -116,6 +116,47 @@ class OfficeDashboard {
     }
 
     /**
+     * 判断日期是否为工作日（跳过周末和法定节假日）
+     * @param {string} dateStr - 日期字符串 YYYY-MM-DD
+     * @returns {boolean}
+     */
+    isWorkday(dateStr) {
+        const date = new Date(dateStr);
+        const dayOfWeek = date.getDay();
+        
+        // 周六(6)和周日(0)不是工作日
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            return false;
+        }
+        
+        // 2024-2025年法定节假日列表（可根据需要扩展）
+        const holidays = [
+            // 2024年
+            '2024-01-01', // 元旦
+            '2024-02-10', '2024-02-11', '2024-02-12', '2024-02-13', '2024-02-14', '2024-02-15', '2024-02-16', '2024-02-17', // 春节
+            '2024-04-04', '2024-04-05', '2024-04-06', // 清明节
+            '2024-05-01', '2024-05-02', '2024-05-03', '2024-05-04', '2024-05-05', // 劳动节
+            '2024-06-08', '2024-06-09', '2024-06-10', // 端午节
+            '2024-09-15', '2024-09-16', '2024-09-17', // 中秋节
+            '2024-10-01', '2024-10-02', '2024-10-03', '2024-10-04', '2024-10-05', '2024-10-06', '2024-10-07', // 国庆节
+            // 2025年
+            '2025-01-01', // 元旦
+            '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-01', '2025-02-02', '2025-02-03', '2025-02-04', // 春节
+            '2025-04-04', '2025-04-05', '2025-04-06', // 清明节
+            '2025-05-01', '2025-05-02', '2025-05-03', '2025-05-04', '2025-05-05', // 劳动节
+            '2025-05-31', '2025-06-01', '2025-06-02', // 端午节
+            '2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05', '2025-10-06', '2025-10-07', '2025-10-08', // 国庆+中秋
+        ];
+        
+        // 检查是否为节假日
+        if (holidays.includes(dateStr)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
      * 初始化应用
      */
     async init() {
@@ -2892,7 +2933,12 @@ class OfficeDashboard {
                     const endDate = item.docEndDate;
                     if (startDate && endDate) {
                         // 跨天办文：检查选中日期是否在日期范围内
-                        return this.selectedDate >= startDate && this.selectedDate <= endDate;
+                        const inRange = this.selectedDate >= startDate && this.selectedDate <= endDate;
+                        // 如果启用了跳过周末和节假日
+                        if (inRange && item.skipWeekend) {
+                            return this.isWorkday(this.selectedDate);
+                        }
+                        return inRange;
                     }
                     // 单天办文
                     const docDate = startDate || (item.createdAt ? item.createdAt.split('T')[0] : null);
@@ -3335,6 +3381,7 @@ class OfficeDashboard {
                 document.getElementById('docContent').value = item.content || '';
                 document.getElementById('docStartDate').value = item.docStartDate || item.docDate || '';
                 document.getElementById('docEndDate').value = item.docEndDate || '';
+                document.getElementById('docSkipWeekend').checked = item.skipWeekend || false;
                 break;
         }
 
@@ -3808,6 +3855,8 @@ class OfficeDashboard {
                 item.docStartDate = document.getElementById('docStartDate').value || this.selectedDate;
                 item.docEndDate = document.getElementById('docEndDate').value || null;
                 item.docDate = item.docStartDate; // 兼容旧数据
+                // 跳过周末和节假日
+                item.skipWeekend = document.getElementById('docSkipWeekend').checked;
                 // 流转历史
                 const existingItem = document.getElementById('itemId').value ? await db.getItem(parseInt(document.getElementById('itemId').value)) : null;
                 item.transferHistory = existingItem?.transferHistory || [];
