@@ -618,8 +618,8 @@ class OfficeDashboard {
                             links.push(defaultLink);
                         }
                     });
-                    // 移除旧的默认网站（微信读书）
-                    links = links.filter(l => !l.url || !l.url.includes('weread.qq.com'));
+                    // 移除旧的默认网站（微信读书、苏州统计局）
+                    links = links.filter(l => !l.url || (!l.url.includes('weread.qq.com') && !l.url.includes('tjj.suzhou.gov.cn')));
                 }
             } catch (e) {
                 console.error('处理网站数据失败:', e);
