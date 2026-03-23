@@ -2166,28 +2166,28 @@ class OCRManager {
             const existTitle = (existing.title || '').trim().toLowerCase();
             const existKeywords = extractKeywords(existTitle);
 
-            // 会议：比较关键词和日期（更宽松的匹配）
+            // 会议：比较关键词和日期
             if (newItem.type === 'meeting') {
-                // 标题完全匹配才考虑合并
+                // 关键词匹配（标题相似度）
+                const keywordMatch = newKeywords === existKeywords ||
+                                     (newKeywords.length > 2 && existKeywords.length > 2 && 
+                                      (newKeywords.includes(existKeywords) || existKeywords.includes(newKeywords)));
+
+                // 标题完全匹配
                 const titleExactMatch = newTitle === existTitle;
-                const titleSimilarMatch = newKeywords === existKeywords && newKeywords.length > 2;
 
-                // 时间也要匹配
-                const timeMatch = newItemData.time === existing.time;
-
-                // 只有标题完全匹配且时间相同才合并参会人员
-                if ((titleExactMatch || titleSimilarMatch) && existing.date === newItemData.date && timeMatch) {
+                // 同一天 + 标题相似 = 合并参会人员
+                if ((keywordMatch || titleExactMatch) && existing.date === newItemData.date) {
                     return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                 }
 
-                // 跨天会议：检查日期范围是否重叠（标题需要完全匹配）
-                if (titleExactMatch && newItemData.endDate) {
+                // 跨天会议：检查日期范围是否重叠
+                if ((keywordMatch || titleExactMatch) && newItemData.endDate) {
                     const newStart = newItemData.date;
                     const newEnd = newItemData.endDate;
                     const existStart = existing.date;
                     const existEnd = existing.endDate || existing.date;
 
-                    // 日期范围重叠
                     if (newStart <= existEnd && newEnd >= existStart) {
                         return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                     }
@@ -2368,6 +2368,13 @@ class OCRManager {
 ⚠️ 表格合并单元格：一个名字跨越多行，表示该人员参加所有对应会议
 ⚠️ 再次强调：每行的attendees数组只包含该行对应的参会人员！
 
+【表格识别步骤 - 必须按此步骤操作】
+1. 先识别表格有几行几列
+2. 确定每列的含义（如：会议名称、时间、地点、参会人员）
+3. 逐行读取，每行生成一个会议对象
+4. 读取每行的参会人员时，只看该行对应的参会人员单元格内容
+5. 如果表格中有多个相同名称的会议，每行都要单独识别，后面系统会自动合并
+
 【输出格式】严格返回JSON：
 {
   "items": [{
@@ -2419,7 +2426,7 @@ class OCRManager {
                                 },
                                 {
                                     type: 'text',
-                                    text: '请识别这张图片。先判断：是"单个会议多议程"还是"表格多会议"？\n\n如果是表格：\n- 每行一个会议\n- ⚠️ 每行的参会人员只包含该行对应的参会人员，不要把其他行的人员混进来！\n- 仔细看每行的参会人员列\n\n如果是单个会议多议程：\n- 合并为一个会议\n- 议程放agenda字段\n\n参会人员必须准确，这是最容易出错的地方！'
+                                    text: '请识别这张图片。\n\n【第一步：判断类型】\n- 单个会议多议程：只有一个会议标题，多个议题 → 合并为一个会议\n- 表格形式：有多行多列 → 每行一个会议\n\n【第二步：表格识别关键】\n⚠️ 逐行读取！每行的参会人员只从该行的单元格读取！\n⚠️ 不要把第一行的参会人员复制到后面的行！\n⚠️ 即使会议名称相同，也要分别识别，参会人员可能不同！\n\n【第三步：输出JSON】\n确保attendees数组准确！'
                                 }
                             ]
                         }
@@ -2608,7 +2615,14 @@ ${ocrText}
 1. 只返回JSON，不要任何解释
 2. 每个事项只提取一次，不要重复
 3. 确保日期和时间格式正确
-4. 多行事项必须全部识别出来！`;
+4. 多行事项必须全部识别出来！
+
+【表格形式会议安排识别 - 非常重要】
+如果是表格形式的会议安排（每行一个会议）：
+⚠️ 每行的参会人员只从该行读取，不要把上一行的人员混进来！
+⚠️ 逐行读取，确保每行的attendees数组只包含该行对应的参会人员！
+⚠️ 即使会议名称相同，也可能是不同时间的会议，参会人员可能不同！
+⚠️ 每行生成一个独立的会议对象！`;
 
             const userPrompt = `请分析以下OCR识别出的文字，提取所有办公事项：
 
