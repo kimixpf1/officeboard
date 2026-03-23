@@ -267,31 +267,53 @@ class Database {
      * 更新事项排序（单事务，oncomplete后才resolve确保数据已提交）
      */
     async updateItemOrder(type, itemIds) {
+        if (!itemIds || itemIds.length === 0) return;
+
         const db = await this.init();
 
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORES.ITEMS, 'readwrite');
             const store = transaction.objectStore(STORES.ITEMS);
+            let updatedCount = 0;
+
+            // 先读取所有需要更新的项目
+            const items = [];
+            let pendingGets = itemIds.length;
 
             itemIds.forEach((id, index) => {
                 const getRequest = store.get(id);
                 getRequest.onsuccess = () => {
                     const item = getRequest.result;
-                    if (item && item.type === type) {
+                    if (item) {
+                        // 更新 order 值（不检查 type，因为 DOM 中的卡片一定属于该容器）
                         item.order = index;
                         item.updatedAt = new Date().toISOString();
-                        store.put(item);
+                        items.push(item);
+                    }
+                    pendingGets--;
+                    // 所有 get 完成后，批量 put
+                    if (pendingGets === 0) {
+                        items.forEach(item => {
+                            store.put(item);
+                            updatedCount++;
+                        });
                     }
                 };
-                getRequest.onerror = () => reject(getRequest.error);
+                getRequest.onerror = () => {
+                    console.error('获取项目失败:', id, getRequest.error);
+                    pendingGets--;
+                };
             });
 
-            // 在事务完成（所有put已提交）后才resolve
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = () => reject(transaction.error);
+            transaction.oncomplete = () => {
+                console.log(`排序保存成功: ${updatedCount} 个项目, 类型: ${type}, 顺序:`, itemIds);
+                resolve();
+            };
+            transaction.onerror = () => {
+                console.error('排序事务失败:', transaction.error);
+                reject(transaction.error);
+            };
             transaction.onabort = () => reject(new Error('排序事务被中止'));
-
-            if (itemIds.length === 0) resolve();
         });
     }
 

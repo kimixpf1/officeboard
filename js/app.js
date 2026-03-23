@@ -2929,6 +2929,11 @@ class OfficeDashboard {
             return new Date(a.createdAt) - new Date(b.createdAt);
         });
 
+        // 调试：打印排序后的项目 order 值
+        if (type === 'meeting' && items.length > 0) {
+            console.log(`${type} 排序后顺序:`, items.map(i => `${i.title}(order:${i.order})`));
+        }
+
         // 渲染卡片
         items.forEach(item => {
             const card = this.createCard(item);
