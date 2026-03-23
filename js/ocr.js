@@ -1964,11 +1964,28 @@ class OCRManager {
 
                 if (kimiApiKey) {
                     // 使用Kimi API直接识别图片（推荐，更精准）
-                    if (progressCallback) progressCallback('正在使用Kimi AI识别图片...');
-                    const kimiResult = await this.recognizeImageWithKimi(file, progressCallback);
-                    items = kimiResult.items || [];
-                    text = kimiResult.text || '';
-                    metadata.recognitionMethod = 'kimi';
+                    try {
+                        if (progressCallback) progressCallback('正在使用Kimi AI识别图片...');
+                        const kimiResult = await this.recognizeImageWithKimi(file, progressCallback);
+                        items = kimiResult.items || [];
+                        text = kimiResult.text || '';
+                        metadata.recognitionMethod = 'kimi';
+                    } catch (kimiError) {
+                        // Kimi过载或失败，尝试备用方案
+                        console.warn('Kimi识别失败，尝试备用方案:', kimiError.message);
+                        if (progressCallback) progressCallback('Kimi服务异常，切换到备用识别...');
+                        
+                        // 尝试 Tesseract OCR + DeepSeek AI
+                        if (progressCallback) progressCallback('正在识别图片文字...');
+                        const imageResult = await this.recognizeImage(file, progressCallback);
+                        text = imageResult.text;
+                        metadata.confidence = imageResult.confidence;
+                        metadata.recognitionMethod = 'tesseract-fallback';
+
+                        // AI解析
+                        if (progressCallback) progressCallback('正在用AI分析内容...');
+                        items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
+                    }
                 } else {
                     // 使用Tesseract OCR + DeepSeek AI
                     if (progressCallback) progressCallback('正在识别图片文字...');
@@ -2348,7 +2365,7 @@ class OCRManager {
     /**
      * 使用Kimi API识别图片（图片理解能力更强）
      */
-    async recognizeImageWithKimi(file, progressCallback = null) {
+    async recognizeImageWithKimi(file, progressCallback = null, retryCount = 0) {
         const apiKey = this.getKimiApiKey();
         if (!apiKey) {
             throw new Error('请先设置Kimi API Key');
@@ -2450,7 +2467,21 @@ class OCRManager {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 console.error('Kimi API错误:', errorData);
-                throw new Error(errorData.error?.message || `Kimi API请求失败: ${response.status}`);
+                const errorMsg = errorData.error?.message || '';
+                
+                // 检查是否是过载错误，自动重试
+                if (errorMsg.includes('overloaded') || errorMsg.includes('try again later') || response.status === 503) {
+                    if (retryCount < 3) {
+                        const waitTime = (retryCount + 1) * 3000; // 3秒、6秒、9秒
+                        if (progressCallback) progressCallback(`Kimi服务繁忙，${waitTime/1000}秒后重试 (${retryCount + 1}/3)...`);
+                        console.log(`Kimi API过载，${waitTime}ms后重试 (${retryCount + 1}/3)`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        return this.recognizeImageWithKimi(file, progressCallback, retryCount + 1);
+                    }
+                    throw new Error('Kimi服务持续过载，请稍后再试，或使用DeepSeek API进行文字识别');
+                }
+                
+                throw new Error(errorMsg || `Kimi API请求失败: ${response.status}`);
             }
 
             const data = await response.json();
