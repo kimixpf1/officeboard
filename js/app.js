@@ -136,9 +136,6 @@ class OfficeDashboard {
             console.log('绑定用户交互事件...');
             this.bindEvents();
 
-            // v24迁移：清除会议的旧order值，让其按领导级别重新排序
-            await this.migrateMeetingOrder();
-
             // 加载数据
             console.log('加载本地数据...');
             await this.loadItems();
@@ -2750,33 +2747,6 @@ class OfficeDashboard {
             }
         } else if (window.calendarView) {
             // 周视图和月视图使用日历组件的日期范围
-        }
-    }
-
-    /**
-     * v24迁移：清除会议的旧order值
-     * 之前版本的排序逻辑可能导致钱局等会议order值不正确，
-     * 清除后会按领导级别+时间重新排序
-     */
-    async migrateMeetingOrder() {
-        try {
-            const migrated = await db.getSetting('v24_meeting_order_migrated');
-            if (migrated) return;
-
-            console.log('v24迁移：重置会议排序...');
-            const allItems = await db.getAllItems();
-            const meetings = allItems.filter(item => item.type === 'meeting');
-
-            for (const meeting of meetings) {
-                if (meeting.order !== undefined && meeting.order !== null) {
-                    await db.updateItem(meeting.id, { order: null });
-                }
-            }
-
-            await db.setSetting('v24_meeting_order_migrated', true);
-            console.log('v24迁移完成：已重置', meetings.length, '个会议的排序');
-        } catch (err) {
-            console.error('v24迁移失败:', err);
         }
     }
 
