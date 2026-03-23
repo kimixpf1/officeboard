@@ -3414,6 +3414,10 @@ class OfficeDashboard {
         const draggedId = this.draggedItem.id;
         const draggedCard = this.draggedElement;
 
+        // 保存原始数据用于撤回（在async操作之前同步获取）
+        const originalItem = await db.getItem(draggedId);
+        const originalType = this.draggedItem.type;
+
         // 确保拖拽卡片在当前容器中（handleDragOver的rAF可能还没执行最后一帧）
         if (draggedCard && draggedCard.parentElement !== container) {
             const afterElement = this.getDragAfterElement(container, e.clientY);
@@ -3445,6 +3449,11 @@ class OfficeDashboard {
 
         // ====== 异步阶段 ======
         try {
+            // 保存原始数据用于撤回
+            if (originalItem) {
+                this.saveUndoHistory('update', { item: originalItem });
+            }
+
             // 跨列移动：先更新类型
             if (!isSameColumn) {
                 await db.updateItem(draggedId, { type: newType });
@@ -3694,12 +3703,19 @@ class OfficeDashboard {
 
         try {
             if (id) {
-                // 编辑模式
+                // 编辑模式 - 先保存原始数据用于撤回
+                const originalItem = await db.getItem(parseInt(id));
+                
                 if (item.isRecurring && item.recurringRule) {
                     // 编辑时转为周期性任务，询问用户
                     const confirm = window.confirm('将此事项转为周期性任务将删除当前事项并生成多个周期性任务，是否继续？');
                     if (!confirm) {
                         return;
+                    }
+                    
+                    // 保存原始数据用于撤回
+                    if (originalItem) {
+                        this.saveUndoHistory('update', { item: originalItem });
                     }
                     
                     // 删除原事项
@@ -3708,13 +3724,24 @@ class OfficeDashboard {
                     // 生成周期性任务
                     const recurringItems = this.generateRecurringItems(item, item.recurringRule, item.recurringCount || 20);
                     if (recurringItems.length > 0) {
+                        const addedIds = [];
                         for (const recurringItem of recurringItems) {
-                            await db.addItem(recurringItem);
+                            const added = await db.addItem(recurringItem);
+                            if (added && added.id) addedIds.push(added.id);
                         }
+                        // 追加到撤回历史（替换之前的update，用delete+add组合）
+                        this.undoHistory[this.undoHistory.length - 1] = {
+                            action: 'update',
+                            data: { originalItem: originalItem, addedIds: addedIds },
+                            timestamp: Date.now()
+                        };
                         this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
                     }
                 } else {
-                    // 普通编辑，直接更新
+                    // 普通编辑，保存原始数据用于撤回
+                    if (originalItem) {
+                        this.saveUndoHistory('update', { item: originalItem });
+                    }
                     await db.updateItem(parseInt(id), item);
                     this.showSuccess('事项已更新');
                 }
@@ -3797,6 +3824,12 @@ class OfficeDashboard {
     async toggleItemComplete(id, type, completed) {
         console.log(`toggleItemComplete: id=${id}, type=${type}, completed=${completed}`);
         try {
+            // 保存原始数据用于撤回
+            const originalItem = await db.getItem(id);
+            if (originalItem) {
+                this.saveUndoHistory('update', { item: originalItem });
+            }
+            
             const result = await db.updateItem(id, {
                 completed,
                 completedAt: completed ? new Date().toISOString() : null,
@@ -3820,7 +3853,18 @@ class OfficeDashboard {
      */
     async toggleItemPin(id, type, pinned) {
         try {
-            await db.updateItem(id, { pinned });
+            // 保存原始数据用于撤回
+            const originalItem = await db.getItem(id);
+            if (originalItem) {
+                this.saveUndoHistory('update', { item: originalItem });
+            }
+            
+            // 如果置顶，先取消沉底（互斥）
+            if (pinned) {
+                await db.updateItem(id, { pinned: true, sunk: false });
+            } else {
+                await db.updateItem(id, { pinned: false });
+            }
             await this.loadItems();
             // 立即同步到云端
             if (syncManager.isLoggedIn()) {
@@ -3838,6 +3882,12 @@ class OfficeDashboard {
      */
     async toggleItemSink(id, type, sunk) {
         try {
+            // 保存原始数据用于撤回
+            const originalItem = await db.getItem(id);
+            if (originalItem) {
+                this.saveUndoHistory('update', { item: originalItem });
+            }
+            
             // 如果沉底，先取消置顶（互斥）
             if (sunk) {
                 await db.updateItem(id, { sunk: true, pinned: false });
