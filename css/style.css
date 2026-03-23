@@ -899,11 +899,9 @@ body {
     border-color: #7c3aed;
 }
 
-/* 沉底卡片样式 - 暗淡风格，与置顶形成对比 */
+/* 沉底卡片样式 - 仅用边框颜色区分，不影响可读性 */
 .card.sunk {
     border-left: 3px solid #8b5cf6;
-    background: linear-gradient(135deg, #f3f0f7 0%, #ebe7f0 50%, var(--bg-primary) 100%);
-    opacity: 0.75;
 }
 
 /* 已完成文字样式 */
