@@ -2649,38 +2649,66 @@ class OfficeDashboard {
                     }
 
                     // 显示结果 - 弹出详细的识别日志
-                    let logHtml = `<div style="text-align:left; max-height:400px; overflow-y:auto;">`;
-                    logHtml += `<h4 style="margin-bottom:12px;">📄 文件：${file.name}</h4>`;
+                    let logHtml = `<div style="text-align:left; max-height:500px; overflow-y:auto;">`;
+                    logHtml += `<h4 style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #eee;">📄 文件：${file.name}</h4>`;
+
+                    // 汇总统计
+                    const totalCount = (result.items?.length || 0) + (result.mergedItems?.length || 0) + (result.skippedItems?.length || 0);
+                    logHtml += `<div style="margin-bottom:16px;padding:10px;background:#f8fafc;border-radius:6px;">`;
+                    logHtml += `<b>识别汇总：</b>共识别 ${totalCount} 条记录`;
+                    logHtml += ` → <span style="color:#10b981;">新增 ${result.items?.length || 0}</span>`;
+                    logHtml += ` | <span style="color:#f59e0b;">合并 ${result.mergedItems?.length || 0}</span>`;
+                    logHtml += ` | <span style="color:#6b7280;">跳过 ${result.skippedItems?.length || 0}</span>`;
+                    logHtml += `</div>`;
 
                     if (result.items && result.items.length > 0) {
-                        logHtml += `<div style="margin-bottom:12px;">`;
-                        logHtml += `<h5 style="color:#10b981;margin-bottom:8px;">✅ 新增事项 (${result.items.length}个)</h5>`;
-                        logHtml += `<ul style="margin:0;padding-left:20px;font-size:13px;">`;
-                        result.items.forEach(item => {
-                            const typeIcon = { meeting: '📅', todo: '☑️', document: '📄' }[item.type] || '📌';
-                            const attendees = item.data.attendees?.length ? ` (参会: ${item.data.attendees.slice(0,3).join('、')}${item.data.attendees.length > 3 ? '等' : ''})` : '';
-                            logHtml += `<li style="margin:4px 0;">${typeIcon} ${item.data.title}${attendees}</li>`;
+                        logHtml += `<div style="margin-bottom:16px;">`;
+                        logHtml += `<h5 style="color:#10b981;margin-bottom:10px;padding:6px 10px;background:#ecfdf5;border-radius:4px;">✅ 新增事项 (${result.items.length}个)</h5>`;
+                        logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+                        logHtml += `<tr style="background:#f1f5f9;"><th style="padding:6px;text-align:left;border-bottom:1px solid #ddd;">类型</th><th style="padding:6px;text-align:left;border-bottom:1px solid #ddd;">日期时间</th><th style="padding:6px;text-align:left;border-bottom:1px solid #ddd;">事项名称</th><th style="padding:6px;text-align:left;border-bottom:1px solid #ddd;">参会人员</th></tr>`;
+                        result.items.forEach((item, idx) => {
+                            if (!item) return;
+                            const typeIcon = { meeting: '📅 会议', todo: '☑️ 待办', document: '📄 办文' }[item.type] || '📌';
+                            const title = item.title || item.displayTitle || '未知事项';
+                            // 日期显示
+                            let dateStr = item.date || '';
+                            if (item.endDate && item.endDate !== item.date) {
+                                dateStr = `${item.date} 至 ${item.endDate}`;
+                            }
+                            // 时间显示
+                            let timeStr = item.time || '';
+                            if (item.endTime) {
+                                timeStr = `${item.time}-${item.endTime}`;
+                            }
+                            const dateTime = dateStr + (timeStr ? ` ${timeStr}` : '');
+                            const itemAttendees = item.attendees || [];
+                            const attendeesStr = itemAttendees.length > 0 ? itemAttendees.join('、') : '-';
+                            const bgColor = idx % 2 === 0 ? '#fff' : '#fafafa';
+                            logHtml += `<tr style="background:${bgColor};"><td style="padding:6px;border-bottom:1px solid #eee;">${typeIcon}</td><td style="padding:6px;border-bottom:1px solid #eee;white-space:nowrap;">${dateTime || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee;">${title}</td><td style="padding:6px;border-bottom:1px solid #eee;">${attendeesStr}</td></tr>`;
                         });
-                        logHtml += `</ul></div>`;
+                        logHtml += `</table></div>`;
                     }
 
                     if (result.mergedItems && result.mergedItems.length > 0) {
-                        logHtml += `<div style="margin-bottom:12px;">`;
-                        logHtml += `<h5 style="color:#f59e0b;margin-bottom:8px;">🔄 合并参会人员 (${result.mergedItems.length}个)</h5>`;
-                        logHtml += `<ul style="margin:0;padding-left:20px;font-size:13px;">`;
-                        result.mergedItems.forEach(item => {
-                            const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '无新增';
-                            logHtml += `<li style="margin:4px 0;">📅 ${item.title}<br><span style="color:#666;font-size:12px;">&nbsp;&nbsp;新增参会: ${addedStr}</span></li>`;
+                        logHtml += `<div style="margin-bottom:16px;">`;
+                        logHtml += `<h5 style="color:#f59e0b;margin-bottom:10px;padding:6px 10px;background:#fffbeb;border-radius:4px;">🔄 合并参会人员 (${result.mergedItems.length}个)</h5>`;
+                        logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+                        logHtml += `<tr style="background:#f1f5f9;"><th style="padding:6px;text-align:left;border-bottom:1px solid #ddd;">事项名称</th><th style="padding:6px;text-align:left;border-bottom:1px solid #ddd;">新增参会人员</th></tr>`;
+                        result.mergedItems.forEach((item, idx) => {
+                            const title = item.title || '未知事项';
+                            const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '-';
+                            const bgColor = idx % 2 === 0 ? '#fff' : '#fafafa';
+                            logHtml += `<tr style="background:${bgColor};"><td style="padding:6px;border-bottom:1px solid #eee;">📅 ${title}</td><td style="padding:6px;border-bottom:1px solid #eee;color:#f59e0b;font-weight:500;">+${addedStr}</td></tr>`;
                         });
-                        logHtml += `</ul></div>`;
+                        logHtml += `</table></div>`;
                     }
 
                     if (result.skippedItems && result.skippedItems.length > 0) {
-                        logHtml += `<div style="margin-bottom:12px;">`;
-                        logHtml += `<h5 style="color:#6b7280;margin-bottom:8px;">⏭️ 跳过重复 (${result.skippedItems.length}个)</h5>`;
+                        logHtml += `<div style="margin-bottom:16px;">`;
+                        logHtml += `<h5 style="color:#6b7280;margin-bottom:10px;padding:6px 10px;background:#f3f4f6;border-radius:4px;">⏭️ 跳过重复 (${result.skippedItems.length}个)</h5>`;
                         logHtml += `<ul style="margin:0;padding-left:20px;font-size:12px;color:#888;">`;
                         result.skippedItems.forEach(title => {
-                            logHtml += `<li style="margin:2px 0;">${title}</li>`;
+                            logHtml += `<li style="margin:4px 0;">${title}</li>`;
                         });
                         logHtml += `</ul></div>`;
                     }

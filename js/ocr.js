@@ -383,11 +383,19 @@ class OCRManager {
      * 验证并清理解析结果
      */
     validateAndCleanItem(item) {
-        if (!item || !item.type || !item.data) {
+        if (!item || !item.type) {
             return null;
         }
 
-        const data = { ...item.data };
+        // 兼容两种格式：嵌套格式 {type, data: {...}} 和扁平格式 {type, title, ...}
+        let data;
+        if (item.data && typeof item.data === 'object') {
+            data = { ...item.data };
+        } else {
+            // 扁平格式，提取非 type 字段到 data
+            const { type, ...rest } = item;
+            data = rest;
+        }
 
         // 确保标题存在
         if (!data.title || data.title.length < 2) {
@@ -412,6 +420,11 @@ class OCRManager {
         // 验证日期格式
         if (data.date && !/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
             data.date = this.extractDate(data.date);
+        }
+
+        // 验证endDate格式（跨天会议）
+        if (data.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(data.endDate)) {
+            data.endDate = this.extractDate(data.endDate);
         }
 
         // 验证时间格式
@@ -1998,19 +2011,38 @@ class OCRManager {
             const processedInBatch = [];
 
             for (const item of items) {
+                // 安全获取 item 数据
+                if (!item || !item.type) continue;
+                const itemData = item.data || {};
+                const itemTitle = itemData.title || '未知事项';
+                const itemAttendees = itemData.attendees || [];
+
                 // 先检查本次批次中是否已有相似事项
                 const batchDuplicate = this.checkDuplicateInBatch(item, processedInBatch);
                 if (batchDuplicate.isDuplicate) {
                     // 合并参会人员到批次中的事项
                     if (item.type === 'meeting' && batchDuplicate.existingItem) {
                         const existing = batchDuplicate.existingItem;
-                        const newAttendees = item.data.attendees || [];
                         const existingAttendees = existing.attendees || [];
-                        const mergedAttendees = [...new Set([...existingAttendees, ...newAttendees])];
-                        existing.attendees = mergedAttendees;
-                        console.log('批次内合并参会人员:', item.data.title, newAttendees);
+                        const addedAttendees = itemAttendees.filter(a => !existingAttendees.includes(a));
+                        if (addedAttendees.length > 0) {
+                            const mergedAttendees = [...existingAttendees, ...addedAttendees];
+                            existing.attendees = mergedAttendees;
+                            // 同步更新数据库中已保存的记录
+                            if (existing.id) {
+                                await db.updateItem(existing.id, { attendees: mergedAttendees });
+                            }
+                            mergedItems.push({
+                                title: itemTitle,
+                                addedAttendees: addedAttendees
+                            });
+                            console.log('批次内合并参会人员:', itemTitle, '新增:', addedAttendees);
+                        } else {
+                            skippedItems.push(itemTitle);
+                        }
+                    } else {
+                        skippedItems.push(itemTitle);
                     }
-                    skippedItems.push(item.data.title);
                     continue;
                 }
 
@@ -2021,26 +2053,25 @@ class OCRManager {
                     // 会议类型：合并参会人员
                     if (item.type === 'meeting' && duplicateInfo.existingItem) {
                         const existing = duplicateInfo.existingItem;
-                        const newAttendees = item.data.attendees || [];
                         const existingAttendees = existing.attendees || [];
 
                         // 合并参会人员（去重）
-                        const mergedAttendees = [...new Set([...existingAttendees, ...newAttendees])];
+                        const mergedAttendees = [...new Set([...existingAttendees, ...itemAttendees])];
 
                         if (mergedAttendees.length > existingAttendees.length) {
                             // 更新现有会议的参会人员
                             await db.updateItem(existing.id, { attendees: mergedAttendees });
                             mergedItems.push({
-                                title: item.data.title,
-                                addedAttendees: newAttendees.filter(a => !existingAttendees.includes(a))
+                                title: itemTitle,
+                                addedAttendees: itemAttendees.filter(a => !existingAttendees.includes(a))
                             });
-                            console.log('合并参会人员:', item.data.title, newAttendees);
+                            console.log('合并参会人员:', itemTitle, itemAttendees);
                         } else {
-                            skippedItems.push(item.data.title);
+                            skippedItems.push(itemTitle);
                         }
                     } else {
-                        skippedItems.push(item.data.title);
-                        console.log('跳过重复事项:', item.data.title);
+                        skippedItems.push(itemTitle);
+                        console.log('跳过重复事项:', itemTitle);
                     }
                     continue;
                 }
@@ -2048,11 +2079,11 @@ class OCRManager {
                 try {
                     const id = await db.addItem({
                         type: item.type,
-                        ...item.data,
+                        ...itemData,
                         source: 'document',
                         sourceFile: file.name
                     });
-                    const newItem = { id, type: item.type, ...item.data };
+                    const newItem = { id, type: item.type, ...itemData };
                     createdItems.push(newItem);
 
                     // 添加到已存在列表，防止后续重复
@@ -2085,7 +2116,8 @@ class OCRManager {
      * 比数据库去重更宽松，防止同一图片中的相似事项被重复添加
      */
     checkDuplicateInBatch(newItem, batchItems) {
-        const newItemData = newItem.data;
+        // 安全获取数据
+        const newItemData = newItem.data || {};
         const newTitle = (newItemData.title || '').trim().toLowerCase();
         const result = { isDuplicate: false, existingItem: null };
 
@@ -2114,9 +2146,20 @@ class OCRManager {
                                      (newTitle.length > 2 && existTitle.length > 2 &&
                                       (newTitle.includes(existTitle) || existTitle.includes(newTitle)));
 
-                // 同一天 + 关键词匹配 = 重复
-                if (keywordMatch && existing.date === newItemData.date) {
-                    return { isDuplicate: true, existingItem: existing };
+                // 同一天 + 关键词匹配 = 重复（也支持跨天会议）
+                if (keywordMatch) {
+                    // 日期完全相同
+                    if (existing.date === newItemData.date) {
+                        return { isDuplicate: true, existingItem: existing };
+                    }
+                    // 跨天会议：日期范围有重叠
+                    const newStart = newItemData.date;
+                    const newEnd = newItemData.endDate || newItemData.date;
+                    const existStart = existing.date;
+                    const existEnd = existing.endDate || existing.date;
+                    if (newStart && existStart && newStart <= existEnd && newEnd >= existStart) {
+                        return { isDuplicate: true, existingItem: existing };
+                    }
                 }
             }
 
@@ -2147,7 +2190,8 @@ class OCRManager {
      * 返回 { isDuplicate: boolean, existingItem: object|null, shouldMerge: boolean }
      */
     checkDuplicateItem(newItem, existingItems) {
-        const newItemData = newItem.data;
+        // 安全获取数据
+        const newItemData = newItem.data || {};
         const newTitle = (newItemData.title || '').trim().toLowerCase();
         const result = { isDuplicate: false, existingItem: null, shouldMerge: false };
 
@@ -2188,7 +2232,7 @@ class OCRManager {
                     const existStart = existing.date;
                     const existEnd = existing.endDate || existing.date;
 
-                    if (newStart <= existEnd && newEnd >= existStart) {
+                    if (newStart && existStart && newStart <= existEnd && newEnd >= existStart) {
                         return { isDuplicate: true, existingItem: existing, shouldMerge: true };
                     }
                 }
@@ -2321,91 +2365,48 @@ class OCRManager {
             const todayStr = this.formatDateLocal(today);
             const weekDay = ['日', '一', '二', '三', '四', '五', '六'][today.getDay()];
 
-            const systemPrompt = `你是专业的办公文档识别助手。请仔细分析图片内容，精准提取办公事项。
+            const systemPrompt = `你是专业的办公文档识别助手。今天是${todayStr}（星期${weekDay}）。
 
-【当前时间】
-今天是${todayStr}（星期${weekDay}）
+【表格结构】
+会议安排表格分为"局领导"和"处室"两个区域，每个区域有3列：
+- 第1列：参会人员（如"钱局"、"吴局"、"综合处"、"核算处"）
+- 第2列：会议内容（日期+时间+会议名称）
+- 第3列：备注/地点
 
-【核心判断原则 - 最重要！】
-你需要先判断图片类型，再决定如何识别：
+【关键规则 - 必须严格遵守】
+1. **逐行读取**：表格每一行是独立的！不要把上一行的人混到下一行！
+2. **参会人员**：每行的attendees只填该行第1列的那一个人名/处室名
+3. **跨日期会议**：如"3月25日下午-26日"必须同时填date和endDate
+4. **同名会议**：同一会议出现在不同行（如"高新区经济大镇调研"有钱局和综合处），每行单独输出
 
-**情况一：单个会议通知（多议程合并）**
-特征：
-- 只有一个会议名称/主题
-- 参会人员、时间、地点是统一的
-- 有多个议程/议题（如：议题一、议题二、议程1、议程2）
-处理方式：
-- 合并为一个会议事项
-- 所有议程放入agenda字段，换行分隔
+【日期格式】
+- "3月24日" → date="${todayStr.substring(0,4)}-03-24"
+- "3月25日下午-26日" → date="${todayStr.substring(0,4)}-03-25", endDate="${todayStr.substring(0,4)}-03-26"
 
-**情况二：表格形式的会议安排（分别识别）**
-特征：
-- 表格形式，每行是一个独立会议
-- 每行有不同的参会人员、时间或地点
-- 类似"会议安排表"、"日程表"的形式
-处理方式：
-- 每行识别为一个独立的会议
-- 仔细提取每行的参会人员，不要遗漏
-- 表格有合并单元格时，合并单元格的人员参加所有对应会议
+【时间格式】
+- 上午8:50 → "08:50"，下午 → 不填time（留空）
+- "上午8:50" → time="08:50"
 
-【如何判断是哪种情况？】
-1. 看是否有表格结构：有明确行列的是表格形式
-2. 看参会人员是否相同：每行参会人员不同的是表格形式
-3. 看时间/地点：每行有不同时间/地点的是表格形式
-4. 如果只有一个标题、一组参会人员、一个时间地点，但有多个议题 → 单个会议
+【标题提取】
+去掉日期时间前缀，只保留会议核心名称
+- "3月24日（周二）上午8:50，参加高新区经济大镇调研" → title="参加高新区经济大镇调研"
 
-【参会人员识别 - 极其重要！错误率最高的地方！】
-1. 提取"参会人员"、"出席人员"、"通知对象"后的人名
-2. 多个名字用顿号、逗号分隔时，分别提取每个人
-3. "全体员工"、"各部门负责人"等集体称呼也要提取
-4. 部门名称如"财务部"、"人事部"也算参会方
-
-【表格参会人员 - 特别注意，容易出错！】
-⚠️ 表格中每行的参会人员是独立的！
-⚠️ 不要把上一行的人混到下一行！
-⚠️ 仔细看每行对应的参会人员列，只提取该行对应的参会人员！
-⚠️ 如果某行没有明确标注参会人员，填空数组[]，不要猜测！
-⚠️ 表格合并单元格：一个名字跨越多行，表示该人员参加所有对应会议
-⚠️ 再次强调：每行的attendees数组只包含该行对应的参会人员！
-
-【表格识别步骤 - 必须按此步骤操作】
-1. 先识别表格有几行几列
-2. 确定每列的含义（如：会议名称、时间、地点、参会人员）
-3. 逐行读取，每行生成一个会议对象
-4. 读取每行的参会人员时，只看该行对应的参会人员单元格内容
-5. 如果表格中有多个相同名称的会议，每行都要单独识别，后面系统会自动合并
-
-【输出格式】严格返回JSON：
+【输出格式】严格返回JSON
 {
   "items": [{
     "type": "meeting",
     "data": {
-      "title": "会议名称（简洁明确）",
+      "title": "会议名称",
       "date": "YYYY-MM-DD",
-      "endDate": "YYYY-MM-DD（跨天会议才填）",
+      "endDate": "YYYY-MM-DD（跨天会议必填）",
       "time": "HH:MM",
-      "endTime": "HH:MM",
-      "location": "会议地点",
-      "attendees": ["参会人员数组 - 必须完整且准确提取，只包含该会议的参会人员！"],
-      "agenda": "议程1\\n议程2（仅单个会议多议程时填写）"
+      "location": "地点（第3列内容）",
+      "attendees": ["该行第1列的人名"]
     }
   }]
 }
 
-【时间识别】
-- 上午8:50 = 08:50，下午3点 = 15:00
-- 时间段"8:50-10:00"：time="08:50"，endTime="10:00"
-
-【待办事项识别】
-如果图片中明确是独立的待办任务（非会议议程），识别为todo类型。
-
-【重要提醒】
-- 表格形式：每行一个会议，参会人员要仔细提取，不要把上一行的人混到下一行！
-- 单会议多议程：合并为一个会议，议程放agenda字段！
-- 宁可多识别不要漏识别！
-- 参会人员必须准确，这是最容易出错的地方！
-
-只返回JSON，不要解释。`;
+只返回JSON。`;
 
             const response = await fetch(`${this.kimiBaseUrl}/chat/completions`, {
                 method: 'POST',
@@ -2426,7 +2427,17 @@ class OCRManager {
                                 },
                                 {
                                     type: 'text',
-                                    text: '请识别这张图片。\n\n【第一步：判断类型】\n- 单个会议多议程：只有一个会议标题，多个议题 → 合并为一个会议\n- 表格形式：有多行多列 → 每行一个会议\n\n【第二步：表格识别关键】\n⚠️ 逐行读取！每行的参会人员只从该行的单元格读取！\n⚠️ 不要把第一行的参会人员复制到后面的行！\n⚠️ 即使会议名称相同，也要分别识别，参会人员可能不同！\n\n【第三步：输出JSON】\n确保attendees数组准确！'
+                                    text: `请识别这个会议安排表格。
+
+⚠️ 重要：逐行读取！不要跨行！
+- 第1列是参会人员（每行只对应一个人名/处室名）
+- 第2列是会议内容（日期+时间+会议名称）
+- 第3列是地点
+
+每行输出一条记录，attendees只填该行第1列对应的人名，不要把其他行的人混进来！
+
+跨日期会议示例："3月24日-25日" → date和endDate都要填`
+
                                 }
                             ]
                         }
