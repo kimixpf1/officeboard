@@ -136,6 +136,9 @@ class OfficeDashboard {
             console.log('绑定用户交互事件...');
             this.bindEvents();
 
+            // v24迁移：清除会议的旧order值，让其按领导级别重新排序
+            await this.migrateMeetingOrder();
+
             // 加载数据
             console.log('加载本地数据...');
             await this.loadItems();
@@ -2752,6 +2755,33 @@ class OfficeDashboard {
     }
 
     /**
+     * v24迁移：清除会议的旧order值
+     * 之前版本的排序逻辑可能导致钱局等会议order值不正确，
+     * 清除后会按领导级别+时间重新排序
+     */
+    async migrateMeetingOrder() {
+        try {
+            const migrated = await db.getSetting('v24_meeting_order_migrated');
+            if (migrated) return;
+
+            console.log('v24迁移：重置会议排序...');
+            const allItems = await db.getAllItems();
+            const meetings = allItems.filter(item => item.type === 'meeting');
+
+            for (const meeting of meetings) {
+                if (meeting.order !== undefined && meeting.order !== null) {
+                    await db.updateItem(meeting.id, { order: null });
+                }
+            }
+
+            await db.setSetting('v24_meeting_order_migrated', true);
+            console.log('v24迁移完成：已重置', meetings.length, '个会议的排序');
+        } catch (err) {
+            console.error('v24迁移失败:', err);
+        }
+    }
+
+    /**
      * 加载事项列表
      */
     async loadItems() {
@@ -2852,6 +2882,8 @@ class OfficeDashboard {
         container.innerHTML = '';
 
         // 排序逻辑
+        const hasOrder = (item) => item.order !== undefined && item.order !== null;
+
         items.sort((a, b) => {
             // 置顶的排最前
             if (a.pinned !== b.pinned) {
@@ -2862,33 +2894,30 @@ class OfficeDashboard {
                 return a.completed ? 1 : -1;
             }
 
-            // 会议类型特殊排序：
-            // 1. 钱局参会(level=1)永远在最顶部
-            // 2. 其他会议：用户拖动的order优先，无order时按领导级别+时间
+            // 核心排序：有 order 值的一律按 order 排（用户拖拽的结果）
+            const aHasOrder = hasOrder(a);
+            const bHasOrder = hasOrder(b);
+
+            if (aHasOrder && bHasOrder) {
+                if (a.order !== b.order) return a.order - b.order;
+                // order 相同（理论上不会出现），按创建时间兜底
+                return new Date(a.createdAt) - new Date(b.createdAt);
+            }
+
+            // 有 order 的排在无 order 的前面
+            if (aHasOrder && !bHasOrder) return -1;
+            if (bHasOrder && !aHasOrder) return 1;
+
+            // 都没有 order（从未被拖拽过的项目）：
+            // 会议按领导级别 + 时间排序
             if (type === 'meeting') {
                 const levelA = this.getMeetingLevel(a);
                 const levelB = this.getMeetingLevel(b);
-                const orderA = a.order;
-                const orderB = b.order;
-                
-                // 钱局参会永远在最前（level=1），不可被拖动改变
-                if (levelA === 1 && levelB !== 1) return -1;
-                if (levelB === 1 && levelA !== 1) return 1;
-                
-                // 如果两个都有用户设置的order，按order排序（尊重用户拖动）
-                if (orderA !== undefined && orderA !== null && orderB !== undefined && orderB !== null) {
-                    if (orderA !== orderB) return orderA - orderB;
-                }
-                
-                // 如果只有一个有order，有order的排前面
-                if (orderA !== undefined && orderA !== null && (orderB === undefined || orderB === null)) return -1;
-                if (orderB !== undefined && orderB !== null && (orderA === undefined || orderA === null)) return 1;
-                
-                // 都没有order时：按领导级别排序
+
                 if (levelA !== levelB) {
                     return levelA - levelB;
                 }
-                
+
                 // 同级别按会议时间排序
                 const timeA = a.time || '99:99';
                 const timeB = b.time || '99:99';
@@ -2897,13 +2926,7 @@ class OfficeDashboard {
                 }
             }
 
-            // 其他类型：按order排序
-            const orderA = a.order ?? 999999;
-            const orderB = b.order ?? 999999;
-            if (orderA !== orderB) {
-                return orderA - orderB;
-            }
-            // order相同时按创建时间排序（稳定的次序）
+            // 按创建时间排序兜底
             return new Date(a.createdAt) - new Date(b.createdAt);
         });
 
@@ -3247,6 +3270,8 @@ class OfficeDashboard {
 
     /**
      * 拖拽结束
+     * 注意：drop事件先于dragend触发。handleDrop已处理了状态清理，
+     * 这里只需清理handleDrop未涉及的样式（如拖拽取消的情况）
      */
     handleDragEnd(e) {
         e.target.classList.remove('dragging');
@@ -3256,40 +3281,49 @@ class OfficeDashboard {
         document.querySelectorAll('.card').forEach(card => {
             card.classList.remove('drag-above', 'drag-below');
         });
+        // 取消未执行的 rAF
+        if (this._dragOverRAF) {
+            cancelAnimationFrame(this._dragOverRAF);
+            this._dragOverRAF = null;
+        }
         this.draggedItem = null;
         this.draggedElement = null;
     }
 
     /**
-     * 拖拽悬停（节流优化，减少闪烁）
+     * 拖拽悬停 - 实时移动卡片预览
+     * 使用 requestAnimationFrame 优化，确保每帧都更新到最新鼠标位置
      */
     handleDragOver(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         e.currentTarget.classList.add('drag-over');
 
-        // 节流：限制更新频率
-        const now = Date.now();
-        if (this._lastDragOverTime && now - this._lastDragOverTime < 30) return;
-        this._lastDragOverTime = now;
+        // 记录最新的鼠标位置和容器（不节流，始终记录最新位置）
+        this._dragOverContainer = e.currentTarget;
+        this._dragOverY = e.clientY;
 
-        const container = e.currentTarget;
-        const afterElement = this.getDragAfterElement(container, e.clientY);
+        // 用 rAF 保证每帧最多执行一次 DOM 操作，且使用最新鼠标位置
+        if (!this._dragOverRAF) {
+            this._dragOverRAF = requestAnimationFrame(() => {
+                this._dragOverRAF = null;
+                const container = this._dragOverContainer;
+                const y = this._dragOverY;
+                if (!container || !this.draggedElement) return;
 
-        // 实时移动卡片预览：拖动时其他卡片实时移动
-        const draggedCard = this.draggedElement;
-        if (draggedCard) {
-            if (afterElement) {
-                // 插入到目标位置之前
-                if (draggedCard.nextSibling !== afterElement) {
-                    container.insertBefore(draggedCard, afterElement);
+                const afterElement = this.getDragAfterElement(container, y);
+                const draggedCard = this.draggedElement;
+
+                if (afterElement) {
+                    if (draggedCard.nextSibling !== afterElement) {
+                        container.insertBefore(draggedCard, afterElement);
+                    }
+                } else {
+                    if (draggedCard !== container.lastElementChild) {
+                        container.appendChild(draggedCard);
+                    }
                 }
-            } else {
-                // 插入到末尾
-                if (draggedCard !== container.lastElementChild) {
-                    container.appendChild(draggedCard);
-                }
-            }
+            });
         }
     }
 
@@ -3323,13 +3357,21 @@ class OfficeDashboard {
 
     /**
      * 放置
-     * 关键：在任何await之前同步捕获所有DOM数据，避免与handleDragEnd竞态
+     * 核心策略：
+     * - 同列拖动：DOM已经是正确位置（handleDragOver实时移动了），只需保存顺序到DB，不重新渲染
+     * - 跨列拖动：需要更新类型并重新渲染
      */
     async handleDrop(e) {
         e.preventDefault();
         e.currentTarget.classList.remove('drag-over');
 
         if (!this.draggedItem) return;
+
+        // 取消未执行的 rAF，确保用最终位置
+        if (this._dragOverRAF) {
+            cancelAnimationFrame(this._dragOverRAF);
+            this._dragOverRAF = null;
+        }
 
         // ====== 同步阶段：在任何await之前捕获所有必要数据 ======
         const container = e.currentTarget;
@@ -3338,21 +3380,24 @@ class OfficeDashboard {
         const draggedId = this.draggedItem.id;
         const draggedCard = this.draggedElement;
 
-        // 直接读取当前 DOM 顺序（handleDragOver 已经实时移动了卡片）
-        // 这是用户看到的最终位置，直接用它作为新的排序
-        let orderedIds;
-        if (isSameColumn && draggedCard && draggedCard.parentElement === container) {
-            // 同列拖动：直接读取当前 DOM 顺序（用户看到的位置）
-            const allCards = [...container.querySelectorAll('.card')];
-            orderedIds = allCards.map(card => parseInt(card.dataset.id));
-        } else {
-            // 跨列拖动：目标列没有 draggedCard，需要计算插入位置
-            const existingCards = [...container.querySelectorAll('.card')];
-            const existingIds = existingCards.map(card => parseInt(card.dataset.id));
+        // 确保拖拽卡片在当前容器中（handleDragOver的rAF可能还没执行最后一帧）
+        if (draggedCard && draggedCard.parentElement !== container) {
+            const afterElement = this.getDragAfterElement(container, e.clientY);
+            if (afterElement) {
+                container.insertBefore(draggedCard, afterElement);
+            } else {
+                container.appendChild(draggedCard);
+            }
+        }
+
+        // 读取当前 DOM 顺序 - 这就是用户看到的最终位置
+        const allCards = [...container.querySelectorAll('.card')];
+        let orderedIds = allCards.map(card => parseInt(card.dataset.id));
+
+        // 确保 draggedId 在列表中（防御性检查）
+        if (!orderedIds.includes(draggedId)) {
             const afterElement = this.getDragAfterElement(container, e.clientY);
             const afterId = afterElement ? parseInt(afterElement.dataset.id) : null;
-            
-            orderedIds = [...existingIds];
             let insertIndex = orderedIds.length;
             if (afterId !== null) {
                 const idx = orderedIds.indexOf(afterId);
@@ -3361,6 +3406,9 @@ class OfficeDashboard {
             orderedIds.splice(insertIndex, 0, draggedId);
         }
 
+        // 去重确保无重复ID
+        orderedIds = [...new Set(orderedIds)];
+
         // ====== 异步阶段 ======
         try {
             // 跨列移动：先更新类型
@@ -3368,15 +3416,25 @@ class OfficeDashboard {
                 await db.updateItem(draggedId, { type: newType });
             }
 
-            // 使用单事务批量更新排序
+            // 批量更新排序
             await db.updateItemOrder(newType, orderedIds);
 
-            // 重新渲染
-            await this.loadItems();
+            if (isSameColumn) {
+                // 同列拖动：DOM已经正确，不需要重新渲染
+                // 只需移除 dragging 样式
+                if (draggedCard) {
+                    draggedCard.classList.remove('dragging');
+                }
+            } else {
+                // 跨列拖动：需要重新渲染（类型变更，卡片需重建）
+                await this.loadItems();
+            }
 
-            // 同步到云端
+            // 同步到云端（不阻塞UI）
             if (syncManager.isLoggedIn()) {
-                await syncManager.immediateSyncToCloud();
+                syncManager.immediateSyncToCloud().catch(err => {
+                    console.error('云端同步失败:', err);
+                });
             }
 
         } catch (error) {
@@ -3386,6 +3444,7 @@ class OfficeDashboard {
         }
 
         this.draggedItem = null;
+        this.draggedElement = null;
     }
 
     /**
