@@ -1088,9 +1088,11 @@ body {
 .week-cell {
     background: var(--bg-primary);
     min-height: 500px;
+    max-height: calc(100vh - 200px);
     padding: var(--spacing-3);
     cursor: pointer;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .week-cell:hover {
@@ -1121,8 +1123,11 @@ body {
 .month-cell {
     background: var(--bg-primary);
     min-height: 120px;
+    max-height: 150px;
     padding: var(--spacing-2);
     cursor: pointer;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .month-cell:hover {
