@@ -98,6 +98,10 @@ class OfficeDashboard {
         this.selectedItems = new Set(); // 选中的事项ID
         this.batchMode = false; // 是否处于批量模式
 
+        // 撤回历史
+        this.undoHistory = [];
+        this.maxUndoSteps = 20;
+
         this.init();
     }
 
@@ -264,6 +268,17 @@ class OfficeDashboard {
         document.getElementById('reportBtn')?.addEventListener('click', () => this.showModal('reportModal'));
         document.getElementById('generateReport')?.addEventListener('click', () => this.generateReport());
         document.getElementById('cancelReport')?.addEventListener('click', () => this.hideModal('reportModal'));
+
+        // 撤回按钮
+        document.getElementById('undoBtn')?.addEventListener('click', () => this.undoLastAction());
+
+        // 键盘快捷键：Ctrl+Z 撤回
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undoLastAction();
+            }
+        });
 
         // 删除确认
         document.getElementById('cancelDelete')?.addEventListener('click', () => this.hideModal('confirmModal'));
@@ -1664,9 +1679,18 @@ class OfficeDashboard {
         }
 
         try {
+            // 保存删除的项目用于撤回
+            const deletedItems = [];
             for (const itemId of itemIds) {
+                const item = await db.getItem(itemId);
+                if (item) deletedItems.push(item);
                 await db.deleteItem(itemId);
                 console.log('删除事项成功:', itemId);
+            }
+
+            // 保存历史用于撤回
+            if (deletedItems.length > 0) {
+                this.saveUndoHistory('delete', { items: deletedItems });
             }
 
             // 强制重新加载数据
@@ -2872,6 +2896,13 @@ class OfficeDashboard {
                 return aPinned ? -1 : 1;
             }
 
+            // 沉底的排最后（确保转为布尔值比较）
+            const aSunk = !!a.sunk;
+            const bSunk = !!b.sunk;
+            if (aSunk !== bSunk) {
+                return aSunk ? 1 : -1;
+            }
+
             // 已完成的沉底（确保转为布尔值比较）
             const aCompleted = !!a.completed;
             const bCompleted = !!b.completed;
@@ -2932,7 +2963,7 @@ class OfficeDashboard {
      */
     createCard(item) {
         const card = document.createElement('div');
-        card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}${item.pinned ? ' pinned' : ''}`;
+        card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}${item.pinned ? ' pinned' : ''}${item.sunk ? ' sunk' : ''}`;
         card.dataset.id = item.id;
         card.draggable = true;
 
@@ -3029,6 +3060,11 @@ class OfficeDashboard {
                         <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>
                     </svg>
                 </button>
+                <button class="card-action-btn sink-btn ${item.sunk ? 'sunk' : ''}" title="${item.sunk ? '取消沉底' : '沉底'}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.sunk ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22L8.91 15.74L2 14.73L7 9.86L5.82 2.98L12 6.23L18.18 2.98L17 9.86L22 14.73L15.09 15.74L12 22Z"></path>
+                    </svg>
+                </button>
                 <button class="card-action-btn complete-btn ${item.completed ? 'completed' : ''}" title="${item.completed ? '已完成' : '标记完成'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
@@ -3078,6 +3114,13 @@ class OfficeDashboard {
         pinBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleItemPin(item.id, item.type, !item.pinned);
+        });
+
+        // 绑定沉底按钮事件
+        const sinkBtn = card.querySelector('.sink-btn');
+        sinkBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleItemSink(item.id, item.type, !item.sunk);
         });
 
         // 绑定删除事件
@@ -3687,10 +3730,16 @@ class OfficeDashboard {
                     console.log('生成的任务列表:', recurringItems);
 
                     if (recurringItems.length > 0) {
+                        const addedIds = [];
                         for (const recurringItem of recurringItems) {
                             console.log('保存任务:', recurringItem);
-                            await db.addItem(recurringItem);
+                            const addedItem = await db.addItem(recurringItem);
+                            if (addedItem && addedItem.id) {
+                                addedIds.push(addedItem.id);
+                            }
                         }
+                        // 保存历史用于撤回
+                        this.saveUndoHistory('add', { ids: addedIds });
                         this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
                     } else {
                         console.error('未生成任何周期性任务');
@@ -3698,7 +3747,11 @@ class OfficeDashboard {
                         return;
                     }
                 } else {
-                    await db.addItem(item);
+                    const addedItem = await db.addItem(item);
+                    // 保存历史用于撤回
+                    if (addedItem && addedItem.id) {
+                        this.saveUndoHistory('add', { id: addedItem.id });
+                    }
                 }
             }
 
@@ -3777,6 +3830,142 @@ class OfficeDashboard {
         } catch (error) {
             console.error('更新置顶状态失败:', error);
             this.showError('更新失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 通用切换沉底状态（所有类型）
+     */
+    async toggleItemSink(id, type, sunk) {
+        try {
+            // 如果沉底，先取消置顶（互斥）
+            if (sunk) {
+                await db.updateItem(id, { sunk: true, pinned: false });
+            } else {
+                await db.updateItem(id, { sunk: false });
+            }
+            await this.loadItems();
+            // 立即同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+            this.showSuccess(sunk ? '已沉底' : '已取消沉底');
+        } catch (error) {
+            console.error('更新沉底状态失败:', error);
+            this.showError('更新失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 保存操作历史（用于撤回）
+     */
+    saveUndoHistory(action, data) {
+        this.undoHistory.push({
+            action,
+            data: JSON.parse(JSON.stringify(data)),
+            timestamp: Date.now()
+        });
+
+        // 限制历史记录数量
+        if (this.undoHistory.length > this.maxUndoSteps) {
+            this.undoHistory.shift();
+        }
+
+        // 显示撤回按钮
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) undoBtn.style.display = 'inline-flex';
+    }
+
+    /**
+     * 撤回上一步操作
+     */
+    async undoLastAction() {
+        if (this.undoHistory.length === 0) {
+            this.showError('没有可撤回的操作');
+            return;
+        }
+
+        const lastAction = this.undoHistory.pop();
+
+        try {
+            switch (lastAction.action) {
+                case 'add':
+                    // 撤回添加：删除添加的项目
+                    if (Array.isArray(lastAction.data.ids)) {
+                        for (const id of lastAction.data.ids) {
+                            await db.deleteItem(id);
+                        }
+                        this.showSuccess(`已撤回：删除了 ${lastAction.data.ids.length} 个事项`);
+                    } else {
+                        await db.deleteItem(lastAction.data.id);
+                        this.showSuccess('已撤回：删除了添加的事项');
+                    }
+                    break;
+
+                case 'delete':
+                    // 撤回删除：恢复删除的项目
+                    if (Array.isArray(lastAction.data.items)) {
+                        for (const item of lastAction.data.items) {
+                            await db.addItem(item);
+                        }
+                        this.showSuccess(`已撤回：恢复了 ${lastAction.data.items.length} 个事项`);
+                    } else {
+                        await db.addItem(lastAction.data.item);
+                        this.showSuccess('已撤回：恢复了删除的事项');
+                    }
+                    break;
+
+                case 'update':
+                    // 撤回更新：恢复原来的值
+                    if (Array.isArray(lastAction.data.items)) {
+                        for (const item of lastAction.data.items) {
+                            await db.updateItem(item.id, item);
+                        }
+                        this.showSuccess('已撤回：恢复了修改');
+                    } else {
+                        await db.updateItem(lastAction.data.item.id, lastAction.data.item);
+                        this.showSuccess('已撤回：恢复了修改');
+                    }
+                    break;
+
+                case 'complete':
+                    // 撤回完成：恢复未完成状态
+                    await db.updateItem(lastAction.data.id, { completed: false, completedAt: null });
+                    this.showSuccess('已撤回：取消完成状态');
+                    break;
+
+                case 'pin':
+                    // 撤回置顶
+                    await db.updateItem(lastAction.data.id, { pinned: lastAction.data.oldValue });
+                    this.showSuccess('已撤回：取消置顶');
+                    break;
+
+                case 'sink':
+                    // 撤回沉底
+                    await db.updateItem(lastAction.data.id, { sunk: lastAction.data.oldValue });
+                    this.showSuccess('已撤回：取消沉底');
+                    break;
+
+                default:
+                    this.showError('无法撤回此操作');
+            }
+
+            await this.loadItems();
+
+            // 同步到云端
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+
+        } catch (error) {
+            console.error('撤回失败:', error);
+            this.showError('撤回失败: ' + error.message);
+        }
+
+        // 如果没有更多历史，隐藏撤回按钮
+        if (this.undoHistory.length === 0) {
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn) undoBtn.style.display = 'none';
         }
     }
 
@@ -4233,6 +4422,12 @@ class OfficeDashboard {
         if (!this.deleteItemId) return;
 
         try {
+            // 保存删除的项目用于撤回
+            const itemToDelete = await db.getItem(this.deleteItemId);
+            if (itemToDelete) {
+                this.saveUndoHistory('delete', { item: itemToDelete });
+            }
+
             await db.deleteItem(this.deleteItemId);
             this.hideModal('confirmModal');
             await this.loadItems();
@@ -4240,6 +4435,7 @@ class OfficeDashboard {
             if (syncManager.isLoggedIn()) {
                 await syncManager.immediateSyncToCloud();
             }
+            this.showSuccess('已删除（可撤回）');
         } catch (error) {
             console.error('删除失败:', error);
             alert('删除失败，请重试');

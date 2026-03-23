@@ -877,6 +877,34 @@ body {
     background: linear-gradient(135deg, #fffbeb 0%, var(--bg-primary) 30%);
 }
 
+/* 沉底按钮样式 */
+.card-action-btn.sink-btn {
+    color: var(--gray-400);
+}
+
+.card-action-btn.sink-btn:hover {
+    background: #6b7280;
+    color: white;
+    border-color: #6b7280;
+}
+
+.card-action-btn.sink-btn.sunk {
+    background: #6b7280;
+    color: white;
+    border-color: #6b7280;
+}
+
+.card-action-btn.sink-btn.sunk:hover {
+    background: var(--gray-400);
+    border-color: var(--gray-400);
+}
+
+/* 沉底卡片样式 */
+.card.sunk {
+    border-left: 3px solid #6b7280;
+    opacity: 0.7;
+}
+
 /* 已完成文字样式 */
 .completed-text {
     text-decoration: line-through;
