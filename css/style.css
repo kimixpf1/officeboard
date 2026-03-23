@@ -1087,12 +1087,32 @@ body {
 
 .week-cell {
     background: var(--bg-primary);
-    min-height: 500px;
-    max-height: calc(100vh - 200px);
+    min-height: 300px;
+    max-height: calc(100vh - 220px);
     padding: var(--spacing-3);
+    padding-bottom: var(--spacing-2);
     cursor: pointer;
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-400) transparent;
+}
+
+.week-cell::-webkit-scrollbar {
+    width: 8px;
+}
+
+.week-cell::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.week-cell::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 4px;
+}
+
+.week-cell::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
 }
 
 .week-cell:hover {
@@ -1122,12 +1142,32 @@ body {
 
 .month-cell {
     background: var(--bg-primary);
-    min-height: 120px;
+    min-height: 100px;
+    height: 120px;
     max-height: 150px;
     padding: var(--spacing-2);
     cursor: pointer;
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-400) transparent;
+}
+
+.month-cell::-webkit-scrollbar {
+    width: 6px;
+}
+
+.month-cell::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.month-cell::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 3px;
+}
+
+.month-cell::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
 }
 
 .month-cell:hover {
