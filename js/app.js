@@ -1667,11 +1667,6 @@ class OfficeDashboard {
             if (status) status.textContent = `共 ${this.contacts.length} 个联系人`;
         }
     }
-            } catch (e) {
-                console.error('通讯录同步失败:', e);
-            }
-        }
-    }
 
     /**
      * 搜索过滤通讯录
