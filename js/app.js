@@ -3191,6 +3191,7 @@ class OfficeDashboard {
         }
 
         this.showModal('itemModal');
+        this.initRecurringEvents();
     }
 
     /**
