@@ -3262,6 +3262,12 @@ class OfficeDashboard {
                 break;
         }
 
+        // 存储周期性任务信息，用于编辑时判断
+        const recurringGroupIdInput = document.getElementById('recurringGroupId');
+        const occurrenceIndexInput = document.getElementById('occurrenceIndex');
+        if (recurringGroupIdInput) recurringGroupIdInput.value = item.recurringGroupId || '';
+        if (occurrenceIndexInput) occurrenceIndexInput.value = item.occurrenceIndex || '';
+
         this.showModal('itemModal');
         this.initRecurringEvents();
     }
@@ -3829,6 +3835,94 @@ class OfficeDashboard {
             console.error('保存失败:', error);
             alert('保存失败: ' + error.message);
         }
+    }
+
+    /**
+     * 显示周期性任务编辑选择框
+     * @returns {Promise<string>} 'this' | 'all' | 'cancel'
+     */
+    showRecurringEditChoice() {
+        return new Promise((resolve) => {
+            // 创建选择弹窗
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'recurringChoiceModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>修改周期性任务</h3>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何修改？</p>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button class="btn-secondary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
+                                仅修改本项
+                            </button>
+                            <button class="btn-primary" id="recurringChoiceAll" style="width: 100%; padding: 12px;">
+                                修改后续所有周期
+                            </button>
+                            <button class="btn-text" id="recurringChoiceCancel" style="width: 100%; padding: 8px;">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // 绑定事件
+            document.getElementById('recurringChoiceThis').onclick = () => {
+                modal.remove();
+                resolve('this');
+            };
+            document.getElementById('recurringChoiceAll').onclick = () => {
+                modal.remove();
+                resolve('all');
+            };
+            document.getElementById('recurringChoiceCancel').onclick = () => {
+                modal.remove();
+                resolve('cancel');
+            };
+        });
+    }
+
+    /**
+     * 批量更新周期性任务组
+     * @param {Object} originalItem - 原始任务数据
+     * @param {Object} updates - 更新内容
+     * @param {string} groupId - 周期性任务组ID
+     * @param {number} fromIndex - 从第几个开始更新
+     */
+    async updateRecurringGroup(originalItem, updates, groupId, fromIndex) {
+        // 保存原始数据用于撤回
+        const allItems = await db.getAllItems();
+        const groupItems = allItems.filter(item => 
+            item.recurringGroupId === groupId && 
+            item.occurrenceIndex >= fromIndex
+        );
+
+        // 保存所有原始数据
+        this.saveUndoHistory('update', { items: groupItems.map(i => ({ ...i })) });
+
+        // 提取需要同步更新的字段（排除周期性相关字段和日期）
+        const fieldsToUpdate = { ...updates };
+        delete fieldsToUpdate.isRecurring;
+        delete fieldsToUpdate.recurringRule;
+        delete fieldsToUpdate.recurringCount;
+        delete fieldsToUpdate.recurringGroupId;
+        delete fieldsToUpdate.occurrenceIndex;
+        delete fieldsToUpdate.deadline; // 日期保持各自的
+        delete fieldsToUpdate.id;
+        delete fieldsToUpdate.createdAt;
+        delete fieldsToUpdate.completed;
+        delete fieldsToUpdate.completedAt;
+
+        // 批量更新
+        for (const groupItem of groupItems) {
+            await db.updateItem(groupItem.id, fieldsToUpdate);
+        }
+
+        await this.loadItems();
     }
 
     /**
