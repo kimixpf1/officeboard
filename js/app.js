@@ -3740,22 +3740,53 @@ class OfficeDashboard {
             if (id) {
                 // 编辑模式 - 先保存原始数据用于撤回
                 const originalItem = await db.getItem(parseInt(id));
-                
-                if (item.isRecurring && item.recurringRule) {
+                const recurringGroupId = document.getElementById('recurringGroupId')?.value;
+                const occurrenceIndex = parseInt(document.getElementById('occurrenceIndex')?.value) || 0;
+
+                console.log('编辑模式检查周期性任务:', { recurringGroupId, occurrenceIndex, originalItem });
+
+                // 检查是否是编辑已有的周期性任务
+                if (recurringGroupId && originalItem && originalItem.isRecurring) {
+                    // 弹出选择框
+                    const choice = await this.showRecurringEditChoice();
+
+                    console.log('用户选择:', choice);
+
+                    if (choice === 'cancel') {
+                        return; // 用户取消
+                    }
+
+                    if (choice === 'all') {
+                        // 修改后续所有周期性任务
+                        await this.updateRecurringGroup(originalItem, item, recurringGroupId, occurrenceIndex);
+                        this.showSuccess('已更新后续所有周期性任务');
+                    } else {
+                        // 仅修改本项
+                        if (originalItem) {
+                            this.saveUndoHistory('update', { item: originalItem });
+                        }
+                        // 清除周期性标识，变成普通任务
+                        item.isRecurring = false;
+                        item.recurringGroupId = null;
+                        item.occurrenceIndex = null;
+                        await db.updateItem(parseInt(id), item);
+                        this.showSuccess('事项已更新');
+                    }
+                } else if (item.isRecurring && item.recurringRule) {
                     // 编辑时转为周期性任务，询问用户
                     const confirm = window.confirm('将此事项转为周期性任务将删除当前事项并生成多个周期性任务，是否继续？');
                     if (!confirm) {
                         return;
                     }
-                    
+
                     // 保存原始数据用于撤回
                     if (originalItem) {
                         this.saveUndoHistory('update', { item: originalItem });
                     }
-                    
+
                     // 删除原事项
                     await db.deleteItem(parseInt(id));
-                    
+
                     // 生成周期性任务
                     const recurringItems = this.generateRecurringItems(item, item.recurringRule, item.recurringCount || 20);
                     if (recurringItems.length > 0) {
