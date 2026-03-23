@@ -3335,6 +3335,9 @@ class OfficeDashboard {
                     document.getElementById('recurringCount').value = item.recurringCount || 20;
                     document.getElementById('skipWeekends').checked = item.recurringRule.skipWeekends || false;
                     document.getElementById('skipHolidays').checked = item.recurringRule.skipHolidays || false;
+                    // 日期范围
+                    document.getElementById('recurringStartDate').value = item.recurringRule.startDate || '';
+                    document.getElementById('recurringEndDate').value = item.recurringRule.endDate || '';
                     
                     // 触发类型切换以显示对应字段
                     recurringTypeSelect.dispatchEvent(new Event('change'));
@@ -3789,11 +3792,15 @@ class OfficeDashboard {
                     const recurringCount = parseInt(document.getElementById('recurringCount').value) || 20;
                     const skipWeekends = document.getElementById('skipWeekends')?.checked || false;
                     const skipHolidays = document.getElementById('skipHolidays')?.checked || false;
+                    const recurringStartDate = document.getElementById('recurringStartDate')?.value || null;
+                    const recurringEndDate = document.getElementById('recurringEndDate')?.value || null;
 
                     const rule = {
                         type: recurringType,
                         skipWeekends: skipWeekends,
-                        skipHolidays: skipHolidays
+                        skipHolidays: skipHolidays,
+                        startDate: recurringStartDate,
+                        endDate: recurringEndDate
                     };
 
                     if (recurringType === 'monthly_date') {
@@ -4084,6 +4091,86 @@ class OfficeDashboard {
     }
 
     /**
+     * 显示周期性任务状态变更选择弹窗
+     * @param {string} actionType - 操作类型描述
+     * @param {string} actionName - 操作名称
+     */
+    showRecurringChoice(actionType, actionName) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'recurringStatusChoiceModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>周期性任务 - ${actionType}</h3>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <p style="margin-bottom: 20px; color: #666;">这是周期性任务，您想如何操作？</p>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button class="btn-secondary" id="recurringStatusChoiceThis" style="width: 100%; padding: 12px;">
+                                仅本项${actionName}
+                            </button>
+                            <button class="btn-primary" id="recurringStatusChoiceAll" style="width: 100%; padding: 12px;">
+                                所有后续周期都${actionName}
+                            </button>
+                            <button class="btn-text" id="recurringStatusChoiceCancel" style="width: 100%; padding: 8px;">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('recurringStatusChoiceThis').onclick = () => {
+                modal.remove();
+                resolve('this');
+            };
+            document.getElementById('recurringStatusChoiceAll').onclick = () => {
+                modal.remove();
+                resolve('all');
+            };
+            document.getElementById('recurringStatusChoiceCancel').onclick = () => {
+                modal.remove();
+                resolve('cancel');
+            };
+        });
+    }
+
+    /**
+     * 批量更新周期性任务组的状态（用于置顶、沉底、完成等）
+     * @param {Object} originalItem - 原始任务数据
+     * @param {Object} updates - 更新内容
+     */
+    async updateRecurringGroupStatus(originalItem, updates) {
+        const allItems = await db.getAllItems();
+        const groupItems = allItems.filter(item => 
+            item.recurringGroupId === originalItem.recurringGroupId && 
+            item.occurrenceIndex >= originalItem.occurrenceIndex
+        );
+
+        // 保存所有原始数据用于撤回
+        this.saveUndoHistory('update', { items: groupItems.map(i => ({ ...i })) });
+
+        // 批量更新
+        for (const groupItem of groupItems) {
+            const updateData = { ...updates };
+            // 清理undefined值
+            Object.keys(updateData).forEach(key => {
+                if (updateData[key] === undefined) delete updateData[key];
+            });
+            await db.updateItem(groupItem.id, updateData);
+        }
+
+        await this.loadItems();
+        // 立即同步到云端
+        if (syncManager.isLoggedIn()) {
+            await syncManager.immediateSyncToCloud();
+        }
+    }
+
+    /**
      * 切换待办完成状态
      */
     async toggleTodoComplete(id, completed) {
@@ -4105,8 +4192,24 @@ class OfficeDashboard {
     async toggleItemComplete(id, type, completed) {
         console.log(`toggleItemComplete: id=${id}, type=${type}, completed=${completed}`);
         try {
-            // 保存原始数据用于撤回
+            // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
+            if (originalItem && originalItem.recurringGroupId) {
+                const choice = await this.showRecurringChoice('完成状态', completed ? '标记完成' : '取消完成');
+                if (choice === 'cancel') return;
+                
+                if (choice === 'all') {
+                    // 更新所有后续周期
+                    await this.updateRecurringGroupStatus(originalItem, { 
+                        completed, 
+                        completedAt: completed ? new Date().toISOString() : null,
+                        ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
+                    });
+                    return;
+                }
+            }
+            
+            // 保存原始数据用于撤回
             if (originalItem) {
                 this.saveUndoHistory('update', { item: originalItem });
             }
@@ -4134,8 +4237,24 @@ class OfficeDashboard {
      */
     async toggleItemPin(id, type, pinned) {
         try {
-            // 保存原始数据用于撤回
+            // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
+            if (originalItem && originalItem.recurringGroupId) {
+                const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
+                if (choice === 'cancel') return;
+                
+                if (choice === 'all') {
+                    // 更新所有后续周期
+                    await this.updateRecurringGroupStatus(originalItem, { 
+                        pinned, 
+                        sunk: pinned ? false : undefined // 置顶时取消沉底
+                    });
+                    this.showSuccess(pinned ? '已置顶所有后续周期' : '已取消所有后续周期置顶');
+                    return;
+                }
+            }
+            
+            // 保存原始数据用于撤回
             if (originalItem) {
                 this.saveUndoHistory('update', { item: originalItem });
             }
@@ -4163,8 +4282,24 @@ class OfficeDashboard {
      */
     async toggleItemSink(id, type, sunk) {
         try {
-            // 保存原始数据用于撤回
+            // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
+            if (originalItem && originalItem.recurringGroupId) {
+                const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
+                if (choice === 'cancel') return;
+                
+                if (choice === 'all') {
+                    // 更新所有后续周期
+                    await this.updateRecurringGroupStatus(originalItem, { 
+                        sunk, 
+                        pinned: sunk ? false : undefined // 沉底时取消置顶
+                    });
+                    this.showSuccess(sunk ? '已沉底所有后续周期' : '已取消所有后续周期沉底');
+                    return;
+                }
+            }
+            
+            // 保存原始数据用于撤回
             if (originalItem) {
                 this.saveUndoHistory('update', { item: originalItem });
             }
@@ -4385,7 +4520,14 @@ class OfficeDashboard {
         const today = new Date();
         today.setHours(12, 0, 0, 0);
 
-        console.log('生成周期性任务:', { baseItem, rule, count });
+        // 日期范围过滤
+        const startDate = rule.startDate ? new Date(rule.startDate + 'T12:00:00') : null;
+        const endDate = rule.endDate ? new Date(rule.endDate + 'T12:00:00') : null;
+        
+        // 如果有开始日期且早于今天，从开始日期开始
+        const firstDate = startDate && startDate > today ? startDate : today;
+
+        console.log('生成周期性任务:', { baseItem, rule, count, startDate, endDate, firstDate });
 
         // 复制基础数据，移除周期相关字段和需要重新计算的字段
         const cleanItem = { ...baseItem };
@@ -4396,13 +4538,23 @@ class OfficeDashboard {
         delete cleanItem.deadline;
 
         const skipHolidays = rule.skipHolidays || false;
+        
+        // 辅助函数：检查日期是否在范围内
+        const isInRange = (date) => {
+            if (startDate && date < startDate) return false;
+            if (endDate && date > endDate) return false;
+            return true;
+        };
 
         switch (rule.type) {
             case 'daily':
                 // 每天
                 let dailyCount = 0;
-                let dailyDate = new Date(today);
+                let dailyDate = new Date(firstDate);
                 while (dailyCount < count) {
+                    // 检查日期范围
+                    if (endDate && dailyDate > endDate) break;
+                    
                     if (rule.skipWeekends && this.isWeekend(dailyDate)) {
                         dailyDate.setDate(dailyDate.getDate() + 1);
                         continue;
@@ -4421,8 +4573,11 @@ class OfficeDashboard {
             case 'workday_daily':
                 // 工作日每天（周一至周五，跳过周末和节假日）
                 let workdayCount1 = 0;
-                let currentDate1 = new Date(today);
+                let currentDate1 = new Date(firstDate);
                 while (workdayCount1 < count) {
+                    // 检查日期范围
+                    if (endDate && currentDate1 > endDate) break;
+                    
                     const isWeekendDay = this.isWeekend(currentDate1);
                     const isHolidayDay = skipHolidays && this.isHoliday(currentDate1);
                     
@@ -4440,8 +4595,11 @@ class OfficeDashboard {
                 let weeklyCount = 0;
                 let weekNum = 0;
                 while (weeklyCount < count) {
-                    const date = this.getWeeklyDay(today, weekNum, rule.weekDay);
-                    if (date >= today) {
+                    const date = this.getWeeklyDay(firstDate, weekNum, rule.weekDay);
+                    // 检查日期范围
+                    if (endDate && date > endDate) break;
+                    
+                    if (date >= firstDate) {
                         let shouldSkip = false;
                         if (rule.skipWeekends && this.isWeekend(date)) {
                             shouldSkip = true;
@@ -4466,9 +4624,14 @@ class OfficeDashboard {
                 while (itemsGenerated < count) {
                     for (const day of weekDays) {
                         if (itemsGenerated >= count) break;
-                        const date = this.getWeeklyDay(today, weekOffset, day);
-                        // 确保日期不早于今天
-                        if (date >= today) {
+                        const date = this.getWeeklyDay(firstDate, weekOffset, day);
+                        // 检查日期范围
+                        if (endDate && date > endDate) {
+                            weekOffset = Infinity; // 结束外层循环
+                            break;
+                        }
+                        // 确保日期不早于开始日期
+                        if (date >= firstDate) {
                             let shouldSkip = false;
                             if (rule.skipWeekends && this.isWeekend(date)) {
                                 shouldSkip = true;
@@ -4483,6 +4646,7 @@ class OfficeDashboard {
                         }
                     }
                     weekOffset++;
+                    if (weekOffset === Infinity) break;
                 }
                 break;
 
@@ -4491,7 +4655,10 @@ class OfficeDashboard {
                 let monthlyDateCount = 0;
                 let monthNum = 1;
                 while (monthlyDateCount < count) {
-                    const date = this.getMonthlyDate(today, monthNum, rule.day, false);
+                    const date = this.getMonthlyDate(firstDate, monthNum, rule.day, false);
+                    // 检查日期范围
+                    if (endDate && date > endDate) break;
+                    
                     let shouldSkip = false;
                     if (rule.skipWeekends && this.isWeekend(date)) {
                         shouldSkip = true;
@@ -4514,7 +4681,10 @@ class OfficeDashboard {
             case 'monthly_workday':
                 // 每月第N个工作日
                 for (let i = 0; i < count; i++) {
-                    const date = this.getNthWorkDayOfMonth(today, i + 1, rule.nthWorkDay, skipHolidays);
+                    const date = this.getNthWorkDayOfMonth(firstDate, i + 1, rule.nthWorkDay, skipHolidays);
+                    // 检查日期范围
+                    if (endDate && date && date > endDate) break;
+                    
                     if (date) {
                         items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
                     }
@@ -4524,8 +4694,13 @@ class OfficeDashboard {
             case 'monthly_weekday':
                 // 每月第N个星期X（如每月第一个周一）
                 for (let i = 0; i < count; i++) {
-                    const date = this.getNthWeekDayOfMonth(today, i + 1, rule.nthWeek, rule.weekDay);
-                    items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                    const date = this.getNthWeekDayOfMonth(firstDate, i + 1, rule.nthWeek, rule.weekDay);
+                    // 检查日期范围
+                    if (endDate && date && date > endDate) break;
+                    
+                    if (date) {
+                        items.push(this.createRecurringItem(cleanItem, date, rule, groupId, i + 1));
+                    }
                 }
                 break;
         }
