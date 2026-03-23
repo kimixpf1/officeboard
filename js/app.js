@@ -374,6 +374,7 @@ class OfficeDashboard {
     initSidePanels() {
         this.initToolsPanel();
         this.initLinksPanel();
+        this.initContactsPanel();
         this.initMemoPanel();
         this.initToolModals();
     }
@@ -1419,6 +1420,311 @@ class OfficeDashboard {
             startBtn.disabled = false;
             pauseBtn.disabled = true;
         });
+    }
+
+    /**
+     * 初始化通讯录面板
+     */
+    initContactsPanel() {
+        const panel = document.getElementById('contactsPanel');
+        const toggle = document.getElementById('contactsToggle');
+        const close = document.getElementById('contactsClose');
+        const searchInput = document.getElementById('contactsSearchInput');
+        const addBtn = document.getElementById('addContactBtn');
+        const importFile = document.getElementById('importContactsFile');
+        const nameInput = document.getElementById('newContactName');
+        const phoneInput = document.getElementById('newContactPhone');
+
+        if (!panel || !toggle) return;
+
+        // 切换面板
+        toggle.addEventListener('click', () => {
+            panel.classList.toggle('expanded');
+            if (panel.classList.contains('expanded')) {
+                this.loadContacts();
+            }
+        });
+
+        if (close) {
+            close.addEventListener('click', () => {
+                panel.classList.remove('expanded');
+            });
+        }
+
+        // 添加联系人
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                this.addContact();
+            });
+        }
+
+        // 回车添加
+        if (phoneInput) {
+            phoneInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.addContact();
+                }
+            });
+        }
+
+        // 搜索
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                this.filterContacts(searchInput.value);
+            });
+        }
+
+        // 导入Excel
+        if (importFile) {
+            importFile.addEventListener('change', (e) => {
+                this.importContactsFromExcel(e.target.files[0]);
+            });
+        }
+
+        // 初始加载
+        this.loadContacts();
+    }
+
+    /**
+     * 加载通讯录
+     */
+    async loadContacts() {
+        let contacts = [];
+        
+        // 从本地加载
+        const saved = localStorage.getItem('office_contacts');
+        if (saved) {
+            try {
+                contacts = JSON.parse(saved);
+            } catch (e) {
+                contacts = [];
+            }
+        }
+
+        // 未登录时清空数据
+        if (!syncManager.isLoggedIn()) {
+            contacts = [];
+        }
+
+        this.contacts = contacts;
+        this.renderContacts(contacts);
+    }
+
+    /**
+     * 渲染通讯录列表
+     */
+    renderContacts(contacts) {
+        const list = document.getElementById('contactsList');
+        const status = document.getElementById('contactsStatus');
+        
+        if (!list) return;
+
+        // 未登录提示
+        if (!syncManager.isLoggedIn()) {
+            list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">请登录后使用通讯录功能</div>';
+            if (status) status.textContent = '请登录';
+            return;
+        }
+
+        if (contacts.length === 0) {
+            list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">暂无联系人</div>';
+        } else {
+            list.innerHTML = contacts.map((contact, index) => `
+                <div class="contact-item" data-index="${index}">
+                    <div class="contact-info">
+                        <div class="contact-name">${this.escapeHtml(contact.name)}</div>
+                        <div class="contact-phone">${this.escapeHtml(contact.phone)}</div>
+                    </div>
+                    <div class="contact-actions">
+                        <button class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
+                        <button class="contact-delete" data-id="${contact.id || index}">删除</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // 绑定删除事件
+            list.querySelectorAll('.contact-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.dataset.id;
+                    this.deleteContact(id);
+                });
+            });
+        }
+
+        if (status) {
+            status.textContent = `共 ${contacts.length} 个联系人`;
+        }
+    }
+
+    /**
+     * 添加联系人
+     */
+    async addContact() {
+        if (!syncManager.isLoggedIn()) {
+            alert('请先登录');
+            return;
+        }
+
+        const nameInput = document.getElementById('newContactName');
+        const phoneInput = document.getElementById('newContactPhone');
+        
+        const name = nameInput?.value.trim();
+        const phone = phoneInput?.value.trim();
+
+        if (!name) {
+            alert('请输入姓名');
+            return;
+        }
+        if (!phone) {
+            alert('请输入电话号码');
+            return;
+        }
+
+        const contact = {
+            id: Date.now().toString(),
+            name,
+            phone,
+            createdAt: new Date().toISOString()
+        };
+
+        this.contacts = this.contacts || [];
+        this.contacts.push(contact);
+
+        // 保存
+        await this.saveContacts();
+
+        // 清空输入
+        nameInput.value = '';
+        phoneInput.value = '';
+
+        // 刷新列表
+        this.renderContacts(this.contacts);
+    }
+
+    /**
+     * 删除联系人
+     */
+    async deleteContact(id) {
+        if (!confirm('确定删除此联系人？')) return;
+
+        this.contacts = this.contacts.filter(c => c.id !== id && c.id !== parseInt(id));
+        await this.saveContacts();
+        this.renderContacts(this.contacts);
+    }
+
+    /**
+     * 保存通讯录
+     */
+    async saveContacts() {
+        // 保存到本地
+        localStorage.setItem('office_contacts', JSON.stringify(this.contacts));
+
+        // 同步到云端
+        if (syncManager.isLoggedIn()) {
+            try {
+                await syncManager.immediateSyncToCloud();
+                console.log('通讯录已同步到云端');
+            } catch (e) {
+                console.error('通讯录同步失败:', e);
+            }
+        }
+    }
+
+    /**
+     * 搜索过滤通讯录
+     */
+    filterContacts(keyword) {
+        if (!keyword) {
+            this.renderContacts(this.contacts);
+            return;
+        }
+
+        keyword = keyword.toLowerCase();
+        const filtered = this.contacts.filter(c => 
+            c.name.toLowerCase().includes(keyword) || 
+            c.phone.includes(keyword)
+        );
+        this.renderContacts(filtered);
+    }
+
+    /**
+     * 从Excel导入通讯录
+     */
+    async importContactsFromExcel(file) {
+        if (!syncManager.isLoggedIn()) {
+            alert('请先登录');
+            return;
+        }
+
+        if (!file) return;
+
+        try {
+            // 使用SheetJS解析
+            if (typeof XLSX === 'undefined') {
+                // 动态加载SheetJS
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js';
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+            }
+
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            // 跳过标题行，解析数据
+            let imported = 0;
+            for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (row && row.length >= 2) {
+                    const name = String(row[0] || '').trim();
+                    const phone = String(row[1] || '').trim();
+                    
+                    if (name && phone) {
+                        // 检查是否已存在
+                        const exists = this.contacts.some(c => c.name === name && c.phone === phone);
+                        if (!exists) {
+                            this.contacts.push({
+                                id: Date.now().toString() + '_' + i,
+                                name,
+                                phone,
+                                createdAt: new Date().toISOString()
+                            });
+                            imported++;
+                        }
+                    }
+                }
+            }
+
+            if (imported > 0) {
+                await this.saveContacts();
+                this.renderContacts(this.contacts);
+                alert(`成功导入 ${imported} 个联系人`);
+            } else {
+                alert('没有新的联系人可导入');
+            }
+
+            // 清空文件选择
+            document.getElementById('importContactsFile').value = '';
+
+        } catch (e) {
+            console.error('导入Excel失败:', e);
+            alert('导入失败: ' + e.message);
+        }
+    }
+
+    /**
+     * HTML转义
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**
@@ -4144,11 +4450,25 @@ class OfficeDashboard {
      * @param {Object} updates - 更新内容
      */
     async updateRecurringGroupStatus(originalItem, updates) {
+        console.log('updateRecurringGroupStatus 开始:', { originalItem, updates });
+        
         const allItems = await db.getAllItems();
         const groupItems = allItems.filter(item => 
             item.recurringGroupId === originalItem.recurringGroupId && 
             item.occurrenceIndex >= originalItem.occurrenceIndex
         );
+
+        console.log('找到的周期任务:', { 
+            groupId: originalItem.recurringGroupId, 
+            currentIndex: originalItem.occurrenceIndex,
+            count: groupItems.length,
+            items: groupItems.map(i => ({ id: i.id, title: i.title, occurrenceIndex: i.occurrenceIndex }))
+        });
+
+        if (groupItems.length === 0) {
+            console.warn('没有找到后续周期任务');
+            return;
+        }
 
         // 保存所有原始数据用于撤回
         this.saveUndoHistory('update', { items: groupItems.map(i => ({ ...i })) });
@@ -4160,9 +4480,11 @@ class OfficeDashboard {
             Object.keys(updateData).forEach(key => {
                 if (updateData[key] === undefined) delete updateData[key];
             });
+            console.log(`更新任务 ${groupItem.id}:`, updateData);
             await db.updateItem(groupItem.id, updateData);
         }
 
+        console.log('批量更新完成');
         await this.loadItems();
         // 立即同步到云端
         if (syncManager.isLoggedIn()) {
@@ -4239,12 +4561,17 @@ class OfficeDashboard {
         try {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
+            console.log('toggleItemPin:', { id, pinned, recurringGroupId: originalItem?.recurringGroupId });
+            
             if (originalItem && originalItem.recurringGroupId) {
                 const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
+                console.log('用户选择:', choice);
+                
                 if (choice === 'cancel') return;
                 
                 if (choice === 'all') {
                     // 更新所有后续周期
+                    console.log('执行批量置顶更新...');
                     await this.updateRecurringGroupStatus(originalItem, { 
                         pinned, 
                         sunk: pinned ? false : undefined // 置顶时取消沉底
@@ -4284,12 +4611,17 @@ class OfficeDashboard {
         try {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
+            console.log('toggleItemSink:', { id, sunk, recurringGroupId: originalItem?.recurringGroupId });
+            
             if (originalItem && originalItem.recurringGroupId) {
                 const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
+                console.log('用户选择:', choice);
+                
                 if (choice === 'cancel') return;
                 
                 if (choice === 'all') {
                     // 更新所有后续周期
+                    console.log('执行批量沉底更新...');
                     await this.updateRecurringGroupStatus(originalItem, { 
                         sunk, 
                         pinned: sunk ? false : undefined // 沉底时取消置顶

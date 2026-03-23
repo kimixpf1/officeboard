@@ -2845,6 +2845,175 @@ body {
     background: linear-gradient(180deg, #c4b5fd, #8b5cf6);
 }
 
+/* 通讯录面板 */
+.contacts-panel {
+    z-index: 1000;
+}
+.contacts-toggle {
+    background: linear-gradient(180deg, #34d399, #059669);
+    top: calc(50% + 88px);
+    right: 4px;
+    border-right: 2px solid rgba(255,255,255,0.15);
+}
+.contacts-toggle:hover {
+    background: linear-gradient(180deg, #6ee7b7, #10b981);
+}
+
+/* 通讯录样式 */
+.contacts-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.contacts-search {
+    padding: 0 4px;
+}
+
+.contacts-search input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.contacts-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.contacts-add-form {
+    display: flex;
+    gap: 6px;
+    padding: 0 4px;
+}
+
+.contacts-add-form input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.contacts-add-form input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.btn-add-contact {
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-add-contact:hover {
+    background: var(--primary-hover);
+}
+
+.contacts-import {
+    padding: 0 4px;
+}
+
+.btn-import-contacts {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-import-contacts:hover {
+    background: var(--primary-light);
+    border-color: var(--primary-color);
+}
+
+.contacts-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.contact-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    transition: all 0.2s;
+}
+
+.contact-item:hover {
+    background: var(--primary-light);
+}
+
+.contact-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.contact-name {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.contact-phone {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.contact-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.contact-actions button {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.contact-call {
+    background: var(--primary-color);
+    color: white;
+}
+
+.contact-call:hover {
+    background: var(--primary-hover);
+}
+
+.contact-delete {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.contact-delete:hover {
+    background: #fecaca;
+}
+
 /* 面板内容区 - 全屏高度 */
 .panel-content {
     width: 0;
@@ -2873,6 +3042,9 @@ body {
 }
 .memo-panel.expanded .panel-toggle {
     right: 364px;
+}
+.contacts-panel.expanded .panel-toggle {
+    right: 366px;
 }
 
 /* 面板头部 */
