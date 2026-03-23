@@ -4672,9 +4672,115 @@ class OfficeDashboard {
     /**
      * 显示删除确认
      */
-    showDeleteConfirm(id) {
-        this.deleteItemId = id;
-        this.showModal('confirmModal');
+    async showDeleteConfirm(id) {
+        // 先检查是否是周期性任务
+        const item = await db.getItem(id);
+        
+        if (item && item.isRecurring && item.recurringGroupId) {
+            // 周期性任务：显示选择框
+            this.deleteItemId = id;
+            this.deleteItem = item;
+            const choice = await this.showRecurringDeleteChoice();
+            
+            if (choice === 'cancel') {
+                this.deleteItemId = null;
+                this.deleteItem = null;
+                return;
+            }
+            
+            if (choice === 'all') {
+                await this.deleteRecurringGroup(item);
+            } else {
+                // 仅删除本项
+                await this.confirmDelete();
+            }
+        } else {
+            // 普通任务：显示确认弹窗
+            this.deleteItemId = id;
+            this.deleteItem = null;
+            this.showModal('confirmModal');
+        }
+    }
+
+    /**
+     * 显示周期性任务删除选择框
+     */
+    showRecurringDeleteChoice() {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'recurringDeleteModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>删除周期性任务</h3>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何删除？</p>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button class="btn-secondary" id="recurringDeleteThis" style="width: 100%; padding: 12px;">
+                                仅删除本项
+                            </button>
+                            <button class="btn-danger" id="recurringDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
+                                删除本项及后续所有周期
+                            </button>
+                            <button class="btn-text" id="recurringDeleteCancel" style="width: 100%; padding: 8px;">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('recurringDeleteThis').onclick = () => {
+                modal.remove();
+                resolve('this');
+            };
+            document.getElementById('recurringDeleteAll').onclick = () => {
+                modal.remove();
+                resolve('all');
+            };
+            document.getElementById('recurringDeleteCancel').onclick = () => {
+                modal.remove();
+                resolve('cancel');
+            };
+        });
+    }
+
+    /**
+     * 删除周期性任务组（本项及后续所有）
+     */
+    async deleteRecurringGroup(item) {
+        try {
+            const allItems = await db.getAllItems();
+            const groupItems = allItems.filter(i => 
+                i.recurringGroupId === item.recurringGroupId && 
+                i.occurrenceIndex >= item.occurrenceIndex
+            );
+
+            // 保存所有要删除的项目用于撤回
+            this.saveUndoHistory('delete', { items: groupItems });
+
+            // 批量删除
+            for (const groupItem of groupItems) {
+                await db.deleteItem(groupItem.id);
+            }
+
+            await this.loadItems();
+            
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
+            
+            this.showSuccess(`已删除${groupItems.length}个周期性任务（可撤回）`);
+        } catch (error) {
+            console.error('批量删除失败:', error);
+            this.showError('删除失败: ' + error.message);
+        }
+
+        this.deleteItemId = null;
+        this.deleteItem = null;
     }
 
     /**
