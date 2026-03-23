@@ -883,26 +883,26 @@ body {
 }
 
 .card-action-btn.sink-btn:hover {
-    background: #6b7280;
+    background: #8b5cf6;
     color: white;
-    border-color: #6b7280;
+    border-color: #8b5cf6;
 }
 
 .card-action-btn.sink-btn.sunk {
-    background: #6b7280;
+    background: #8b5cf6;
     color: white;
-    border-color: #6b7280;
+    border-color: #8b5cf6;
 }
 
 .card-action-btn.sink-btn.sunk:hover {
-    background: var(--gray-400);
-    border-color: var(--gray-400);
+    background: #7c3aed;
+    border-color: #7c3aed;
 }
 
 /* 沉底卡片样式 */
 .card.sunk {
-    border-left: 3px solid #6b7280;
-    opacity: 0.7;
+    border-left: 3px solid #8b5cf6;
+    background: linear-gradient(135deg, #f5f3ff 0%, var(--bg-primary) 30%);
 }
 
 /* 已完成文字样式 */

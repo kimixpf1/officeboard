@@ -3871,9 +3871,13 @@ class OfficeDashboard {
             this.undoHistory.shift();
         }
 
-        // 显示撤回按钮
+        // 启用撤回按钮
         const undoBtn = document.getElementById('undoBtn');
-        if (undoBtn) undoBtn.style.display = 'inline-flex';
+        if (undoBtn) {
+            undoBtn.disabled = false;
+            undoBtn.style.opacity = '1';
+            undoBtn.style.cursor = 'pointer';
+        }
     }
 
     /**
@@ -3962,10 +3966,14 @@ class OfficeDashboard {
             this.showError('撤回失败: ' + error.message);
         }
 
-        // 如果没有更多历史，隐藏撤回按钮
+        // 如果没有更多历史，禁用撤回按钮
         if (this.undoHistory.length === 0) {
             const undoBtn = document.getElementById('undoBtn');
-            if (undoBtn) undoBtn.style.display = 'none';
+            if (undoBtn) {
+                undoBtn.disabled = true;
+                undoBtn.style.opacity = '0.4';
+                undoBtn.style.cursor = 'not-allowed';
+            }
         }
     }
 
