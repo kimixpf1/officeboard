@@ -290,23 +290,27 @@ class CalendarView {
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
+                    
+                    // 首先检查当前日期是否在办文日期范围内
+                    let inRange = false;
                     if (startDate && endDate) {
                         // 跨天办文：检查日期范围
-                        const inRange = dateStr >= startDate && dateStr <= endDate;
-                        // 如果启用了跳过周末和节假日
-                        if (inRange && item.skipWeekend) {
-                            return this.isWorkday(dateStr);
-                        }
-                        return inRange;
-                    }
-                    if (startDate) {
-                        return startDate === dateStr;
-                    }
-                    // 兼容旧数据：按创建日期
-                    if (item.createdAt) {
+                        inRange = dateStr >= startDate && dateStr <= endDate;
+                    } else if (startDate) {
+                        // 单天办文
+                        inRange = startDate === dateStr;
+                    } else if (item.createdAt) {
+                        // 兼容旧数据：按创建日期
                         const createdDate = item.createdAt.split('T')[0];
-                        return createdDate === dateStr;
+                        inRange = createdDate === dateStr;
                     }
+                    
+                    // 如果在范围内且启用了跳过周末，检查是否是工作日
+                    if (inRange && item.skipWeekend) {
+                        return this.isWorkday(dateStr);
+                    }
+                    
+                    return inRange;
                 }
                 return false;
             });
@@ -417,22 +421,26 @@ class CalendarView {
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
+                    
+                    // 首先检查当前日期是否在办文日期范围内
+                    let inRange = false;
                     if (startDate && endDate) {
                         // 跨天办文：检查日期范围
-                        const inRange = dateStr >= startDate && dateStr <= endDate;
-                        // 如果启用了跳过周末和节假日
-                        if (inRange && item.skipWeekend) {
-                            return this.isWorkday(dateStr);
-                        }
-                        return inRange;
+                        inRange = dateStr >= startDate && dateStr <= endDate;
+                    } else if (startDate) {
+                        // 单天办文
+                        inRange = startDate === dateStr;
+                    } else if (item.createdAt) {
+                        // 兼容旧数据：按创建日期
+                        inRange = item.createdAt.startsWith(dateStr);
                     }
-                    if (startDate) {
-                        return startDate === dateStr;
+                    
+                    // 如果在范围内且启用了跳过周末，检查是否是工作日
+                    if (inRange && item.skipWeekend) {
+                        return this.isWorkday(dateStr);
                     }
-                    // 兼容旧数据：按创建日期
-                    if (item.createdAt) {
-                        return item.createdAt.startsWith(dateStr);
-                    }
+                    
+                    return inRange;
                 }
                 return false;
             });

@@ -3537,18 +3537,26 @@ class OfficeDashboard {
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
+                    
+                    // 首先检查当前日期是否在办文日期范围内
+                    let inRange = false;
                     if (startDate && endDate) {
                         // 跨天办文：检查选中日期是否在日期范围内
-                        const inRange = this.selectedDate >= startDate && this.selectedDate <= endDate;
-                        // 如果启用了跳过周末和节假日
-                        if (inRange && item.skipWeekend) {
-                            return this.isWorkday(this.selectedDate);
-                        }
-                        return inRange;
+                        inRange = this.selectedDate >= startDate && this.selectedDate <= endDate;
+                    } else if (startDate) {
+                        // 单天办文
+                        inRange = startDate === this.selectedDate;
+                    } else if (item.createdAt) {
+                        // 兼容旧数据
+                        inRange = item.createdAt.startsWith(this.selectedDate);
                     }
-                    // 单天办文
-                    const docDate = startDate || (item.createdAt ? item.createdAt.split('T')[0] : null);
-                    return docDate === this.selectedDate;
+                    
+                    // 如果在范围内且启用了跳过周末和节假日
+                    if (inRange && item.skipWeekend) {
+                        return this.isWorkday(this.selectedDate);
+                    }
+                    
+                    return inRange;
                 }
                 return false;
             });
