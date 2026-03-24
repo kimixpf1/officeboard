@@ -1654,7 +1654,7 @@ class OfficeDashboard {
         const batchDeleteBtn = document.getElementById('batchDeleteContactsBtn');
         if (batchDeleteBtn) {
             batchDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
-            batchDeleteBtn.textContent = `删除选中 (${checkedCount})`;
+            batchDeleteBtn.textContent = `删除(${checkedCount})`;
         }
     }
 
@@ -3650,26 +3650,13 @@ class OfficeDashboard {
                 return priorityA - priorityB;
             }
 
-            // 核心排序：有 order 值的一律按 order 排（用户拖拽的结果）
-            const aHasOrder = hasOrder(a);
-            const bHasOrder = hasOrder(b);
-
-            if (aHasOrder && bHasOrder) {
-                if (a.order !== b.order) return a.order - b.order;
-                // order 相同（理论上不会出现），按创建时间兜底
-                return new Date(a.createdAt) - new Date(b.createdAt);
-            }
-
-            // 有 order 的排在无 order 的前面
-            if (aHasOrder && !bHasOrder) return -1;
-            if (bHasOrder && !aHasOrder) return 1;
-
-            // 都没有 order（从未被拖拽过的项目）：
-            // 会议按领导级别 + 时间排序
+            // 会议特殊处理：按领导级别优先排序（钱局最优先）
+            // 这里的排序不受 order 值影响，确保领导相关会议始终在最前面
             if (type === 'meeting') {
                 const levelA = this.getMeetingLevel(a);
                 const levelB = this.getMeetingLevel(b);
 
+                // 如果级别不同，直接按级别排序（忽略order）
                 if (levelA !== levelB) {
                     return levelA - levelB;
                 }
@@ -3681,6 +3668,20 @@ class OfficeDashboard {
                     return timeA.localeCompare(timeB);
                 }
             }
+
+            // 非会议类型，或同级别会议：有 order 值的按 order 排（用户拖拽的结果）
+            const aHasOrder = hasOrder(a);
+            const bHasOrder = hasOrder(b);
+
+            if (aHasOrder && bHasOrder) {
+                if (a.order !== b.order) return a.order - b.order;
+                // order 相同（理论上不会出现），按创建时间兜底
+                return new Date(a.createdAt) - new Date(b.createdAt);
+            }
+
+            // 有 order 的排在无 order 的前面（仅对非会议类型或同级别会议）
+            if (aHasOrder && !bHasOrder) return -1;
+            if (bHasOrder && !aHasOrder) return 1;
 
             // 按创建时间排序兜底
             return new Date(a.createdAt) - new Date(b.createdAt);
