@@ -1602,12 +1602,13 @@ class OfficeDashboard {
                 return `
                     <div class="contact-item ${isMatched ? 'matched' : ''}" data-index="${index}" data-id="${contact.id || index}">
                         <input type="checkbox" class="contact-checkbox" data-id="${contact.id || index}">
-                        <div class="contact-info">
+                        <div class="contact-info" ondblclick="app.editContact('${contact.id || index}')">
                             <div class="contact-name">${displayName}</div>
                             <div class="contact-phone">${displayPhone}</div>
                         </div>
                         <div class="contact-actions">
                             <button class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
+                            <button class="contact-edit" data-id="${contact.id || index}">编辑</button>
                             <button class="contact-delete" data-id="${contact.id || index}">删除</button>
                         </div>
                     </div>
@@ -1620,6 +1621,15 @@ class OfficeDashboard {
                     e.stopPropagation();
                     const id = e.target.dataset.id;
                     this.deleteContact(id);
+                });
+            });
+
+            // 绑定编辑事件
+            list.querySelectorAll('.contact-edit').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const id = e.target.dataset.id;
+                    this.editContact(id);
                 });
             });
 
@@ -1669,7 +1679,7 @@ class OfficeDashboard {
     }
 
     /**
-     * 添加联系人
+     * 添加/更新联系人
      */
     async addContact() {
         if (!syncManager.isLoggedIn()) {
@@ -1679,7 +1689,8 @@ class OfficeDashboard {
 
         const nameInput = document.getElementById('newContactName');
         const phoneInput = document.getElementById('newContactPhone');
-        
+        const addBtn = document.getElementById('addContactBtn');
+
         const name = nameInput?.value.trim();
         const phone = phoneInput?.value.trim();
 
@@ -1692,15 +1703,32 @@ class OfficeDashboard {
             return;
         }
 
-        const contact = {
-            id: Date.now().toString(),
-            name,
-            phone,
-            createdAt: new Date().toISOString()
-        };
-
-        this.contacts = this.contacts || [];
-        this.contacts.push(contact);
+        // 检查是否是编辑模式
+        const editId = addBtn?.dataset.editId;
+        
+        if (editId && addBtn?.classList.contains('editing')) {
+            // 编辑模式：更新现有联系人
+            const index = this.contacts.findIndex(c => c.id === editId || c.id === parseInt(editId));
+            if (index >= 0) {
+                this.contacts[index].name = name;
+                this.contacts[index].phone = phone;
+                this.contacts[index].updatedAt = new Date().toISOString();
+            }
+            // 重置按钮状态
+            addBtn.textContent = '+ 添加';
+            delete addBtn.dataset.editId;
+            addBtn.classList.remove('editing');
+        } else {
+            // 新增模式
+            const contact = {
+                id: Date.now().toString(),
+                name,
+                phone,
+                createdAt: new Date().toISOString()
+            };
+            this.contacts = this.contacts || [];
+            this.contacts.push(contact);
+        }
 
         // 保存
         await this.saveContacts();
@@ -1722,6 +1750,36 @@ class OfficeDashboard {
         this.contacts = this.contacts.filter(c => c.id !== id && c.id !== parseInt(id));
         await this.saveContacts();
         this.renderContacts(this.contacts);
+    }
+
+    /**
+     * 编辑联系人
+     */
+    editContact(id) {
+        const contact = this.contacts.find(c => c.id === id || c.id === parseInt(id));
+        if (!contact) return;
+
+        // 填充到输入框
+        const nameInput = document.getElementById('newContactName');
+        const phoneInput = document.getElementById('newContactPhone');
+        const addBtn = document.getElementById('addContactBtn');
+
+        if (nameInput && phoneInput) {
+            nameInput.value = contact.name;
+            phoneInput.value = contact.phone;
+
+            // 更改按钮状态为编辑模式
+            if (addBtn) {
+                addBtn.textContent = '保存';
+                addBtn.dataset.editId = id;
+                addBtn.classList.add('editing');
+            }
+
+            nameInput.focus();
+
+            // 滚动到输入区域
+            nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
 
     /**
