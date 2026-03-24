@@ -3081,6 +3081,15 @@ body {
     background: #fecaca;
 }
 
+
+.contact-edit {
+    background: #e0e7ff;
+    color: #4f46e5;
+}
+
+.contact-edit:hover {
+    background: #c7d2fe;
+}
 /* 搜索匹配高亮样式 */
 .contact-item.matched {
     background: #fffbeb;
