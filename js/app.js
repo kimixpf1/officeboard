@@ -1540,11 +1540,13 @@ class OfficeDashboard {
 
     /**
      * 渲染通讯录列表
+     * @param {Array} contacts - 联系人数组
+     * @param {string} highlightKeyword - 高亮关键词（可选）
      */
-    renderContacts(contacts) {
+    renderContacts(contacts, highlightKeyword = '') {
         const list = document.getElementById('contactsList');
         const status = document.getElementById('contactsStatus');
-        
+
         if (!list) return;
 
         // 未登录提示
@@ -1557,22 +1559,45 @@ class OfficeDashboard {
         if (contacts.length === 0) {
             list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">暂无联系人</div>';
         } else {
-            list.innerHTML = contacts.map((contact, index) => `
-                <div class="contact-item" data-index="${index}">
-                    <div class="contact-info">
-                        <div class="contact-name">${this.escapeHtml(contact.name)}</div>
-                        <div class="contact-phone">${this.escapeHtml(contact.phone)}</div>
+            list.innerHTML = contacts.map((contact, index) => {
+                // 高亮匹配的文字
+                let displayName = this.escapeHtml(contact.name);
+                let displayPhone = this.escapeHtml(contact.phone);
+
+                if (highlightKeyword) {
+                    // 高亮姓名中的匹配文字
+                    const nameRegex = new RegExp(`(${this.escapeRegex(highlightKeyword)})`, 'gi');
+                    displayName = displayName.replace(nameRegex, '<mark class="highlight">$1</mark>');
+
+                    // 高亮电话号码中的匹配文字（包括后四位）
+                    const phoneRegex = new RegExp(`(${this.escapeRegex(highlightKeyword)})`, 'gi');
+                    displayPhone = displayPhone.replace(phoneRegex, '<mark class="highlight">$1</mark>');
+                }
+
+                const isMatched = highlightKeyword && (
+                    contact.name.toLowerCase().includes(highlightKeyword.toLowerCase()) ||
+                    contact.phone.includes(highlightKeyword) ||
+                    (contact.phone.length >= 4 && contact.phone.slice(-4) === highlightKeyword)
+                );
+
+                return `
+                    <div class="contact-item ${isMatched ? 'matched' : ''}" data-index="${index}" data-id="${contact.id || index}">
+                        <div class="contact-info">
+                            <div class="contact-name">${displayName}</div>
+                            <div class="contact-phone">${displayPhone}</div>
+                        </div>
+                        <div class="contact-actions">
+                            <button class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
+                            <button class="contact-delete" data-id="${contact.id || index}">删除</button>
+                        </div>
                     </div>
-                    <div class="contact-actions">
-                        <button class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
-                        <button class="contact-delete" data-id="${contact.id || index}">删除</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             // 绑定删除事件
             list.querySelectorAll('.contact-delete').forEach(btn => {
                 btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const id = e.target.dataset.id;
                     this.deleteContact(id);
                 });
@@ -1670,6 +1695,7 @@ class OfficeDashboard {
 
     /**
      * 搜索过滤通讯录
+     * 支持：姓名模糊搜索、电话号码搜索、后四位尾号搜索
      */
     filterContacts(keyword) {
         if (!keyword) {
@@ -1677,16 +1703,32 @@ class OfficeDashboard {
             return;
         }
 
-        keyword = keyword.toLowerCase();
-        const filtered = this.contacts.filter(c => 
-            c.name.toLowerCase().includes(keyword) || 
-            c.phone.includes(keyword)
-        );
-        this.renderContacts(filtered);
+        keyword = keyword.toLowerCase().trim();
+        
+        // 支持后四位尾号搜索
+        const filtered = this.contacts.filter(c => {
+            const nameMatch = c.name.toLowerCase().includes(keyword);
+            const phoneMatch = c.phone.includes(keyword);
+            // 后四位尾号匹配
+            const lastFourMatch = c.phone.length >= 4 && c.phone.slice(-4) === keyword;
+            return nameMatch || phoneMatch || lastFourMatch;
+        });
+        
+        // 渲染并滚动到第一个匹配项
+        this.renderContacts(filtered, keyword);
+        
+        // 滚动到第一个匹配的联系人
+        setTimeout(() => {
+            const firstMatch = document.querySelector('.contact-item.matched');
+            if (firstMatch) {
+                firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
     }
 
     /**
      * 从Excel导入通讯录
+     * 支持自动识别姓名和电话列
      */
     async importContactsFromExcel(file) {
         if (!syncManager.isLoggedIn()) {
@@ -1715,40 +1757,120 @@ class OfficeDashboard {
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            // 跳过标题行，解析数据
-            let imported = 0;
-            for (let i = 1; i < jsonData.length; i++) {
-                const row = jsonData[i];
-                if (row && row.length >= 2) {
-                    const name = String(row[0] || '').trim();
-                    const phone = String(row[1] || '').trim();
-                    
-                    if (name && phone) {
-                        // 检查是否已存在
-                        const exists = this.contacts.some(c => c.name === name && c.phone === phone);
-                        if (!exists) {
-                            this.contacts.push({
-                                id: Date.now().toString() + '_' + i,
-                                name,
-                                phone,
-                                createdAt: new Date().toISOString()
-                            });
-                            imported++;
-                        }
-                    }
-                }
+            if (jsonData.length < 2) {
+                alert('Excel文件为空或只有标题行');
+                return;
             }
 
-            if (imported > 0) {
-                await this.saveContacts();
-                this.renderContacts(this.contacts);
-                alert(`成功导入 ${imported} 个联系人`);
-            } else {
-                alert('没有新的联系人可导入');
+            // 智能识别姓名和电话列
+            const headerRow = jsonData[0] || [];
+            let nameColIndex = -1;
+            let phoneColIndex = -1;
+
+            // 遍历标题行查找姓名和电话列
+            headerRow.forEach((cell, index) => {
+                const cellText = String(cell || '').toLowerCase().trim();
+                // 识别姓名列
+                if (nameColIndex === -1 && (
+                    cellText.includes('姓名') || 
+                    cellText.includes('名字') || 
+                    cellText === 'name' ||
+                    cellText === '联系人'
+                )) {
+                    nameColIndex = index;
+                }
+                // 识别电话列
+                if (phoneColIndex === -1 && (
+                    cellText.includes('电话') || 
+                    cellText.includes('手机') || 
+                    cellText.includes('联系方式') ||
+                    cellText === 'phone' ||
+                    cellText === 'tel' ||
+                    cellText === 'mobile'
+                )) {
+                    phoneColIndex = index;
+                }
+            });
+
+            // 如果没有识别到标题，尝试自动检测数据类型
+            if (nameColIndex === -1 || phoneColIndex === -1) {
+                // 检查第二行数据，自动判断
+                const secondRow = jsonData[1] || [];
+                secondRow.forEach((cell, index) => {
+                    const cellText = String(cell || '').trim();
+                    // 检测是否为电话号码（包含数字，可能带横线或空格）
+                    const phonePattern = /^[\d\s\-]+$/
+                    const hasDigits = /\d{7,}/.test(cellText);
+                    
+                    if (phoneColIndex === -1 && hasDigits && phonePattern.test(cellText)) {
+                        phoneColIndex = index;
+                    } else if (nameColIndex === -1 && !hasDigits && cellText.length <= 20) {
+                        nameColIndex = index;
+                    }
+                });
+            }
+
+            // 默认使用前两列
+            if (nameColIndex === -1) nameColIndex = 0;
+            if (phoneColIndex === -1) phoneColIndex = 1;
+
+            console.log(`识别到姓名列: ${nameColIndex}, 电话列: ${phoneColIndex}`);
+
+            // 解析数据
+            let imported = 0;
+            let skipped = 0;
+            const startRow = 1; // 跳过标题行
+
+            for (let i = startRow; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length === 0) continue;
+
+                const name = String(row[nameColIndex] || '').trim();
+                let phone = String(row[phoneColIndex] || '').trim();
+                
+                // 清理电话号码格式（移除空格、横线等）
+                phone = phone.replace(/[\s\-]/g, '');
+
+                if (name && phone && phone.length >= 7) {
+                    // 检查是否已存在（按电话号码判断）
+                    const exists = this.contacts.some(c => {
+                        const existingPhone = c.phone.replace(/[\s\-]/g, '');
+                        return existingPhone === phone;
+                    });
+                    
+                    if (!exists) {
+                        this.contacts.push({
+                            id: Date.now().toString() + '_' + i,
+                            name,
+                            phone,
+                            createdAt: new Date().toISOString()
+                        });
+                        imported++;
+                    } else {
+                        skipped++;
+                    }
+                } else if (name || phone) {
+                    skipped++;
+                    console.log(`跳过无效行 ${i}: 姓名="${name}", 电话="${phone}"`);
+                }
             }
 
             // 清空文件选择
             document.getElementById('importContactsFile').value = '';
+
+            if (imported > 0) {
+                await this.saveContacts();
+                this.renderContacts(this.contacts);
+                let message = `成功导入 ${imported} 个联系人`;
+                if (skipped > 0) {
+                    message += `\n（跳过 ${skipped} 个重复或无效项）`;
+                }
+                alert(message);
+            } else if (skipped > 0) {
+                alert(`没有新的联系人可导入\n（跳过 ${skipped} 个重复或无效项）`);
+            } else {
+                alert('未找到有效的联系人数据\n\n请确保Excel包含"姓名"和"电话"两列');
+            }
 
         } catch (e) {
             console.error('导入Excel失败:', e);
@@ -1763,6 +1885,13 @@ class OfficeDashboard {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * 正则表达式特殊字符转义
+     */
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     /**
