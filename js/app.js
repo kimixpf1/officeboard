@@ -4753,11 +4753,26 @@ class OfficeDashboard {
     async updateRecurringGroupStatus(originalItem, updates) {
         console.log('updateRecurringGroupStatus 开始:', { originalItem, updates });
         
+        // 获取所有事项
         const allItems = await db.getAllItems();
-        const groupItems = allItems.filter(item => 
-            item.recurringGroupId === originalItem.recurringGroupId && 
-            item.occurrenceIndex >= originalItem.occurrenceIndex
-        );
+        console.log('数据库中所有事项数量:', allItems.length);
+        console.log('所有周期性任务:', allItems.filter(i => i.recurringGroupId).map(i => ({
+            id: i.id,
+            title: i.title,
+            recurringGroupId: i.recurringGroupId,
+            occurrenceIndex: i.occurrenceIndex
+        })));
+        
+        // 筛选同一组的后续周期任务
+        // 注意：需要处理 occurrenceIndex 可能为 undefined 的情况
+        const currentIndex = originalItem.occurrenceIndex || 0;
+        const groupItems = allItems.filter(item => {
+            // 检查 recurringGroupId 是否匹配
+            if (item.recurringGroupId !== originalItem.recurringGroupId) return false;
+            // 检查 occurrenceIndex（如果当前项没有 occurrenceIndex，则更新所有同组任务）
+            const itemIndex = item.occurrenceIndex || 0;
+            return itemIndex >= currentIndex;
+        });
 
         console.log('找到的周期任务:', { 
             groupId: originalItem.recurringGroupId, 
@@ -4768,6 +4783,9 @@ class OfficeDashboard {
 
         if (groupItems.length === 0) {
             console.warn('没有找到后续周期任务');
+            // 即使没有找到其他项，也更新当前项
+            await db.updateItem(originalItem.id, updates);
+            await this.loadItems();
             return;
         }
 
@@ -4785,7 +4803,7 @@ class OfficeDashboard {
             await db.updateItem(groupItem.id, updateData);
         }
 
-        console.log('批量更新完成');
+        console.log('批量更新完成，共更新', groupItems.length, '项');
         await this.loadItems();
         // 立即同步到云端
         if (syncManager.isLoggedIn()) {
