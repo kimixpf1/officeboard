@@ -4751,32 +4751,35 @@ class OfficeDashboard {
      * @param {Object} updates - 更新内容
      */
     async updateRecurringGroupStatus(originalItem, updates) {
-        console.log('updateRecurringGroupStatus 开始:', { 
-            originalItem, 
-            updates,
-            recurringGroupId: originalItem?.recurringGroupId,
-            recurringGroupIdType: typeof originalItem?.recurringGroupId,
-            occurrenceIndex: originalItem?.occurrenceIndex,
-            occurrenceIndexType: typeof originalItem?.occurrenceIndex
-        });
+        console.log('=== updateRecurringGroupStatus 开始 ===');
+        console.log('原始任务:', originalItem);
+        console.log('更新内容:', updates);
+        console.log('recurringGroupId:', originalItem?.recurringGroupId);
+        console.log('occurrenceIndex:', originalItem?.occurrenceIndex);
         
         // 获取所有事项
         const allItems = await db.getAllItems();
         console.log('数据库中所有事项数量:', allItems.length);
-        console.log('所有周期性任务:', allItems.filter(i => i.recurringGroupId).map(i => ({
+        
+        // 检查周期性任务
+        const allRecurringTasks = allItems.filter(i => i.recurringGroupId);
+        console.log('所有周期性任务数量:', allRecurringTasks.length);
+        console.log('所有周期性任务详情:', allRecurringTasks.map(i => ({
             id: i.id,
             title: i.title,
             recurringGroupId: i.recurringGroupId,
-            recurringGroupIdType: typeof i.recurringGroupId,
-            occurrenceIndex: i.occurrenceIndex
+            occurrenceIndex: i.occurrenceIndex,
+            sunk: i.sunk,
+            pinned: i.pinned
         })));
         
         // 检查 recurringGroupId 是否存在
         if (!originalItem.recurringGroupId) {
-            console.error('originalItem.recurringGroupId 为空！');
+            console.error('❌ originalItem.recurringGroupId 为空！');
             // 仍然更新当前项
             await db.updateItem(originalItem.id, updates);
             await this.loadItems();
+            this.showError('该任务没有周期组ID，仅更新了当前项');
             return;
         }
         
@@ -4785,27 +4788,33 @@ class OfficeDashboard {
         const targetGroupId = String(originalItem.recurringGroupId);
         const currentIndex = parseInt(originalItem.occurrenceIndex) || 0;
         
-        console.log('筛选条件:', { targetGroupId, currentIndex });
+        console.log('筛选条件 - targetGroupId:', targetGroupId, 'currentIndex:', currentIndex);
         
         const groupItems = allItems.filter(item => {
-            const itemGroupId = String(item.recurringGroupId || '');
+            if (!item.recurringGroupId) return false;
+            
+            const itemGroupId = String(item.recurringGroupId);
             const itemIndex = parseInt(item.occurrenceIndex) || 0;
             const matches = itemGroupId === targetGroupId && itemIndex >= currentIndex;
-            if (item.recurringGroupId) {
-                console.log(`检查任务 ${item.id}: groupId=${itemGroupId}, index=${itemIndex}, 匹配=${matches}`);
-            }
+            
+            console.log(`检查任务: id=${item.id}, title="${item.title}", groupId=${itemGroupId}, index=${itemIndex}, 匹配=${matches}`);
+            
             return matches;
         });
 
-        console.log('找到的周期任务:', { 
-            count: groupItems.length,
-            items: groupItems.map(i => ({ id: i.id, title: i.title, occurrenceIndex: i.occurrenceIndex, sunk: i.sunk }))
-        });
+        console.log('✅ 找到的周期任务数量:', groupItems.length);
+        console.log('匹配的任务:', groupItems.map(i => ({
+            id: i.id,
+            title: i.title,
+            occurrenceIndex: i.occurrenceIndex,
+            sunk: i.sunk
+        })));
 
         if (groupItems.length === 0) {
-            console.warn('没有找到后续周期任务，只更新当前项');
+            console.warn('⚠️ 没有找到后续周期任务，只更新当前项');
             await db.updateItem(originalItem.id, updates);
             await this.loadItems();
+            this.showError('未找到其他周期任务，仅更新了当前项');
             return;
         }
 
@@ -4813,22 +4822,36 @@ class OfficeDashboard {
         this.saveUndoHistory('update', { items: groupItems.map(i => ({ ...i })) });
 
         // 批量更新
+        let successCount = 0;
         for (const groupItem of groupItems) {
             const updateData = { ...updates };
             // 清理undefined值
             Object.keys(updateData).forEach(key => {
                 if (updateData[key] === undefined) delete updateData[key];
             });
+            
             console.log(`更新任务 ${groupItem.id} (${groupItem.title}):`, updateData);
-            await db.updateItem(groupItem.id, updateData);
+            
+            try {
+                await db.updateItem(groupItem.id, updateData);
+                successCount++;
+                console.log(`✅ 更新成功: ${groupItem.id}`);
+            } catch (err) {
+                console.error(`❌ 更新失败: ${groupItem.id}`, err);
+            }
         }
 
-        console.log('批量更新完成，共更新', groupItems.length, '项');
+        console.log(`=== 批量更新完成，成功 ${successCount}/${groupItems.length} 项 ===`);
+        
         await this.loadItems();
+        
         // 立即同步到云端
         if (syncManager.isLoggedIn()) {
+            console.log('同步到云端...');
             await syncManager.immediateSyncToCloud();
         }
+        
+        this.showSuccess(`已更新 ${successCount} 个周期任务`);
     }
 
     /**

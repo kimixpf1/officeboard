@@ -116,14 +116,25 @@ class Database {
 
             checkRequest.onsuccess = () => {
                 if (checkRequest.result) {
-                    console.log('事项已存在，跳过添加:', item.title);
-                    resolve(checkRequest.result.id);
-                    return;
+                    // 已存在相同的hash，但可能是不同的周期性任务
+                    // 检查是否是同一周期的任务
+                    const existing = checkRequest.result;
+                    if (item.recurringGroupId && existing.recurringGroupId === item.recurringGroupId) {
+                        console.log('同一周期任务已存在，跳过:', item.title, 'occurrenceIndex:', item.occurrenceIndex);
+                        resolve(existing.id);
+                        return;
+                    }
+                    // 不同周期的任务，修改hash后重新添加
+                    item.hash = item.hash + '_' + Date.now();
+                    console.log('hash冲突，重新生成hash:', item.title, 'new hash:', item.hash);
                 }
 
                 // 不存在则添加
                 const addRequest = store.add(item);
-                addRequest.onsuccess = () => resolve(addRequest.result);
+                addRequest.onsuccess = () => {
+                    console.log('添加事项成功:', item.title, 'id:', addRequest.result, 'recurringGroupId:', item.recurringGroupId);
+                    resolve(addRequest.result);
+                };
                 addRequest.onerror = () => reject(addRequest.error);
             };
 
