@@ -214,6 +214,29 @@ class CalendarView {
     }
 
     /**
+     * 检查日期是否是工作日（不含周末和节假日）
+     */
+    isWorkday(dateStr) {
+        const date = new Date(dateStr);
+        const dayOfWeek = date.getDay();
+        
+        // 周六=6, 周日=0
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            return false;
+        }
+        
+        // 简单节假日检查（可扩展）
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const holidays = [
+            '1-1', '1-2', '1-3',  // 元旦
+            '5-1', '5-2', '5-3',  // 劳动节
+            '10-1', '10-2', '10-3', '10-4', '10-5', '10-6', '10-7'  // 国庆
+        ];
+        return !holidays.includes(`${month}-${day}`);
+    }
+
+    /**
      * 渲染周视图
      */
     renderWeekView(items) {
@@ -263,13 +286,18 @@ class CalendarView {
                     const deadlineDate = item.deadline.split('T')[0];
                     return deadlineDate === dateStr;
                 }
-                // 办文：按办文日期范围（支持跨天）
+                // 办文：按办文日期范围（支持跨天），支持跳过周末
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
                     if (startDate && endDate) {
                         // 跨天办文：检查日期范围
-                        return dateStr >= startDate && dateStr <= endDate;
+                        const inRange = dateStr >= startDate && dateStr <= endDate;
+                        // 如果启用了跳过周末和节假日
+                        if (inRange && item.skipWeekend) {
+                            return this.isWorkday(dateStr);
+                        }
+                        return inRange;
                     }
                     if (startDate) {
                         return startDate === dateStr;
@@ -385,13 +413,18 @@ class CalendarView {
                 if (item.type === 'todo' && item.deadline) {
                     return item.deadline.startsWith(dateStr);
                 }
-                // 办文：按办文日期范围（支持跨天）
+                // 办文：按办文日期范围（支持跨天），支持跳过周末
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
                     if (startDate && endDate) {
                         // 跨天办文：检查日期范围
-                        return dateStr >= startDate && dateStr <= endDate;
+                        const inRange = dateStr >= startDate && dateStr <= endDate;
+                        // 如果启用了跳过周末和节假日
+                        if (inRange && item.skipWeekend) {
+                            return this.isWorkday(dateStr);
+                        }
+                        return inRange;
                     }
                     if (startDate) {
                         return startDate === dateStr;
