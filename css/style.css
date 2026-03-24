@@ -3083,15 +3083,55 @@ body {
 
 /* 搜索匹配高亮样式 */
 .contact-item.matched {
-    background: #fef3c7;
+    background: #fffbeb;
     border-left: 3px solid #f59e0b;
 }
 
+.contact-item.matched .contact-name,
+.contact-item.matched .contact-phone {
+    color: #1f2937;
+}
+
 mark.highlight {
-    background: #fbbf24;
-    color: #78350f;
+    background: #fef3c7;
+    color: #92400e;
     padding: 0 2px;
     border-radius: 2px;
+}
+
+/* 联系人复选框样式 */
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.contact-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.contact-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 批量删除按钮 */
+.btn-batch-delete {
+    padding: 4px 10px;
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-batch-delete:hover {
+    background: #fecaca;
 }
 
 /* 面板内容区 - 全屏高度 */

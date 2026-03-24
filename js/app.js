@@ -1509,6 +1509,14 @@ class OfficeDashboard {
             });
         }
 
+        // 批量删除按钮
+        const batchDeleteBtn = document.getElementById('batchDeleteContactsBtn');
+        if (batchDeleteBtn) {
+            batchDeleteBtn.addEventListener('click', () => {
+                this.batchDeleteContacts();
+            });
+        }
+
         // 初始加载
         this.loadContacts();
     }
@@ -1558,6 +1566,9 @@ class OfficeDashboard {
 
         if (contacts.length === 0) {
             list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">暂无联系人</div>';
+            // 隐藏批量删除按钮
+            const batchDeleteBtn = document.getElementById('batchDeleteContactsBtn');
+            if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
         } else {
             list.innerHTML = contacts.map((contact, index) => {
                 // 高亮匹配的文字
@@ -1582,6 +1593,7 @@ class OfficeDashboard {
 
                 return `
                     <div class="contact-item ${isMatched ? 'matched' : ''}" data-index="${index}" data-id="${contact.id || index}">
+                        <input type="checkbox" class="contact-checkbox" data-id="${contact.id || index}">
                         <div class="contact-info">
                             <div class="contact-name">${displayName}</div>
                             <div class="contact-phone">${displayPhone}</div>
@@ -1602,11 +1614,50 @@ class OfficeDashboard {
                     this.deleteContact(id);
                 });
             });
+
+            // 绑定复选框事件
+            list.querySelectorAll('.contact-checkbox').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    this.updateBatchDeleteButton();
+                });
+            });
         }
 
         if (status) {
             status.textContent = `共 ${contacts.length} 个联系人`;
         }
+    }
+
+    /**
+     * 更新批量删除按钮状态
+     */
+    updateBatchDeleteButton() {
+        const checkedCount = document.querySelectorAll('.contact-checkbox:checked').length;
+        const batchDeleteBtn = document.getElementById('batchDeleteContactsBtn');
+        if (batchDeleteBtn) {
+            batchDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+            batchDeleteBtn.textContent = `删除选中 (${checkedCount})`;
+        }
+    }
+
+    /**
+     * 批量删除选中的联系人
+     */
+    async batchDeleteContacts() {
+        const checkedBoxes = document.querySelectorAll('.contact-checkbox:checked');
+        if (checkedBoxes.length === 0) return;
+
+        if (!confirm(`确定删除选中的 ${checkedBoxes.length} 个联系人？`)) return;
+
+        const idsToDelete = Array.from(checkedBoxes).map(cb => cb.dataset.id);
+        this.contacts = this.contacts.filter(c => !idsToDelete.includes(c.id) && !idsToDelete.includes(String(c.id)));
+
+        await this.saveContacts();
+        this.renderContacts(this.contacts);
+
+        // 隐藏批量删除按钮
+        const batchDeleteBtn = document.getElementById('batchDeleteContactsBtn');
+        if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
     }
 
     /**
@@ -1818,6 +1869,7 @@ class OfficeDashboard {
 
             // 解析数据
             let imported = 0;
+            let updated = 0;
             let skipped = 0;
             const startRow = 1; // 跳过标题行
 
@@ -1827,18 +1879,28 @@ class OfficeDashboard {
 
                 const name = String(row[nameColIndex] || '').trim();
                 let phone = String(row[phoneColIndex] || '').trim();
-                
+
                 // 清理电话号码格式（移除空格、横线等）
                 phone = phone.replace(/[\s\-]/g, '');
 
                 if (name && phone && phone.length >= 7) {
-                    // 检查是否已存在（按电话号码判断）
-                    const exists = this.contacts.some(c => {
-                        const existingPhone = c.phone.replace(/[\s\-]/g, '');
-                        return existingPhone === phone;
-                    });
-                    
-                    if (!exists) {
+                    // 检查是否已存在相同姓名的联系人
+                    const existingIndex = this.contacts.findIndex(c =>
+                        c.name === name
+                    );
+
+                    if (existingIndex >= 0) {
+                        // 相同姓名，更新电话号码
+                        const existingPhone = this.contacts[existingIndex].phone.replace(/[\s\-]/g, '');
+                        if (existingPhone !== phone) {
+                            this.contacts[existingIndex].phone = phone;
+                            this.contacts[existingIndex].updatedAt = new Date().toISOString();
+                            updated++;
+                        } else {
+                            skipped++; // 姓名和电话都相同，跳过
+                        }
+                    } else {
+                        // 新联系人，添加
                         this.contacts.push({
                             id: Date.now().toString() + '_' + i,
                             name,
@@ -1846,8 +1908,6 @@ class OfficeDashboard {
                             createdAt: new Date().toISOString()
                         });
                         imported++;
-                    } else {
-                        skipped++;
                     }
                 } else if (name || phone) {
                     skipped++;
@@ -1858,10 +1918,17 @@ class OfficeDashboard {
             // 清空文件选择
             document.getElementById('importContactsFile').value = '';
 
-            if (imported > 0) {
+            const totalChanged = imported + updated;
+            if (totalChanged > 0) {
                 await this.saveContacts();
                 this.renderContacts(this.contacts);
-                let message = `成功导入 ${imported} 个联系人`;
+                let message = '';
+                if (imported > 0) {
+                    message += `新增 ${imported} 个联系人`;
+                }
+                if (updated > 0) {
+                    message += (message ? '\n' : '') + `更新 ${updated} 个联系人电话`;
+                }
                 if (skipped > 0) {
                     message += `\n（跳过 ${skipped} 个重复或无效项）`;
                 }
