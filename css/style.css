@@ -1146,9 +1146,9 @@ body {
 
 .month-cell {
     background: var(--bg-primary);
-    min-height: 80px;
+    min-height: 120px;
     height: auto;
-    max-height: 200px;
+    max-height: 400px;
     padding: var(--spacing-2);
     cursor: pointer;
     overflow-y: auto;
