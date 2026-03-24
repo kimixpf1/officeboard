@@ -4751,7 +4751,14 @@ class OfficeDashboard {
      * @param {Object} updates - 更新内容
      */
     async updateRecurringGroupStatus(originalItem, updates) {
-        console.log('updateRecurringGroupStatus 开始:', { originalItem, updates });
+        console.log('updateRecurringGroupStatus 开始:', { 
+            originalItem, 
+            updates,
+            recurringGroupId: originalItem?.recurringGroupId,
+            recurringGroupIdType: typeof originalItem?.recurringGroupId,
+            occurrenceIndex: originalItem?.occurrenceIndex,
+            occurrenceIndexType: typeof originalItem?.occurrenceIndex
+        });
         
         // 获取所有事项
         const allItems = await db.getAllItems();
@@ -4760,30 +4767,43 @@ class OfficeDashboard {
             id: i.id,
             title: i.title,
             recurringGroupId: i.recurringGroupId,
+            recurringGroupIdType: typeof i.recurringGroupId,
             occurrenceIndex: i.occurrenceIndex
         })));
         
+        // 检查 recurringGroupId 是否存在
+        if (!originalItem.recurringGroupId) {
+            console.error('originalItem.recurringGroupId 为空！');
+            // 仍然更新当前项
+            await db.updateItem(originalItem.id, updates);
+            await this.loadItems();
+            return;
+        }
+        
         // 筛选同一组的后续周期任务
-        // 注意：需要处理 occurrenceIndex 可能为 undefined 的情况
-        const currentIndex = originalItem.occurrenceIndex || 0;
+        // 使用 String() 确保类型一致进行比较
+        const targetGroupId = String(originalItem.recurringGroupId);
+        const currentIndex = parseInt(originalItem.occurrenceIndex) || 0;
+        
+        console.log('筛选条件:', { targetGroupId, currentIndex });
+        
         const groupItems = allItems.filter(item => {
-            // 检查 recurringGroupId 是否匹配
-            if (item.recurringGroupId !== originalItem.recurringGroupId) return false;
-            // 检查 occurrenceIndex（如果当前项没有 occurrenceIndex，则更新所有同组任务）
-            const itemIndex = item.occurrenceIndex || 0;
-            return itemIndex >= currentIndex;
+            const itemGroupId = String(item.recurringGroupId || '');
+            const itemIndex = parseInt(item.occurrenceIndex) || 0;
+            const matches = itemGroupId === targetGroupId && itemIndex >= currentIndex;
+            if (item.recurringGroupId) {
+                console.log(`检查任务 ${item.id}: groupId=${itemGroupId}, index=${itemIndex}, 匹配=${matches}`);
+            }
+            return matches;
         });
 
         console.log('找到的周期任务:', { 
-            groupId: originalItem.recurringGroupId, 
-            currentIndex: originalItem.occurrenceIndex,
             count: groupItems.length,
-            items: groupItems.map(i => ({ id: i.id, title: i.title, occurrenceIndex: i.occurrenceIndex }))
+            items: groupItems.map(i => ({ id: i.id, title: i.title, occurrenceIndex: i.occurrenceIndex, sunk: i.sunk }))
         });
 
         if (groupItems.length === 0) {
-            console.warn('没有找到后续周期任务');
-            // 即使没有找到其他项，也更新当前项
+            console.warn('没有找到后续周期任务，只更新当前项');
             await db.updateItem(originalItem.id, updates);
             await this.loadItems();
             return;
@@ -4799,7 +4819,7 @@ class OfficeDashboard {
             Object.keys(updateData).forEach(key => {
                 if (updateData[key] === undefined) delete updateData[key];
             });
-            console.log(`更新任务 ${groupItem.id}:`, updateData);
+            console.log(`更新任务 ${groupItem.id} (${groupItem.title}):`, updateData);
             await db.updateItem(groupItem.id, updateData);
         }
 
