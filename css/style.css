@@ -1132,9 +1132,13 @@ body {
     border: 1px solid var(--border-color);
 }
 
+.month-title {
+    display: none;
+}
+
 .month-header {
     background: var(--gray-100);
-    padding: var(--spacing-3);
+    padding: var(--spacing-2);
     text-align: center;
     font-weight: 600;
     font-size: var(--font-size-sm);
@@ -1142,9 +1146,9 @@ body {
 
 .month-cell {
     background: var(--bg-primary);
-    min-height: 100px;
-    height: 120px;
-    max-height: 150px;
+    min-height: 80px;
+    height: auto;
+    max-height: 200px;
     padding: var(--spacing-2);
     cursor: pointer;
     overflow-y: auto;
