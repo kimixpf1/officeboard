@@ -1517,6 +1517,14 @@ class OfficeDashboard {
             });
         }
 
+        // 监听云端同步事件（其他设备更新时）
+        document.addEventListener('contactsSynced', (e) => {
+            const newContacts = e.detail.contacts;
+            this.contacts = newContacts;
+            this.renderContacts(newContacts);
+            console.log('通讯录已从云端同步');
+        });
+
         // 初始加载
         this.loadContacts();
     }

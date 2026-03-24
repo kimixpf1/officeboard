@@ -272,7 +272,7 @@ class SyncManager {
                 settings: settings,
                 memo: localStorage.getItem('office_memo_content') || '',
                 links: localStorage.getItem('office_links') || '',
-                links: localStorage.getItem('office_links') || '',
+                contacts: localStorage.getItem('office_contacts') || '',
                 device_info: navigator.userAgent
             };
 
@@ -339,8 +339,16 @@ class SyncManager {
             // 同步网站
             if (cloudData.data.links !== undefined) {
                 localStorage.setItem('office_links', cloudData.data.links);
-                document.dispatchEvent(new CustomEvent('linksSynced', { 
-                    detail: { links: JSON.parse(cloudData.data.links || '[]') } 
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: JSON.parse(cloudData.data.links || '[]') }
+                }));
+            }
+
+            // 同步通讯录
+            if (cloudData.data.contacts !== undefined) {
+                localStorage.setItem('office_contacts', cloudData.data.contacts);
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: JSON.parse(cloudData.data.contacts || '[]') }
                 }));
             }
 
@@ -457,8 +465,21 @@ class SyncManager {
                 if (cloudLinks !== localLinks) {
                     console.log('同步网站（云端版本）');
                     localStorage.setItem('office_links', cloudLinks);
-                    document.dispatchEvent(new CustomEvent('linksSynced', { 
-                        detail: { links: JSON.parse(cloudLinks || '[]') } 
+                    document.dispatchEvent(new CustomEvent('linksSynced', {
+                        detail: { links: JSON.parse(cloudLinks || '[]') }
+                    }));
+                }
+            }
+
+            // 同步通讯录（云端优先）
+            if (cloudData.data.contacts !== undefined) {
+                const cloudContacts = cloudData.data.contacts;
+                const localContacts = localStorage.getItem('office_contacts') || '';
+                if (cloudContacts !== localContacts) {
+                    console.log('同步通讯录（云端版本）');
+                    localStorage.setItem('office_contacts', cloudContacts);
+                    document.dispatchEvent(new CustomEvent('contactsSynced', {
+                        detail: { contacts: JSON.parse(cloudContacts || '[]') }
                     }));
                 }
             }
@@ -667,8 +688,16 @@ class SyncManager {
             // 同步网站
             if (data.data.links !== undefined) {
                 localStorage.setItem('office_links', data.data.links);
-                document.dispatchEvent(new CustomEvent('linksSynced', { 
-                    detail: { links: JSON.parse(data.data.links || '[]') } 
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: JSON.parse(data.data.links || '[]') }
+                }));
+            }
+
+            // 同步通讯录
+            if (data.data.contacts !== undefined) {
+                localStorage.setItem('office_contacts', data.data.contacts);
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: JSON.parse(data.data.contacts || '[]') }
                 }));
             }
 
@@ -1070,10 +1099,19 @@ class SyncManager {
             // 同步网站
             if (data.data.links !== undefined) {
                 localStorage.setItem('office_links', data.data.links);
-                document.dispatchEvent(new CustomEvent('linksSynced', { 
-                    detail: { links: JSON.parse(data.data.links || '[]') } 
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: JSON.parse(data.data.links || '[]') }
                 }));
                 console.log('已同步网站');
+            }
+
+            // 同步通讯录
+            if (data.data.contacts !== undefined) {
+                localStorage.setItem('office_contacts', data.data.contacts);
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: JSON.parse(data.data.contacts || '[]') }
+                }));
+                console.log('已同步通讯录');
             }
 
             // 同步事项数据
