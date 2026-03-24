@@ -244,20 +244,37 @@ class Database {
 
     /**
      * 获取日期范围内的事项
-     * 支持 date 字段（会议）和 deadline 字段（待办）
+     * 支持 date 字段（会议）、deadline 字段（待办）、docStartDate/docEndDate 字段（办文）
      */
     async getItemsByDateRange(startDate, endDate) {
         const allItems = await this.getAllItems();
 
         return allItems.filter(item => {
-            // 会议：使用 date 字段
-            if (item.date) {
-                return item.date >= startDate && item.date <= endDate;
+            // 会议：使用 date 字段（支持跨天会议）
+            if (item.type === 'meeting' && item.date) {
+                const meetingStart = item.date;
+                const meetingEnd = item.endDate || item.date;
+                // 检查会议日期范围是否与查询范围有交集
+                return meetingStart <= endDate && meetingEnd >= startDate;
             }
             // 待办：使用 deadline 字段
-            if (item.deadline) {
+            if (item.type === 'todo' && item.deadline) {
                 const deadlineDate = item.deadline.split('T')[0];
                 return deadlineDate >= startDate && deadlineDate <= endDate;
+            }
+            // 办文：使用 docStartDate/docEndDate 字段
+            if (item.type === 'document') {
+                const docStart = item.docStartDate || item.docDate;
+                const docEnd = item.docEndDate || docStart;
+                if (docStart) {
+                    // 检查办文日期范围是否与查询范围有交集
+                    return docStart <= endDate && docEnd >= startDate;
+                }
+                // 兼容旧数据：使用 createdAt
+                if (item.createdAt) {
+                    const createdDate = item.createdAt.split('T')[0];
+                    return createdDate >= startDate && createdDate <= endDate;
+                }
             }
             return false;
         });
