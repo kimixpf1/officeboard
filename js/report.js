@@ -83,7 +83,9 @@ class ReportGenerator {
         const titles = {
             daily: '工作日报',
             weekly: '工作周报',
-            monthly: '工作月报'
+            monthly: '工作月报',
+            yearly: '工作年报',
+            custom: '工作报告'
         };
         return titles[reportType] || '工作报告';
     }
@@ -451,7 +453,7 @@ class ReportGenerator {
     /**
      * 获取日期范围
      */
-    getDateRange(reportType, date = new Date()) {
+    getDateRange(reportType, date = new Date(), customStart = null, customEnd = null) {
         const year = date.getFullYear();
         const month = date.getMonth();
         const day = date.getDate();
@@ -484,10 +486,158 @@ class ReportGenerator {
                     end: formatLocalDate(monthEnd)
                 };
 
-            default:
+            case 'yearly':
+                const yearStart = new Date(year, 0, 1);
+                const yearEnd = new Date(year, 11, 31);
+                return {
+                    start: formatLocalDate(yearStart),
+                    end: formatLocalDate(yearEnd)
+                };
+
+            case 'custom':
+                if (customStart && customEnd) {
+                    return { start: customStart, end: customEnd };
+                }
                 const defaultStr = formatLocalDate(date);
                 return { start: defaultStr, end: defaultStr };
+
+            default:
+                const defaultStr2 = formatLocalDate(date);
+                return { start: defaultStr2, end: defaultStr2 };
         }
+    }
+
+    /**
+     * 动态加载jsPDF库
+     */
+    async loadJsPDFLibrary() {
+        if (window.jspdf) return window.jspdf;
+
+        const cdnSources = [
+            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+            'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+        ];
+
+        for (const src of cdnSources) {
+            try {
+                await this.loadScript(src);
+                if (window.jspdf) {
+                    console.log('jsPDF库加载成功:', src);
+                    return window.jspdf;
+                }
+            } catch (e) {
+                console.warn('CDN加载失败:', src, e.message);
+            }
+        }
+
+        throw new Error('jsPDF库加载失败，请检查网络连接');
+    }
+
+    /**
+     * 导出为PDF文档
+     */
+    async exportToPDF(reportType, startDate, endDate) {
+        const report = await this.generateReportContent(reportType, startDate, endDate);
+
+        let jsPDFLib;
+        try {
+            jsPDFLib = await this.loadJsPDFLibrary();
+        } catch (error) {
+            throw new Error('PDF导出库加载失败: ' + error.message);
+        }
+
+        const { jsPDF } = jsPDFLib;
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        // 添加字体支持（使用内置字体）
+        doc.setFont('helvetica');
+
+        let yPosition = 20;
+        const pageHeight = 280;
+        const leftMargin = 15;
+        const lineHeight = 7;
+
+        // 标题
+        doc.setFontSize(18);
+        doc.text(report.title, 105, yPosition, { align: 'center' });
+        yPosition += 15;
+
+        // 日期和生成时间
+        doc.setFontSize(10);
+        doc.text(`报告期间：${report.dateRange}`, leftMargin, yPosition);
+        yPosition += 6;
+        doc.text(`生成时间：${new Date().toLocaleString('zh-CN')}`, leftMargin, yPosition);
+        yPosition += 12;
+
+        // 分割线
+        doc.setDrawColor(200);
+        doc.line(leftMargin, yPosition, 195, yPosition);
+        yPosition += 8;
+
+        // 内容
+        doc.setFontSize(11);
+        const lines = report.content.split('\n');
+
+        for (const line of lines) {
+            // 跳过标题和日期行（已处理）
+            if (line.includes(report.title) || line.startsWith('报告期间：') || line.startsWith('生成时间：')) {
+                continue;
+            }
+
+            // 检查是否需要换页
+            if (yPosition > pageHeight) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            if (line.startsWith('一、') || line.startsWith('二、') ||
+                line.startsWith('三、') || line.startsWith('四、') ||
+                line.startsWith('五、') || line.startsWith('六、')) {
+                // 章节标题
+                doc.setFontSize(13);
+                doc.setFont('helvetica', 'bold');
+                yPosition += 3;
+                doc.text(line, leftMargin, yPosition);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
+                yPosition += lineHeight + 2;
+            } else if (line.match(/^\d+\./)) {
+                // 列表项
+                doc.text('  ' + line, leftMargin, yPosition);
+                yPosition += lineHeight;
+            } else if (line.trim()) {
+                // 普通文本，处理自动换行
+                const maxWidth = 180;
+                const splitText = doc.splitTextToSize(line, maxWidth);
+                for (const text of splitText) {
+                    if (yPosition > pageHeight) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+                    doc.text(text, leftMargin, yPosition);
+                    yPosition += lineHeight;
+                }
+            } else {
+                yPosition += 3; // 空行
+            }
+        }
+
+        // 添加页脚
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.text(`第 ${i} 页 / 共 ${pageCount} 页`, 105, 290, { align: 'center' });
+        }
+
+        // 下载
+        doc.save(`${report.title}_${startDate}.pdf`);
+
+        return true;
     }
 }
 
