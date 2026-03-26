@@ -4329,6 +4329,12 @@ class OfficeDashboard {
         form.reset();
         document.getElementById('itemId').value = '';
         document.getElementById('itemType').value = type;
+        
+        // 清除周期性任务的隐藏字段（防止编辑后残留）
+        const recurringGroupIdInput = document.getElementById('recurringGroupId');
+        const occurrenceIndexInput = document.getElementById('occurrenceIndex');
+        if (recurringGroupIdInput) recurringGroupIdInput.value = '';
+        if (occurrenceIndexInput) occurrenceIndexInput.value = '';
 
         // 设置标题
         const typeLabels = { todo: '待办事项', meeting: '会议活动', document: '办文情况' };
@@ -4360,6 +4366,16 @@ class OfficeDashboard {
             console.log('设置会议日期:', dateStr);
             if (dateEl) dateEl.value = dateStr;
             if (timeEl) timeEl.value = timeStr;
+        } else if (type === 'document') {
+            // 重置办文周期性选项
+            const docRecurringFields = document.getElementById('docRecurringFields');
+            const docIsRecurring = document.getElementById('docIsRecurring');
+            if (docRecurringFields) docRecurringFields.style.display = 'none';
+            if (docIsRecurring) docIsRecurring.checked = false;
+            
+            // 设置默认开始日期
+            const docStartDateEl = document.getElementById('docStartDate');
+            if (docStartDateEl) docStartDateEl.value = dateStr;
         }
 
         this.showModal('itemModal');
@@ -4370,7 +4386,7 @@ class OfficeDashboard {
      * 初始化周期性任务相关事件
      */
     initRecurringEvents() {
-        // 周期性选项切换
+        // === 待办事项的周期性选项 ===
         const isRecurring = document.getElementById('isRecurring');
         const recurringFields = document.getElementById('recurringFields');
 
@@ -4416,6 +4432,23 @@ class OfficeDashboard {
                         if (monthlyWeekDayGroup) monthlyWeekDayGroup.style.display = 'block';
                         break;
                 }
+            };
+        }
+        
+        // === 办文的周期性选项 ===
+        const docIsRecurring = document.getElementById('docIsRecurring');
+        const docRecurringFields = document.getElementById('docRecurringFields');
+        const docRecurringType = document.getElementById('docRecurringType');
+
+        if (docIsRecurring && docRecurringFields) {
+            docIsRecurring.onchange = (e) => {
+                docRecurringFields.style.display = e.target.checked ? 'block' : 'none';
+            };
+        }
+
+        if (docRecurringType) {
+            docRecurringType.onchange = (e) => {
+                this.updateDocRecurringFieldsVisibility(e.target.value);
             };
         }
     }
@@ -4726,11 +4759,11 @@ class OfficeDashboard {
                         <div style="display: flex; flex-direction: column; gap: 12px;">
                             <button class="btn-primary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
                                 仅修改本项（保留周期性）
-                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">只修改当前日期的内容，方便记录当天特定信息</div>
+                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">独立记录当天的内容，不影响其他周期任务</div>
                             </button>
                             <button class="btn-secondary" id="recurringChoiceFuture" style="width: 100%; padding: 12px;">
                                 修改本项及未来所有周期
-                                <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新本项及之后的所有周期</div>
+                                <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新标题、经办人等信息到后续所有周期（日期保持不变）</div>
                             </button>
                             <button class="btn-secondary" id="recurringChoiceDetach" style="width: 100%; padding: 12px; border-color: #f59e0b; color: #f59e0b;">
                                 仅修改本项（脱离周期）
@@ -4775,26 +4808,41 @@ class OfficeDashboard {
     async updateRecurringGroup(originalItem, updates, groupId, fromIndex) {
         // 保存原始数据用于撤回
         const allItems = await db.getAllItems();
+        // 使用 String 转换确保类型一致
+        const targetGroupId = String(groupId);
         const groupItems = allItems.filter(item => 
-            item.recurringGroupId === groupId && 
-            item.occurrenceIndex >= fromIndex
+            String(item.recurringGroupId) === targetGroupId && 
+            parseInt(item.occurrenceIndex) >= parseInt(fromIndex)
         );
 
         // 保存所有原始数据
         this.saveUndoHistory('update', { items: groupItems.map(i => ({ ...i })) });
 
-        // 提取需要同步更新的字段（排除周期性相关字段和日期）
+        // 提取需要同步更新的字段（排除周期性相关字段和各类型的日期字段）
         const fieldsToUpdate = { ...updates };
+        // 周期性相关字段
         delete fieldsToUpdate.isRecurring;
         delete fieldsToUpdate.recurringRule;
         delete fieldsToUpdate.recurringCount;
         delete fieldsToUpdate.recurringGroupId;
         delete fieldsToUpdate.occurrenceIndex;
-        delete fieldsToUpdate.deadline; // 日期保持各自的
+        // 待办事项日期
+        delete fieldsToUpdate.deadline;
+        // 办文日期（每个周期有自己的日期）
+        delete fieldsToUpdate.docStartDate;
+        delete fieldsToUpdate.docEndDate;
+        delete fieldsToUpdate.docDate;
+        // 会议日期
+        delete fieldsToUpdate.date;
+        delete fieldsToUpdate.endDate;
+        // 其他不应同步的字段
         delete fieldsToUpdate.id;
         delete fieldsToUpdate.createdAt;
         delete fieldsToUpdate.completed;
         delete fieldsToUpdate.completedAt;
+        delete fieldsToUpdate.hash;
+
+        console.log('批量更新周期组:', { groupId, fromIndex, itemCount: groupItems.length, fieldsToUpdate });
 
         // 批量更新
         for (const groupItem of groupItems) {
@@ -5390,6 +5438,10 @@ class OfficeDashboard {
         delete cleanItem.recurringCount;
         delete cleanItem.displayTitle;
         delete cleanItem.deadline;
+        // 办文类型也需要移除日期字段，由 createRecurringItem 重新设置
+        delete cleanItem.docStartDate;
+        delete cleanItem.docEndDate;
+        delete cleanItem.docDate;
 
         const skipHolidays = rule.skipHolidays || false;
         
@@ -5565,16 +5617,35 @@ class OfficeDashboard {
 
     /**
      * 创建单个周期性任务项
+     * @param {Object} baseItem - 基础任务数据
+     * @param {Date} date - 周期日期
+     * @param {Object} rule - 周期规则
+     * @param {string} groupId - 周期组ID
+     * @param {number} index - 周期序号
+     * @returns {Object} 周期性任务项
      */
     createRecurringItem(baseItem, date, rule, groupId, index) {
-        return {
+        const dateStr = this.formatDateForInput(date);
+        const item = {
             ...baseItem,
-            deadline: this.formatDateForInput(date),
             isRecurring: true,
             recurringRule: rule,
             recurringGroupId: groupId,
             occurrenceIndex: index
         };
+        
+        // 根据事项类型设置正确的日期字段
+        if (baseItem.type === 'document') {
+            // 办文类型使用 docStartDate
+            item.docStartDate = dateStr.split('T')[0]; // 只取日期部分
+            item.docDate = item.docStartDate; // 兼容旧数据
+            // 保留原始的结束日期偏移逻辑（如果有跨天设置）
+        } else {
+            // 待办和会议类型使用 deadline
+            item.deadline = dateStr;
+        }
+        
+        return item;
     }
 
     /**
@@ -5860,10 +5931,16 @@ class OfficeDashboard {
     async deleteRecurringGroup(item) {
         try {
             const allItems = await db.getAllItems();
+            // 使用 String 转换确保类型一致
+            const targetGroupId = String(item.recurringGroupId);
+            const currentIndex = parseInt(item.occurrenceIndex) || 0;
+            
             const groupItems = allItems.filter(i => 
-                i.recurringGroupId === item.recurringGroupId && 
-                i.occurrenceIndex >= item.occurrenceIndex
+                String(i.recurringGroupId) === targetGroupId && 
+                (parseInt(i.occurrenceIndex) || 0) >= currentIndex
             );
+
+            console.log('删除周期组:', { targetGroupId, currentIndex, itemCount: groupItems.length });
 
             // 保存所有要删除的项目用于撤回
             this.saveUndoHistory('delete', { items: groupItems });
