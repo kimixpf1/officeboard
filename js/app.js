@@ -3126,6 +3126,7 @@ class OfficeDashboard {
 
     /**
      * 解析自然语言
+     * 支持新增、编辑、删除操作
      */
     async parseNaturalLanguage() {
         const input = document.getElementById('nlpInput');
@@ -3176,6 +3177,7 @@ class OfficeDashboard {
                     if (items && items.length > 0) {
                         const firstItem = items[0];
                         result = {
+                            action: 'add',
                             type: firstItem.type,
                             data: firstItem.data,
                             confidence: 0.7,
@@ -3194,32 +3196,23 @@ class OfficeDashboard {
 
                 console.log('AI解析结果:', result);
 
-                // 处理周期性任务
-                if (result.isRecurring && result.recurringRule) {
-                    console.log('检测到周期性任务:', result.recurringRule);
-
-                    const recurringItems = this.generateRecurringItems(
-                        { type: result.type, ...result.data, source: 'nlp', rawInput: text },
-                        result.recurringRule,
-                        result.recurringCount || 6
-                    );
-
-                    console.log('生成的周期性任务数量:', recurringItems.length);
-
-                    for (const item of recurringItems) {
-                        await db.addItem(item);
-                    }
-
-                    this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
-                } else {
-                    // 普通任务保存到数据库
-                    const id = await db.addItem({
-                        type: result.type,
-                        ...result.data,
-                        source: 'nlp',
-                        rawInput: text
-                    });
-                    this.showSuccess('已添加到' + this.getTypeLabel(result.type));
+                // 根据操作类型执行不同的处理
+                const action = result.action || 'add';
+                
+                switch (action) {
+                    case 'delete':
+                        await this.executeAIDeleteCommand(result);
+                        break;
+                    case 'edit':
+                        await this.executeAIEditCommand(result);
+                        break;
+                    case 'query':
+                        await this.executeAIQueryCommand(result);
+                        break;
+                    case 'add':
+                    default:
+                        await this.executeAIAddCommand(result);
+                        break;
                 }
 
                 // 清空输入
@@ -3241,6 +3234,347 @@ class OfficeDashboard {
                 hideStatus();
             }
         })();
+    }
+
+    /**
+     * 执行AI新增命令
+     */
+    async executeAIAddCommand(result) {
+        // 处理周期性任务
+        if (result.isRecurring && result.recurringRule) {
+            console.log('检测到周期性任务:', result.recurringRule);
+
+            const recurringItems = this.generateRecurringItems(
+                { type: result.type, ...result.data, source: 'nlp' },
+                result.recurringRule,
+                result.recurringCount || 6
+            );
+
+            console.log('生成的周期性任务数量:', recurringItems.length);
+
+            for (const item of recurringItems) {
+                await db.addItem(item);
+            }
+
+            this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
+        } else {
+            // 普通任务保存到数据库
+            await db.addItem({
+                type: result.type,
+                ...result.data,
+                source: 'nlp'
+            });
+            this.showSuccess('已添加到' + this.getTypeLabel(result.type));
+        }
+    }
+
+    /**
+     * 执行AI删除命令
+     */
+    async executeAIDeleteCommand(result) {
+        const filter = result.filter || {};
+        const allItems = await db.getAllItems();
+        
+        // 根据筛选条件找到匹配的事项
+        const matchedItems = allItems.filter(item => {
+            // 标题匹配
+            if (filter.titleMatch) {
+                const titleLower = (item.title || '').toLowerCase();
+                const matchLower = filter.titleMatch.toLowerCase();
+                if (!titleLower.includes(matchLower)) {
+                    return false;
+                }
+            }
+            
+            // 事项类型匹配
+            if (filter.itemType && filter.itemType !== 'all') {
+                if (item.type !== filter.itemType) {
+                    return false;
+                }
+            }
+            
+            // 日期范围匹配
+            const itemDate = item.deadline?.split('T')[0] || item.date || item.docStartDate || item.docDate;
+            if (filter.startDate && itemDate) {
+                if (itemDate < filter.startDate) {
+                    return false;
+                }
+            }
+            if (filter.endDate && itemDate) {
+                if (itemDate > filter.endDate) {
+                    return false;
+                }
+            }
+            
+            // 周期性任务匹配
+            if (filter.isRecurring !== undefined) {
+                if (!!item.isRecurring !== filter.isRecurring) {
+                    return false;
+                }
+            }
+            
+            // 完成状态匹配
+            if (filter.completed !== undefined) {
+                if (!!item.completed !== filter.completed) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+
+        if (matchedItems.length === 0) {
+            this.showError('没有找到匹配的事项');
+            return;
+        }
+
+        // 显示确认对话框
+        const confirmed = await this.showAICommandConfirm(
+            '删除确认',
+            `将要删除 ${matchedItems.length} 个事项：`,
+            matchedItems.slice(0, 10).map(item => item.title || '未命名'),
+            matchedItems.length > 10 ? `...等共 ${matchedItems.length} 项` : ''
+        );
+
+        if (!confirmed) {
+            this.showSuccess('已取消删除操作');
+            return;
+        }
+
+        // 保存撤回历史
+        this.saveUndoHistory('delete', { items: matchedItems });
+
+        // 执行删除
+        for (const item of matchedItems) {
+            await db.deleteItem(item.id);
+        }
+
+        this.showSuccess(`已删除 ${matchedItems.length} 个事项（可撤回）`);
+    }
+
+    /**
+     * 执行AI编辑命令
+     */
+    async executeAIEditCommand(result) {
+        const filter = result.filter || {};
+        const updates = result.updates || {};
+        const allItems = await db.getAllItems();
+        
+        // 根据筛选条件找到匹配的事项
+        const matchedItems = allItems.filter(item => {
+            // 标题匹配
+            if (filter.titleMatch) {
+                const titleLower = (item.title || '').toLowerCase();
+                const matchLower = filter.titleMatch.toLowerCase();
+                if (!titleLower.includes(matchLower)) {
+                    return false;
+                }
+            }
+            
+            // 事项类型匹配
+            if (filter.itemType && filter.itemType !== 'all') {
+                if (item.type !== filter.itemType) {
+                    return false;
+                }
+            }
+            
+            // 日期范围匹配
+            const itemDate = item.deadline?.split('T')[0] || item.date || item.docStartDate || item.docDate;
+            if (filter.startDate && itemDate) {
+                if (itemDate < filter.startDate) {
+                    return false;
+                }
+            }
+            if (filter.endDate && itemDate) {
+                if (itemDate > filter.endDate) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+
+        if (matchedItems.length === 0) {
+            this.showError('没有找到匹配的事项');
+            return;
+        }
+
+        if (Object.keys(updates).length === 0) {
+            this.showError('没有指定要修改的内容');
+            return;
+        }
+
+        // 构建更新描述
+        const updateDesc = Object.entries(updates)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+
+        // 显示确认对话框
+        const confirmed = await this.showAICommandConfirm(
+            '修改确认',
+            `将要修改 ${matchedItems.length} 个事项的：${updateDesc}`,
+            matchedItems.slice(0, 10).map(item => item.title || '未命名'),
+            matchedItems.length > 10 ? `...等共 ${matchedItems.length} 项` : ''
+        );
+
+        if (!confirmed) {
+            this.showSuccess('已取消修改操作');
+            return;
+        }
+
+        // 保存撤回历史
+        this.saveUndoHistory('update', { items: matchedItems.map(i => ({ ...i })) });
+
+        // 执行更新
+        for (const item of matchedItems) {
+            // 清理更新字段，移除不应该更新的字段
+            const cleanUpdates = { ...updates };
+            delete cleanUpdates.id;
+            delete cleanUpdates.createdAt;
+            delete cleanUpdates.recurringGroupId;
+            delete cleanUpdates.occurrenceIndex;
+            
+            await db.updateItem(item.id, cleanUpdates);
+        }
+
+        this.showSuccess(`已修改 ${matchedItems.length} 个事项（可撤回）`);
+    }
+
+    /**
+     * 执行AI查询命令
+     */
+    async executeAIQueryCommand(result) {
+        const filter = result.filter || {};
+        const allItems = await db.getAllItems();
+        
+        // 根据筛选条件找到匹配的事项
+        const matchedItems = allItems.filter(item => {
+            if (filter.titleMatch) {
+                const titleLower = (item.title || '').toLowerCase();
+                const matchLower = filter.titleMatch.toLowerCase();
+                if (!titleLower.includes(matchLower)) {
+                    return false;
+                }
+            }
+            
+            if (filter.itemType && filter.itemType !== 'all') {
+                if (item.type !== filter.itemType) {
+                    return false;
+                }
+            }
+            
+            const itemDate = item.deadline?.split('T')[0] || item.date || item.docStartDate || item.docDate;
+            if (filter.startDate && itemDate) {
+                if (itemDate < filter.startDate) {
+                    return false;
+                }
+            }
+            if (filter.endDate && itemDate) {
+                if (itemDate > filter.endDate) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+
+        if (matchedItems.length === 0) {
+            this.showSuccess('没有找到匹配的事项');
+        } else {
+            // 显示查询结果
+            this.showQueryResult(matchedItems, result.description);
+        }
+    }
+
+    /**
+     * 显示AI命令确认对话框
+     */
+    showAICommandConfirm(title, description, items, suffix = '') {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'aiCommandConfirmModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>${title}</h3>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <p style="margin-bottom: 15px; color: #666;">${description}</p>
+                        <div style="max-height: 200px; overflow-y: auto; background: var(--card-bg, #f8fafc); padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                            <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+                                ${items.map(item => `<li style="margin: 4px 0;">${this.escapeHtml(item)}</li>`).join('')}
+                            </ul>
+                            ${suffix ? `<p style="margin-top: 10px; color: #999; font-size: 12px;">${suffix}</p>` : ''}
+                        </div>
+                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                            <button class="btn-secondary" id="aiCmdCancel" style="padding: 8px 20px;">取消</button>
+                            <button class="btn-danger" id="aiCmdConfirm" style="padding: 8px 20px; background: #ef4444; color: white;">确认执行</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('aiCmdCancel').onclick = () => {
+                modal.remove();
+                resolve(false);
+            };
+            document.getElementById('aiCmdConfirm').onclick = () => {
+                modal.remove();
+                resolve(true);
+            };
+        });
+    }
+
+    /**
+     * 显示查询结果
+     */
+    showQueryResult(items, description) {
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'queryResultModal';
+        
+        const typeLabels = { todo: '待办', meeting: '会议', document: '办文' };
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3>查询结果</h3>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <p style="margin-bottom: 15px; color: #666;">找到 ${items.length} 个匹配的事项：</p>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <thead>
+                                <tr style="background: var(--header-bg, #f1f5f9);">
+                                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">类型</th>
+                                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">标题</th>
+                                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">日期</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.map(item => {
+                                    const date = item.deadline?.split('T')[0] || item.date || item.docStartDate || '-';
+                                    return `
+                                        <tr>
+                                            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${typeLabels[item.type] || item.type}</td>
+                                            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${this.escapeHtml(item.title || '未命名')}</td>
+                                            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${date}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 15px; text-align: right;">
+                        <button class="btn-primary" onclick="this.closest('.modal').remove()" style="padding: 8px 20px;">关闭</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 
     /**

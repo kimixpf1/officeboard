@@ -122,11 +122,43 @@ class KimiAPI {
 
     /**
      * 解析自然语言输入
+     * 支持新增、编辑、删除操作
      */
     async parseNaturalLanguage(input) {
         const systemPrompt = `你是一个智能办公助手，专门解析用户的自然语言输入并转换为结构化数据。
 
-你需要将输入分类为以下三种类型之一：
+【操作类型识别 - 非常重要】
+首先判断用户想要执行什么操作：
+1. "add"（新增）：默认操作，用户描述新事项
+2. "delete"（删除）：包含"删除"、"移除"、"清除"、"去掉"、"取消"等词
+3. "edit"（修改）：包含"修改"、"更改"、"改成"、"改为"、"调整"、"更新"等词
+4. "query"（查询）：包含"查找"、"搜索"、"有哪些"、"列出"等词
+
+【删除操作识别示例】
+- "删除3月26号到3月30号所有名为每日汇报的周期性事项" → action: "delete"
+- "帮我删除所有已完成的待办" → action: "delete"
+- "清除上周的会议记录" → action: "delete"
+- "取消明天的周例会" → action: "delete"
+
+【修改操作识别示例】
+- "把每周例会改到周三下午3点" → action: "edit"
+- "修改明天会议的地点为二号会议室" → action: "edit"
+- "将张三的待办优先级改为高" → action: "edit"
+
+【筛选条件识别】
+当用户要删除或修改事项时，需要提取筛选条件：
+- 日期范围：startDate, endDate（格式YYYY-MM-DD）
+- 标题匹配：titleMatch（模糊匹配）
+- 事项类型：itemType（todo/meeting/document）
+- 是否周期性：isRecurring（true/false）
+- 完成状态：completed（true/false）
+- 周期组ID：recurringGroupId（如果要操作整个周期组）
+
+【修改操作的更新字段】
+当是修改操作时，需要提取要更新的字段：
+- updates: { title, priority, deadline, location, time, date, handler... }
+
+你需要将输入分类为以下三种事项类型之一：
 1. todo - 待办事项
 2. meeting - 会议活动
 3. document - 办文情况
@@ -170,8 +202,10 @@ class KimiAPI {
 
 当前日期：${new Date().toISOString().split('T')[0]}
 
-请分析用户输入，返回JSON格式：
+【返回格式】
+对于新增操作：
 {
+  "action": "add",
   "type": "todo|meeting|document",
   "data": { 相应字段 },
   "confidence": 0.0-1.0 的置信度,
@@ -180,12 +214,45 @@ class KimiAPI {
   "recurringCount": 6
 }
 
+对于删除操作：
+{
+  "action": "delete",
+  "filter": {
+    "titleMatch": "标题关键词",
+    "itemType": "todo|meeting|document|all",
+    "startDate": "YYYY-MM-DD",
+    "endDate": "YYYY-MM-DD",
+    "isRecurring": true/false,
+    "completed": true/false
+  },
+  "description": "将要删除的事项描述",
+  "confidence": 0.0-1.0
+}
+
+对于修改操作：
+{
+  "action": "edit",
+  "filter": {
+    "titleMatch": "标题关键词",
+    "itemType": "todo|meeting|document|all",
+    "startDate": "YYYY-MM-DD",
+    "endDate": "YYYY-MM-DD"
+  },
+  "updates": {
+    "要更新的字段": "新值"
+  },
+  "updateFuture": true/false,  // 是否更新后续周期
+  "description": "将要修改的内容描述",
+  "confidence": 0.0-1.0
+}
+
 相对日期处理规则：
 - "今天" = 当前日期
 - "明天" = 当前日期+1天
 - "后天" = 当前日期+2天
 - "下周X" = 下周一到周日的对应日期
-- "下月X号" = 下月对应日期`;
+- "下月X号" = 下月对应日期
+- "X号到Y号" = startDate和endDate`;
 
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -196,7 +263,7 @@ class KimiAPI {
 
         try {
             const result = JSON.parse(response);
-            return this.validateAndNormalize(result);
+            return this.validateAndNormalizeCommand(result);
         } catch (error) {
             console.error('解析响应失败:', error);
             throw new Error('无法解析AI响应，请重试');
@@ -204,7 +271,47 @@ class KimiAPI {
     }
 
     /**
-     * 验证和规范化解析结果
+     * 验证和规范化命令结果
+     */
+    validateAndNormalizeCommand(result) {
+        // 确定操作类型，默认为新增
+        const action = result.action || 'add';
+        
+        if (action === 'delete') {
+            return {
+                action: 'delete',
+                filter: result.filter || {},
+                description: result.description || '删除匹配的事项',
+                confidence: result.confidence || 0.8
+            };
+        }
+        
+        if (action === 'edit') {
+            return {
+                action: 'edit',
+                filter: result.filter || {},
+                updates: result.updates || {},
+                updateFuture: result.updateFuture || false,
+                description: result.description || '修改匹配的事项',
+                confidence: result.confidence || 0.8
+            };
+        }
+        
+        if (action === 'query') {
+            return {
+                action: 'query',
+                filter: result.filter || {},
+                description: result.description || '查询事项',
+                confidence: result.confidence || 0.8
+            };
+        }
+        
+        // 默认是新增操作，使用原来的验证逻辑
+        return this.validateAndNormalize({ ...result, action: 'add' });
+    }
+
+    /**
+     * 验证和规范化解析结果（新增操作）
      */
     validateAndNormalize(result) {
         if (!result.type || !['todo', 'meeting', 'document'].includes(result.type)) {
