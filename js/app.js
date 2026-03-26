@@ -3896,7 +3896,7 @@ class OfficeDashboard {
             });
         }
 
-        // 为跨日期办文应用当天的独立状态
+        // 为跨日期办文应用当天的独立状态，并过滤隐藏的项
         items = items.map(item => {
             // 只处理跨日期办文（有开始和结束日期，但不是周期性任务）
             if (item.type === 'document' && 
@@ -3907,15 +3907,23 @@ class OfficeDashboard {
                 const dayState = item.dayStates[this.selectedDate];
                 return {
                     ...item,
+                    // 完成状态
                     completed: dayState.completed !== undefined ? dayState.completed : item.completed,
                     completedAt: dayState.completedAt !== undefined ? dayState.completedAt : item.completedAt,
                     progress: dayState.progress !== undefined ? dayState.progress : item.progress,
+                    // 置顶沉底
                     pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
-                    sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk
+                    sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk,
+                    // 编辑字段
+                    title: dayState.title !== undefined ? dayState.title : item.title,
+                    content: dayState.content !== undefined ? dayState.content : item.content,
+                    handler: dayState.handler !== undefined ? dayState.handler : item.handler,
+                    // 隐藏标记
+                    _hidden: dayState.hidden || false
                 };
             }
             return item;
-        });
+        }).filter(item => !item._hidden);
 
         // 按类型分组
         const grouped = {
@@ -5020,6 +5028,35 @@ class OfficeDashboard {
                         await db.updateItem(parseInt(id), item);
                         this.showSuccess('事项已更新（保留周期性）');
                     }
+                } else if (originalItem && originalItem.type === 'document' && 
+                    originalItem.docStartDate && originalItem.docEndDate && 
+                    !originalItem.recurringGroupId) {
+                    // 跨日期办文编辑：询问用户是否只修改当天
+                    const choice = await this.showCrossDateDocChoice('编辑', '修改');
+                    if (choice === 'cancel') return;
+                    
+                    if (choice === 'this') {
+                        // 仅修改当天的内容：使用 dayStates 存储
+                        const dayStates = originalItem.dayStates || {};
+                        dayStates[this.selectedDate] = {
+                            ...(dayStates[this.selectedDate] || {}),
+                            title: item.title,
+                            content: item.content,
+                            handler: item.handler,
+                            progress: item.progress
+                        };
+                        
+                        this.saveUndoHistory('update', { item: originalItem });
+                        await db.updateItem(parseInt(id), { dayStates });
+                        this.hideModal('itemModal');
+                        await this.loadItems();
+                        if (syncManager.isLoggedIn()) {
+                            await syncManager.immediateSyncToCloud();
+                        }
+                        this.showSuccess('已修改当天内容');
+                        return;
+                    }
+                    // choice === 'all' 继续执行下面的全量更新逻辑
                 } else if (item.isRecurring && item.recurringRule) {
                     // 编辑时转为周期性任务，询问用户
                     const confirm = window.confirm('将此事项转为周期性任务将删除当前事项并生成多个周期性任务，是否继续？');
@@ -5278,6 +5315,57 @@ class OfficeDashboard {
     }
 
     /**
+     * 显示跨日期办文操作选择框
+     * @param {string} actionType - 操作类型
+     * @param {string} actionName - 操作名称
+     * @returns {Promise<string>} 'this' | 'all' | 'cancel'
+     */
+    showCrossDateDocChoice(actionType, actionName) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'crossDateDocChoiceModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>跨日期办文 - ${actionType}</h3>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <p style="margin-bottom: 20px; color: #666;">这是一个跨日期办文，您想如何操作？</p>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button class="btn-primary" id="crossDateChoiceThis" style="width: 100%; padding: 12px;">
+                                仅当天${actionName}
+                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">独立记录当天的状态，不影响其他日期</div>
+                            </button>
+                            <button class="btn-secondary" id="crossDateChoiceAll" style="width: 100%; padding: 12px;">
+                                全部日期都${actionName}
+                                <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新所有日期的状态</div>
+                            </button>
+                            <button class="btn-text" id="crossDateChoiceCancel" style="width: 100%; padding: 8px;">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('crossDateChoiceThis').onclick = () => {
+                modal.remove();
+                resolve('this');
+            };
+            document.getElementById('crossDateChoiceAll').onclick = () => {
+                modal.remove();
+                resolve('all');
+            };
+            document.getElementById('crossDateChoiceCancel').onclick = () => {
+                modal.remove();
+                resolve('cancel');
+            };
+        });
+    }
+
+    /**
      * 批量更新周期性任务组的状态（用于置顶、沉底、完成等）
      * @param {Object} originalItem - 原始任务数据
      * @param {Object} updates - 更新内容
@@ -5433,25 +5521,31 @@ class OfficeDashboard {
             if (type === 'document' && originalItem && 
                 originalItem.docStartDate && originalItem.docEndDate && 
                 !originalItem.recurringGroupId) {
-                // 跨日期办文：使用 dayStates 存储每天的独立状态
-                const dayStates = originalItem.dayStates || {};
-                dayStates[this.selectedDate] = {
-                    ...(dayStates[this.selectedDate] || {}),
-                    completed,
-                    completedAt: completed ? new Date().toISOString() : null,
-                    progress: completed ? 'completed' : 'pending'
-                };
+                // 跨日期办文：询问用户是否只修改当天
+                const choice = await this.showCrossDateDocChoice('完成状态', completed ? '标记完成' : '取消完成');
+                if (choice === 'cancel') return;
                 
-                // 保存原始数据用于撤回
-                this.saveUndoHistory('update', { item: originalItem });
-                
-                await db.updateItem(id, { dayStates });
-                console.log('跨日期办文更新当天状态:', this.selectedDate, dayStates[this.selectedDate]);
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
+                if (choice === 'this') {
+                    // 仅修改当天：使用 dayStates 存储每天的独立状态
+                    const dayStates = originalItem.dayStates || {};
+                    dayStates[this.selectedDate] = {
+                        ...(dayStates[this.selectedDate] || {}),
+                        completed,
+                        completedAt: completed ? new Date().toISOString() : null,
+                        progress: completed ? 'completed' : 'pending'
+                    };
+                    
+                    this.saveUndoHistory('update', { item: originalItem });
+                    await db.updateItem(id, { dayStates });
+                    console.log('跨日期办文更新当天状态:', this.selectedDate, dayStates[this.selectedDate]);
+                    await this.loadItems();
+                    if (syncManager.isLoggedIn()) {
+                        await syncManager.immediateSyncToCloud();
+                    }
+                    this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
+                    return;
                 }
-                return;
+                // choice === 'all' 继续执行下面的全量更新逻辑
             }
             
             // 保存原始数据用于撤回
@@ -5512,23 +5606,30 @@ class OfficeDashboard {
             if (originalItem && originalItem.type === 'document' && 
                 originalItem.docStartDate && originalItem.docEndDate && 
                 !originalItem.recurringGroupId) {
-                // 跨日期办文：使用 dayStates 存储每天的独立状态
-                const dayStates = originalItem.dayStates || {};
-                dayStates[this.selectedDate] = {
-                    ...(dayStates[this.selectedDate] || {}),
-                    pinned,
-                    sunk: pinned ? false : (dayStates[this.selectedDate]?.sunk || false)
-                };
+                // 跨日期办文：询问用户是否只修改当天
+                const choice = await this.showCrossDateDocChoice('置顶状态', pinned ? '置顶' : '取消置顶');
+                if (choice === 'cancel') return;
                 
-                this.saveUndoHistory('update', { item: originalItem });
-                await db.updateItem(id, { dayStates });
-                console.log('跨日期办文更新当天置顶状态:', this.selectedDate, dayStates[this.selectedDate]);
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
+                if (choice === 'this') {
+                    // 仅修改当天：使用 dayStates 存储每天的独立状态
+                    const dayStates = originalItem.dayStates || {};
+                    dayStates[this.selectedDate] = {
+                        ...(dayStates[this.selectedDate] || {}),
+                        pinned,
+                        sunk: pinned ? false : (dayStates[this.selectedDate]?.sunk || false)
+                    };
+                    
+                    this.saveUndoHistory('update', { item: originalItem });
+                    await db.updateItem(id, { dayStates });
+                    console.log('跨日期办文更新当天置顶状态:', this.selectedDate, dayStates[this.selectedDate]);
+                    await this.loadItems();
+                    if (syncManager.isLoggedIn()) {
+                        await syncManager.immediateSyncToCloud();
+                    }
+                    this.showSuccess(pinned ? '已置顶当天' : '已取消当天置顶');
+                    return;
                 }
-                this.showSuccess(pinned ? '已置顶' : '已取消置顶');
-                return;
+                // choice === 'all' 继续执行下面的全量更新逻辑
             }
             
             // 保存原始数据用于撤回
@@ -5589,23 +5690,30 @@ class OfficeDashboard {
             if (originalItem && originalItem.type === 'document' && 
                 originalItem.docStartDate && originalItem.docEndDate && 
                 !originalItem.recurringGroupId) {
-                // 跨日期办文：使用 dayStates 存储每天的独立状态
-                const dayStates = originalItem.dayStates || {};
-                dayStates[this.selectedDate] = {
-                    ...(dayStates[this.selectedDate] || {}),
-                    sunk,
-                    pinned: sunk ? false : (dayStates[this.selectedDate]?.pinned || false)
-                };
+                // 跨日期办文：询问用户是否只修改当天
+                const choice = await this.showCrossDateDocChoice('沉底状态', sunk ? '沉底' : '取消沉底');
+                if (choice === 'cancel') return;
                 
-                this.saveUndoHistory('update', { item: originalItem });
-                await db.updateItem(id, { dayStates });
-                console.log('跨日期办文更新当天沉底状态:', this.selectedDate, dayStates[this.selectedDate]);
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
+                if (choice === 'this') {
+                    // 仅修改当天：使用 dayStates 存储每天的独立状态
+                    const dayStates = originalItem.dayStates || {};
+                    dayStates[this.selectedDate] = {
+                        ...(dayStates[this.selectedDate] || {}),
+                        sunk,
+                        pinned: sunk ? false : (dayStates[this.selectedDate]?.pinned || false)
+                    };
+                    
+                    this.saveUndoHistory('update', { item: originalItem });
+                    await db.updateItem(id, { dayStates });
+                    console.log('跨日期办文更新当天沉底状态:', this.selectedDate, dayStates[this.selectedDate]);
+                    await this.loadItems();
+                    if (syncManager.isLoggedIn()) {
+                        await syncManager.immediateSyncToCloud();
+                    }
+                    this.showSuccess(sunk ? '已沉底当天' : '已取消当天沉底');
+                    return;
                 }
-                this.showSuccess(sunk ? '已沉底' : '已取消沉底');
-                return;
+                // choice === 'all' 继续执行下面的全量更新逻辑
             }
             
             // 保存原始数据用于撤回
@@ -6313,6 +6421,35 @@ class OfficeDashboard {
         // 先检查是否是周期性任务
         const item = await db.getItem(id);
         
+        // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
+        if (item && item.type === 'document' && 
+            item.docStartDate && item.docEndDate && 
+            !item.recurringGroupId) {
+            // 跨日期办文：询问用户如何删除
+            const choice = await this.showCrossDateDocDeleteChoice();
+            if (choice === 'cancel') {
+                return;
+            }
+            
+            if (choice === 'this') {
+                // 仅从当天移除：添加到 dayStates 中标记当天隐藏
+                const dayStates = item.dayStates || {};
+                dayStates[this.selectedDate] = {
+                    ...(dayStates[this.selectedDate] || {}),
+                    hidden: true
+                };
+                await db.updateItem(id, { dayStates });
+                await this.loadItems();
+                this.showSuccess('已从当天移除');
+                return;
+            }
+            // choice === 'all' 执行完整删除
+            this.deleteItemId = id;
+            this.deleteItem = item;
+            await this.confirmDelete();
+            return;
+        }
+        
         if (item && item.isRecurring && item.recurringGroupId) {
             // 办文类型默认独立删除，不弹出选择框
             if (item.type === 'document') {
@@ -6388,6 +6525,55 @@ class OfficeDashboard {
                 resolve('all');
             };
             document.getElementById('recurringDeleteCancel').onclick = () => {
+                modal.remove();
+                resolve('cancel');
+            };
+        });
+    }
+
+    /**
+     * 显示跨日期办文删除选择框
+     * @returns {Promise<string>} 'this' | 'all' | 'cancel'
+     */
+    showCrossDateDocDeleteChoice() {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'crossDateDocDeleteModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>删除跨日期办文</h3>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <p style="margin-bottom: 20px; color: #666;">这是一个跨日期办文，您想如何删除？</p>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button class="btn-secondary" id="crossDateDeleteThis" style="width: 100%; padding: 12px;">
+                                仅从当天移除
+                                <div style="font-size: 12px; color: #666; margin-top: 4px;">其他日期仍可看到此办文</div>
+                            </button>
+                            <button class="btn-danger" id="crossDateDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
+                                彻底删除
+                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">从所有日期删除此办文</div>
+                            </button>
+                            <button class="btn-text" id="crossDateDeleteCancel" style="width: 100%; padding: 8px;">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('crossDateDeleteThis').onclick = () => {
+                modal.remove();
+                resolve('this');
+            };
+            document.getElementById('crossDateDeleteAll').onclick = () => {
+                modal.remove();
+                resolve('all');
+            };
+            document.getElementById('crossDateDeleteCancel').onclick = () => {
                 modal.remove();
                 resolve('cancel');
             };
