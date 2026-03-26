@@ -4965,15 +4965,37 @@ class OfficeDashboard {
                         await db.updateItem(parseInt(id), item);
                         this.showSuccess('事项已更新并脱离周期组');
                     } else {
-                        // 仅修改本项（保留周期性标识）
+                        // 仅修改本项（保留周期性标识和日期）
                         if (originalItem) {
                             this.saveUndoHistory('update', { item: originalItem });
                         }
-                        // 保留周期性标识，只更新内容
+                        // 保留周期性标识
                         item.isRecurring = true;
                         item.recurringGroupId = originalItem.recurringGroupId;
                         item.occurrenceIndex = originalItem.occurrenceIndex;
                         item.recurringRule = originalItem.recurringRule;
+                        
+                        // 保留原事项的日期字段（只修改内容，不修改日期）
+                        // 待办类型
+                        if (originalItem.deadline) {
+                            item.deadline = originalItem.deadline;
+                        }
+                        // 会议类型
+                        if (originalItem.date) {
+                            item.date = originalItem.date;
+                        }
+                        if (originalItem.endDate) {
+                            item.endDate = originalItem.endDate;
+                        }
+                        // 办文类型 - 保留周期日期
+                        if (originalItem.docStartDate) {
+                            item.docStartDate = originalItem.docStartDate;
+                            item.docDate = originalItem.docStartDate;
+                        }
+                        if (originalItem.docEndDate) {
+                            item.docEndDate = originalItem.docEndDate;
+                        }
+                        
                         await db.updateItem(parseInt(id), item);
                         this.showSuccess('事项已更新（保留周期性）');
                     }

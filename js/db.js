@@ -415,11 +415,26 @@ class Database {
      * 生成事项哈希（用于去重）
      */
     generateHash(item) {
+        // 根据事项类型选择日期字段
+        let dateField = '';
+        if (item.type === 'document') {
+            // 办文类型使用 docStartDate 或 docDate
+            dateField = item.docStartDate || item.docDate || '';
+        } else {
+            // 待办和会议类型使用 date 或 deadline
+            dateField = item.date || item.deadline || '';
+        }
+        
+        // 周期性任务需要包含周期序号以区分不同周期
+        const recurringKey = item.recurringGroupId ? 
+            `_${item.recurringGroupId}_${item.occurrenceIndex || 0}` : '';
+        
         const data = JSON.stringify({
             title: item.title,
             type: item.type,
-            date: item.date || item.deadline || '',
-            time: item.time || ''
+            date: dateField,
+            time: item.time || '',
+            recurring: recurringKey
         });
 
         // 简单的哈希算法
