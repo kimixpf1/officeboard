@@ -4000,6 +4000,47 @@ class OfficeDashboard {
                 document.getElementById('docStartDate').value = item.docStartDate || item.docDate || '';
                 document.getElementById('docEndDate').value = item.docEndDate || '';
                 document.getElementById('docSkipWeekend').checked = item.skipWeekend || false;
+                
+                // 办文周期性任务回填
+                const docIsRecurringCb = document.getElementById('docIsRecurring');
+                const docRecurringFieldsEl = document.getElementById('docRecurringFields');
+                const docRecurringTypeEl = document.getElementById('docRecurringType');
+                
+                if (item.isRecurring && item.recurringRule && docIsRecurringCb && docRecurringFieldsEl) {
+                    docIsRecurringCb.checked = true;
+                    docRecurringFieldsEl.style.display = 'block';
+                    docRecurringTypeEl.value = item.recurringRule.type || 'weekly_day';
+                    document.getElementById('docRecurringCount').value = item.recurringCount || 20;
+                    document.getElementById('docRecurringSkipWeekends').checked = item.recurringRule.skipWeekends || false;
+                    document.getElementById('docRecurringSkipHolidays').checked = item.recurringRule.skipHolidays || false;
+                    document.getElementById('docRecurringStartDate').value = item.recurringRule.startDate || '';
+                    document.getElementById('docRecurringEndDate').value = item.recurringRule.endDate || '';
+                    
+                    // 触发类型切换以显示对应字段
+                    this.updateDocRecurringFieldsVisibility(item.recurringRule.type);
+                    
+                    // 填充具体的周期参数
+                    setTimeout(() => {
+                        if (item.recurringRule.type === 'monthly_date') {
+                            document.getElementById('docRecurringDay').value = item.recurringRule.day || '';
+                        } else if (item.recurringRule.type === 'monthly_workday') {
+                            document.getElementById('docNthWorkDay').value = item.recurringRule.nthWorkDay || '';
+                        } else if (item.recurringRule.type === 'weekly_day') {
+                            document.getElementById('docWeekDay').value = item.recurringRule.weekDay || 1;
+                        } else if (item.recurringRule.type === 'weekly_multi') {
+                            const checkboxes = document.querySelectorAll('input[name="docWeekDays"]');
+                            checkboxes.forEach(cb => {
+                                cb.checked = (item.recurringRule.weekDays || []).includes(parseInt(cb.value));
+                            });
+                        } else if (item.recurringRule.type === 'monthly_weekday') {
+                            document.getElementById('docMonthlyNthWeek').value = item.recurringRule.nthWeek || 1;
+                            document.getElementById('docMonthlyWeekDayValue').value = item.recurringRule.weekDay || 1;
+                        }
+                    }, 50);
+                } else if (docIsRecurringCb && docRecurringFieldsEl) {
+                    docIsRecurringCb.checked = false;
+                    docRecurringFieldsEl.style.display = 'none';
+                }
                 break;
         }
 
@@ -4482,6 +4523,41 @@ class OfficeDashboard {
                 // 流转历史
                 const existingItem = document.getElementById('itemId').value ? await db.getItem(parseInt(document.getElementById('itemId').value)) : null;
                 item.transferHistory = existingItem?.transferHistory || [];
+                
+                // 办文周期性任务设置
+                const docIsRecurring = document.getElementById('docIsRecurring')?.checked;
+                if (docIsRecurring) {
+                    const docRecurringType = document.getElementById('docRecurringType').value;
+                    const docRecurringCount = parseInt(document.getElementById('docRecurringCount').value) || 20;
+                    const rule = {
+                        type: docRecurringType,
+                        skipWeekends: document.getElementById('docRecurringSkipWeekends')?.checked || false,
+                        skipHolidays: document.getElementById('docRecurringSkipHolidays')?.checked || false,
+                        startDate: document.getElementById('docRecurringStartDate')?.value || null,
+                        endDate: document.getElementById('docRecurringEndDate')?.value || null,
+                    };
+                    // 根据周期类型添加额外参数
+                    if (docRecurringType === 'monthly_date') {
+                        rule.day = parseInt(document.getElementById('docRecurringDay').value) || 1;
+                    } else if (docRecurringType === 'monthly_workday') {
+                        rule.nthWorkDay = parseInt(document.getElementById('docNthWorkDay').value) || 1;
+                    } else if (docRecurringType === 'weekly_day') {
+                        rule.weekDay = parseInt(document.getElementById('docWeekDay').value) || 1;
+                    } else if (docRecurringType === 'weekly_multi') {
+                        const docWeekDays = [];
+                        document.querySelectorAll('input[name="docWeekDays"]:checked').forEach(cb => {
+                            docWeekDays.push(parseInt(cb.value));
+                        });
+                        rule.weekDays = docWeekDays;
+                    } else if (docRecurringType === 'monthly_weekday') {
+                        rule.nthWeek = parseInt(document.getElementById('docMonthlyNthWeek').value) || 1;
+                        rule.weekDay = parseInt(document.getElementById('docMonthlyWeekDayValue').value) || 1;
+                    }
+                    item.isRecurring = true;
+                    item.recurringRule = rule;
+                    item.recurringCount = docRecurringCount;
+                    console.log('办文周期性任务配置:', { rule, docRecurringCount });
+                }
                 break;
         }
 
@@ -4505,12 +4581,12 @@ class OfficeDashboard {
                         return; // 用户取消
                     }
 
-                    if (choice === 'all') {
-                        // 修改后续所有周期性任务
+                    if (choice === 'future') {
+                        // 修改本项及未来所有周期性任务
                         await this.updateRecurringGroup(originalItem, item, recurringGroupId, occurrenceIndex);
-                        this.showSuccess('已更新后续所有周期性任务');
-                    } else {
-                        // 仅修改本项
+                        this.showSuccess('已更新本项及未来所有周期性任务');
+                    } else if (choice === 'this_detach') {
+                        // 仅修改本项并脱离周期组
                         if (originalItem) {
                             this.saveUndoHistory('update', { item: originalItem });
                         }
@@ -4518,8 +4594,21 @@ class OfficeDashboard {
                         item.isRecurring = false;
                         item.recurringGroupId = null;
                         item.occurrenceIndex = null;
+                        item.recurringRule = null;
                         await db.updateItem(parseInt(id), item);
-                        this.showSuccess('事项已更新');
+                        this.showSuccess('事项已更新并脱离周期组');
+                    } else {
+                        // 仅修改本项（保留周期性标识）
+                        if (originalItem) {
+                            this.saveUndoHistory('update', { item: originalItem });
+                        }
+                        // 保留周期性标识，只更新内容
+                        item.isRecurring = true;
+                        item.recurringGroupId = originalItem.recurringGroupId;
+                        item.occurrenceIndex = originalItem.occurrenceIndex;
+                        item.recurringRule = originalItem.recurringRule;
+                        await db.updateItem(parseInt(id), item);
+                        this.showSuccess('事项已更新（保留周期性）');
                     }
                 } else if (item.isRecurring && item.recurringRule) {
                     // 编辑时转为周期性任务，询问用户
@@ -4619,7 +4708,7 @@ class OfficeDashboard {
 
     /**
      * 显示周期性任务编辑选择框
-     * @returns {Promise<string>} 'this' | 'all' | 'cancel'
+     * @returns {Promise<string>} 'this' | 'this_detach' | 'future' | 'cancel'
      */
     showRecurringEditChoice() {
         return new Promise((resolve) => {
@@ -4628,18 +4717,24 @@ class OfficeDashboard {
             modal.className = 'modal active';
             modal.id = 'recurringChoiceModal';
             modal.innerHTML = `
-                <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-content" style="max-width: 450px;">
                     <div class="modal-header">
                         <h3>修改周期性任务</h3>
                     </div>
                     <div class="modal-body" style="padding: 20px;">
                         <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何修改？</p>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn-secondary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
-                                仅修改本项
+                            <button class="btn-primary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
+                                仅修改本项（保留周期性）
+                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">只修改当前日期的内容，方便记录当天特定信息</div>
                             </button>
-                            <button class="btn-primary" id="recurringChoiceAll" style="width: 100%; padding: 12px;">
-                                修改后续所有周期
+                            <button class="btn-secondary" id="recurringChoiceFuture" style="width: 100%; padding: 12px;">
+                                修改本项及未来所有周期
+                                <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新本项及之后的所有周期</div>
+                            </button>
+                            <button class="btn-secondary" id="recurringChoiceDetach" style="width: 100%; padding: 12px; border-color: #f59e0b; color: #f59e0b;">
+                                仅修改本项（脱离周期）
+                                <div style="font-size: 12px; color: #999; margin-top: 4px;">将此项变为独立任务，不再属于周期组</div>
                             </button>
                             <button class="btn-text" id="recurringChoiceCancel" style="width: 100%; padding: 8px;">
                                 取消
@@ -4655,9 +4750,13 @@ class OfficeDashboard {
                 modal.remove();
                 resolve('this');
             };
-            document.getElementById('recurringChoiceAll').onclick = () => {
+            document.getElementById('recurringChoiceFuture').onclick = () => {
                 modal.remove();
-                resolve('all');
+                resolve('future');
+            };
+            document.getElementById('recurringChoiceDetach').onclick = () => {
+                modal.remove();
+                resolve('this_detach');
             };
             document.getElementById('recurringChoiceCancel').onclick = () => {
                 modal.remove();
@@ -5216,6 +5315,59 @@ class OfficeDashboard {
     /**
      * 生成周期性任务实例
      */
+
+    /**
+     * 初始化办文周期性字段事件
+     */
+    initDocRecurringEvents() {
+        const docIsRecurring = document.getElementById('docIsRecurring');
+        const docRecurringFields = document.getElementById('docRecurringFields');
+        const docRecurringType = document.getElementById('docRecurringType');
+
+        if (docIsRecurring && docRecurringFields) {
+            docIsRecurring.addEventListener('change', (e) => {
+                docRecurringFields.style.display = e.target.checked ? 'block' : 'none';
+            });
+        }
+
+        if (docRecurringType) {
+            docRecurringType.addEventListener('change', (e) => {
+                this.updateDocRecurringFieldsVisibility(e.target.value);
+            });
+        }
+    }
+
+    /**
+     * 更新办文周期性字段显示
+     */
+    updateDocRecurringFieldsVisibility(type) {
+        // 隐藏所有组
+        const groups = ['docMonthlyDateGroup', 'docNthWorkDayGroup', 'docWeekDayGroup', 'docWeekMultiGroup', 'docMonthlyWeekDayGroup'];
+        groups.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        // 根据类型显示对应组
+        switch (type) {
+            case 'monthly_date':
+                document.getElementById('docMonthlyDateGroup').style.display = 'block';
+                break;
+            case 'monthly_workday':
+                document.getElementById('docNthWorkDayGroup').style.display = 'block';
+                break;
+            case 'weekly_day':
+                document.getElementById('docWeekDayGroup').style.display = 'block';
+                break;
+            case 'weekly_multi':
+                document.getElementById('docWeekMultiGroup').style.display = 'block';
+                break;
+            case 'monthly_weekday':
+                document.getElementById('docMonthlyWeekDayGroup').style.display = 'block';
+                break;
+        }
+    }
+
     generateRecurringItems(baseItem, rule, count) {
         const items = [];
         const groupId = 'recurring_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
