@@ -3896,6 +3896,27 @@ class OfficeDashboard {
             });
         }
 
+        // 为跨日期办文应用当天的独立状态
+        items = items.map(item => {
+            // 只处理跨日期办文（有开始和结束日期，但不是周期性任务）
+            if (item.type === 'document' && 
+                item.docStartDate && item.docEndDate && 
+                !item.recurringGroupId && 
+                item.dayStates && item.dayStates[this.selectedDate]) {
+                // 应用当天的状态
+                const dayState = item.dayStates[this.selectedDate];
+                return {
+                    ...item,
+                    completed: dayState.completed !== undefined ? dayState.completed : item.completed,
+                    completedAt: dayState.completedAt !== undefined ? dayState.completedAt : item.completedAt,
+                    progress: dayState.progress !== undefined ? dayState.progress : item.progress,
+                    pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
+                    sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk
+                };
+            }
+            return item;
+        });
+
         // 按类型分组
         const grouped = {
             todo: [],
@@ -5408,6 +5429,31 @@ class OfficeDashboard {
                 // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
+            // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
+            if (type === 'document' && originalItem && 
+                originalItem.docStartDate && originalItem.docEndDate && 
+                !originalItem.recurringGroupId) {
+                // 跨日期办文：使用 dayStates 存储每天的独立状态
+                const dayStates = originalItem.dayStates || {};
+                dayStates[this.selectedDate] = {
+                    ...(dayStates[this.selectedDate] || {}),
+                    completed,
+                    completedAt: completed ? new Date().toISOString() : null,
+                    progress: completed ? 'completed' : 'pending'
+                };
+                
+                // 保存原始数据用于撤回
+                this.saveUndoHistory('update', { item: originalItem });
+                
+                await db.updateItem(id, { dayStates });
+                console.log('跨日期办文更新当天状态:', this.selectedDate, dayStates[this.selectedDate]);
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) {
+                    await syncManager.immediateSyncToCloud();
+                }
+                return;
+            }
+            
             // 保存原始数据用于撤回
             if (originalItem) {
                 this.saveUndoHistory('update', { item: originalItem });
@@ -5462,6 +5508,29 @@ class OfficeDashboard {
                 // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
+            // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
+            if (originalItem && originalItem.type === 'document' && 
+                originalItem.docStartDate && originalItem.docEndDate && 
+                !originalItem.recurringGroupId) {
+                // 跨日期办文：使用 dayStates 存储每天的独立状态
+                const dayStates = originalItem.dayStates || {};
+                dayStates[this.selectedDate] = {
+                    ...(dayStates[this.selectedDate] || {}),
+                    pinned,
+                    sunk: pinned ? false : (dayStates[this.selectedDate]?.sunk || false)
+                };
+                
+                this.saveUndoHistory('update', { item: originalItem });
+                await db.updateItem(id, { dayStates });
+                console.log('跨日期办文更新当天置顶状态:', this.selectedDate, dayStates[this.selectedDate]);
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) {
+                    await syncManager.immediateSyncToCloud();
+                }
+                this.showSuccess(pinned ? '已置顶' : '已取消置顶');
+                return;
+            }
+            
             // 保存原始数据用于撤回
             if (originalItem) {
                 this.saveUndoHistory('update', { item: originalItem });
@@ -5514,6 +5583,29 @@ class OfficeDashboard {
                     }
                 }
                 // 办文类型或用户选择"仅本项"：直接执行独立更新
+            }
+            
+            // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
+            if (originalItem && originalItem.type === 'document' && 
+                originalItem.docStartDate && originalItem.docEndDate && 
+                !originalItem.recurringGroupId) {
+                // 跨日期办文：使用 dayStates 存储每天的独立状态
+                const dayStates = originalItem.dayStates || {};
+                dayStates[this.selectedDate] = {
+                    ...(dayStates[this.selectedDate] || {}),
+                    sunk,
+                    pinned: sunk ? false : (dayStates[this.selectedDate]?.pinned || false)
+                };
+                
+                this.saveUndoHistory('update', { item: originalItem });
+                await db.updateItem(id, { dayStates });
+                console.log('跨日期办文更新当天沉底状态:', this.selectedDate, dayStates[this.selectedDate]);
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) {
+                    await syncManager.immediateSyncToCloud();
+                }
+                this.showSuccess(sunk ? '已沉底' : '已取消沉底');
+                return;
             }
             
             // 保存原始数据用于撤回
