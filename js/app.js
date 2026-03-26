@@ -5390,18 +5390,22 @@ class OfficeDashboard {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
             if (originalItem && originalItem.recurringGroupId) {
-                const choice = await this.showRecurringChoice('完成状态', completed ? '标记完成' : '取消完成');
-                if (choice === 'cancel') return;
-                
-                if (choice === 'all') {
-                    // 更新所有后续周期
-                    await this.updateRecurringGroupStatus(originalItem, { 
-                        completed, 
-                        completedAt: completed ? new Date().toISOString() : null,
-                        ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
-                    });
-                    return;
+                // 办文类型默认独立操作，不弹出选择框
+                if (type !== 'document') {
+                    const choice = await this.showRecurringChoice('完成状态', completed ? '标记完成' : '取消完成');
+                    if (choice === 'cancel') return;
+                    
+                    if (choice === 'all') {
+                        // 更新所有后续周期
+                        await this.updateRecurringGroupStatus(originalItem, { 
+                            completed, 
+                            completedAt: completed ? new Date().toISOString() : null,
+                            ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
+                        });
+                        return;
+                    }
                 }
+                // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
             // 保存原始数据用于撤回
@@ -5437,21 +5441,25 @@ class OfficeDashboard {
             console.log('toggleItemPin:', { id, pinned, recurringGroupId: originalItem?.recurringGroupId });
             
             if (originalItem && originalItem.recurringGroupId) {
-                const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
-                console.log('用户选择:', choice);
-                
-                if (choice === 'cancel') return;
-                
-                if (choice === 'all') {
-                    // 更新所有后续周期
-                    console.log('执行批量置顶更新...');
-                    await this.updateRecurringGroupStatus(originalItem, { 
-                        pinned, 
-                        sunk: pinned ? false : undefined // 置顶时取消沉底
-                    });
-                    this.showSuccess(pinned ? '已置顶所有后续周期' : '已取消所有后续周期置顶');
-                    return;
+                // 办文类型默认独立操作，不弹出选择框
+                if (originalItem.type !== 'document') {
+                    const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
+                    console.log('用户选择:', choice);
+                    
+                    if (choice === 'cancel') return;
+                    
+                    if (choice === 'all') {
+                        // 更新所有后续周期
+                        console.log('执行批量置顶更新...');
+                        await this.updateRecurringGroupStatus(originalItem, { 
+                            pinned, 
+                            sunk: pinned ? false : undefined // 置顶时取消沉底
+                        });
+                        this.showSuccess(pinned ? '已置顶所有后续周期' : '已取消所有后续周期置顶');
+                        return;
+                    }
                 }
+                // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
             // 保存原始数据用于撤回
@@ -5487,21 +5495,25 @@ class OfficeDashboard {
             console.log('toggleItemSink:', { id, sunk, recurringGroupId: originalItem?.recurringGroupId });
             
             if (originalItem && originalItem.recurringGroupId) {
-                const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
-                console.log('用户选择:', choice);
-                
-                if (choice === 'cancel') return;
-                
-                if (choice === 'all') {
-                    // 更新所有后续周期
-                    console.log('执行批量沉底更新...');
-                    await this.updateRecurringGroupStatus(originalItem, { 
-                        sunk, 
-                        pinned: sunk ? false : undefined // 沉底时取消置顶
-                    });
-                    this.showSuccess(sunk ? '已沉底所有后续周期' : '已取消所有后续周期沉底');
-                    return;
+                // 办文类型默认独立操作，不弹出选择框
+                if (originalItem.type !== 'document') {
+                    const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
+                    console.log('用户选择:', choice);
+                    
+                    if (choice === 'cancel') return;
+                    
+                    if (choice === 'all') {
+                        // 更新所有后续周期
+                        console.log('执行批量沉底更新...');
+                        await this.updateRecurringGroupStatus(originalItem, { 
+                            sunk, 
+                            pinned: sunk ? false : undefined // 沉底时取消置顶
+                        });
+                        this.showSuccess(sunk ? '已沉底所有后续周期' : '已取消所有后续周期沉底');
+                        return;
+                    }
                 }
+                // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
             // 保存原始数据用于撤回
@@ -6210,7 +6222,16 @@ class OfficeDashboard {
         const item = await db.getItem(id);
         
         if (item && item.isRecurring && item.recurringGroupId) {
-            // 周期性任务：显示选择框
+            // 办文类型默认独立删除，不弹出选择框
+            if (item.type === 'document') {
+                this.deleteItemId = id;
+                this.deleteItem = item;
+                // 直接删除本项
+                await this.confirmDelete();
+                return;
+            }
+            
+            // 其他类型周期性任务：显示选择框
             this.deleteItemId = id;
             this.deleteItem = item;
             const choice = await this.showRecurringDeleteChoice();
