@@ -4516,8 +4516,9 @@ class OfficeDashboard {
             cancelAnimationFrame(this._dragOverRAF);
             this._dragOverRAF = null;
         }
-        this.draggedItem = null;
-        this.draggedElement = null;
+        // 注意：不要在这里清空 draggedItem 和 draggedElement
+        // 因为 handleDrop 是异步的，可能还在执行中
+        // handleDrop 结束时会自己清空这些变量
     }
 
     /**
