@@ -3933,7 +3933,7 @@ class OfficeDashboard {
         };
 
         items.forEach(item => {
-            if (grouped[item.type]) {
+            if (item && item.type && grouped[item.type]) {
                 grouped[item.type].push(item);
             }
         });
@@ -4489,6 +4489,7 @@ class OfficeDashboard {
      * 拖拽开始
      */
     handleDragStart(e, item) {
+        console.log('[handleDragStart] 开始拖动:', item.title, 'type:', item.type, 'id:', item.id);
         this.draggedItem = item;
         this.draggedElement = e.target;
         e.target.classList.add('dragging');
@@ -4502,6 +4503,7 @@ class OfficeDashboard {
      * 这里只需清理handleDrop未涉及的样式（如拖拽取消的情况）
      */
     handleDragEnd(e) {
+        console.log('[handleDragEnd] 拖动结束');
         e.target.classList.remove('dragging');
         document.querySelectorAll('.column-content').forEach(col => {
             col.classList.remove('drag-over');
@@ -4590,10 +4592,15 @@ class OfficeDashboard {
      * - 跨列拖动：需要更新类型并重新渲染
      */
     async handleDrop(e) {
+        console.log('[handleDrop] 触发 drop 事件');
         e.preventDefault();
         e.currentTarget.classList.remove('drag-over');
 
-        if (!this.draggedItem) return;
+        if (!this.draggedItem) {
+            console.log('[handleDrop] 无拖动项目，返回');
+            return;
+        }
+        console.log('[handleDrop] 拖动项目:', this.draggedItem.title);
 
         // 取消未执行的 rAF，确保用最终位置
         if (this._dragOverRAF) {
