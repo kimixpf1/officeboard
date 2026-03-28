@@ -4614,10 +4614,10 @@ class OfficeDashboard {
         const isSameColumn = newType === this.draggedItem.type;
         const draggedId = this.draggedItem.id;
         const draggedCard = this.draggedElement;
+        const originalType = this.draggedItem.type;  // 必须在 await 之前获取！
 
         // 保存原始数据用于撤回（在async操作之前同步获取）
         const originalItem = await db.getItem(draggedId);
-        const originalType = this.draggedItem.type;
 
         // 确保拖拽卡片在当前容器中（handleDragOver的rAF可能还没执行最后一帧）
         if (draggedCard && draggedCard.parentElement !== container) {
