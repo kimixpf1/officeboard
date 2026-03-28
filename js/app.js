@@ -4021,13 +4021,27 @@ class OfficeDashboard {
                 return priorityA - priorityB;
             }
 
-            // 会议特殊处理：按领导级别优先排序（钱局最优先）
-            // 这里的排序不受 order 值影响，确保领导相关会议始终在最前面
+            // 检查是否有用户拖动的排序（order值）
+            const aHasOrder = hasOrder(a);
+            const bHasOrder = hasOrder(b);
+
+            // 会议特殊处理：
+            // - 如果两个都有order值，优先用order（用户拖动结果）
+            // - 如果只有一个有order，有order的排前面
+            // - 如果都没有order，按领导级别+时间排序
             if (type === 'meeting') {
+                // 两个都有order值：按order排序（用户拖动结果）
+                if (aHasOrder && bHasOrder) {
+                    if (a.order !== b.order) return a.order - b.order;
+                }
+                
+                // 有order的排在没有order的前面
+                if (aHasOrder && !bHasOrder) return -1;
+                if (bHasOrder && !aHasOrder) return 1;
+                
+                // 都没有order：按领导级别排序
                 const levelA = this.getMeetingLevel(a);
                 const levelB = this.getMeetingLevel(b);
-
-                // 如果级别不同，直接按级别排序（忽略order）
                 if (levelA !== levelB) {
                     return levelA - levelB;
                 }
@@ -4038,11 +4052,12 @@ class OfficeDashboard {
                 if (timeA !== timeB) {
                     return timeA.localeCompare(timeB);
                 }
+                
+                // 最后按创建时间
+                return new Date(a.createdAt) - new Date(b.createdAt);
             }
 
-            // 非会议类型，或同级别会议：有 order 值的按 order 排（用户拖拽的结果）
-            const aHasOrder = hasOrder(a);
-            const bHasOrder = hasOrder(b);
+            // 非会议类型：有 order 值的按 order 排（用户拖拽的结果）
 
             if (aHasOrder && bHasOrder) {
                 if (a.order !== b.order) return a.order - b.order;
