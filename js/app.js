@@ -170,6 +170,9 @@ class OfficeDashboard {
 
             // 等待同步管理器初始化完成
             await syncManager.waitForInit();
+            
+            // 调试：打印登录状态
+            console.log('[app.init] 登录状态:', syncManager.isLoggedIn());
 
             // 检查登录状态，未登录则清除本地数据
             if (!syncManager.isLoggedIn()) {
@@ -3839,16 +3842,13 @@ class OfficeDashboard {
     async loadItems() {
         const allItems = await db.getAllItems();
 
-        // 调试：打印会议的 completed 状态
-        const meetings = allItems.filter(i => i.type === 'meeting');
-        if (meetings.length > 0) {
-            console.log('loadItems - 会议数据:', meetings.map(m => ({
-                title: m.title,
-                completed: m.completed,
-                completedType: typeof m.completed,
-                order: m.order
-            })));
-        }
+        // 调试：打印所有数据的 order 值
+        console.log('[loadItems] 从 IndexedDB 加载数据, 总数:', allItems.length);
+        console.log('[loadItems] 所有数据的 order:', allItems.map(m => ({
+            title: m.title,
+            order: m.order,
+            type: m.type
+        })));
 
         // 日视图：按选中日期筛选
         let items = allItems;
@@ -3996,9 +3996,10 @@ class OfficeDashboard {
         // 排序逻辑
         const hasOrder = (item) => item.order !== undefined && item.order !== null;
 
-        // 调试：打印排序前的状态
-        console.log('排序前项目:', items.map(i => ({
+        // 调试：打印排序前的状态（包含order值）
+        console.log(`[${type}] 排序前项目:`, items.map(i => ({
             title: i.title,
+            order: i.order,
             pinned: !!i.pinned,
             sunk: !!i.sunk,
             completed: !!i.completed
@@ -4074,9 +4075,7 @@ class OfficeDashboard {
         });
 
         // 调试：打印排序后的项目状态
-        if (type === 'meeting' && items.length > 0) {
-            console.log(`${type} 排序后顺序:`, items.map(i => `${i.title}(completed:${!!i.completed},order:${i.order})`));
-        }
+        console.log(`[${type}] 排序后顺序:`, items.map(i => `${i.title}(order:${i.order})`));
 
         // 渲染卡片
         items.forEach(item => {
@@ -4655,7 +4654,9 @@ class OfficeDashboard {
             }
 
             // 批量更新排序
+            console.log('[handleDrop] 正在保存排序, 类型:', newType, '顺序:', orderedIds);
             await db.updateItemOrder(newType, orderedIds);
+            console.log('[handleDrop] 排序保存完成');
 
             if (isSameColumn) {
                 // 同列拖动：DOM已经正确，不需要重新渲染

@@ -26,6 +26,12 @@ class SyncManager {
         this.lastLocalModifyTime = localStorage.getItem('lastLocalModifyTime') || null;  // 本地最后修改时间
         this.lastCloudSyncTime = localStorage.getItem('lastCloudSyncTime') || null;  // 最后成功同步到云端的时间
         this.isSyncing = false;  // 是否正在同步中
+        
+        // 调试：打印启动时的时间戳
+        console.log('[SyncManager] 初始化, 时间戳:', {
+            lastLocalModifyTime: this.lastLocalModifyTime,
+            lastCloudSyncTime: this.lastCloudSyncTime
+        });
 
         // 初始化Supabase
         this.initPromise = this.initSupabase();
@@ -140,6 +146,8 @@ class SyncManager {
             // 1. 获取本地数据
             const localItems = await db.getAllItems();
             console.log('本地事项数量:', localItems.length);
+            // 调试：打印本地数据的order值
+            console.log('本地数据order值:', localItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
 
             // 2. 获取云端数据和时间戳
             const { data: cloudData, error } = await this.supabase
@@ -189,6 +197,8 @@ class SyncManager {
 
             // 情况3: 两边都有数据，需要比较时间
             const cloudItems = cloudData.data.items || [];
+            // 调试：打印云端数据的order值
+            console.log('云端数据order值:', cloudItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
             
             // 判断云端是否有更新（云端更新时间 > 上次同步时间）
             const cloudHasUpdate = cloudUpdateTime && lastSyncTime && cloudUpdateTime > lastSyncTime;
@@ -253,6 +263,8 @@ class SyncManager {
 
         try {
             const allItems = await db.getAllItems();
+            // 调试：打印上传数据的order值
+            console.log('上传数据order值:', allItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
             
             const settings = {};
             const kimiKey = await db.getSetting('kimi_api_key');
@@ -354,6 +366,8 @@ class SyncManager {
 
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
+            // 调试：打印下载的数据的order值
+            console.log('[downloadFromCloud] 下载数据 order:', cloudItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
             const deduplicatedItems = this.deduplicateItems(cloudItems);
             
             await db.clearAllItems();

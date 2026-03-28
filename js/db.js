@@ -103,8 +103,13 @@ class Database {
 
         // 生成唯一标识（用于去重）
         item.hash = this.generateHash(item);
-        item.createdAt = new Date().toISOString();
-        item.updatedAt = item.createdAt;
+        // 保留原有的 createdAt 和 updatedAt（如果存在）
+        if (!item.createdAt) {
+            item.createdAt = new Date().toISOString();
+        }
+        if (!item.updatedAt) {
+            item.updatedAt = item.createdAt;
+        }
 
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORES.ITEMS, 'readwrite');
@@ -334,7 +339,8 @@ class Database {
             });
 
             transaction.oncomplete = () => {
-                console.log(`排序保存成功: ${updatedCount} 个项目, 类型: ${type}, 顺序:`, itemIds);
+                console.log(`排序保存成功: ${updatedCount} 个项目, 类型: ${type}`);
+                console.log('更新后的 order 值:', items.map(i => ({ title: i.title, order: i.order })));
                 resolve();
             };
             transaction.onerror = () => {
