@@ -4516,9 +4516,16 @@ class OfficeDashboard {
             cancelAnimationFrame(this._dragOverRAF);
             this._dragOverRAF = null;
         }
-        // 注意：不要在这里清空 draggedItem 和 draggedElement
-        // 因为 handleDrop 是异步的，可能还在执行中
-        // handleDrop 结束时会自己清空这些变量
+        // 使用 setTimeout 确保 handleDrop 有机会先执行
+        // 如果 handleDrop 已经清空了这些变量，这里就不会有问题
+        setTimeout(() => {
+            // 只有在 handleDrop 还没清空时才清空（拖放取消的情况）
+            if (this.draggedItem) {
+                console.log('[handleDragEnd] 拖放被取消，清空状态');
+                this.draggedItem = null;
+                this.draggedElement = null;
+            }
+        }, 0);
     }
 
     /**
