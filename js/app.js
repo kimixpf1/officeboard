@@ -5056,7 +5056,18 @@ class OfficeDashboard {
                         this.showSuccess('已修改当天内容');
                         return;
                     }
-                    // choice === 'all' 继续执行下面的全量更新逻辑
+                    // choice === 'all' 全部日期都修改：清除dayStates中的内容字段
+                    this.saveUndoHistory('update', { item: originalItem });
+                    const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['title', 'content', 'handler', 'progress']);
+                    item.dayStates = clearedDayStates;
+                    await db.updateItem(parseInt(id), item);
+                    this.hideModal('itemModal');
+                    await this.loadItems();
+                    if (syncManager.isLoggedIn()) {
+                        await syncManager.immediateSyncToCloud();
+                    }
+                    this.showSuccess('已修改全部日期内容');
+                    return;
                 } else if (item.isRecurring && item.recurringRule) {
                     // 编辑时转为周期性任务，询问用户
                     const confirm = window.confirm('将此事项转为周期性任务将删除当前事项并生成多个周期性任务，是否继续？');
@@ -5366,6 +5377,32 @@ class OfficeDashboard {
     }
 
     /**
+     * 清除dayStates中所有日期的指定字段
+     * @param {Object} dayStates - 原始dayStates对象
+     * @param {Array<string>} fields - 要清除的字段名数组
+     * @returns {Object} 清除后的dayStates
+     */
+    clearDayStatesFields(dayStates, fields) {
+        if (!dayStates || typeof dayStates !== 'object') {
+            return {};
+        }
+        
+        const cleared = {};
+        for (const date of Object.keys(dayStates)) {
+            const dayState = { ...dayStates[date] };
+            // 删除指定字段
+            for (const field of fields) {
+                delete dayState[field];
+            }
+            // 只保留非空的dayState
+            if (Object.keys(dayState).length > 0) {
+                cleared[date] = dayState;
+            }
+        }
+        return cleared;
+    }
+
+    /**
      * 批量更新周期性任务组的状态（用于置顶、沉底、完成等）
      * @param {Object} originalItem - 原始任务数据
      * @param {Object} updates - 更新内容
@@ -5545,7 +5582,21 @@ class OfficeDashboard {
                     this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
                     return;
                 }
-                // choice === 'all' 继续执行下面的全量更新逻辑
+                // choice === 'all' 全部日期都修改：清除dayStates中的完成状态并更新全局状态
+                this.saveUndoHistory('update', { item: originalItem });
+                const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['completed', 'completedAt', 'progress']);
+                await db.updateItem(id, {
+                    completed,
+                    completedAt: completed ? new Date().toISOString() : null,
+                    progress: completed ? 'completed' : 'pending',
+                    dayStates: clearedDayStates
+                });
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) {
+                    await syncManager.immediateSyncToCloud();
+                }
+                this.showSuccess(completed ? '已标记全部日期完成' : '已取消全部日期完成');
+                return;
             }
             
             // 保存原始数据用于撤回
@@ -5629,7 +5680,20 @@ class OfficeDashboard {
                     this.showSuccess(pinned ? '已置顶当天' : '已取消当天置顶');
                     return;
                 }
-                // choice === 'all' 继续执行下面的全量更新逻辑
+                // choice === 'all' 全部日期都修改：清除dayStates中的置顶状态并更新全局状态
+                this.saveUndoHistory('update', { item: originalItem });
+                const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['pinned', 'sunk']);
+                await db.updateItem(id, {
+                    pinned,
+                    sunk: pinned ? false : originalItem.sunk,
+                    dayStates: clearedDayStates
+                });
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) {
+                    await syncManager.immediateSyncToCloud();
+                }
+                this.showSuccess(pinned ? '已置顶全部日期' : '已取消全部日期置顶');
+                return;
             }
             
             // 保存原始数据用于撤回
@@ -5713,7 +5777,20 @@ class OfficeDashboard {
                     this.showSuccess(sunk ? '已沉底当天' : '已取消当天沉底');
                     return;
                 }
-                // choice === 'all' 继续执行下面的全量更新逻辑
+                // choice === 'all' 全部日期都修改：清除dayStates中的沉底状态并更新全局状态
+                this.saveUndoHistory('update', { item: originalItem });
+                const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['pinned', 'sunk']);
+                await db.updateItem(id, {
+                    sunk,
+                    pinned: sunk ? false : originalItem.pinned,
+                    dayStates: clearedDayStates
+                });
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) {
+                    await syncManager.immediateSyncToCloud();
+                }
+                this.showSuccess(sunk ? '已沉底全部日期' : '已取消全部日期沉底');
+                return;
             }
             
             // 保存原始数据用于撤回
