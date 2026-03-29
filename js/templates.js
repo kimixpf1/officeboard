@@ -4,6 +4,18 @@
  * 用于增强基础识别准确度
  */
 
+const TemplateOfficeConstants = window.OfficeConstants || {};
+const TEMPLATE_ITEM_TYPES = TemplateOfficeConstants.ITEM_TYPES || {
+    TODO: 'todo',
+    MEETING: 'meeting',
+    DOCUMENT: 'document'
+};
+const TEMPLATE_DOCUMENT_PROGRESS = TemplateOfficeConstants.DOCUMENT_PROGRESS || {
+    PENDING: 'pending',
+    PROCESSING: 'processing',
+    COMPLETED: 'completed'
+};
+
 const ITEM_TEMPLATES = {
     // ==================== 政府机关模板 ====================
     government: {
@@ -720,13 +732,13 @@ class TemplateMatcher {
             result.type = template.type;
             result.data.title = template.title || text.substring(0, 50);
 
-            if (template.type === 'meeting') {
+            if (template.type === TEMPLATE_ITEM_TYPES.MEETING) {
                 result.data.priority = template.priority || 'medium';
-            } else if (template.type === 'todo') {
+            } else if (template.type === TEMPLATE_ITEM_TYPES.TODO) {
                 result.data.priority = template.priority || 'medium';
-            } else if (template.type === 'document') {
+            } else if (template.type === TEMPLATE_ITEM_TYPES.DOCUMENT) {
                 result.data.docType = template.docType || '文件';
-                result.data.progress = template.progress || 'pending';
+                result.data.progress = template.progress || TEMPLATE_DOCUMENT_PROGRESS.PENDING;
             }
         }
 
@@ -752,6 +764,28 @@ class TemplateMatcher {
         return this.flatTemplates.length;
     }
 }
+
+Object.values(ITEM_TEMPLATES).forEach(category => {
+    if (category.meetings) {
+        category.meetings = category.meetings.map(item => ({
+            ...item,
+            type: TEMPLATE_ITEM_TYPES.MEETING
+        }));
+    }
+    if (category.todos) {
+        category.todos = category.todos.map(item => ({
+            ...item,
+            type: TEMPLATE_ITEM_TYPES.TODO
+        }));
+    }
+    if (category.documents) {
+        category.documents = category.documents.map(item => ({
+            ...item,
+            type: TEMPLATE_ITEM_TYPES.DOCUMENT,
+            progress: item.progress || TEMPLATE_DOCUMENT_PROGRESS.PENDING
+        }));
+    }
+});
 
 // 导出
 window.TemplateMatcher = TemplateMatcher;

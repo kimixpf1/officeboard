@@ -3,6 +3,18 @@
  * 支持生成日报/周报/月报，导出Word文档或高清长图
  */
 
+const ReportOfficeConstants = window.OfficeConstants || {};
+const REPORT_ITEM_TYPES = ReportOfficeConstants.ITEM_TYPES || {
+    TODO: 'todo',
+    MEETING: 'meeting',
+    DOCUMENT: 'document'
+};
+const REPORT_DOCUMENT_PROGRESS = ReportOfficeConstants.DOCUMENT_PROGRESS || {
+    PENDING: 'pending',
+    PROCESSING: 'processing',
+    COMPLETED: 'completed'
+};
+
 class ReportGenerator {
     constructor() {
         this.companyName = '办公室';
@@ -31,7 +43,7 @@ class ReportGenerator {
 
         for (const item of items) {
             switch (item.type) {
-                case 'todo':
+                case REPORT_ITEM_TYPES.TODO:
                     categorized.todo.push(item);
                     stats.todo.total++;
                     if (item.completed) {
@@ -44,7 +56,7 @@ class ReportGenerator {
                     }
                     break;
 
-                case 'meeting':
+                case REPORT_ITEM_TYPES.MEETING:
                     categorized.meeting.push(item);
                     stats.meeting.total++;
                     if (item.date >= new Date().toISOString().split('T')[0]) {
@@ -52,12 +64,12 @@ class ReportGenerator {
                     }
                     break;
 
-                case 'document':
+                case REPORT_ITEM_TYPES.DOCUMENT:
                     categorized.document.push(item);
                     stats.document.total++;
-                    if (item.progress === 'completed') {
+                    if (item.progress === REPORT_DOCUMENT_PROGRESS.COMPLETED) {
                         stats.document.completed++;
-                    } else if (item.progress === 'processing') {
+                    } else if (item.progress === REPORT_DOCUMENT_PROGRESS.PROCESSING) {
                         stats.document.processing++;
                     } else {
                         stats.document.pending++;
@@ -165,9 +177,9 @@ class ReportGenerator {
             content += '四、文件办理情况\n';
             data.items.document.forEach((item, index) => {
                 const progressMap = {
-                    pending: '待办',
-                    processing: '办理中',
-                    completed: '已办结'
+                    [REPORT_DOCUMENT_PROGRESS.PENDING]: '待办',
+                    [REPORT_DOCUMENT_PROGRESS.PROCESSING]: '办理中',
+                    [REPORT_DOCUMENT_PROGRESS.COMPLETED]: '已办结'
                 };
                 const progress = progressMap[item.progress] || item.progress;
                 content += `${index + 1}. ${item.title} - ${progress}\n`;

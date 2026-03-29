@@ -7,13 +7,13 @@
  */
 
 // ========== 全局常量 ==========
-const ITEM_TYPES = {
+const OfficeConstants = window.OfficeConstants || {};
+const ITEM_TYPES = OfficeConstants.ITEM_TYPES || {
     TODO: 'todo',
     MEETING: 'meeting',
     DOCUMENT: 'document'
 };
-
-const RECURRING_TYPES = {
+const RECURRING_TYPES = OfficeConstants.RECURRING_TYPES || {
     DAILY: 'daily',
     WORKDAY_DAILY: 'workday_daily',
     WEEKLY_DAY: 'weekly_day',
@@ -21,6 +21,11 @@ const RECURRING_TYPES = {
     MONTHLY_DATE: 'monthly_date',
     MONTHLY_WORKDAY: 'monthly_workday',
     MONTHLY_WEEKDAY: 'monthly_weekday'
+};
+const DOCUMENT_PROGRESS = OfficeConstants.DOCUMENT_PROGRESS || {
+    PENDING: 'pending',
+    PROCESSING: 'processing',
+    COMPLETED: 'completed'
 };
 
 // ========== 安全工具函数 ==========
@@ -378,6 +383,7 @@ class OfficeDashboard {
 
         // 多选功能
         this.bindBatchSelectionEvents();
+        this.bindBoardCardEvents();
 
         // 监听跳转到日期事件
         document.addEventListener('gotoDate', (e) => {
@@ -2238,6 +2244,77 @@ class OfficeDashboard {
         });
     }
 
+    bindBoardCardEvents() {
+        [ITEM_TYPES.TODO, ITEM_TYPES.MEETING].forEach(type => {
+            const container = document.getElementById(type + 'List');
+            if (!container) return;
+
+            container.addEventListener('click', async (e) => {
+                const card = e.target.closest('.card');
+                if (!card) return;
+
+                const itemId = parseInt(card.dataset.id);
+                const itemType = card.dataset.type;
+
+                if (Number.isNaN(itemId) || itemType !== type) {
+                    return;
+                }
+
+                if (e.target.closest('.expand-btn')) {
+                    e.stopPropagation();
+                    this.toggleCardDetail(card);
+                    return;
+                }
+
+                if (e.target.closest('.complete-btn')) {
+                    e.stopPropagation();
+                    await this.toggleItemComplete(itemId, itemType, card.dataset.completed !== 'true');
+                    return;
+                }
+
+                if (e.target.closest('.pin-btn')) {
+                    e.stopPropagation();
+                    await this.toggleItemPin(itemId, itemType, card.dataset.pinned !== 'true');
+                    return;
+                }
+
+                if (e.target.closest('.sink-btn')) {
+                    e.stopPropagation();
+                    await this.toggleItemSink(itemId, itemType, card.dataset.sunk !== 'true');
+                    return;
+                }
+
+                if (e.target.closest('.delete-btn')) {
+                    e.stopPropagation();
+                    await this.showDeleteConfirm(itemId);
+                    return;
+                }
+
+                if (e.target.closest('.edit-btn') || e.target.closest('.card-title')) {
+                    e.stopPropagation();
+                    const item = await db.getItem(itemId);
+                    if (item) {
+                        await this.editItem(item);
+                    }
+                }
+            });
+        });
+    }
+
+    toggleCardDetail(card) {
+        const expandBtn = card.querySelector('.expand-btn');
+        const detailEl = card.querySelector('.card-detail');
+        if (!expandBtn || !detailEl) {
+            return;
+        }
+
+        const isExpanded = detailEl.style.display !== 'none';
+        detailEl.style.display = isExpanded ? 'none' : 'block';
+        expandBtn.innerHTML = isExpanded
+            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+    }
+
     /**
      * 更新批量操作按钮显示状态
      */
@@ -2316,7 +2393,7 @@ class OfficeDashboard {
                 const result = await db.updateItem(itemId, {
                     completed: true,
                     completedAt: new Date().toISOString(),
-                    ...(type === ITEM_TYPES.DOCUMENT && { progress: 'completed' })
+                            ...(type === ITEM_TYPES.DOCUMENT && { progress: DOCUMENT_PROGRESS.COMPLETED })
                 });
                 console.log('更新事项成功:', itemId, result);
             }
@@ -3944,9 +4021,9 @@ class OfficeDashboard {
 
         // 按类型分组
         const grouped = {
-            todo: [],
-            meeting: [],
-            document: []
+            [ITEM_TYPES.TODO]: [],
+            [ITEM_TYPES.MEETING]: [],
+            [ITEM_TYPES.DOCUMENT]: []
         };
 
         items.forEach(item => {
@@ -3956,9 +4033,9 @@ class OfficeDashboard {
         });
 
         // 渲染各列（排序在renderColumn中处理）
-        this.renderColumn('todo', grouped.todo);
-        this.renderColumn('meeting', grouped.meeting);
-        this.renderColumn('document', grouped.document);
+        this.renderColumn(ITEM_TYPES.TODO, grouped[ITEM_TYPES.TODO]);
+        this.renderColumn(ITEM_TYPES.MEETING, grouped[ITEM_TYPES.MEETING]);
+        this.renderColumn(ITEM_TYPES.DOCUMENT, grouped[ITEM_TYPES.DOCUMENT]);
     }
 
     /**
@@ -4108,6 +4185,10 @@ class OfficeDashboard {
         const card = document.createElement('div');
         card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}${item.pinned ? ' pinned' : ''}${item.sunk ? ' sunk' : ''}`;
         card.dataset.id = item.id;
+        card.dataset.type = item.type;
+        card.dataset.completed = String(!!item.completed);
+        card.dataset.pinned = String(!!item.pinned);
+        card.dataset.sunk = String(!!item.sunk);
         card.draggable = true;
 
         let contentHtml = '';
@@ -4177,7 +4258,7 @@ class OfficeDashboard {
                 // 办文新设计：收/发/流转 + 完成状态
                 const docTypeIcon = { receive: '收', send: '发', transfer: '转' }[item.docType] || '文';
                 const docTypeClass = item.docType || 'receive';
-                const isCompleted = item.progress === 'completed';
+                const isCompleted = item.progress === DOCUMENT_PROGRESS.COMPLETED;
 
                 // 办文日期范围显示
                 let docDateDisplay = '';
@@ -4249,58 +4330,51 @@ class OfficeDashboard {
         `;
 
         // 绑定展开/收起事件
-        const expandBtn = card.querySelector('.expand-btn');
-        const detailEl = card.querySelector('.card-detail');
-        expandBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isExpanded = detailEl.style.display !== 'none';
-            detailEl.style.display = isExpanded ? 'none' : 'block';
-            expandBtn.innerHTML = isExpanded
-                ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
-                : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
-        });
-
-        // 绑定完成按钮事件（所有类型通用）
-        const completeBtn = card.querySelector('.complete-btn');
-        completeBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleItemComplete(item.id, item.type, !item.completed);
-        });
-
-        // 绑定置顶按钮事件
-        const pinBtn = card.querySelector('.pin-btn');
-        pinBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleItemPin(item.id, item.type, !item.pinned);
-        });
-
-        // 绑定沉底按钮事件
-        const sinkBtn = card.querySelector('.sink-btn');
-        sinkBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleItemSink(item.id, item.type, !item.sunk);
-        });
-
-        // 绑定删除事件
-        card.querySelector('.delete-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.showDeleteConfirm(item.id);
-        });
-
         // 绑定拖拽事件
         card.addEventListener('dragstart', (e) => this.handleDragStart(e, item));
         card.addEventListener('dragend', (e) => this.handleDragEnd(e));
 
-        // 绑定编辑事件（点击标题）
-        card.querySelector('.card-title')?.addEventListener('click', () => {
-            this.editItem(item);
-        });
+        if (item.type === ITEM_TYPES.DOCUMENT) {
+            const expandBtn = card.querySelector('.expand-btn');
+            const detailEl = card.querySelector('.card-detail');
+            expandBtn?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isExpanded = detailEl.style.display !== 'none';
+                detailEl.style.display = isExpanded ? 'none' : 'block';
+                expandBtn.innerHTML = isExpanded
+                    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
+                    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+            });
 
-        // 绑定编辑按钮事件（如果有编辑按钮）
-        card.querySelector('.edit-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.editItem(item);
-        });
+            card.querySelector('.complete-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleItemComplete(item.id, item.type, !item.completed);
+            });
+
+            card.querySelector('.pin-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleItemPin(item.id, item.type, !item.pinned);
+            });
+
+            card.querySelector('.sink-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleItemSink(item.id, item.type, !item.sunk);
+            });
+
+            card.querySelector('.delete-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showDeleteConfirm(item.id);
+            });
+
+            card.querySelector('.card-title')?.addEventListener('click', () => {
+                this.editItem(item);
+            });
+
+            card.querySelector('.edit-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.editItem(item);
+            });
+        }
 
         return card;
     }
@@ -4314,7 +4388,11 @@ class OfficeDashboard {
         const titleEl = document.getElementById('modalTitle');
 
         // 设置标题
-        const typeLabels = { todo: '待办事项', meeting: '会议活动', document: '办文情况' };
+        const typeLabels = {
+            [ITEM_TYPES.TODO]: '待办事项',
+            [ITEM_TYPES.MEETING]: '会议活动',
+            [ITEM_TYPES.DOCUMENT]: '办文情况'
+        };
         titleEl.textContent = '编辑' + typeLabels[item.type];
 
         // 设置表单值
@@ -4340,7 +4418,7 @@ class OfficeDashboard {
                 if (item.isRecurring && item.recurringRule) {
                     isRecurringCheckbox.checked = true;
                     recurringFields.style.display = 'block';
-                    recurringTypeSelect.value = item.recurringRule.type || 'weekly_day';
+                    recurringTypeSelect.value = item.recurringRule.type || RECURRING_TYPES.WEEKLY_DAY;
                     document.getElementById('recurringCount').value = item.recurringCount || 20;
                     document.getElementById('skipWeekends').checked = item.recurringRule.skipWeekends || false;
                     document.getElementById('skipHolidays').checked = item.recurringRule.skipHolidays || false;
@@ -4355,16 +4433,16 @@ class OfficeDashboard {
                     setTimeout(() => {
                         if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_DATE) {
                             document.getElementById('recurringDay').value = item.recurringRule.day || '';
-                        } else if (item.recurringRule.type === 'monthly_workday') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_WORKDAY) {
                             document.getElementById('nthWorkDay').value = item.recurringRule.nthWorkDay || '';
                         } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY) {
                             document.getElementById('weekDay').value = item.recurringRule.weekDay || 1;
-                        } else if (item.recurringRule.type === 'weekly_multi') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_MULTI) {
                             const checkboxes = document.querySelectorAll('input[name="weekDays"]');
                             checkboxes.forEach(cb => {
                                 cb.checked = (item.recurringRule.weekDays || []).includes(parseInt(cb.value));
                             });
-                        } else if (item.recurringRule.type === 'monthly_weekday') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_WEEKDAY) {
                             document.getElementById('monthlyNthWeek').value = item.recurringRule.nthWeek || 1;
                             document.getElementById('monthlyWeekDayValue').value = item.recurringRule.weekDay || 1;
                         }
@@ -4403,7 +4481,7 @@ class OfficeDashboard {
                 if (item.isRecurring && item.recurringRule && docIsRecurringCb && docRecurringFieldsEl) {
                     docIsRecurringCb.checked = true;
                     docRecurringFieldsEl.style.display = 'block';
-                    docRecurringTypeEl.value = item.recurringRule.type || 'weekly_day';
+                    docRecurringTypeEl.value = item.recurringRule.type || RECURRING_TYPES.WEEKLY_DAY;
                     document.getElementById('docRecurringCount').value = item.recurringCount || 20;
                     document.getElementById('docRecurringSkipWeekends').checked = item.recurringRule.skipWeekends || false;
                     document.getElementById('docRecurringSkipHolidays').checked = item.recurringRule.skipHolidays || false;
@@ -4417,16 +4495,16 @@ class OfficeDashboard {
                     setTimeout(() => {
                         if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_DATE) {
                             document.getElementById('docRecurringDay').value = item.recurringRule.day || '';
-                        } else if (item.recurringRule.type === 'monthly_workday') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_WORKDAY) {
                             document.getElementById('docNthWorkDay').value = item.recurringRule.nthWorkDay || '';
                         } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY) {
                             document.getElementById('docWeekDay').value = item.recurringRule.weekDay || 1;
-                        } else if (item.recurringRule.type === 'weekly_multi') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_MULTI) {
                             const checkboxes = document.querySelectorAll('input[name="docWeekDays"]');
                             checkboxes.forEach(cb => {
                                 cb.checked = (item.recurringRule.weekDays || []).includes(parseInt(cb.value));
                             });
-                        } else if (item.recurringRule.type === 'monthly_weekday') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_WEEKDAY) {
                             document.getElementById('docMonthlyNthWeek').value = item.recurringRule.nthWeek || 1;
                             document.getElementById('docMonthlyWeekDayValue').value = item.recurringRule.weekDay || 1;
                         }
@@ -4477,7 +4555,7 @@ class OfficeDashboard {
             const item = await db.getItem(id);
             if (!item) return;
 
-            item.progress = completed ? 'completed' : 'pending';
+            item.progress = completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING;
             item.completed = completed;
             item.completedAt = completed ? new Date().toISOString() : null;
 
@@ -4910,7 +4988,7 @@ class OfficeDashboard {
                             return;
                         }
                         rule.day = day;
-                    } else if (recurringType === 'monthly_workday') {
+                    } else if (recurringType === RECURRING_TYPES.MONTHLY_WORKDAY) {
                         const nthWorkDay = parseInt(document.getElementById('nthWorkDay').value);
                         if (!nthWorkDay || nthWorkDay < 1 || nthWorkDay > 23) {
                             alert('请输入有效的工作日序号（1-23）');
@@ -4919,14 +4997,14 @@ class OfficeDashboard {
                         rule.nthWorkDay = nthWorkDay;
                     } else if (recurringType === RECURRING_TYPES.WEEKLY_DAY) {
                         rule.weekDay = parseInt(document.getElementById('weekDay').value);
-                    } else if (recurringType === 'weekly_multi') {
+                    } else if (recurringType === RECURRING_TYPES.WEEKLY_MULTI) {
                         const checkedDays = Array.from(document.querySelectorAll('input[name="weekDays"]:checked')).map(cb => parseInt(cb.value));
                         if (checkedDays.length === 0) {
                             alert('请至少选择一个星期');
                             return;
                         }
                         rule.weekDays = checkedDays.sort((a, b) => a - b);
-                    } else if (recurringType === 'monthly_weekday') {
+                    } else if (recurringType === RECURRING_TYPES.MONTHLY_WEEKDAY) {
                         rule.nthWeek = parseInt(document.getElementById('monthlyNthWeek').value);
                         rule.weekDay = parseInt(document.getElementById('monthlyWeekDayValue').value);
                     }
@@ -4957,7 +5035,7 @@ class OfficeDashboard {
                 item.source = document.getElementById('docSource').value.trim();
                 item.handler = document.getElementById('docHandler').value.trim();
                 item.content = document.getElementById('docContent').value.trim();
-                item.progress = item.handler ? 'processing' : 'pending';
+                item.progress = item.handler ? DOCUMENT_PROGRESS.PROCESSING : DOCUMENT_PROGRESS.PENDING;
                 // 办文日期范围
                 item.docStartDate = document.getElementById('docStartDate').value || this.selectedDate;
                 item.docEndDate = document.getElementById('docEndDate').value || null;
@@ -4983,17 +5061,17 @@ class OfficeDashboard {
                     // 根据周期类型添加额外参数
                     if (docRecurringType === RECURRING_TYPES.MONTHLY_DATE) {
                         rule.day = parseInt(document.getElementById('docRecurringDay').value) || 1;
-                    } else if (docRecurringType === 'monthly_workday') {
+                    } else if (docRecurringType === RECURRING_TYPES.MONTHLY_WORKDAY) {
                         rule.nthWorkDay = parseInt(document.getElementById('docNthWorkDay').value) || 1;
                     } else if (docRecurringType === RECURRING_TYPES.WEEKLY_DAY) {
                         rule.weekDay = parseInt(document.getElementById('docWeekDay').value) || 1;
-                    } else if (docRecurringType === 'weekly_multi') {
+                    } else if (docRecurringType === RECURRING_TYPES.WEEKLY_MULTI) {
                         const docWeekDays = [];
                         document.querySelectorAll('input[name="docWeekDays"]:checked').forEach(cb => {
                             docWeekDays.push(parseInt(cb.value));
                         });
                         rule.weekDays = docWeekDays;
-                    } else if (docRecurringType === 'monthly_weekday') {
+                    } else if (docRecurringType === RECURRING_TYPES.MONTHLY_WEEKDAY) {
                         rule.nthWeek = parseInt(document.getElementById('docMonthlyNthWeek').value) || 1;
                         rule.weekDay = parseInt(document.getElementById('docMonthlyWeekDayValue').value) || 1;
                     }
@@ -5594,7 +5672,7 @@ class OfficeDashboard {
                         await this.updateRecurringGroupStatus(originalItem, { 
                             completed, 
                             completedAt: completed ? new Date().toISOString() : null,
-                            ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? 'completed' : 'pending' })
+                            ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING })
                         });
                         return;
                     }
@@ -5617,7 +5695,7 @@ class OfficeDashboard {
                         ...(dayStates[this.selectedDate] || {}),
                         completed,
                         completedAt: completed ? new Date().toISOString() : null,
-                        progress: completed ? 'completed' : 'pending'
+                        progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING
                     };
                     
                     this.saveUndoHistory('update', { item: originalItem });
@@ -5636,7 +5714,7 @@ class OfficeDashboard {
                 await db.updateItem(id, {
                     completed,
                     completedAt: completed ? new Date().toISOString() : null,
-                    progress: completed ? 'completed' : 'pending',
+                    progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING,
                     dayStates: clearedDayStates
                 });
                 await this.loadItems();
@@ -5656,7 +5734,7 @@ class OfficeDashboard {
                 completed,
                 completedAt: completed ? new Date().toISOString() : null,
                 // 办文类型额外更新progress字段
-                ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? 'completed' : 'pending' })
+                ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING })
             });
             console.log('updateItem 结果:', result);
             await this.loadItems();
@@ -6091,19 +6169,19 @@ class OfficeDashboard {
 
         // 根据类型显示对应组
         switch (type) {
-            case 'monthly_date':
+            case RECURRING_TYPES.MONTHLY_DATE:
                 document.getElementById('docMonthlyDateGroup').style.display = 'block';
                 break;
-            case 'monthly_workday':
+            case RECURRING_TYPES.MONTHLY_WORKDAY:
                 document.getElementById('docNthWorkDayGroup').style.display = 'block';
                 break;
-            case 'weekly_day':
+            case RECURRING_TYPES.WEEKLY_DAY:
                 document.getElementById('docWeekDayGroup').style.display = 'block';
                 break;
-            case 'weekly_multi':
+            case RECURRING_TYPES.WEEKLY_MULTI:
                 document.getElementById('docWeekMultiGroup').style.display = 'block';
                 break;
-            case 'monthly_weekday':
+            case RECURRING_TYPES.MONTHLY_WEEKDAY:
                 document.getElementById('docMonthlyWeekDayGroup').style.display = 'block';
                 break;
         }
@@ -6146,7 +6224,7 @@ class OfficeDashboard {
         };
 
         switch (rule.type) {
-            case 'daily':
+            case RECURRING_TYPES.DAILY:
                 // 每天
                 let dailyCount = 0;
                 let dailyDate = new Date(firstDate);
@@ -6169,7 +6247,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'workday_daily':
+            case RECURRING_TYPES.WORKDAY_DAILY:
                 // 工作日每天（周一至周五，跳过周末和节假日）
                 let workdayCount1 = 0;
                 let currentDate1 = new Date(firstDate);
@@ -6189,7 +6267,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'weekly_day':
+            case RECURRING_TYPES.WEEKLY_DAY:
                 // 每周固定星期
                 let weeklyCount = 0;
                 let weekNum = 0;
@@ -6215,7 +6293,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'weekly_multi':
+            case RECURRING_TYPES.WEEKLY_MULTI:
                 // 每周多天（如一二三）
                 const weekDays = rule.weekDays || [];
                 let weekOffset = 0;
@@ -6249,7 +6327,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'monthly_date':
+            case RECURRING_TYPES.MONTHLY_DATE:
                 // 每月固定日期
                 let monthlyDateCount = 0;
                 let monthNum = 1;
@@ -6277,7 +6355,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'monthly_workday':
+            case RECURRING_TYPES.MONTHLY_WORKDAY:
                 // 每月第N个工作日
                 for (let i = 0; i < count; i++) {
                     const date = this.getNthWorkDayOfMonth(firstDate, i + 1, rule.nthWorkDay, skipHolidays);
@@ -6290,7 +6368,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'monthly_weekday':
+            case RECURRING_TYPES.MONTHLY_WEEKDAY:
                 // 每月第N个星期X（如每月第一个周一）
                 for (let i = 0; i < count; i++) {
                     const date = this.getNthWeekDayOfMonth(firstDate, i + 1, rule.nthWeek, rule.weekDay);
@@ -6829,7 +6907,7 @@ class OfficeDashboard {
 
             // 更新当前处理人
             item.handler = transferTo;
-            item.progress = 'processing';
+            item.progress = DOCUMENT_PROGRESS.PROCESSING;
 
             await db.updateItem(parseInt(itemId), item);
 

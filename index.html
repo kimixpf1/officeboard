@@ -1168,16 +1168,40 @@
         loadSupabase();
     </script>
 
+    <script>
+        window.OfficeConstants = window.OfficeConstants || {
+            ITEM_TYPES: {
+                TODO: 'todo',
+                MEETING: 'meeting',
+                DOCUMENT: 'document'
+            },
+            RECURRING_TYPES: {
+                DAILY: 'daily',
+                WORKDAY_DAILY: 'workday_daily',
+                WEEKLY_DAY: 'weekly_day',
+                WEEKLY_MULTI: 'weekly_multi',
+                MONTHLY_DATE: 'monthly_date',
+                MONTHLY_WORKDAY: 'monthly_workday',
+                MONTHLY_WEEKDAY: 'monthly_weekday'
+            },
+            DOCUMENT_PROGRESS: {
+                PENDING: 'pending',
+                PROCESSING: 'processing',
+                COMPLETED: 'completed'
+            }
+        };
+    </script>
+
     <!-- 其他脚本 -->
     <script src="js/db.js?v=20"></script>
     <script src="js/crypto.js?v=13"></script>
     <script src="js/kimi.js?v=13"></script>
-    <script src="js/templates.js?v=13"></script>
+    <script src="js/templates.js?v=14"></script>
     <script src="js/ocr.js?v=22"></script>
-    <script src="js/report.js?v=13"></script>
+    <script src="js/report.js?v=14"></script>
     <script src="js/calendar.js?v=14"></script>
     <script src="js/sync.js?v=13"></script>
-    <script src="js/app.js?v=49"></script>
+    <script src="js/app.js?v=50"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">
