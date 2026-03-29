@@ -6,6 +6,23 @@
  * 用户可免费使用本软件，但不得用于商业用途。
  */
 
+// ========== 全局常量 ==========
+const ITEM_TYPES = {
+    TODO: 'todo',
+    MEETING: 'meeting',
+    DOCUMENT: 'document'
+};
+
+const RECURRING_TYPES = {
+    DAILY: 'daily',
+    WORKDAY_DAILY: 'workday_daily',
+    WEEKLY_DAY: 'weekly_day',
+    WEEKLY_MULTI: 'weekly_multi',
+    MONTHLY_DATE: 'monthly_date',
+    MONTHLY_WORKDAY: 'monthly_workday',
+    MONTHLY_WEEKDAY: 'monthly_weekday'
+};
+
 // ========== 安全工具函数 ==========
 const SecurityUtils = {
     /**
@@ -2299,7 +2316,7 @@ class OfficeDashboard {
                 const result = await db.updateItem(itemId, {
                     completed: true,
                     completedAt: new Date().toISOString(),
-                    ...(type === 'document' && { progress: 'completed' })
+                    ...(type === ITEM_TYPES.DOCUMENT && { progress: 'completed' })
                 });
                 console.log('更新事项成功:', itemId, result);
             }
@@ -3855,7 +3872,7 @@ class OfficeDashboard {
         if (this.currentView === 'board') {
             items = allItems.filter(item => {
                 // 会议：按日期匹配（支持跨天会议）
-                if (item.type === 'meeting' && item.date) {
+                if (item.type === ITEM_TYPES.MEETING && item.date) {
                     // 跨天会议：检查选中日期是否在日期范围内
                     if (item.endDate) {
                         return this.selectedDate >= item.date && this.selectedDate <= item.endDate;
@@ -3864,11 +3881,11 @@ class OfficeDashboard {
                     return item.date === this.selectedDate;
                 }
                 // 待办：按截止日期匹配
-                if (item.type === 'todo' && item.deadline) {
+                if (item.type === ITEM_TYPES.TODO && item.deadline) {
                     return item.deadline.startsWith(this.selectedDate);
                 }
                 // 文件：按办文日期范围匹配（支持跨天流转）
-                if (item.type === 'document') {
+                if (item.type === ITEM_TYPES.DOCUMENT) {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
                     
@@ -3899,7 +3916,7 @@ class OfficeDashboard {
         // 为跨日期办文应用当天的独立状态，并过滤隐藏的项
         items = items.map(item => {
             // 只处理跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (item.type === 'document' && 
+            if (item.type === ITEM_TYPES.DOCUMENT && 
                 item.docStartDate && item.docEndDate && 
                 !item.recurringGroupId && 
                 item.dayStates && item.dayStates[this.selectedDate]) {
@@ -4030,7 +4047,7 @@ class OfficeDashboard {
             // - 如果两个都有order值，优先用order（用户拖动结果）
             // - 如果只有一个有order，有order的排前面
             // - 如果都没有order，按领导级别+时间排序
-            if (type === 'meeting') {
+            if (type === ITEM_TYPES.MEETING) {
                 // 两个都有order值：按order排序（用户拖动结果）
                 if (aHasOrder && bHasOrder) {
                     if (a.order !== b.order) return a.order - b.order;
@@ -4102,7 +4119,7 @@ class OfficeDashboard {
         `;
 
         switch (item.type) {
-            case 'todo':
+            case ITEM_TYPES.TODO:
                 const priorityClass = `priority-${item.priority || 'medium'}`;
                 const priorityText = { high: '急', medium: '中', low: '低' }[item.priority] || '中';
                 // 周期性任务标志
@@ -4121,7 +4138,7 @@ class OfficeDashboard {
                 `;
                 break;
 
-            case 'meeting':
+            case ITEM_TYPES.MEETING:
                 // 精简显示：【参会人员】会议名称+时间段+地点
                 const attendeeStr = item.attendees && item.attendees.length > 0
                     ? (item.attendees.length > 3 ? item.attendees.slice(0, 3).join('、') + '等' : item.attendees.join('、'))
@@ -4156,7 +4173,7 @@ class OfficeDashboard {
                 `;
                 break;
 
-            case 'document':
+            case ITEM_TYPES.DOCUMENT:
                 // 办文新设计：收/发/流转 + 完成状态
                 const docTypeIcon = { receive: '收', send: '发', transfer: '转' }[item.docType] || '文';
                 const docTypeClass = item.docType || 'receive';
@@ -4311,7 +4328,7 @@ class OfficeDashboard {
 
         // 根据类型填充字段
         switch (item.type) {
-            case 'todo':
+            case ITEM_TYPES.TODO:
                 document.getElementById('todoPriority').value = item.priority || 'medium';
                 document.getElementById('todoDeadline').value = item.deadline || '';
                 
@@ -4336,11 +4353,11 @@ class OfficeDashboard {
                     
                     // 填充具体的周期参数
                     setTimeout(() => {
-                        if (item.recurringRule.type === 'monthly_date') {
+                        if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_DATE) {
                             document.getElementById('recurringDay').value = item.recurringRule.day || '';
                         } else if (item.recurringRule.type === 'monthly_workday') {
                             document.getElementById('nthWorkDay').value = item.recurringRule.nthWorkDay || '';
-                        } else if (item.recurringRule.type === 'weekly_day') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY) {
                             document.getElementById('weekDay').value = item.recurringRule.weekDay || 1;
                         } else if (item.recurringRule.type === 'weekly_multi') {
                             const checkboxes = document.querySelectorAll('input[name="weekDays"]');
@@ -4358,7 +4375,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'meeting':
+            case ITEM_TYPES.MEETING:
                 document.getElementById('meetingDate').value = item.date || '';
                 document.getElementById('meetingEndDate').value = item.endDate || '';
                 document.getElementById('meetingTime').value = item.time || '';
@@ -4368,7 +4385,7 @@ class OfficeDashboard {
                 document.getElementById('meetingAgenda').value = item.agenda || '';
                 break;
 
-            case 'document':
+            case ITEM_TYPES.DOCUMENT:
                 document.getElementById('docType').value = item.docType || 'receive';
                 document.getElementById('docNumber').value = item.docNumber || '';
                 document.getElementById('docSource').value = item.source || '';
@@ -4398,11 +4415,11 @@ class OfficeDashboard {
                     
                     // 填充具体的周期参数
                     setTimeout(() => {
-                        if (item.recurringRule.type === 'monthly_date') {
+                        if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_DATE) {
                             document.getElementById('docRecurringDay').value = item.recurringRule.day || '';
                         } else if (item.recurringRule.type === 'monthly_workday') {
                             document.getElementById('docNthWorkDay').value = item.recurringRule.nthWorkDay || '';
-                        } else if (item.recurringRule.type === 'weekly_day') {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY) {
                             document.getElementById('docWeekDay').value = item.recurringRule.weekDay || 1;
                         } else if (item.recurringRule.type === 'weekly_multi') {
                             const checkboxes = document.querySelectorAll('input[name="docWeekDays"]');
@@ -4744,7 +4761,7 @@ class OfficeDashboard {
         const now = new Date();
         const timeStr = now.toTimeString().slice(0, 5);
 
-        if (type === 'todo') {
+        if (type === ITEM_TYPES.TODO) {
             const deadlineEl = document.getElementById('todoDeadline');
             console.log('设置待办截止时间:', `${dateStr}T${timeStr}`);
             if (deadlineEl) deadlineEl.value = `${dateStr}T${timeStr}`;
@@ -4754,13 +4771,13 @@ class OfficeDashboard {
             const isRecurring = document.getElementById('isRecurring');
             if (recurringFields) recurringFields.style.display = 'none';
             if (isRecurring) isRecurring.checked = false;
-        } else if (type === 'meeting') {
+        } else if (type === ITEM_TYPES.MEETING) {
             const dateEl = document.getElementById('meetingDate');
             const timeEl = document.getElementById('meetingTime');
             console.log('设置会议日期:', dateStr);
             if (dateEl) dateEl.value = dateStr;
             if (timeEl) timeEl.value = timeStr;
-        } else if (type === 'document') {
+        } else if (type === ITEM_TYPES.DOCUMENT) {
             // 重置办文周期性选项
             const docRecurringFields = document.getElementById('docRecurringFields');
             const docIsRecurring = document.getElementById('docIsRecurring');
@@ -4863,7 +4880,7 @@ class OfficeDashboard {
 
         // 类型特定字段
         switch (type) {
-            case 'todo':
+            case ITEM_TYPES.TODO:
                 item.priority = document.getElementById('todoPriority').value;
                 item.deadline = document.getElementById('todoDeadline').value;
                 item.completed = false;
@@ -4886,7 +4903,7 @@ class OfficeDashboard {
                         endDate: recurringEndDate
                     };
 
-                    if (recurringType === 'monthly_date') {
+                    if (recurringType === RECURRING_TYPES.MONTHLY_DATE) {
                         const day = parseInt(document.getElementById('recurringDay').value);
                         if (!day || day < 1 || day > 31) {
                             alert('请输入有效的日期（1-31）');
@@ -4900,7 +4917,7 @@ class OfficeDashboard {
                             return;
                         }
                         rule.nthWorkDay = nthWorkDay;
-                    } else if (recurringType === 'weekly_day') {
+                    } else if (recurringType === RECURRING_TYPES.WEEKLY_DAY) {
                         rule.weekDay = parseInt(document.getElementById('weekDay').value);
                     } else if (recurringType === 'weekly_multi') {
                         const checkedDays = Array.from(document.querySelectorAll('input[name="weekDays"]:checked')).map(cb => parseInt(cb.value));
@@ -4923,7 +4940,7 @@ class OfficeDashboard {
                 }
                 break;
 
-            case 'meeting':
+            case ITEM_TYPES.MEETING:
                 item.date = document.getElementById('meetingDate').value;
                 item.endDate = document.getElementById('meetingEndDate').value || null;
                 item.time = document.getElementById('meetingTime').value;
@@ -4934,7 +4951,7 @@ class OfficeDashboard {
                 item.agenda = document.getElementById('meetingAgenda').value.trim();
                 break;
 
-            case 'document':
+            case ITEM_TYPES.DOCUMENT:
                 item.docType = document.getElementById('docType').value;
                 item.docNumber = document.getElementById('docNumber').value.trim();
                 item.source = document.getElementById('docSource').value.trim();
@@ -4964,11 +4981,11 @@ class OfficeDashboard {
                         endDate: document.getElementById('docRecurringEndDate')?.value || null,
                     };
                     // 根据周期类型添加额外参数
-                    if (docRecurringType === 'monthly_date') {
+                    if (docRecurringType === RECURRING_TYPES.MONTHLY_DATE) {
                         rule.day = parseInt(document.getElementById('docRecurringDay').value) || 1;
                     } else if (docRecurringType === 'monthly_workday') {
                         rule.nthWorkDay = parseInt(document.getElementById('docNthWorkDay').value) || 1;
-                    } else if (docRecurringType === 'weekly_day') {
+                    } else if (docRecurringType === RECURRING_TYPES.WEEKLY_DAY) {
                         rule.weekDay = parseInt(document.getElementById('docWeekDay').value) || 1;
                     } else if (docRecurringType === 'weekly_multi') {
                         const docWeekDays = [];
@@ -5059,7 +5076,7 @@ class OfficeDashboard {
                         await db.updateItem(parseInt(id), item);
                         this.showSuccess('事项已更新（保留周期性）');
                     }
-                } else if (originalItem && originalItem.type === 'document' && 
+                } else if (originalItem && originalItem.type === ITEM_TYPES.DOCUMENT && 
                     originalItem.docStartDate && originalItem.docEndDate && 
                     !originalItem.recurringGroupId) {
                     // 跨日期办文编辑：询问用户是否只修改当天
@@ -5568,7 +5585,7 @@ class OfficeDashboard {
             const originalItem = await db.getItem(id);
             if (originalItem && originalItem.recurringGroupId) {
                 // 办文类型默认独立操作，不弹出选择框
-                if (type !== 'document') {
+                if (type !== ITEM_TYPES.DOCUMENT) {
                     const choice = await this.showRecurringChoice('完成状态', completed ? '标记完成' : '取消完成');
                     if (choice === 'cancel') return;
                     
@@ -5577,7 +5594,7 @@ class OfficeDashboard {
                         await this.updateRecurringGroupStatus(originalItem, { 
                             completed, 
                             completedAt: completed ? new Date().toISOString() : null,
-                            ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
+                            ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? 'completed' : 'pending' })
                         });
                         return;
                     }
@@ -5586,7 +5603,7 @@ class OfficeDashboard {
             }
             
             // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (type === 'document' && originalItem && 
+            if (type === ITEM_TYPES.DOCUMENT && originalItem && 
                 originalItem.docStartDate && originalItem.docEndDate && 
                 !originalItem.recurringGroupId) {
                 // 跨日期办文：询问用户是否只修改当天
@@ -5639,7 +5656,7 @@ class OfficeDashboard {
                 completed,
                 completedAt: completed ? new Date().toISOString() : null,
                 // 办文类型额外更新progress字段
-                ...(type === 'document' && { progress: completed ? 'completed' : 'pending' })
+                ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? 'completed' : 'pending' })
             });
             console.log('updateItem 结果:', result);
             await this.loadItems();
@@ -5664,7 +5681,7 @@ class OfficeDashboard {
             
             if (originalItem && originalItem.recurringGroupId) {
                 // 办文类型默认独立操作，不弹出选择框
-                if (originalItem.type !== 'document') {
+                if (originalItem.type !== ITEM_TYPES.DOCUMENT) {
                     const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
                     console.log('用户选择:', choice);
                     
@@ -5685,7 +5702,7 @@ class OfficeDashboard {
             }
             
             // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (originalItem && originalItem.type === 'document' && 
+            if (originalItem && originalItem.type === ITEM_TYPES.DOCUMENT && 
                 originalItem.docStartDate && originalItem.docEndDate && 
                 !originalItem.recurringGroupId) {
                 // 跨日期办文：询问用户是否只修改当天
@@ -5761,7 +5778,7 @@ class OfficeDashboard {
             
             if (originalItem && originalItem.recurringGroupId) {
                 // 办文类型默认独立操作，不弹出选择框
-                if (originalItem.type !== 'document') {
+                if (originalItem.type !== ITEM_TYPES.DOCUMENT) {
                     const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
                     console.log('用户选择:', choice);
                     
@@ -5782,7 +5799,7 @@ class OfficeDashboard {
             }
             
             // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (originalItem && originalItem.type === 'document' && 
+            if (originalItem && originalItem.type === ITEM_TYPES.DOCUMENT && 
                 originalItem.docStartDate && originalItem.docEndDate && 
                 !originalItem.recurringGroupId) {
                 // 跨日期办文：询问用户是否只修改当天
@@ -5992,7 +6009,7 @@ class OfficeDashboard {
 
             // 筛选未完成的会议
             const incompleteMeetings = allItems.filter(item =>
-                item.type === 'meeting' && !item.completed
+                item.type === ITEM_TYPES.MEETING && !item.completed
             );
 
             for (const meeting of incompleteMeetings) {
@@ -6022,7 +6039,7 @@ class OfficeDashboard {
             // 如果有会议被标记完成，刷新显示
             const updatedItems = await db.getAllItems();
             const hasNewCompleted = updatedItems.some(item =>
-                item.type === 'meeting' &&
+                item.type === ITEM_TYPES.MEETING &&
                 item.completed &&
                 item.completedAt &&
                 new Date(item.completedAt) > new Date(now.getTime() - 120000) // 2分钟内完成的
@@ -6311,7 +6328,7 @@ class OfficeDashboard {
         };
         
         // 根据事项类型设置正确的日期字段
-        if (baseItem.type === 'document') {
+        if (baseItem.type === ITEM_TYPES.DOCUMENT) {
             // 办文类型使用 docStartDate
             item.docStartDate = dateStr.split('T')[0]; // 只取日期部分
             item.docDate = item.docStartDate; // 兼容旧数据
@@ -6530,7 +6547,7 @@ class OfficeDashboard {
         const item = await db.getItem(id);
         
         // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-        if (item && item.type === 'document' && 
+        if (item && item.type === ITEM_TYPES.DOCUMENT && 
             item.docStartDate && item.docEndDate && 
             !item.recurringGroupId) {
             // 跨日期办文：询问用户如何删除
@@ -6560,7 +6577,7 @@ class OfficeDashboard {
         
         if (item && item.isRecurring && item.recurringGroupId) {
             // 办文类型默认独立删除，不弹出选择框
-            if (item.type === 'document') {
+            if (item.type === ITEM_TYPES.DOCUMENT) {
                 this.deleteItemId = id;
                 this.deleteItem = item;
                 // 直接删除本项
