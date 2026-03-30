@@ -2064,15 +2064,19 @@ class OCRManager {
                     // 合并参会人员到批次中的事项
                     if (item.type === 'meeting' && batchDuplicate.existingItem) {
                         const existing = batchDuplicate.existingItem;
-                        const existingAttendees = existing.attendees || [];
-                        const addedAttendees = itemAttendees.filter(a => !existingAttendees.includes(a));
+                        const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
+
                         if (addedAttendees.length > 0) {
-                            const mergedAttendees = [...existingAttendees, ...addedAttendees];
                             existing.attendees = mergedAttendees;
-                            // 同步更新数据库中已保存的记录
+                            existing.displayTitle = this.formatMeetingTitle(existing);
+
                             if (existing.id) {
-                                await db.updateItem(existing.id, { attendees: mergedAttendees });
+                                await db.updateItem(existing.id, {
+                                    attendees: mergedAttendees,
+                                    displayTitle: existing.displayTitle
+                                });
                             }
+
                             mergedItems.push({
                                 title: itemTitle,
                                 addedAttendees: addedAttendees
@@ -2094,17 +2098,26 @@ class OCRManager {
                     // 会议类型：合并参会人员
                     if (item.type === 'meeting' && duplicateInfo.existingItem) {
                         const existing = duplicateInfo.existingItem;
-                        const existingAttendees = existing.attendees || [];
+                        const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
 
-                        // 合并参会人员（去重）
-                        const mergedAttendees = [...new Set([...existingAttendees, ...itemAttendees])];
+                        if (addedAttendees.length > 0) {
+                            const updatedMeeting = {
+                                ...existing,
+                                attendees: mergedAttendees
+                            };
+                            updatedMeeting.displayTitle = this.formatMeetingTitle(updatedMeeting);
 
-                        if (mergedAttendees.length > existingAttendees.length) {
                             // 更新现有会议的参会人员
-                            await db.updateItem(existing.id, { attendees: mergedAttendees });
+                            await db.updateItem(existing.id, {
+                                attendees: mergedAttendees,
+                                displayTitle: updatedMeeting.displayTitle
+                            });
+                            existing.attendees = mergedAttendees;
+                            existing.displayTitle = updatedMeeting.displayTitle;
+
                             mergedItems.push({
                                 title: itemTitle,
-                                addedAttendees: itemAttendees.filter(a => !existingAttendees.includes(a))
+                                addedAttendees
                             });
                             console.log('合并参会人员:', itemTitle, itemAttendees);
                         } else {
@@ -2166,10 +2179,18 @@ class OCRManager {
             // 同类型才比较
             if (existing.type !== newItem.type) continue;
 
-            const existTitle = (existing.title || '').trim().toLowerCase();
-
             // 会议：比较标题关键词和日期
             if (newItem.type === 'meeting') {
+                if (this.isSameMeetingForMerge(newItemData, existing)) {
+                    return { isDuplicate: true, existingItem: existing };
+                }
+
+                if (this.hasConflictingMeetingSchedule(newItemData, existing)) {
+                    continue;
+                }
+
+                const existTitle = (existing.title || '').trim().toLowerCase();
+
                 // 提取标题关键词（去掉"会议"、"研究"等常见词）
                 const extractKeywords = (title) => {
                     return title
@@ -2248,11 +2269,19 @@ class OCRManager {
             // 同类型才比较
             if (existing.type !== newItem.type) continue;
 
-            const existTitle = (existing.title || '').trim().toLowerCase();
-            const existKeywords = extractKeywords(existTitle);
-
             // 会议：比较关键词和日期
             if (newItem.type === 'meeting') {
+                if (this.isSameMeetingForMerge(newItemData, existing)) {
+                    return { isDuplicate: true, existingItem: existing, shouldMerge: true };
+                }
+
+                if (this.hasConflictingMeetingSchedule(newItemData, existing)) {
+                    continue;
+                }
+
+                const existTitle = (existing.title || '').trim().toLowerCase();
+                const existKeywords = extractKeywords(existTitle);
+
                 // 关键词匹配（标题相似度）
                 const keywordMatch = newKeywords === existKeywords ||
                                      (newKeywords.length > 2 && existKeywords.length > 2 && 
@@ -2278,6 +2307,8 @@ class OCRManager {
                     }
                 }
             }
+
+            const existTitle = (existing.title || '').trim().toLowerCase();
 
             // 待办：比较标题和截止日期
             if (newItem.type === 'todo') {
@@ -2311,6 +2342,86 @@ class OCRManager {
         }
 
         return result;
+    }
+
+    normalizeMeetingField(value) {
+        return (value || '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replace(/[（）()【】\[\]\s]/g, '')
+            .replace(/[，,、；;。.!！?？]/g, '');
+    }
+
+    isSameMeetingForMerge(newItemData, existingItem) {
+        const newTitle = this.normalizeMeetingField(newItemData.title);
+        const existingTitle = this.normalizeMeetingField(existingItem.title);
+        const newDate = this.normalizeMeetingField(newItemData.date);
+        const existingDate = this.normalizeMeetingField(existingItem.date);
+        const newEndDate = this.normalizeMeetingField(newItemData.endDate || newItemData.date);
+        const existingEndDate = this.normalizeMeetingField(existingItem.endDate || existingItem.date);
+        const newTime = this.normalizeMeetingField(newItemData.time);
+        const existingTime = this.normalizeMeetingField(existingItem.time);
+        const newLocation = this.normalizeMeetingField(newItemData.location);
+        const existingLocation = this.normalizeMeetingField(existingItem.location);
+
+        if (!newTitle || !existingTitle || !newDate || !existingDate) {
+            return false;
+        }
+
+        const titleMatch = newTitle === existingTitle;
+        const dateMatch = newDate === existingDate && newEndDate === existingEndDate;
+        const timeMatch = newTime && existingTime ? newTime === existingTime : newTime === existingTime;
+        const locationMatch = newLocation && existingLocation ? newLocation === existingLocation : newLocation === existingLocation;
+
+        return titleMatch && dateMatch && timeMatch && locationMatch;
+    }
+
+    hasConflictingMeetingSchedule(newItemData, existingItem) {
+        const newTitle = this.normalizeMeetingField(newItemData.title);
+        const existingTitle = this.normalizeMeetingField(existingItem.title);
+        const newDate = this.normalizeMeetingField(newItemData.date);
+        const existingDate = this.normalizeMeetingField(existingItem.date);
+        const newEndDate = this.normalizeMeetingField(newItemData.endDate || newItemData.date);
+        const existingEndDate = this.normalizeMeetingField(existingItem.endDate || existingItem.date);
+        const newTime = this.normalizeMeetingField(newItemData.time);
+        const existingTime = this.normalizeMeetingField(existingItem.time);
+        const newLocation = this.normalizeMeetingField(newItemData.location);
+        const existingLocation = this.normalizeMeetingField(existingItem.location);
+
+        if (!newTitle || !existingTitle || !newDate || !existingDate) {
+            return false;
+        }
+
+        const titleMatch = newTitle === existingTitle;
+        const dateMatch = newDate === existingDate && newEndDate === existingEndDate;
+        if (!titleMatch || !dateMatch) {
+            return false;
+        }
+
+        const timeConflict = newTime && existingTime && newTime !== existingTime;
+        const locationConflict = newLocation && existingLocation && newLocation !== existingLocation;
+        return timeConflict || locationConflict;
+    }
+
+    mergeMeetingAttendees(existingMeeting, incomingAttendees) {
+        const existingAttendees = Array.isArray(existingMeeting.attendees) ? existingMeeting.attendees : [];
+        const normalizedExisting = new Set(existingAttendees.map(attendee => this.normalizeMeetingField(attendee)));
+        const addedAttendees = [];
+
+        for (const attendee of Array.isArray(incomingAttendees) ? incomingAttendees : []) {
+            const normalized = this.normalizeMeetingField(attendee);
+            if (!normalized || normalizedExisting.has(normalized)) {
+                continue;
+            }
+            normalizedExisting.add(normalized);
+            addedAttendees.push(attendee);
+        }
+
+        return {
+            mergedAttendees: [...existingAttendees, ...addedAttendees],
+            addedAttendees
+        };
     }
 
     /**
