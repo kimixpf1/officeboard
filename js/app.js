@@ -294,7 +294,10 @@ class OfficeDashboard {
         document.getElementById('testApiKey')?.addEventListener('click', () => this.testApiKeyConnection());
 
         // NLP输入
-        document.getElementById('parseBtn')?.addEventListener('click', () => this.parseNaturalLanguage());
+        document.getElementById('parseBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.parseNaturalLanguage();
+        });
         document.getElementById('nlpInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.parseNaturalLanguage();
         });
@@ -307,9 +310,7 @@ class OfficeDashboard {
         });
 
         // 文件上传
-        document.getElementById('uploadBtn')?.addEventListener('click', () => {
-            document.getElementById('fileInput')?.click();
-        });
+        document.getElementById('uploadBtn')?.addEventListener('click', (e) => this.triggerFilePicker(e));
         document.getElementById('fileInput')?.addEventListener('change', (e) => this.handleFileUpload(e));
 
         // 视图切换
@@ -396,6 +397,26 @@ class OfficeDashboard {
 
         // 初始化右侧折叠面板
         this.initSidePanels();
+    }
+
+    triggerFilePicker(event) {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const fileInput = document.getElementById('fileInput');
+        if (!fileInput) {
+            return;
+        }
+
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
+        fileInput.value = '';
+
+        window.setTimeout(() => {
+            fileInput.click();
+        }, 0);
     }
 
     /**
