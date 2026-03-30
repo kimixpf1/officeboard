@@ -895,7 +895,7 @@ class OfficeDashboard {
                 <span class="link-drag" title="拖动排序">⋮⋮</span>
                 <span class="link-icon">${link.icon || '🔗'}</span>
                 <span class="link-name">${SecurityUtils.escapeHtml(link.name)}</span>
-                <button class="link-delete" data-index="${index}" title="删除">×</button>
+                <button type="button" class="link-delete" data-index="${index}" title="删除">×</button>
             </div>
         `).join('');
 
@@ -1279,7 +1279,7 @@ class OfficeDashboard {
                     <div class="weather-detail">湿度 ${humidity}% · 风速 ${windSpeed}km/h</div>
                     <div class="weather-city-row">
                         <span class="weather-city">${cityName}</span>
-                        <button class="weather-change-btn" id="weatherChangeBtn">切换城市</button>
+                        <button type="button" class="weather-change-btn" id="weatherChangeBtn">切换城市</button>
                     </div>
                     ${forecastHtml}
                 </div>
@@ -1296,7 +1296,7 @@ class OfficeDashboard {
                     <div>🌤️</div>
                     <div>天气获取失败</div>
                     <div style="font-size:12px;color:var(--gray-500);margin-top:8px;">请检查网络连接</div>
-                    <button class="weather-change-btn" id="weatherRetryChangeBtn" style="margin-top:10px;">切换城市</button>
+                    <button type="button" class="weather-change-btn" id="weatherRetryChangeBtn" style="margin-top:10px;">切换城市</button>
                 </div>
             `;
             document.getElementById('weatherRetryChangeBtn')?.addEventListener('click', () => {
@@ -1331,12 +1331,12 @@ class OfficeDashboard {
             <div class="city-selector">
                 <div class="city-selector-title">选择城市</div>
                 <div class="city-grid">
-                    ${cities.map(c => `<button class="city-btn" data-city='${JSON.stringify(c)}'>${c.name}</button>`).join('')}
+                    ${cities.map(c => `<button type="button" class="city-btn" data-city='${JSON.stringify(c)}'>${c.name}</button>`).join('')}
                 </div>
                 <div class="city-custom" style="margin-top:10px;">
                     <input type="text" id="customCityName" placeholder="自定义城市名" style="width:45%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;">
                     <input type="text" id="customCityCoords" placeholder="纬度,经度" style="width:35%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;">
-                    <button class="city-btn" id="customCityBtn" style="width:18%;">确定</button>
+                    <button type="button" class="city-btn" id="customCityBtn" style="width:18%;">确定</button>
                 </div>
             </div>
         `;
@@ -1658,9 +1658,9 @@ class OfficeDashboard {
                             <div class="contact-phone">${displayPhone}</div>
                         </div>
                         <div class="contact-actions">
-                            <button class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
-                            <button class="contact-edit" data-id="${contact.id || index}">编辑</button>
-                            <button class="contact-delete" data-id="${contact.id || index}">删除</button>
+                            <button type="button" class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
+                            <button type="button" class="contact-edit" data-id="${contact.id || index}">编辑</button>
+                            <button type="button" class="contact-delete" data-id="${contact.id || index}">删除</button>
                         </div>
                     </div>
                 `;
@@ -3825,8 +3825,8 @@ class OfficeDashboard {
                             ${suffix ? `<p style="margin-top: 10px; color: #999; font-size: 12px;">${suffix}</p>` : ''}
                         </div>
                         <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <button class="btn-secondary" id="aiCmdCancel" style="padding: 8px 20px;">取消</button>
-                            <button class="btn-danger" id="aiCmdConfirm" style="padding: 8px 20px; background: #ef4444; color: white;">确认执行</button>
+                            <button type="button" class="btn-secondary" id="aiCmdCancel" style="padding: 8px 20px;">取消</button>
+                            <button type="button" class="btn-danger" id="aiCmdConfirm" style="padding: 8px 20px; background: #ef4444; color: white;">确认执行</button>
                         </div>
                     </div>
                 </div>
@@ -3858,7 +3858,7 @@ class OfficeDashboard {
             <div class="modal-content" style="max-width: 600px;">
                 <div class="modal-header">
                     <h3>查询结果</h3>
-                    <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                    <button type="button" class="modal-close" onclick="this.closest('.modal').remove()">×</button>
                 </div>
                 <div class="modal-body" style="padding: 20px;">
                     <p style="margin-bottom: 15px; color: #666;">找到 ${items.length} 个匹配的事项：</p>
@@ -3886,7 +3886,7 @@ class OfficeDashboard {
                         </table>
                     </div>
                     <div style="margin-top: 15px; text-align: right;">
-                        <button class="btn-primary" onclick="this.closest('.modal').remove()" style="padding: 8px 20px;">关闭</button>
+                        <button type="button" class="btn-primary" onclick="this.closest('.modal').remove()" style="padding: 8px 20px;">关闭</button>
                     </div>
                 </div>
             </div>
@@ -3939,82 +3939,25 @@ class OfficeDashboard {
                         showStatus(msg);
                     };
 
-                    const result = await ocrManager.analyzeDocument(file, progressCallback);
+                    const previewResult = await ocrManager.analyzeDocument(file, progressCallback, { previewOnly: true });
 
-                    if (result.duplicate) {
+                    if (previewResult.duplicate) {
                         this.showError(`文件"${file.name}"已被处理过`);
                         continue;
                     }
 
-                    // 显示结果 - 弹出详细的识别日志
-                    let logHtml = `<div style="text-align:left; max-height:500px; overflow-y:auto;color:inherit;">`;
-                    logHtml += `<h4 style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-color,#eee);">📄 文件：${file.name}</h4>`;
-
-                    // 汇总统计
-                    const totalCount = (result.items?.length || 0) + (result.mergedItems?.length || 0) + (result.skippedItems?.length || 0);
-                    logHtml += `<div style="margin-bottom:16px;padding:10px;background:var(--card-bg,#f8fafc);border-radius:6px;">`;
-                    logHtml += `<b>识别汇总：</b>共识别 ${totalCount} 条记录`;
-                    logHtml += ` → <span style="color:#10b981;">新增 ${result.items?.length || 0}</span>`;
-                    logHtml += ` | <span style="color:#f59e0b;">合并 ${result.mergedItems?.length || 0}</span>`;
-                    logHtml += ` | <span style="color:#6b7280;">跳过 ${result.skippedItems?.length || 0}</span>`;
-                    logHtml += `</div>`;
-
-                    if (result.items && result.items.length > 0) {
-                        logHtml += `<div style="margin-bottom:16px;">`;
-                        logHtml += `<h5 style="color:#10b981;margin-bottom:10px;padding:6px 10px;background:rgba(16,185,129,0.1);border-radius:4px;">✅ 新增事项 (${result.items.length}个)</h5>`;
-                        logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-                        logHtml += `<tr style="background:var(--header-bg,#f1f5f9);"><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">类型</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">日期时间</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">事项名称</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">参会人员</th></tr>`;
-                        result.items.forEach((item, idx) => {
-                            if (!item) return;
-                            const typeIcon = { meeting: '📅 会议', todo: '☑️ 待办', document: '📄 办文' }[item.type] || '📌';
-                            const title = item.title || item.displayTitle || '未知事项';
-                            // 日期显示
-                            let dateStr = item.date || '';
-                            if (item.endDate && item.endDate !== item.date) {
-                                dateStr = `${item.date} 至 ${item.endDate}`;
-                            }
-                            // 时间显示
-                            let timeStr = item.time || '';
-                            if (item.endTime) {
-                                timeStr = `${item.time}-${item.endTime}`;
-                            }
-                            const dateTime = dateStr + (timeStr ? ` ${timeStr}` : '');
-                            const itemAttendees = item.attendees || [];
-                            const attendeesStr = itemAttendees.length > 0 ? itemAttendees.join('、') : '-';
-                            const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
-                            logHtml += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${typeIcon}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);white-space:nowrap;color:inherit;">${dateTime || '-'}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${attendeesStr}</td></tr>`;
-                        });
-                        logHtml += `</table></div>`;
+                    const confirmed = await this.showRecognitionPreview(file.name, previewResult);
+                    if (!confirmed) {
+                        continue;
                     }
 
-                    if (result.mergedItems && result.mergedItems.length > 0) {
-                        logHtml += `<div style="margin-bottom:16px;">`;
-                        logHtml += `<h5 style="color:#f59e0b;margin-bottom:10px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:4px;">🔄 合并参会人员 (${result.mergedItems.length}个)</h5>`;
-                        logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-                        logHtml += `<tr style="background:var(--header-bg,#f1f5f9);"><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">事项名称</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">新增参会人员</th></tr>`;
-                        result.mergedItems.forEach((item, idx) => {
-                            const title = item.title || '未知事项';
-                            const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '-';
-                            const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
-                            logHtml += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">📅 ${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:#f59e0b;font-weight:500;">+${addedStr}</td></tr>`;
-                        });
-                        logHtml += `</table></div>`;
-                    }
+                    showStatus('正在保存识别结果...');
+                    const result = await ocrManager.applyRecognitionActionPlan(previewResult.actionPlan, {
+                        text: previewResult.text,
+                        metadata: previewResult.metadata
+                    });
 
-                    if (result.skippedItems && result.skippedItems.length > 0) {
-                        logHtml += `<div style="margin-bottom:16px;">`;
-                        logHtml += `<h5 style="color:#6b7280;margin-bottom:10px;padding:6px 10px;background:rgba(107,114,128,0.1);border-radius:4px;">⏭️ 跳过重复 (${result.skippedItems.length}个)</h5>`;
-                        logHtml += `<ul style="margin:0;padding-left:20px;font-size:12px;opacity:0.7;">`;
-                        result.skippedItems.forEach(title => {
-                            logHtml += `<li style="margin:4px 0;">${title}</li>`;
-                        });
-                        logHtml += `</ul></div>`;
-                    }
-
-                    logHtml += `</div>`;
-
-                    // 显示日志弹窗
-                    this.showRecognitionLog('识别结果', logHtml);
+                    this.showRecognitionLog('识别结果', this.buildRecognitionSummaryHtml(file.name, result, false));
                 }
 
                 // 刷新列表
@@ -4514,33 +4457,33 @@ class OfficeDashboard {
             <div class="card-main">${contentHtml}</div>
             <div class="card-detail" style="display: none;">${detailHtml}</div>
             <div class="card-actions">
-                <button class="card-action-btn pin-btn ${item.pinned ? 'pinned' : ''}" title="${item.pinned ? '取消置顶' : '置顶'}">
+                <button type="button" class="card-action-btn pin-btn ${item.pinned ? 'pinned' : ''}" title="${item.pinned ? '取消置顶' : '置顶'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                         <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>
                     </svg>
                 </button>
-                <button class="card-action-btn sink-btn ${item.sunk ? 'sunk' : ''}" title="${item.sunk ? '取消沉底' : '沉底'}">
+                <button type="button" class="card-action-btn sink-btn ${item.sunk ? 'sunk' : ''}" title="${item.sunk ? '取消沉底' : '沉底'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.sunk ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                         <path d="M12 22L8.91 15.74L2 14.73L7 9.86L5.82 2.98L12 6.23L18.18 2.98L17 9.86L22 14.73L15.09 15.74L12 22Z"></path>
                     </svg>
                 </button>
-                <button class="card-action-btn complete-btn ${item.completed ? 'completed' : ''}" title="${item.completed ? '已完成' : '标记完成'}">
+                <button type="button" class="card-action-btn complete-btn ${item.completed ? 'completed' : ''}" title="${item.completed ? '已完成' : '标记完成'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                 </button>
-                <button class="card-action-btn expand-btn" title="展开/收起详情">
+                <button type="button" class="card-action-btn expand-btn" title="展开/收起详情">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </button>
-                <button class="card-action-btn edit-btn" title="编辑">
+                <button type="button" class="card-action-btn edit-btn" title="编辑">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
                 </button>
-                <button class="card-action-btn delete-btn" title="删除">
+                <button type="button" class="card-action-btn delete-btn" title="删除">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -5528,19 +5471,19 @@ class OfficeDashboard {
                     <div class="modal-body" style="padding: 20px;">
                         <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何修改？</p>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn-primary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-primary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
                                 仅修改本项（保留周期性）
                                 <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">独立记录当天的内容，不影响其他周期任务</div>
                             </button>
-                            <button class="btn-secondary" id="recurringChoiceFuture" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-secondary" id="recurringChoiceFuture" style="width: 100%; padding: 12px;">
                                 修改本项及未来所有周期
                                 <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新标题、经办人等信息到后续所有周期（日期保持不变）</div>
                             </button>
-                            <button class="btn-secondary" id="recurringChoiceDetach" style="width: 100%; padding: 12px; border-color: #f59e0b; color: #f59e0b;">
+                            <button type="button" class="btn-secondary" id="recurringChoiceDetach" style="width: 100%; padding: 12px; border-color: #f59e0b; color: #f59e0b;">
                                 仅修改本项（脱离周期）
                                 <div style="font-size: 12px; color: #999; margin-top: 4px;">将此项变为独立任务，不再属于周期组</div>
                             </button>
-                            <button class="btn-text" id="recurringChoiceCancel" style="width: 100%; padding: 8px;">
+                            <button type="button" class="btn-text" id="recurringChoiceCancel" style="width: 100%; padding: 8px;">
                                 取消
                             </button>
                         </div>
@@ -5641,13 +5584,13 @@ class OfficeDashboard {
                     <div class="modal-body" style="padding: 20px;">
                         <p style="margin-bottom: 20px; color: #666;">这是周期性任务，您想如何操作？</p>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn-secondary" id="recurringStatusChoiceThis" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-secondary" id="recurringStatusChoiceThis" style="width: 100%; padding: 12px;">
                                 仅本项${actionName}
                             </button>
-                            <button class="btn-primary" id="recurringStatusChoiceAll" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-primary" id="recurringStatusChoiceAll" style="width: 100%; padding: 12px;">
                                 所有后续周期都${actionName}
                             </button>
-                            <button class="btn-text" id="recurringStatusChoiceCancel" style="width: 100%; padding: 8px;">
+                            <button type="button" class="btn-text" id="recurringStatusChoiceCancel" style="width: 100%; padding: 8px;">
                                 取消
                             </button>
                         </div>
@@ -5690,15 +5633,15 @@ class OfficeDashboard {
                     <div class="modal-body" style="padding: 20px;">
                         <p style="margin-bottom: 20px; color: #666;">这是一个跨日期办文，您想如何操作？</p>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn-primary" id="crossDateChoiceThis" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-primary" id="crossDateChoiceThis" style="width: 100%; padding: 12px;">
                                 仅当天${actionName}
                                 <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">独立记录当天的状态，不影响其他日期</div>
                             </button>
-                            <button class="btn-secondary" id="crossDateChoiceAll" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-secondary" id="crossDateChoiceAll" style="width: 100%; padding: 12px;">
                                 全部日期都${actionName}
                                 <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新所有日期的状态</div>
                             </button>
-                            <button class="btn-text" id="crossDateChoiceCancel" style="width: 100%; padding: 8px;">
+                            <button type="button" class="btn-text" id="crossDateChoiceCancel" style="width: 100%; padding: 8px;">
                                 取消
                             </button>
                         </div>
@@ -6924,13 +6867,13 @@ class OfficeDashboard {
                     <div class="modal-body" style="padding: 20px;">
                         <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何删除？</p>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn-secondary" id="recurringDeleteThis" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-secondary" id="recurringDeleteThis" style="width: 100%; padding: 12px;">
                                 仅删除本项
                             </button>
-                            <button class="btn-danger" id="recurringDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
+                            <button type="button" class="btn-danger" id="recurringDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
                                 删除本项及后续所有周期
                             </button>
-                            <button class="btn-text" id="recurringDeleteCancel" style="width: 100%; padding: 8px;">
+                            <button type="button" class="btn-text" id="recurringDeleteCancel" style="width: 100%; padding: 8px;">
                                 取消
                             </button>
                         </div>
@@ -6971,15 +6914,15 @@ class OfficeDashboard {
                     <div class="modal-body" style="padding: 20px;">
                         <p style="margin-bottom: 20px; color: #666;">这是一个跨日期办文，您想如何删除？</p>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn-secondary" id="crossDateDeleteThis" style="width: 100%; padding: 12px;">
+                            <button type="button" class="btn-secondary" id="crossDateDeleteThis" style="width: 100%; padding: 12px;">
                                 仅从当天移除
                                 <div style="font-size: 12px; color: #666; margin-top: 4px;">其他日期仍可看到此办文</div>
                             </button>
-                            <button class="btn-danger" id="crossDateDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
+                            <button type="button" class="btn-danger" id="crossDateDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
                                 彻底删除
                                 <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">从所有日期删除此办文</div>
                             </button>
-                            <button class="btn-text" id="crossDateDeleteCancel" style="width: 100%; padding: 8px;">
+                            <button type="button" class="btn-text" id="crossDateDeleteCancel" style="width: 100%; padding: 8px;">
                                 取消
                             </button>
                         </div>
@@ -7304,6 +7247,121 @@ class OfficeDashboard {
     /**
      * 显示识别日志弹窗
      */
+    buildRecognitionSummaryHtml(fileName, result, isPreview = false) {
+        const sectionPrefix = isPreview ? '待' : '';
+        let logHtml = `<div style="text-align:left; max-height:500px; overflow-y:auto;color:inherit;">`;
+        logHtml += `<h4 style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-color,#eee);">📄 文件：${fileName}</h4>`;
+
+        const totalCount = (result.items?.length || 0) + (result.mergedItems?.length || 0) + (result.skippedItems?.length || 0);
+        logHtml += `<div style="margin-bottom:16px;padding:10px;background:var(--card-bg,#f8fafc);border-radius:6px;">`;
+        logHtml += `<b>${isPreview ? '识别预览' : '识别汇总'}：</b>共识别 ${totalCount} 条记录`;
+        logHtml += ` → <span style="color:#10b981;">${sectionPrefix}新增 ${result.items?.length || 0}</span>`;
+        logHtml += ` | <span style="color:#f59e0b;">${sectionPrefix}合并 ${result.mergedItems?.length || 0}</span>`;
+        logHtml += ` | <span style="color:#6b7280;">${sectionPrefix}跳过 ${result.skippedItems?.length || 0}</span>`;
+        logHtml += `</div>`;
+
+        if (result.items && result.items.length > 0) {
+            logHtml += `<div style="margin-bottom:16px;">`;
+            logHtml += `<h5 style="color:#10b981;margin-bottom:10px;padding:6px 10px;background:rgba(16,185,129,0.1);border-radius:4px;">✅ ${sectionPrefix}新增事项 (${result.items.length}个)</h5>`;
+            logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+            logHtml += `<tr style="background:var(--header-bg,#f1f5f9);"><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">类型</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">日期时间</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">事项名称</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">参会人员</th></tr>`;
+            result.items.forEach((item, idx) => {
+                if (!item) return;
+                const typeIcon = { meeting: '📅 会议', todo: '☑️ 待办', document: '📄 办文' }[item.type] || '📌';
+                const title = item.title || item.displayTitle || '未知事项';
+                let dateStr = item.date || '';
+                if (item.endDate && item.endDate !== item.date) {
+                    dateStr = `${item.date} 至 ${item.endDate}`;
+                }
+                let timeStr = item.time || '';
+                if (item.endTime) {
+                    timeStr = `${item.time}-${item.endTime}`;
+                }
+                const dateTime = dateStr + (timeStr ? ` ${timeStr}` : '');
+                const itemAttendees = item.attendees || [];
+                const attendeesStr = itemAttendees.length > 0 ? itemAttendees.join('、') : '-';
+                const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
+                logHtml += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${typeIcon}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);white-space:nowrap;color:inherit;">${dateTime || '-'}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${attendeesStr}</td></tr>`;
+            });
+            logHtml += `</table></div>`;
+        }
+
+        if (result.mergedItems && result.mergedItems.length > 0) {
+            logHtml += `<div style="margin-bottom:16px;">`;
+            logHtml += `<h5 style="color:#f59e0b;margin-bottom:10px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:4px;">🔄 ${sectionPrefix}合并参会人员 (${result.mergedItems.length}个)</h5>`;
+            logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+            logHtml += `<tr style="background:var(--header-bg,#f1f5f9);"><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">识别事项</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">归并到</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">新增参会人员</th></tr>`;
+            result.mergedItems.forEach((item, idx) => {
+                const title = item.title || '未知事项';
+                const targetTitle = item.targetTitle || title;
+                const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '-';
+                const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
+                logHtml += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">📅 ${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${targetTitle}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:#f59e0b;font-weight:500;">+${addedStr}</td></tr>`;
+            });
+            logHtml += `</table></div>`;
+        }
+
+        if (result.skippedItems && result.skippedItems.length > 0) {
+            logHtml += `<div style="margin-bottom:16px;">`;
+            logHtml += `<h5 style="color:#6b7280;margin-bottom:10px;padding:6px 10px;background:rgba(107,114,128,0.1);border-radius:4px;">⏭️ ${sectionPrefix}跳过重复 (${result.skippedItems.length}个)</h5>`;
+            logHtml += `<ul style="margin:0;padding-left:20px;font-size:12px;opacity:0.7;">`;
+            result.skippedItems.forEach(title => {
+                logHtml += `<li style="margin:4px 0;">${title}</li>`;
+            });
+            logHtml += `</ul></div>`;
+        }
+
+        if (isPreview) {
+            logHtml += `<div style="padding:10px 12px;border-radius:6px;background:rgba(37,99,235,0.08);color:var(--text-color,#334155);font-size:13px;">确认后才会写入面板；取消则不会新增或合并任何事项。</div>`;
+        }
+
+        logHtml += `</div>`;
+        return logHtml;
+    }
+
+    showRecognitionPreview(fileName, result) {
+        const hasActions = (result.items?.length || 0) > 0 || (result.mergedItems?.length || 0) > 0;
+        const content = this.buildRecognitionSummaryHtml(fileName, result, true);
+
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.id = 'recognitionPreviewModal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 680px;">
+                    <div class="modal-header">
+                        <h3>识别前预览确认</h3>
+                        <button type="button" class="btn-close">×</button>
+                    </div>
+                    <div class="modal-body" style="padding: 16px;">
+                        ${content}
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary preview-cancel">${hasActions ? '取消保存' : '关闭'}</button>
+                        ${hasActions ? '<button type="button" class="btn-primary preview-confirm">确认保存</button>' : ''}
+                    </div>
+                </div>
+            `;
+
+            const finish = (confirmed) => {
+                modal.remove();
+                resolve(confirmed);
+            };
+
+            modal.querySelector('.btn-close')?.addEventListener('click', () => finish(false));
+            modal.querySelector('.preview-cancel')?.addEventListener('click', () => finish(false));
+            modal.querySelector('.preview-confirm')?.addEventListener('click', () => finish(true));
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    finish(false);
+                }
+            });
+
+            document.body.appendChild(modal);
+        });
+    }
+
     showRecognitionLog(title, content) {
         // 创建日志弹窗
         const modal = document.createElement('div');
@@ -7313,13 +7371,13 @@ class OfficeDashboard {
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
                     <h3>${title}</h3>
-                    <button class="btn-close" onclick="this.closest('.modal').remove()">×</button>
+                    <button type="button" class="btn-close" onclick="this.closest('.modal').remove()">×</button>
                 </div>
                 <div class="modal-body" style="padding: 16px;">
                     ${content}
                 </div>
                 <div class="modal-actions" style="justify-content: center;">
-                    <button class="btn-primary" onclick="this.closest('.modal').remove()">确定</button>
+                    <button type="button" class="btn-primary" onclick="this.closest('.modal').remove()">确定</button>
                 </div>
             </div>
         `;

@@ -1950,7 +1950,7 @@ class OCRManager {
      * 支持图片和PDF
      * 优先使用Kimi API进行图片识别（更精准）
      */
-    async analyzeDocument(file, progressCallback = null) {
+    async analyzeDocument(file, progressCallback = null, options = {}) {
         const fileType = this.getFileType(file);
 
         // 检查文件类型
@@ -2034,129 +2034,170 @@ class OCRManager {
                 items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
             }
 
-            // 获取现有数据进行内容去重（不是文件去重）
             const existingItems = await db.getAllItems();
+            const actionPlan = this.buildRecognitionActionPlan(items, existingItems, file.name);
 
-            // 创建卡片（带去重检查和参会人员合并）
-            const createdItems = [];
-            const mergedItems = [];
-            const skippedItems = [];
-
-            // 用于跟踪本次识别中已处理的事项（防止同一图片中的重复）
-            const processedInBatch = [];
-
-            for (const item of items) {
-                // 安全获取 item 数据
-                if (!item || !item.type) continue;
-                const itemData = item.data || {};
-                const itemTitle = itemData.title || '未知事项';
-                const itemAttendees = itemData.attendees || [];
-
-                // 先检查本次批次中是否已有相似事项
-                const batchDuplicate = this.checkDuplicateInBatch(item, processedInBatch);
-                if (batchDuplicate.isDuplicate) {
-                    // 合并参会人员到批次中的事项
-                    if (item.type === 'meeting' && batchDuplicate.existingItem) {
-                        const existing = batchDuplicate.existingItem;
-                        const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
-
-                        if (addedAttendees.length > 0) {
-                            existing.attendees = mergedAttendees;
-                            existing.displayTitle = this.formatMeetingTitle(existing);
-
-                            if (existing.id) {
-                                await db.updateItem(existing.id, {
-                                    attendees: mergedAttendees,
-                                    displayTitle: existing.displayTitle
-                                });
-                            }
-
-                            mergedItems.push({
-                                title: itemTitle,
-                                addedAttendees: addedAttendees
-                            });
-                            console.log('批次内合并参会人员:', itemTitle, '新增:', addedAttendees);
-                        } else {
-                            skippedItems.push(itemTitle);
-                        }
-                    } else {
-                        skippedItems.push(itemTitle);
-                    }
-                    continue;
-                }
-
-                // 检查是否已存在相似事项（数据库中）
-                const duplicateInfo = this.checkDuplicateItem(item, existingItems);
-
-                if (duplicateInfo.isDuplicate) {
-                    // 会议类型：合并参会人员
-                    if (item.type === 'meeting' && duplicateInfo.existingItem) {
-                        const existing = duplicateInfo.existingItem;
-                        const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
-
-                        if (addedAttendees.length > 0) {
-                            const updatedMeeting = {
-                                ...existing,
-                                attendees: mergedAttendees
-                            };
-                            updatedMeeting.displayTitle = this.formatMeetingTitle(updatedMeeting);
-
-                            // 更新现有会议的参会人员
-                            await db.updateItem(existing.id, {
-                                attendees: mergedAttendees,
-                                displayTitle: updatedMeeting.displayTitle
-                            });
-                            existing.attendees = mergedAttendees;
-                            existing.displayTitle = updatedMeeting.displayTitle;
-
-                            mergedItems.push({
-                                title: itemTitle,
-                                addedAttendees
-                            });
-                            console.log('合并参会人员:', itemTitle, itemAttendees);
-                        } else {
-                            skippedItems.push(itemTitle);
-                        }
-                    } else {
-                        skippedItems.push(itemTitle);
-                        console.log('跳过重复事项:', itemTitle);
-                    }
-                    continue;
-                }
-
-                try {
-                    const id = await db.addItem({
-                        type: item.type,
-                        ...itemData,
-                        source: 'document',
-                        sourceFile: file.name
-                    });
-                    const newItem = { id, type: item.type, ...itemData };
-                    createdItems.push(newItem);
-
-                    // 添加到已存在列表，防止后续重复
-                    existingItems.push(newItem);
-                    // 添加到批次处理列表
-                    processedInBatch.push(newItem);
-                } catch (error) {
-                    console.error('创建卡片失败:', error);
-                }
+            if (options.previewOnly) {
+                return {
+                    success: true,
+                    previewOnly: true,
+                    actionPlan,
+                    items: actionPlan.createItems,
+                    mergedItems: actionPlan.mergeSummaries,
+                    mergedCount: actionPlan.mergeSummaries.length,
+                    skippedCount: actionPlan.skippedItems.length,
+                    skippedItems: actionPlan.skippedItems,
+                    text: text.trim(),
+                    metadata
+                };
             }
 
-            return {
-                success: true,
-                items: createdItems,
-                mergedItems: mergedItems,
-                mergedCount: mergedItems.length,
-                skippedCount: skippedItems.length,
-                skippedItems: skippedItems,
+            return await this.applyRecognitionActionPlan(actionPlan, {
                 text: text.trim(),
                 metadata
-            };
+            });
         } catch (error) {
             console.error('文档分析失败:', error);
             throw error;
         }
+    }
+
+    buildRecognitionActionPlan(items, existingItems, fileName) {
+        const workingExistingItems = (Array.isArray(existingItems) ? existingItems : []).map(item => ({
+            ...item,
+            attendees: Array.isArray(item.attendees) ? [...item.attendees] : []
+        }));
+        const createItems = [];
+        const mergeUpdates = [];
+        const mergeUpdateMap = new Map();
+        const skippedItems = [];
+        const processedInBatch = [];
+
+        for (const item of Array.isArray(items) ? items : []) {
+            if (!item || !item.type) {
+                continue;
+            }
+
+            const itemData = item.data || {};
+            const itemTitle = itemData.title || '未知事项';
+            const itemAttendees = itemData.attendees || [];
+
+            const batchDuplicate = this.checkDuplicateInBatch(item, processedInBatch);
+            if (batchDuplicate.isDuplicate) {
+                if (item.type === 'meeting' && batchDuplicate.existingItem) {
+                    const existing = batchDuplicate.existingItem;
+                    const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
+
+                    if (addedAttendees.length > 0) {
+                        existing.attendees = mergedAttendees;
+                        existing.displayTitle = this.formatMeetingTitle(existing);
+                        mergeUpdates.push({
+                            title: itemTitle,
+                            targetTitle: existing.title || itemTitle,
+                            addedAttendees
+                        });
+                    } else {
+                        skippedItems.push(itemTitle);
+                    }
+                } else {
+                    skippedItems.push(itemTitle);
+                }
+                continue;
+            }
+
+            const duplicateInfo = this.checkDuplicateItem(item, workingExistingItems);
+            if (duplicateInfo.isDuplicate) {
+                if (item.type === 'meeting' && duplicateInfo.existingItem) {
+                    const existing = duplicateInfo.existingItem;
+                    const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
+
+                    if (addedAttendees.length > 0) {
+                        existing.attendees = mergedAttendees;
+                        existing.displayTitle = this.formatMeetingTitle(existing);
+
+                        if (existing.id) {
+                            const mergeKey = String(existing.id);
+                            if (!mergeUpdateMap.has(mergeKey)) {
+                                mergeUpdateMap.set(mergeKey, {
+                                    id: existing.id,
+                                    title: existing.title || itemTitle,
+                                    attendees: [...mergedAttendees],
+                                    displayTitle: existing.displayTitle,
+                                    addedAttendees: [...addedAttendees]
+                                });
+                            } else {
+                                const currentMerge = mergeUpdateMap.get(mergeKey);
+                                currentMerge.attendees = [...mergedAttendees];
+                                currentMerge.displayTitle = existing.displayTitle;
+                                currentMerge.addedAttendees = [...new Set([...currentMerge.addedAttendees, ...addedAttendees])];
+                            }
+                        }
+
+                        mergeUpdates.push({
+                            title: itemTitle,
+                            targetTitle: existing.title || itemTitle,
+                            addedAttendees
+                        });
+                    } else {
+                        skippedItems.push(itemTitle);
+                    }
+                } else {
+                    skippedItems.push(itemTitle);
+                }
+                continue;
+            }
+
+            const newItem = {
+                type: item.type,
+                ...itemData,
+                source: 'document',
+                sourceFile: fileName
+            };
+
+            createItems.push(newItem);
+            workingExistingItems.push(newItem);
+            processedInBatch.push(newItem);
+        }
+
+        return {
+            createItems,
+            mergeUpdates: Array.from(mergeUpdateMap.values()),
+            mergeSummaries: mergeUpdates,
+            skippedItems
+        };
+    }
+
+    async applyRecognitionActionPlan(actionPlan, context = {}) {
+        const createdItems = [];
+        const mergeSummaries = Array.isArray(actionPlan?.mergeSummaries) ? actionPlan.mergeSummaries : [];
+        const skippedItems = Array.isArray(actionPlan?.skippedItems) ? actionPlan.skippedItems : [];
+
+        for (const mergeUpdate of Array.isArray(actionPlan?.mergeUpdates) ? actionPlan.mergeUpdates : []) {
+            await db.updateItem(mergeUpdate.id, {
+                attendees: mergeUpdate.attendees,
+                displayTitle: mergeUpdate.displayTitle
+            });
+        }
+
+        for (const item of Array.isArray(actionPlan?.createItems) ? actionPlan.createItems : []) {
+            try {
+                const id = await db.addItem(item);
+                createdItems.push({ id, ...item });
+            } catch (error) {
+                console.error('创建卡片失败:', error);
+            }
+        }
+
+        return {
+            success: true,
+            items: createdItems,
+            mergedItems: mergeSummaries,
+            mergedCount: mergeSummaries.length,
+            skippedCount: skippedItems.length,
+            skippedItems,
+            text: context.text || '',
+            metadata: context.metadata || {}
+        };
     }
 
     /**
@@ -2613,17 +2654,20 @@ class OCRManager {
             const systemPrompt = `你是专业的办公文档识别助手。今天是${todayStr}（星期${weekDay}）。
 
 【表格结构】
-会议安排表格分为"局领导"和"处室"两个区域，每个区域有3列：
-- 第1列：参会人员（如"钱局"、"吴局"、"综合处"、"核算处"）
-- 第2列：会议内容（日期+时间+会议名称）
-- 第3列：备注/地点
+你经常处理的图片格式是“近期主要会议活动安排”这类横向表格，通常视觉上有4列：
+- 最左侧窄列：分组标题，如“局领导”“处室”，这是分组标签，不是attendees
+- 第2列：姓名（处室），如“钱局”“吴局”“综合处”“核算处”，这才是attendees
+- 第3列：会议活动名称，内容里通常同时包含日期、星期、时间和动作描述
+- 第4列：备注，通常就是地点
 
 【关键规则 - 必须严格遵守】
 1. **逐行读取**：表格每一行是独立的！不要把上一行的人混到下一行！
-2. **参会人员**：每行的attendees只填该行第1列的那一个人名/处室名
+2. **参会人员**：每行的attendees只填“姓名（处室）”这一列的那一个人名/处室名，绝不能把“局领导”“处室”这种分组标签当成attendees
 3. **跨日期会议**：如"3月25日下午-26日"必须同时填date和endDate
 4. **同名会议**：同一会议出现在不同行（如"高新区经济大镇调研"有钱局和综合处），每行单独输出
 5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色表述不同，但日期时间和会议主题相同，本质上仍是同一个会议，会议核心主题按去掉动作前缀后的名称理解
+6. **备注列优先当地点**：像“市人大机关一楼主任会议室”“局1405会议室”“南京金奥国际酒店”都应识别到location
+7. **动作词不要当会议主体**：像“参加”“组织召开”“出席”“赴”“前往”是动作前缀，真正用于去重的核心会议主题要尽量保留后面的主题内容
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"
@@ -2676,11 +2720,12 @@ class OCRManager {
                                     text: `请识别这个会议安排表格。
 
 ⚠️ 重要：逐行读取！不要跨行！
-- 第1列是参会人员（每行只对应一个人名/处室名）
-- 第2列是会议内容（日期+时间+会议名称）
-- 第3列是地点
+- 最左侧“局领导/处室”是分组标签，忽略，不要写进attendees
+- “姓名（处室）”这一列才是参会人员（每行只对应一个人名/处室名）
+- “会议活动名称”这一列是会议内容（日期+时间+会议名称）
+- “备注”这一列一般是地点
 
-每行输出一条记录，attendees只填该行第1列对应的人名，不要把其他行的人混进来！
+每行输出一条记录，attendees只填该行“姓名（处室）”对应的人名，不要把其他行的人混进来！
 
 跨日期会议示例："3月24日-25日" → date和endDate都要填`
 
@@ -2797,17 +2842,19 @@ ${ocrText}
 今天是${todayStr}（星期${weekDay}）
 
 【表格结构说明 - 极其重要】
-会议安排表格通常分为"局领导"和"处室"两个区域，每行有3列：
-- 第1列：参会人员（如"钱局"、"吴局"、"综合处"、"核算处"）
-- 第2列：会议内容（日期+时间+会议名称）
-- 第3列：备注/地点
+会议安排表格通常分为"局领导"和"处室"两个区域，视觉上常见为4列：
+- 最左侧窄列是分组标签，如"局领导""处室"，不要识别为attendees
+- 第2列是姓名（处室），如"钱局""吴局""综合处""核算处"，这才是attendees
+- 第3列是会议活动名称（日期+时间+会议名称）
+- 第4列是备注/地点
 
 【核心规则 - 必须严格遵守】
 1. **逐行读取**：表格每一行是独立的！不要把上一行的人混到下一行！
-2. **参会人员**：每行的attendees只填该行第1列的那一个人名/处室名
+2. **参会人员**：每行的attendees只填“姓名（处室）”那一列的那一个人名/处室名
 3. **跨日期会议**：如"3月25日下午-26日"必须同时填date和endDate
 4. **同名会议**：同一会议出现在不同行（如"高新区经济大镇调研"有钱局和综合处），每行单独输出一条记录！
 5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色描述不同，但日期时间和会议主题相同，仍按同一个会议主题理解，核心标题要忽略动作前缀
+6. **地点优先来自备注列**：像"市人大机关一楼主任会议室""局1405会议室""南京金奥国际酒店"都应作为location
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"

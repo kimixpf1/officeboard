@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>微信上传识别</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f5f7fb;
+            --card: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --primary: #2563eb;
+            --primary-strong: #1d4ed8;
+            --border: #e5e7eb;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .page {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 20px 16px 32px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: 24px;
+        }
+
+        p {
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        .desc {
+            color: var(--muted);
+            margin-bottom: 18px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        button {
+            appearance: none;
+            border: 0;
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .primary {
+            background: var(--primary);
+            color: #fff;
+            flex: 1 1 220px;
+        }
+
+        .secondary {
+            background: #eef2ff;
+            color: var(--primary-strong);
+            flex: 1 1 160px;
+        }
+
+        .primary:disabled,
+        .secondary:disabled {
+            opacity: 0.6;
+        }
+
+        .status {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: #eff6ff;
+            color: #1e40af;
+            min-height: 52px;
+            white-space: pre-wrap;
+        }
+
+        .summary {
+            margin-top: 18px;
+            display: none;
+            padding: 16px;
+            border-radius: 12px;
+            background: #ecfdf5;
+            color: #065f46;
+            line-height: 1.7;
+        }
+
+        .summary.error {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .tips {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-card {
+            width: min(720px, 100%);
+            background: #fff;
+            border-radius: 16px;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header,
+        .modal-footer {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-footer {
+            border-bottom: 0;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-body {
+            padding: 16px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <h1>微信专用上传识别</h1>
+            <p class="desc">这里是轻量识别页，只保留上传和识别所需能力，避免微信内打开相册或相机时把主页面重新拉起。</p>
+            <input type="file" id="wechatFileInput" accept="image/*,.pdf" style="display:none">
+            <div class="actions">
+                <button type="button" id="chooseImageBtn" class="primary">选择图片或拍摄</button>
+                <button type="button" id="backBtn" class="secondary">返回主页面</button>
+            </div>
+            <div id="uploadStatus" class="status">等待选择文件</div>
+            <div id="resultSummary" class="summary"></div>
+            <div class="tips">
+                微信里如果点拍摄、点完成、点取消都会导致页面重新进入，这一页会比主页面更稳。
+                <br>
+                识别后会先给你看“新增 / 合并 / 跳过”的预览，确认后才写入面板。
+            </div>
+        </div>
+    </div>
+    <script src="js/db.js?v=20"></script>
+    <script src="js/ocr.js?v=22"></script>
+    <script src="js/wechat-upload.js?v=2"></script>
+</body>
+</html>
