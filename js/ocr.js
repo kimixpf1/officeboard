@@ -380,13 +380,7 @@ class OCRManager {
                         .map(item => this.validateAndCleanItem(item))
                         .filter(item => item !== null);
 
-                    // 格式化会议标题
-                    return items.map(item => {
-                        if (item.type === 'meeting') {
-                            item.data.displayTitle = this.formatMeetingTitle(item.data);
-                        }
-                        return item;
-                    });
+                    return this.mergeRecognizedItems(items);
                 }
             }
 
@@ -2353,9 +2347,63 @@ class OCRManager {
             .replace(/[，,、；;。.!！?？]/g, '');
     }
 
+    getMeetingCoreTitle(title) {
+        const normalizedTitle = this.normalizeMeetingField(title);
+        if (!normalizedTitle) {
+            return '';
+        }
+
+        const leadingPatterns = [
+            /^组织召开/,
+            /^主持召开/,
+            /^组织参加/,
+            /^牵头组织/,
+            /^牵头召开/,
+            /^负责组织/,
+            /^参加并/,
+            /^参加/,
+            /^出席/,
+            /^列席/,
+            /^召开/,
+            /^组织/,
+            /^召集/,
+            /^主持/,
+            /^赴/,
+            /^前往/
+        ];
+
+        let coreTitle = normalizedTitle;
+        let changed = true;
+
+        while (changed) {
+            changed = false;
+            for (const pattern of leadingPatterns) {
+                if (pattern.test(coreTitle)) {
+                    coreTitle = coreTitle.replace(pattern, '');
+                    changed = true;
+                }
+            }
+        }
+
+        return coreTitle || normalizedTitle;
+    }
+
+    isSimilarMeetingTitle(newTitle, existingTitle) {
+        if (!newTitle || !existingTitle) {
+            return false;
+        }
+
+        if (newTitle === existingTitle) {
+            return true;
+        }
+
+        const minLength = Math.min(newTitle.length, existingTitle.length);
+        return minLength >= 6 && (newTitle.includes(existingTitle) || existingTitle.includes(newTitle));
+    }
+
     isSameMeetingForMerge(newItemData, existingItem) {
-        const newTitle = this.normalizeMeetingField(newItemData.title);
-        const existingTitle = this.normalizeMeetingField(existingItem.title);
+        const newTitle = this.getMeetingCoreTitle(newItemData.title);
+        const existingTitle = this.getMeetingCoreTitle(existingItem.title);
         const newDate = this.normalizeMeetingField(newItemData.date);
         const existingDate = this.normalizeMeetingField(existingItem.date);
         const newEndDate = this.normalizeMeetingField(newItemData.endDate || newItemData.date);
@@ -2369,17 +2417,17 @@ class OCRManager {
             return false;
         }
 
-        const titleMatch = newTitle === existingTitle;
+        const titleMatch = this.isSimilarMeetingTitle(newTitle, existingTitle);
         const dateMatch = newDate === existingDate && newEndDate === existingEndDate;
-        const timeMatch = newTime && existingTime ? newTime === existingTime : newTime === existingTime;
-        const locationMatch = newLocation && existingLocation ? newLocation === existingLocation : newLocation === existingLocation;
+        const timeMatch = !newTime || !existingTime || newTime === existingTime;
+        const locationMatch = !newLocation || !existingLocation || newLocation === existingLocation;
 
         return titleMatch && dateMatch && timeMatch && locationMatch;
     }
 
     hasConflictingMeetingSchedule(newItemData, existingItem) {
-        const newTitle = this.normalizeMeetingField(newItemData.title);
-        const existingTitle = this.normalizeMeetingField(existingItem.title);
+        const newTitle = this.getMeetingCoreTitle(newItemData.title);
+        const existingTitle = this.getMeetingCoreTitle(existingItem.title);
         const newDate = this.normalizeMeetingField(newItemData.date);
         const existingDate = this.normalizeMeetingField(existingItem.date);
         const newEndDate = this.normalizeMeetingField(newItemData.endDate || newItemData.date);
@@ -2393,7 +2441,7 @@ class OCRManager {
             return false;
         }
 
-        const titleMatch = newTitle === existingTitle;
+        const titleMatch = this.isSimilarMeetingTitle(newTitle, existingTitle);
         const dateMatch = newDate === existingDate && newEndDate === existingEndDate;
         if (!titleMatch || !dateMatch) {
             return false;
@@ -2422,6 +2470,51 @@ class OCRManager {
             mergedAttendees: [...existingAttendees, ...addedAttendees],
             addedAttendees
         };
+    }
+
+    mergeRecognizedItems(items) {
+        const mergedItems = [];
+
+        for (const item of Array.isArray(items) ? items : []) {
+            if (!item || !item.type || !item.data) {
+                continue;
+            }
+
+            if (item.type !== 'meeting') {
+                mergedItems.push(item);
+                continue;
+            }
+
+            const existingItem = mergedItems.find(candidate =>
+                candidate.type === 'meeting' &&
+                this.isSameMeetingForMerge(item.data, candidate.data)
+            );
+
+            if (!existingItem) {
+                item.data.displayTitle = this.formatMeetingTitle(item.data);
+                mergedItems.push(item);
+                continue;
+            }
+
+            const { mergedAttendees } = this.mergeMeetingAttendees(existingItem.data, item.data.attendees || []);
+            existingItem.data.attendees = mergedAttendees;
+            existingItem.data.endDate = existingItem.data.endDate || item.data.endDate;
+            existingItem.data.time = existingItem.data.time || item.data.time;
+            existingItem.data.endTime = existingItem.data.endTime || item.data.endTime;
+            existingItem.data.location = existingItem.data.location || item.data.location;
+            existingItem.data.displayTitle = this.formatMeetingTitle(existingItem.data);
+        }
+
+        return mergedItems.map(item => {
+            if (item.type === 'meeting') {
+                item.data.displayTitle = this.formatMeetingTitle(item.data);
+            } else if (item.type === 'todo') {
+                item.data.displayTitle = this.formatTodoTitle(item.data);
+            } else if (item.type === 'document') {
+                item.data.displayTitle = this.formatDocumentTitle(item.data);
+            }
+            return item;
+        });
     }
 
     /**
@@ -2530,6 +2623,7 @@ class OCRManager {
 2. **参会人员**：每行的attendees只填该行第1列的那一个人名/处室名
 3. **跨日期会议**：如"3月25日下午-26日"必须同时填date和endDate
 4. **同名会议**：同一会议出现在不同行（如"高新区经济大镇调研"有钱局和综合处），每行单独输出
+5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色表述不同，但日期时间和会议主题相同，本质上仍是同一个会议，会议核心主题按去掉动作前缀后的名称理解
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"
@@ -2638,16 +2732,7 @@ class OCRManager {
 
                     return {
                         text: content,
-                        items: items.map(item => {
-                            if (item.type === 'meeting') {
-                                item.data.displayTitle = this.formatMeetingTitle(item.data);
-                            } else if (item.type === 'todo') {
-                                item.data.displayTitle = this.formatTodoTitle(item.data);
-                            } else if (item.type === 'document') {
-                                item.data.displayTitle = this.formatDocumentTitle(item.data);
-                            }
-                            return item;
-                        })
+                        items: this.mergeRecognizedItems(items)
                     };
                 }
             }
@@ -2722,6 +2807,7 @@ ${ocrText}
 2. **参会人员**：每行的attendees只填该行第1列的那一个人名/处室名
 3. **跨日期会议**：如"3月25日下午-26日"必须同时填date和endDate
 4. **同名会议**：同一会议出现在不同行（如"高新区经济大镇调研"有钱局和综合处），每行单独输出一条记录！
+5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色描述不同，但日期时间和会议主题相同，仍按同一个会议主题理解，核心标题要忽略动作前缀
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"
@@ -2816,17 +2902,7 @@ ${ocrText}
                         .map(item => this.validateAndCleanItem(item))
                         .filter(item => item !== null);
 
-                    // 格式化标题
-                    return items.map(item => {
-                        if (item.type === 'meeting') {
-                            item.data.displayTitle = this.formatMeetingTitle(item.data);
-                        } else if (item.type === 'todo') {
-                            item.data.displayTitle = this.formatTodoTitle(item.data);
-                        } else if (item.type === 'document') {
-                            item.data.displayTitle = this.formatDocumentTitle(item.data);
-                        }
-                        return item;
-                    });
+                    return this.mergeRecognizedItems(items);
                 }
             }
 
