@@ -327,75 +327,7 @@
                             <span>周期性任务</span>
                         </label>
                     </div>
-                    <div id="recurringFields" class="recurring-fields" style="display:none;">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>周期类型</label>
-                                <select id="recurringType"></select>
-                            </div>
-                            <div class="form-group">
-                                <label>生成数量</label>
-                                <input type="number" id="recurringCount" min="1" max="365" value="20" placeholder="生成几个">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <!-- 每月固定日期 -->
-                            <div class="form-group" id="monthlyDateGroup">
-                                <label>每月几号</label>
-                                <input type="number" id="recurringDay" min="1" max="31" placeholder="如：13">
-                            </div>
-                            <!-- 每月第N个工作日 -->
-                            <div class="form-group" id="nthWorkDayGroup" style="display:none;">
-                                <label>第几个工作日</label>
-                                <input type="number" id="nthWorkDay" min="1" max="23" placeholder="如：1=第一个工作日">
-                            </div>
-                            <!-- 每周固定星期 -->
-                            <div class="form-group" id="weekDayGroup" style="display:none;">
-                                <label>每周几</label>
-                                <select id="weekDay"></select>
-                            </div>
-                            <!-- 每周多天 -->
-                            <div class="form-group" id="weekMultiGroup" style="display:none;">
-                                <label>选择星期（可多选）</label>
-                                <div class="weekday-checkboxes" id="weekDaysOptions"></div>
-                            </div>
-                            <!-- 每月第N个星期X -->
-                            <div class="form-group" id="monthlyWeekDayGroup" style="display:none;">
-                                <div class="form-row">
-                                    <div style="flex:1;">
-                                        <label>第几个</label>
-                                        <select id="monthlyNthWeek"></select>
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label>星期</label>
-                                        <select id="monthlyWeekDayValue"></select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="skipWeekends" checked>
-                                <span>跳过周末（顺延到下一工作日）</span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="skipHolidays">
-                                <span>跳过法定节假日（顺延到下一工作日）</span>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>生效开始日期</label>
-                                <input type="date" id="recurringStartDate" placeholder="留空则从今天开始">
-                            </div>
-                            <div class="form-group">
-                                <label>生效结束日期</label>
-                                <input type="date" id="recurringEndDate" placeholder="留空则不限结束">
-                            </div>
-                        </div>
-                    </div>
+                    <div id="recurringFields" class="recurring-fields" style="display:none;"></div>
                 </div>
 
                 <!-- 会议活动字段 -->
@@ -473,75 +405,7 @@
                             <span>周期性办文（每天/每周/每月固定办理）</span>
                         </label>
                     </div>
-                    <div id="docRecurringFields" class="recurring-fields" style="display:none;">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>周期类型</label>
-                                <select id="docRecurringType"></select>
-                            </div>
-                            <div class="form-group">
-                                <label>生成数量</label>
-                                <input type="number" id="docRecurringCount" min="1" max="365" value="20" placeholder="生成几个">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <!-- 每月固定日期 -->
-                            <div class="form-group" id="docMonthlyDateGroup">
-                                <label>每月几号</label>
-                                <input type="number" id="docRecurringDay" min="1" max="31" placeholder="如：13">
-                            </div>
-                            <!-- 每月第N个工作日 -->
-                            <div class="form-group" id="docNthWorkDayGroup" style="display:none;">
-                                <label>第几个工作日</label>
-                                <input type="number" id="docNthWorkDay" min="1" max="23" placeholder="如：1=第一个工作日">
-                            </div>
-                            <!-- 每周固定星期 -->
-                            <div class="form-group" id="docWeekDayGroup" style="display:none;">
-                                <label>每周几</label>
-                                <select id="docWeekDay"></select>
-                            </div>
-                            <!-- 每周多天 -->
-                            <div class="form-group" id="docWeekMultiGroup" style="display:none;">
-                                <label>选择星期（可多选）</label>
-                                <div class="weekday-checkboxes" id="docWeekDaysOptions"></div>
-                            </div>
-                            <!-- 每月第N个星期X -->
-                            <div class="form-group" id="docMonthlyWeekDayGroup" style="display:none;">
-                                <div class="form-row">
-                                    <div style="flex:1;">
-                                        <label>第几个</label>
-                                        <select id="docMonthlyNthWeek"></select>
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label>星期</label>
-                                        <select id="docMonthlyWeekDayValue"></select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="docRecurringSkipWeekends" checked>
-                                <span>跳过周末（顺延到下一工作日）</span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="docRecurringSkipHolidays">
-                                <span>跳过法定节假日（顺延到下一工作日）</span>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>生效开始日期</label>
-                                <input type="date" id="docRecurringStartDate" placeholder="留空则从今天开始">
-                            </div>
-                            <div class="form-group">
-                                <label>生效结束日期</label>
-                                <input type="date" id="docRecurringEndDate" placeholder="留空则不限结束">
-                            </div>
-                        </div>
-                    </div>
+                    <div id="docRecurringFields" class="recurring-fields" style="display:none;"></div>
                     <div class="form-group">
                         <label for="docSource">来文单位 / 发文单位</label>
                         <input type="text" id="docSource" placeholder="填写来文单位或发文单位">
@@ -1153,7 +1017,7 @@
     <script src="js/report.js?v=14"></script>
     <script src="js/calendar.js?v=14"></script>
     <script src="js/sync.js?v=13"></script>
-    <script src="js/app.js?v=51"></script>
+    <script src="js/app.js?v=52"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">

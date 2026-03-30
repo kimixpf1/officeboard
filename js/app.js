@@ -2306,6 +2306,8 @@ class OfficeDashboard {
     }
 
     initializeRecurringFieldOptions() {
+        this.renderRecurringFieldTemplate(false);
+        this.renderRecurringFieldTemplate(true);
         this.renderRecurringTypeSelect('recurringType');
         this.renderRecurringTypeSelect('docRecurringType');
         this.renderSimpleSelectOptions('weekDay', WEEKDAY_OPTIONS);
@@ -2316,6 +2318,121 @@ class OfficeDashboard {
         this.renderSimpleSelectOptions('docMonthlyNthWeek', NTH_WEEK_OPTIONS);
         this.renderWeekdayCheckboxes('weekDaysOptions', 'weekDays');
         this.renderWeekdayCheckboxes('docWeekDaysOptions', 'docWeekDays');
+    }
+
+    getRecurringFieldConfig(isDocument = false) {
+        return isDocument
+            ? {
+                containerId: 'docRecurringFields',
+                typeSelectId: 'docRecurringType',
+                countId: 'docRecurringCount',
+                monthlyDateGroupId: 'docMonthlyDateGroup',
+                dayInputId: 'docRecurringDay',
+                nthWorkDayGroupId: 'docNthWorkDayGroup',
+                nthWorkDayInputId: 'docNthWorkDay',
+                weekDayGroupId: 'docWeekDayGroup',
+                weekDaySelectId: 'docWeekDay',
+                weekMultiGroupId: 'docWeekMultiGroup',
+                weekDaysContainerId: 'docWeekDaysOptions',
+                monthlyWeekDayGroupId: 'docMonthlyWeekDayGroup',
+                nthWeekSelectId: 'docMonthlyNthWeek',
+                monthlyWeekDayValueId: 'docMonthlyWeekDayValue',
+                skipWeekendsId: 'docRecurringSkipWeekends',
+                skipHolidaysId: 'docRecurringSkipHolidays',
+                startDateId: 'docRecurringStartDate',
+                endDateId: 'docRecurringEndDate'
+            }
+            : {
+                containerId: 'recurringFields',
+                typeSelectId: 'recurringType',
+                countId: 'recurringCount',
+                monthlyDateGroupId: 'monthlyDateGroup',
+                dayInputId: 'recurringDay',
+                nthWorkDayGroupId: 'nthWorkDayGroup',
+                nthWorkDayInputId: 'nthWorkDay',
+                weekDayGroupId: 'weekDayGroup',
+                weekDaySelectId: 'weekDay',
+                weekMultiGroupId: 'weekMultiGroup',
+                weekDaysContainerId: 'weekDaysOptions',
+                monthlyWeekDayGroupId: 'monthlyWeekDayGroup',
+                nthWeekSelectId: 'monthlyNthWeek',
+                monthlyWeekDayValueId: 'monthlyWeekDayValue',
+                skipWeekendsId: 'skipWeekends',
+                skipHolidaysId: 'skipHolidays',
+                startDateId: 'recurringStartDate',
+                endDateId: 'recurringEndDate'
+            };
+    }
+
+    renderRecurringFieldTemplate(isDocument = false) {
+        const config = this.getRecurringFieldConfig(isDocument);
+        const container = document.getElementById(config.containerId);
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="form-row">
+                <div class="form-group">
+                    <label>周期类型</label>
+                    <select id="${config.typeSelectId}"></select>
+                </div>
+                <div class="form-group">
+                    <label>生成数量</label>
+                    <input type="number" id="${config.countId}" min="1" max="365" value="20" placeholder="生成几个">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" id="${config.monthlyDateGroupId}">
+                    <label>每月几号</label>
+                    <input type="number" id="${config.dayInputId}" min="1" max="31" placeholder="如：13">
+                </div>
+                <div class="form-group" id="${config.nthWorkDayGroupId}" style="display:none;">
+                    <label>第几个工作日</label>
+                    <input type="number" id="${config.nthWorkDayInputId}" min="1" max="23" placeholder="如：1=第一个工作日">
+                </div>
+                <div class="form-group" id="${config.weekDayGroupId}" style="display:none;">
+                    <label>每周几</label>
+                    <select id="${config.weekDaySelectId}"></select>
+                </div>
+                <div class="form-group" id="${config.weekMultiGroupId}" style="display:none;">
+                    <label>选择星期（可多选）</label>
+                    <div class="weekday-checkboxes" id="${config.weekDaysContainerId}"></div>
+                </div>
+                <div class="form-group" id="${config.monthlyWeekDayGroupId}" style="display:none;">
+                    <div class="form-row">
+                        <div style="flex:1;">
+                            <label>第几个</label>
+                            <select id="${config.nthWeekSelectId}"></select>
+                        </div>
+                        <div style="flex:1;">
+                            <label>星期</label>
+                            <select id="${config.monthlyWeekDayValueId}"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="${config.skipWeekendsId}" checked>
+                    <span>跳过周末（顺延到下一工作日）</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="${config.skipHolidaysId}">
+                    <span>跳过法定节假日（顺延到下一工作日）</span>
+                </label>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>生效开始日期</label>
+                    <input type="date" id="${config.startDateId}" placeholder="留空则从今天开始">
+                </div>
+                <div class="form-group">
+                    <label>生效结束日期</label>
+                    <input type="date" id="${config.endDateId}" placeholder="留空则不限结束">
+                </div>
+            </div>
+        `;
     }
 
     renderRecurringTypeSelect(selectId) {
