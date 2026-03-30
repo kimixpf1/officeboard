@@ -27,6 +27,9 @@ const DOCUMENT_PROGRESS = OfficeConstants.DOCUMENT_PROGRESS || {
     PROCESSING: 'processing',
     COMPLETED: 'completed'
 };
+const RECURRING_OPTION_GROUPS = OfficeConstants.RECURRING_OPTION_GROUPS || [];
+const WEEKDAY_OPTIONS = OfficeConstants.WEEKDAY_OPTIONS || [];
+const NTH_WEEK_OPTIONS = OfficeConstants.NTH_WEEK_OPTIONS || [];
 
 // ========== 安全工具函数 ==========
 const SecurityUtils = {
@@ -204,6 +207,7 @@ class OfficeDashboard {
 
             // 绑定事件（先绑定事件，让用户可以交互）
             console.log('绑定用户交互事件...');
+            this.initializeRecurringFieldOptions();
             this.bindEvents();
 
             // 加载数据
@@ -2299,6 +2303,84 @@ class OfficeDashboard {
                 }
             });
         });
+    }
+
+    initializeRecurringFieldOptions() {
+        this.renderRecurringTypeSelect('recurringType');
+        this.renderRecurringTypeSelect('docRecurringType');
+        this.renderSimpleSelectOptions('weekDay', WEEKDAY_OPTIONS);
+        this.renderSimpleSelectOptions('docWeekDay', WEEKDAY_OPTIONS);
+        this.renderSimpleSelectOptions('monthlyWeekDayValue', WEEKDAY_OPTIONS);
+        this.renderSimpleSelectOptions('docMonthlyWeekDayValue', WEEKDAY_OPTIONS);
+        this.renderSimpleSelectOptions('monthlyNthWeek', NTH_WEEK_OPTIONS);
+        this.renderSimpleSelectOptions('docMonthlyNthWeek', NTH_WEEK_OPTIONS);
+        this.renderWeekdayCheckboxes('weekDaysOptions', 'weekDays');
+        this.renderWeekdayCheckboxes('docWeekDaysOptions', 'docWeekDays');
+    }
+
+    renderRecurringTypeSelect(selectId) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+
+        select.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        RECURRING_OPTION_GROUPS.forEach(group => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.label;
+
+            group.options.forEach(option => {
+                const optionEl = document.createElement('option');
+                optionEl.value = option.value;
+                optionEl.textContent = option.label;
+                optgroup.appendChild(optionEl);
+            });
+
+            fragment.appendChild(optgroup);
+        });
+
+        select.appendChild(fragment);
+    }
+
+    renderSimpleSelectOptions(selectId, options) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+
+        select.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        options.forEach(option => {
+            const optionEl = document.createElement('option');
+            optionEl.value = option.value;
+            optionEl.textContent = option.label;
+            fragment.appendChild(optionEl);
+        });
+
+        select.appendChild(fragment);
+    }
+
+    renderWeekdayCheckboxes(containerId, inputName) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        WEEKDAY_OPTIONS.forEach(option => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-inline';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.name = inputName;
+            input.value = option.value;
+
+            label.appendChild(input);
+            label.appendChild(document.createTextNode(` ${option.shortLabel || option.label}`));
+            fragment.appendChild(label);
+        });
+
+        container.appendChild(fragment);
     }
 
     toggleCardDetail(card) {

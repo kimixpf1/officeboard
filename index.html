@@ -331,21 +331,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label>周期类型</label>
-                                <select id="recurringType">
-                                    <optgroup label="每日">
-                                        <option value="daily">每天</option>
-                                        <option value="workday_daily">工作日每天（周一至周五）</option>
-                                    </optgroup>
-                                    <optgroup label="每周">
-                                        <option value="weekly_day">每周固定星期</option>
-                                        <option value="weekly_multi">每周多天（如一二三）</option>
-                                    </optgroup>
-                                    <optgroup label="每月">
-                                        <option value="monthly_date">每月固定日期</option>
-                                        <option value="monthly_workday">每月第N个工作日</option>
-                                        <option value="monthly_weekday">每月第N个星期X</option>
-                                    </optgroup>
-                                </select>
+                                <select id="recurringType"></select>
                             </div>
                             <div class="form-group">
                                 <label>生成数量</label>
@@ -366,53 +352,23 @@
                             <!-- 每周固定星期 -->
                             <div class="form-group" id="weekDayGroup" style="display:none;">
                                 <label>每周几</label>
-                                <select id="weekDay">
-                                    <option value="1">周一</option>
-                                    <option value="2">周二</option>
-                                    <option value="3">周三</option>
-                                    <option value="4">周四</option>
-                                    <option value="5">周五</option>
-                                    <option value="6">周六</option>
-                                    <option value="7">周日</option>
-                                </select>
+                                <select id="weekDay"></select>
                             </div>
                             <!-- 每周多天 -->
                             <div class="form-group" id="weekMultiGroup" style="display:none;">
                                 <label>选择星期（可多选）</label>
-                                <div class="weekday-checkboxes">
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="1"> 一</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="2"> 二</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="3"> 三</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="4"> 四</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="5"> 五</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="6"> 六</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="weekDays" value="7"> 日</label>
-                                </div>
+                                <div class="weekday-checkboxes" id="weekDaysOptions"></div>
                             </div>
                             <!-- 每月第N个星期X -->
                             <div class="form-group" id="monthlyWeekDayGroup" style="display:none;">
                                 <div class="form-row">
                                     <div style="flex:1;">
                                         <label>第几个</label>
-                                        <select id="monthlyNthWeek">
-                                            <option value="1">第一个</option>
-                                            <option value="2">第二个</option>
-                                            <option value="3">第三个</option>
-                                            <option value="4">第四个</option>
-                                            <option value="5">第五个</option>
-                                        </select>
+                                        <select id="monthlyNthWeek"></select>
                                     </div>
                                     <div style="flex:1;">
                                         <label>星期</label>
-                                        <select id="monthlyWeekDayValue">
-                                            <option value="1">周一</option>
-                                            <option value="2">周二</option>
-                                            <option value="3">周三</option>
-                                            <option value="4">周四</option>
-                                            <option value="5">周五</option>
-                                            <option value="6">周六</option>
-                                            <option value="7">周日</option>
-                                        </select>
+                                        <select id="monthlyWeekDayValue"></select>
                                     </div>
                                 </div>
                             </div>
@@ -521,21 +477,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label>周期类型</label>
-                                <select id="docRecurringType">
-                                    <optgroup label="每日">
-                                        <option value="daily">每天</option>
-                                        <option value="workday_daily">工作日每天（周一至周五）</option>
-                                    </optgroup>
-                                    <optgroup label="每周">
-                                        <option value="weekly_day">每周固定星期</option>
-                                        <option value="weekly_multi">每周多天（如一二三）</option>
-                                    </optgroup>
-                                    <optgroup label="每月">
-                                        <option value="monthly_date">每月固定日期</option>
-                                        <option value="monthly_workday">每月第N个工作日</option>
-                                        <option value="monthly_weekday">每月第N个星期X</option>
-                                    </optgroup>
-                                </select>
+                                <select id="docRecurringType"></select>
                             </div>
                             <div class="form-group">
                                 <label>生成数量</label>
@@ -556,53 +498,23 @@
                             <!-- 每周固定星期 -->
                             <div class="form-group" id="docWeekDayGroup" style="display:none;">
                                 <label>每周几</label>
-                                <select id="docWeekDay">
-                                    <option value="1">周一</option>
-                                    <option value="2">周二</option>
-                                    <option value="3">周三</option>
-                                    <option value="4">周四</option>
-                                    <option value="5">周五</option>
-                                    <option value="6">周六</option>
-                                    <option value="7">周日</option>
-                                </select>
+                                <select id="docWeekDay"></select>
                             </div>
                             <!-- 每周多天 -->
                             <div class="form-group" id="docWeekMultiGroup" style="display:none;">
                                 <label>选择星期（可多选）</label>
-                                <div class="weekday-checkboxes">
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="1"> 一</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="2"> 二</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="3"> 三</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="4"> 四</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="5"> 五</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="6"> 六</label>
-                                    <label class="checkbox-inline"><input type="checkbox" name="docWeekDays" value="7"> 日</label>
-                                </div>
+                                <div class="weekday-checkboxes" id="docWeekDaysOptions"></div>
                             </div>
                             <!-- 每月第N个星期X -->
                             <div class="form-group" id="docMonthlyWeekDayGroup" style="display:none;">
                                 <div class="form-row">
                                     <div style="flex:1;">
                                         <label>第几个</label>
-                                        <select id="docMonthlyNthWeek">
-                                            <option value="1">第一个</option>
-                                            <option value="2">第二个</option>
-                                            <option value="3">第三个</option>
-                                            <option value="4">第四个</option>
-                                            <option value="5">第五个</option>
-                                        </select>
+                                        <select id="docMonthlyNthWeek"></select>
                                     </div>
                                     <div style="flex:1;">
                                         <label>星期</label>
-                                        <select id="docMonthlyWeekDayValue">
-                                            <option value="1">周一</option>
-                                            <option value="2">周二</option>
-                                            <option value="3">周三</option>
-                                            <option value="4">周四</option>
-                                            <option value="5">周五</option>
-                                            <option value="6">周六</option>
-                                            <option value="7">周日</option>
-                                        </select>
+                                        <select id="docMonthlyWeekDayValue"></select>
                                     </div>
                                 </div>
                             </div>
@@ -1188,7 +1100,47 @@
                 PENDING: 'pending',
                 PROCESSING: 'processing',
                 COMPLETED: 'completed'
-            }
+            },
+            RECURRING_OPTION_GROUPS: [
+                {
+                    label: '每日',
+                    options: [
+                        { value: 'daily', label: '每天' },
+                        { value: 'workday_daily', label: '工作日每天（周一至周五）' }
+                    ]
+                },
+                {
+                    label: '每周',
+                    options: [
+                        { value: 'weekly_day', label: '每周固定星期' },
+                        { value: 'weekly_multi', label: '每周多天（如一二三）' }
+                    ]
+                },
+                {
+                    label: '每月',
+                    options: [
+                        { value: 'monthly_date', label: '每月固定日期' },
+                        { value: 'monthly_workday', label: '每月第N个工作日' },
+                        { value: 'monthly_weekday', label: '每月第N个星期X' }
+                    ]
+                }
+            ],
+            WEEKDAY_OPTIONS: [
+                { value: '1', label: '周一', shortLabel: '一' },
+                { value: '2', label: '周二', shortLabel: '二' },
+                { value: '3', label: '周三', shortLabel: '三' },
+                { value: '4', label: '周四', shortLabel: '四' },
+                { value: '5', label: '周五', shortLabel: '五' },
+                { value: '6', label: '周六', shortLabel: '六' },
+                { value: '7', label: '周日', shortLabel: '日' }
+            ],
+            NTH_WEEK_OPTIONS: [
+                { value: '1', label: '第一个' },
+                { value: '2', label: '第二个' },
+                { value: '3', label: '第三个' },
+                { value: '4', label: '第四个' },
+                { value: '5', label: '第五个' }
+            ]
         };
     </script>
 
@@ -1201,7 +1153,7 @@
     <script src="js/report.js?v=14"></script>
     <script src="js/calendar.js?v=14"></script>
     <script src="js/sync.js?v=13"></script>
-    <script src="js/app.js?v=50"></script>
+    <script src="js/app.js?v=51"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">
