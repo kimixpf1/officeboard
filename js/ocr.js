@@ -2200,6 +2200,39 @@ class OCRManager {
         };
     }
 
+    async captureItemsSnapshot() {
+        const items = await db.getAllItems();
+        return items.map(item => ({
+            ...item,
+            attendees: Array.isArray(item.attendees) ? [...item.attendees] : item.attendees
+        }));
+    }
+
+    async restoreItemsSnapshot(snapshot) {
+        const snapshotItems = Array.isArray(snapshot) ? snapshot : [];
+        const currentItems = await db.getAllItems();
+        const snapshotMap = new Map(snapshotItems.filter(item => item?.id != null).map(item => [item.id, item]));
+        const currentMap = new Map(currentItems.filter(item => item?.id != null).map(item => [item.id, item]));
+
+        for (const currentItem of currentItems) {
+            if (!snapshotMap.has(currentItem.id)) {
+                await db.deleteItem(currentItem.id);
+            }
+        }
+
+        for (const snapshotItem of snapshotItems) {
+            const currentItem = currentMap.get(snapshotItem.id);
+            if (!currentItem) {
+                continue;
+            }
+
+            if (JSON.stringify(currentItem) !== JSON.stringify(snapshotItem)) {
+                const { id, ...restoredItem } = snapshotItem;
+                await db.updateItem(id, restoredItem);
+            }
+        }
+    }
+
     /**
      * 检查同一批次中的重复事项（用于同一图片识别出的多个事项）
      * 比数据库去重更宽松，防止同一图片中的相似事项被重复添加

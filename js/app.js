@@ -3920,6 +3920,9 @@ class OfficeDashboard {
         // 异步处理，不阻塞UI
         (async () => {
             try {
+                let hasCommittedChanges = false;
+                let shouldRefreshItems = false;
+
                 for (const file of files) {
                     // 检查文件类型
                     const fileType = file.type.toLowerCase();
@@ -3939,6 +3942,7 @@ class OfficeDashboard {
                         showStatus(msg);
                     };
 
+                    const itemsSnapshot = await ocrManager.captureItemsSnapshot();
                     const previewResult = await ocrManager.analyzeDocument(file, progressCallback, { previewOnly: true });
 
                     if (previewResult.duplicate) {
@@ -3948,6 +3952,9 @@ class OfficeDashboard {
 
                     const confirmed = await this.showRecognitionPreview(file.name, previewResult);
                     if (!confirmed) {
+                        await ocrManager.restoreItemsSnapshot(itemsSnapshot);
+                        shouldRefreshItems = true;
+                        showStatus('已取消保存，本次识别结果未写入面板');
                         continue;
                     }
 
@@ -3957,14 +3964,18 @@ class OfficeDashboard {
                         metadata: previewResult.metadata
                     });
 
+                    hasCommittedChanges = true;
+                    shouldRefreshItems = true;
                     this.showRecognitionLog('识别结果', this.buildRecognitionSummaryHtml(file.name, result, false));
                 }
 
                 // 刷新列表
-                await this.loadItems();
+                if (shouldRefreshItems) {
+                    await this.loadItems();
+                }
 
                 // OCR提取后立即同步到云端
-                if (syncManager.isLoggedIn()) {
+                if (hasCommittedChanges && syncManager.isLoggedIn()) {
                     console.log('文件上传后立即同步到云端...');
                     await syncManager.immediateSyncToCloud();
                 }

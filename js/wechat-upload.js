@@ -131,10 +131,12 @@
 
         try {
             const progressCallback = (message) => setStatus(message);
+            const itemsSnapshot = await ocrManager.captureItemsSnapshot();
             const previewResult = await ocrManager.analyzeDocument(file, progressCallback, { previewOnly: true });
             const confirmed = await showPreviewDialog(file.name, previewResult);
 
             if (!confirmed) {
+                await ocrManager.restoreItemsSnapshot(itemsSnapshot);
                 setStatus('已取消保存识别结果');
                 setSummary('本次识别结果未写入主面板。');
                 return;
