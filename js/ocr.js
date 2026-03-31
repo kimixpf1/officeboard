@@ -2101,13 +2101,20 @@ class OCRManager {
                         mergeUpdates.push({
                             title: itemTitle,
                             targetTitle: existing.title || itemTitle,
-                            addedAttendees
+                            addedAttendees,
+                            reason: '同一批次内识别到相同会议，自动合并新增参会人员'
                         });
                     } else {
-                        skippedItems.push(itemTitle);
+                        skippedItems.push({
+                            title: itemTitle,
+                            reason: '同一批次内已存在相同会议，且没有新增参会人员'
+                        });
                     }
                 } else {
-                    skippedItems.push(itemTitle);
+                    skippedItems.push({
+                        title: itemTitle,
+                        reason: '同一批次内已存在相同事项，跳过重复写入'
+                    });
                 }
                 continue;
             }
@@ -2130,7 +2137,8 @@ class OCRManager {
                                     title: existing.title || itemTitle,
                                     attendees: [...mergedAttendees],
                                     displayTitle: existing.displayTitle,
-                                    addedAttendees: [...addedAttendees]
+                                    addedAttendees: [...addedAttendees],
+                                    reason: '已匹配到面板内同一会议，自动合并新增参会人员'
                                 });
                             } else {
                                 const currentMerge = mergeUpdateMap.get(mergeKey);
@@ -2143,13 +2151,20 @@ class OCRManager {
                         mergeUpdates.push({
                             title: itemTitle,
                             targetTitle: existing.title || itemTitle,
-                            addedAttendees
+                            addedAttendees,
+                            reason: '已匹配到面板内同一会议，自动合并新增参会人员'
                         });
                     } else {
-                        skippedItems.push(itemTitle);
+                        skippedItems.push({
+                            title: itemTitle,
+                            reason: this.getDuplicateSkipReason(item, duplicateInfo)
+                        });
                     }
                 } else {
-                    skippedItems.push(itemTitle);
+                    skippedItems.push({
+                        title: itemTitle,
+                        reason: this.getDuplicateSkipReason(item, duplicateInfo)
+                    });
                 }
                 continue;
             }
@@ -2158,7 +2173,8 @@ class OCRManager {
                 type: item.type,
                 ...itemData,
                 source: 'document',
-                sourceFile: fileName
+                sourceFile: fileName,
+                previewReason: this.getCreateReason(item)
             };
 
             createItems.push(newItem);
@@ -2188,8 +2204,9 @@ class OCRManager {
 
         for (const item of Array.isArray(actionPlan?.createItems) ? actionPlan.createItems : []) {
             try {
-                const id = await db.addItem(item);
-                createdItems.push({ id, ...item });
+                const { previewReason, ...persistedItem } = item;
+                const id = await db.addItem(persistedItem);
+                createdItems.push({ id, ...persistedItem, previewReason });
             } catch (error) {
                 console.error('创建卡片失败:', error);
             }
@@ -2205,6 +2222,42 @@ class OCRManager {
             text: context.text || '',
             metadata: context.metadata || {}
         };
+    }
+
+    getCreateReason(item) {
+        if (item?.type === 'meeting') {
+            return '未匹配到同日期同主题的已有会议，准备新增';
+        }
+
+        if (item?.type === 'todo') {
+            return '未匹配到同标题同截止日期的待办，准备新增';
+        }
+
+        if (item?.type === 'document') {
+            return '未匹配到同文号或同标题的办文，准备新增';
+        }
+
+        return '未命中现有事项，准备新增';
+    }
+
+    getDuplicateSkipReason(item, duplicateInfo) {
+        if (item?.type === 'meeting') {
+            return '已匹配到面板内同一会议，且没有新增参会人员';
+        }
+
+        if (item?.type === 'todo') {
+            return duplicateInfo?.existingItem?.deadline
+                ? '已匹配到同标题同截止日期的待办，跳过重复写入'
+                : '已匹配到相同待办，跳过重复写入';
+        }
+
+        if (item?.type === 'document') {
+            return duplicateInfo?.existingItem?.docNumber
+                ? '已匹配到相同文号的办文，跳过重复写入'
+                : '已匹配到相同标题的办文，跳过重复写入';
+        }
+
+        return '已匹配到相同事项，跳过重复写入';
     }
 
     async captureItemsSnapshot() {

@@ -59,6 +59,7 @@
             return;
         }
 
+        let shouldStayDisabled = false;
         chooseBtn.disabled = true;
         backBtn.disabled = true;
         summaryEl.style.display = 'none';
@@ -82,15 +83,25 @@
                 metadata: previewResult.metadata
             });
 
-            setStatus('识别完成，结果已保存到本地。');
-            setSummary(window.UploadFlowUtils.buildRecognitionSummaryHtml(file.name, result, false, 'compact'));
+            setStatus('识别完成，结果已保存到本地，正在返回主页面...');
+            setSummary(
+                `${window.UploadFlowUtils.buildRecognitionSummaryHtml(file.name, result, false, 'compact')}
+                <div style="margin-top:12px;padding:10px;background:#eff6ff;border-radius:8px;color:#1e40af;">已保存成功，约 1 秒后自动返回主页面。</div>`
+            );
+
+            shouldStayDisabled = true;
+            window.setTimeout(() => {
+                window.location.href = returnUrl;
+            }, 1200);
         } catch (error) {
             setStatus(`识别失败：${error.message}`);
             setSummary(`<div>识别失败：${error.message}</div>`, true);
         } finally {
             fileInput.value = '';
-            chooseBtn.disabled = false;
-            backBtn.disabled = false;
+            if (!shouldStayDisabled) {
+                chooseBtn.disabled = false;
+                backBtn.disabled = false;
+            }
         }
     }
 

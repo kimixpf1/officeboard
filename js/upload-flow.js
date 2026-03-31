@@ -1,4 +1,20 @@
 (function () {
+    function getReasonHtml(reason, color = '#64748b') {
+        if (!reason) {
+            return '';
+        }
+
+        return `<div style="margin-top:4px;font-size:12px;color:${color};">依据：${reason}</div>`;
+    }
+
+    function getSkippedTitle(item) {
+        return typeof item === 'string' ? item : (item?.title || '未知事项');
+    }
+
+    function getSkippedReason(item) {
+        return typeof item === 'string' ? '' : (item?.reason || '');
+    }
+
     function buildDetailedSummaryHtml(fileName, result, isPreview) {
         const sectionPrefix = isPreview ? '待' : '';
         let html = `<div style="text-align:left; max-height:500px; overflow-y:auto;color:inherit;">`;
@@ -33,7 +49,7 @@
                 const attendees = Array.isArray(item.attendees) ? item.attendees : [];
                 const attendeesStr = attendees.length > 0 ? attendees.join('、') : '-';
                 const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
-                html += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${typeIcon}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);white-space:nowrap;color:inherit;">${dateTime || '-'}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${attendeesStr}</td></tr>`;
+                html += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${typeIcon}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);white-space:nowrap;color:inherit;">${dateTime || '-'}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${title}${getReasonHtml(item.previewReason)}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${attendeesStr}</td></tr>`;
             });
             html += `</table></div>`;
         }
@@ -48,7 +64,7 @@
                 const targetTitle = item.targetTitle || title;
                 const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '-';
                 const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
-                html += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">📅 ${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${targetTitle}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:#f59e0b;font-weight:500;">+${addedStr}</td></tr>`;
+                html += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">📅 ${title}${getReasonHtml(item.reason)}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${targetTitle}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:#f59e0b;font-weight:500;">+${addedStr}</td></tr>`;
             });
             html += `</table></div>`;
         }
@@ -57,8 +73,8 @@
             html += `<div style="margin-bottom:16px;">`;
             html += `<h5 style="color:#6b7280;margin-bottom:10px;padding:6px 10px;background:rgba(107,114,128,0.1);border-radius:4px;">⏭️ ${sectionPrefix}跳过重复 (${result.skippedItems.length}个)</h5>`;
             html += `<ul style="margin:0;padding-left:20px;font-size:12px;opacity:0.7;">`;
-            result.skippedItems.forEach(title => {
-                html += `<li style="margin:4px 0;">${title}</li>`;
+            result.skippedItems.forEach(item => {
+                html += `<li style="margin:4px 0;">${getSkippedTitle(item)}${getReasonHtml(getSkippedReason(item), '#6b7280')}</li>`;
             });
             html += `</ul></div>`;
         }
@@ -88,7 +104,7 @@
             result.items.forEach(item => {
                 const title = item.title || item.displayTitle || '未知事项';
                 const dateTime = [item.date, item.time].filter(Boolean).join(' ');
-                html += `<li style="margin:6px 0;">${title}${dateTime ? `（${dateTime}）` : ''}</li>`;
+                html += `<li style="margin:6px 0;">${title}${dateTime ? `（${dateTime}）` : ''}${getReasonHtml(item.previewReason)}</li>`;
             });
             html += `</ul></div>`;
         }
@@ -99,15 +115,15 @@
                 const title = item.title || '未知事项';
                 const targetTitle = item.targetTitle || title;
                 const added = item.addedAttendees?.join('、') || '-';
-                html += `<li style="margin:6px 0;">${title} → ${targetTitle}（新增：${added}）</li>`;
+                html += `<li style="margin:6px 0;">${title} → ${targetTitle}（新增：${added}）${getReasonHtml(item.reason, '#b45309')}</li>`;
             });
             html += `</ul></div>`;
         }
 
         if (result.skippedItems?.length) {
             html += `<div><h5 style="color:#6b7280;margin:0 0 10px;">⏭️ ${sectionPrefix}跳过重复 (${result.skippedItems.length}个)</h5><ul style="margin:0;padding-left:18px;">`;
-            result.skippedItems.forEach(title => {
-                html += `<li style="margin:6px 0;">${title}</li>`;
+            result.skippedItems.forEach(item => {
+                html += `<li style="margin:6px 0;">${getSkippedTitle(item)}${getReasonHtml(getSkippedReason(item), '#6b7280')}</li>`;
             });
             html += `</ul></div>`;
         }
