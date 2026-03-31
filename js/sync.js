@@ -1010,14 +1010,24 @@ class SyncManager {
                 data: syncData,
                 updated_at: new Date().toISOString()
             };
-            console.log('上传数据:', JSON.stringify(upsertData, null, 2));
+            console.log('上传数据摘要:', {
+                userId: this.currentUser.id,
+                itemCount: allItems.length,
+                hasKimiKey: Boolean(kimiKey),
+                hasDeepSeekKey: Boolean(deepseekKey),
+                hasMemo: Boolean(syncData.memo),
+                hasLinks: Boolean(syncData.links)
+            });
 
             const { data, error } = await this.supabase
                 .from('user_data')
                 .upsert(upsertData, { onConflict: 'user_id' })
                 .select();
 
-            console.log('上传响应:', { data, error });
+            console.log('上传响应状态:', {
+                success: !error,
+                recordCount: Array.isArray(data) ? data.length : (data ? 1 : 0)
+            });
 
             if (error) {
                 console.error('上传失败:', error);
@@ -1045,15 +1055,8 @@ class SyncManager {
         try {
             console.log('=== 下载数据 ===');
             console.log('用户ID:', this.currentUser.id);
-            console.log('用户邮箱:', this.currentUser.email);
 
             if (progressCallback) progressCallback('正在从云端获取数据...');
-
-            // 先查询所有数据（调试用）
-            const { data: allData, error: allError } = await this.supabase
-                .from('user_data')
-                .select('*');
-            console.log('表中所有数据:', allData, '错误:', allError);
 
             // 查询当前用户数据
             const { data, error } = await this.supabase
@@ -1062,7 +1065,10 @@ class SyncManager {
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 
-            console.log('查询结果:', { data, error });
+            console.log('查询结果摘要:', {
+                success: !error,
+                hasData: Boolean(data)
+            });
 
             if (error) {
                 console.error('查询失败:', error);

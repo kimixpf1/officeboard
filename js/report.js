@@ -251,13 +251,31 @@ class ReportGenerator {
      */
     loadScript(src) {
         return new Promise((resolve, reject) => {
+            const existingScript = Array.from(document.scripts).find(script => script.src === src);
+            if (existingScript) {
+                if (existingScript.dataset.loaded === 'true') {
+                    resolve();
+                    return;
+                }
+
+                existingScript.addEventListener('load', () => resolve(), { once: true });
+                existingScript.addEventListener('error', () => reject(new Error('脚本加载失败')), { once: true });
+                return;
+            }
+
             const script = document.createElement('script');
             script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
+            const timeoutId = setTimeout(() => reject(new Error('加载超时')), 10000);
+            script.onload = () => {
+                clearTimeout(timeoutId);
+                script.dataset.loaded = 'true';
+                resolve();
+            };
+            script.onerror = () => {
+                clearTimeout(timeoutId);
+                reject(new Error('脚本加载失败'));
+            };
             document.head.appendChild(script);
-            // 超时处理
-            setTimeout(() => reject(new Error('加载超时')), 10000);
         });
     }
 

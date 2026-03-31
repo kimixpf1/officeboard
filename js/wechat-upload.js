@@ -89,7 +89,12 @@
                 </div>
             `;
 
+            let settled = false;
             const finish = (confirmed) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
                 overlay.remove();
                 resolve(confirmed);
             };

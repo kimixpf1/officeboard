@@ -699,26 +699,33 @@ class OCRManager {
      * 增强版会议标题提取
      */
     extractMeetingTitleEnhanced(text) {
+        const cleanedText = this.cleanMeetingTitleCandidate(text);
+
+        const actionDrivenMatch = cleanedText.match(/(?:组织召开|主持召开|组织参加|参加并|参加|出席|列席|召开|组织|召集|主持|赴|前往|到)\s*([^，,。！？\n]{2,40}(?:会议|座谈会|研讨会|讨论会|汇报会|培训会|工作会|协调会|推进会|部署会|动员会|总结会|分析会|评审会|论证会|听证会|通气会|例会|周会|月会|年会|调研|考察|督导|检查|巡查|会商|论坛|讲座|大讲堂|发布会|开幕式|活动))/);
+        if (actionDrivenMatch) {
+            return actionDrivenMatch[1].trim();
+        }
+
         // ========== 1. 提取"召开XXX会议"格式 ==========
-        const conveneMeetingMatch = text.match(/召开\s*([^，,。！？\n]{2,20}(?:会议|座谈|研讨|讨论|会谈))/);
+        const conveneMeetingMatch = cleanedText.match(/召开\s*([^，,。！？\n]{2,20}(?:会议|座谈|研讨|讨论|会谈))/);
         if (conveneMeetingMatch) {
             return conveneMeetingMatch[1].trim();
         }
 
         // ========== 2. 提取"举行XXX会议"格式 ==========
-        const holdMeetingMatch = text.match(/举行\s*([^，,。！？\n]{2,20}(?:会议|座谈|研讨|讨论|会谈))/);
+        const holdMeetingMatch = cleanedText.match(/举行\s*([^，,。！？\n]{2,20}(?:会议|座谈|研讨|讨论|会谈))/);
         if (holdMeetingMatch) {
             return holdMeetingMatch[1].trim();
         }
 
         // ========== 3. 提取"进行XXX"格式 ==========
-        const conductMatch = text.match(/进行\s*([^，,。！？\n]{2,15}(?:会议|座谈|研讨|讨论|培训|学习|交流|汇报))/);
+        const conductMatch = cleanedText.match(/进行\s*([^，,。！？\n]{2,15}(?:会议|座谈|研讨|讨论|培训|学习|交流|汇报))/);
         if (conductMatch) {
             return conductMatch[1].trim();
         }
 
         // ========== 4. 提取"XXX会议"格式（会议词结尾）==========
-        const meetingEndMatch = text.match(/([^，,。！？\n]{2,15}(?:会议|座谈会|研讨会|讨论会|汇报会|培训会|工作会|协调会|推进会|部署会|动员会|总结会|分析会|评审会|论证会|听证会|通气会|例会|周会|月会|年会))/);
+        const meetingEndMatch = cleanedText.match(/([^，,。！？\n]{2,24}(?:会议|座谈会|研讨会|讨论会|汇报会|培训会|工作会|协调会|推进会|部署会|动员会|总结会|分析会|评审会|论证会|听证会|通气会|例会|周会|月会|年会))/);
         if (meetingEndMatch) {
             return meetingEndMatch[1].trim();
         }
@@ -730,7 +737,7 @@ class OCRManager {
         for (const theme of themeKeywords) {
             for (const type of meetingTypes) {
                 const pattern = new RegExp(`(${theme}[^，,。！？\\n]{0,8}${type})`);
-                const match = text.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     return match[1].trim();
                 }
@@ -738,7 +745,7 @@ class OCRManager {
         }
 
         // ========== 6. 提取"XXX座谈/研讨/讨论"格式 ==========
-        const discussMatch = text.match(/([^，,。！？\n]{2,12}(?:座谈|研讨|讨论|交流|沟通))/);
+        const discussMatch = cleanedText.match(/([^，,。！？\n]{2,16}(?:座谈|研讨|讨论|交流|沟通))/);
         if (discussMatch) {
             return discussMatch[1].trim();
         }
@@ -747,7 +754,7 @@ class OCRManager {
         const specialMeetings = ['党组会', '常务会', '办公会', '专题会', '协调会', '调度会', '现场会', '座谈会', '研讨会', '论证会', '评审会', '通气会', '汇报会', '总结会', '动员会', '部署会', '推进会', '新闻发布会', '听证会', '民主生活会', '组织生活会', '中心组学习', '三会一课', '主题党日', '例会', '周会', '月会', '年会', '晨会', '夕会'];
 
         for (const sm of specialMeetings) {
-            if (text.includes(sm)) {
+            if (cleanedText.includes(sm)) {
                 return sm;
             }
         }
@@ -2421,13 +2428,29 @@ class OCRManager {
             .replace(/[，,、；;。.!！?？]/g, '');
     }
 
+    cleanMeetingTitleCandidate(value) {
+        return (value || '')
+            .toString()
+            .replace(/^\s*\d{1,2}月\d{1,2}(?:[-至~—]\d{1,2}(?:月\d{1,2})?)?[日号]?/, '')
+            .replace(/^\s*(?:（[^）]*）|\([^)]*\))/, '')
+            .replace(/^\s*(?:星期|周)[一二三四五六日天]?/, '')
+            .replace(/^\s*(?:上午|下午|中午|晚上|凌晨)?\s*\d{1,2}(?:[:：点时]\d{0,2})?(?:分)?/, '')
+            .replace(/^[，,、；;：:\-—\s]+/, '')
+            .trim();
+    }
+
     getMeetingCoreTitle(title) {
-        const normalizedTitle = this.normalizeMeetingField(title);
+        const normalizedTitle = this.normalizeMeetingField(this.cleanMeetingTitleCandidate(title));
         if (!normalizedTitle) {
             return '';
         }
 
         const leadingPatterns = [
+            /^参加并出席/,
+            /^参加并列席/,
+            /^陪同参加/,
+            /^陪同出席/,
+            /^陪同/,
             /^组织召开/,
             /^主持召开/,
             /^组织参加/,
@@ -2443,7 +2466,8 @@ class OCRManager {
             /^召集/,
             /^主持/,
             /^赴/,
-            /^前往/
+            /^前往/,
+            /^到/
         ];
 
         let coreTitle = normalizedTitle;

@@ -7354,7 +7354,12 @@ class OfficeDashboard {
                 </div>
             `;
 
+            let settled = false;
             const finish = (confirmed) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
                 modal.remove();
                 resolve(confirmed);
             };
