@@ -23,90 +23,19 @@
         summaryEl.classList.toggle('error', isError);
     }
 
-    function buildRecognitionSummaryHtml(fileName, result, isPreview = false) {
-        const sectionPrefix = isPreview ? '待' : '';
-        let html = `<div style="text-align:left;color:inherit;">`;
-        html += `<h4 style="margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e5e7eb;">📄 文件：${fileName}</h4>`;
-        const totalCount = (result.items?.length || 0) + (result.mergedItems?.length || 0) + (result.skippedItems?.length || 0);
-        html += `<div style="margin-bottom:16px;padding:10px;background:#f8fafc;border-radius:6px;">`;
-        html += `<b>${isPreview ? '识别预览' : '识别汇总'}：</b>共识别 ${totalCount} 条记录`;
-        html += ` → <span style="color:#10b981;">${sectionPrefix}新增 ${result.items?.length || 0}</span>`;
-        html += ` | <span style="color:#f59e0b;">${sectionPrefix}合并 ${result.mergedItems?.length || 0}</span>`;
-        html += ` | <span style="color:#6b7280;">${sectionPrefix}跳过 ${result.skippedItems?.length || 0}</span>`;
-        html += `</div>`;
-
-        if (result.items?.length) {
-            html += `<div style="margin-bottom:16px;"><h5 style="color:#10b981;margin:0 0 10px;">✅ ${sectionPrefix}新增事项 (${result.items.length}个)</h5><ul style="margin:0;padding-left:18px;">`;
-            result.items.forEach(item => {
-                const title = item.title || item.displayTitle || '未知事项';
-                const dateTime = [item.date, item.time].filter(Boolean).join(' ');
-                html += `<li style="margin:6px 0;">${title}${dateTime ? `（${dateTime}）` : ''}</li>`;
-            });
-            html += `</ul></div>`;
-        }
-
-        if (result.mergedItems?.length) {
-            html += `<div style="margin-bottom:16px;"><h5 style="color:#f59e0b;margin:0 0 10px;">🔄 ${sectionPrefix}合并参会人员 (${result.mergedItems.length}个)</h5><ul style="margin:0;padding-left:18px;">`;
-            result.mergedItems.forEach(item => {
-                const title = item.title || '未知事项';
-                const targetTitle = item.targetTitle || title;
-                const added = item.addedAttendees?.join('、') || '-';
-                html += `<li style="margin:6px 0;">${title} → ${targetTitle}（新增：${added}）</li>`;
-            });
-            html += `</ul></div>`;
-        }
-
-        if (result.skippedItems?.length) {
-            html += `<div><h5 style="color:#6b7280;margin:0 0 10px;">⏭️ ${sectionPrefix}跳过重复 (${result.skippedItems.length}个)</h5><ul style="margin:0;padding-left:18px;">`;
-            result.skippedItems.forEach(title => {
-                html += `<li style="margin:6px 0;">${title}</li>`;
-            });
-            html += `</ul></div>`;
-        }
-
-        if (isPreview) {
-            html += `<div style="margin-top:12px;padding:10px;background:#eff6ff;border-radius:8px;color:#1e40af;">确认后才会写入主面板；取消则不保存。</div>`;
-        }
-
-        html += `</div>`;
-        return html;
-    }
-
     function showPreviewDialog(fileName, previewResult) {
-        const hasActions = (previewResult.items?.length || 0) > 0 || (previewResult.mergedItems?.length || 0) > 0;
-
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal';
-            overlay.innerHTML = `
-                <div class="modal-card">
-                    <div class="modal-header"><strong>识别前预览确认</strong></div>
-                    <div class="modal-body">${buildRecognitionSummaryHtml(fileName, previewResult, true)}</div>
-                    <div class="modal-footer">
-                        <button type="button" class="secondary preview-cancel">${hasActions ? '取消保存' : '关闭'}</button>
-                        ${hasActions ? '<button type="button" class="primary preview-confirm">确认保存</button>' : ''}
-                    </div>
-                </div>
-            `;
-
-            let settled = false;
-            const finish = (confirmed) => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                overlay.remove();
-                resolve(confirmed);
-            };
-
-            overlay.querySelector('.preview-cancel')?.addEventListener('click', () => finish(false));
-            overlay.querySelector('.preview-confirm')?.addEventListener('click', () => finish(true));
-            overlay.addEventListener('click', (event) => {
-                if (event.target === overlay) {
-                    finish(false);
-                }
-            });
-            document.body.appendChild(overlay);
+        return window.UploadFlowUtils.showRecognitionPreviewModal(fileName, previewResult, {
+            layout: 'compact',
+            overlayClassName: 'modal',
+            dialogClassName: 'modal-card',
+            dialogStyle: '',
+            headerClassName: 'modal-header',
+            headerHtml: '<strong>识别前预览确认</strong>',
+            showCloseButton: false,
+            bodyClassName: 'modal-body',
+            footerClassName: 'modal-footer',
+            cancelButtonClass: 'secondary',
+            confirmButtonClass: 'primary'
         });
     }
 
@@ -154,7 +83,7 @@
             });
 
             setStatus('识别完成，结果已保存到本地。');
-            setSummary(buildRecognitionSummaryHtml(file.name, result, false));
+            setSummary(window.UploadFlowUtils.buildRecognitionSummaryHtml(file.name, result, false, 'compact'));
         } catch (error) {
             setStatus(`识别失败：${error.message}`);
             setSummary(`<div>识别失败：${error.message}</div>`, true);

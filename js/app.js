@@ -119,6 +119,17 @@ class OfficeDashboard {
         this.draggedItem = null;
         this.deleteItemId = null;
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const restoreDate = urlParams.get('restoreDate');
+        const restoreView = urlParams.get('restoreView');
+        if (restoreDate) {
+            this.selectedDate = restoreDate;
+            this.currentDate = new Date(`${restoreDate}T00:00:00`);
+        }
+        if (restoreView) {
+            this.currentView = restoreView;
+        }
+
         // 多选功能状态
         this.selectedItems = new Set(); // 选中的事项ID
         this.batchMode = false; // 是否处于批量模式
@@ -403,6 +414,15 @@ class OfficeDashboard {
         event?.preventDefault?.();
         event?.stopPropagation?.();
 
+        if (this.isWeChatBrowser()) {
+            const returnParams = new URLSearchParams();
+            returnParams.set('restoreDate', this.selectedDate || this.formatDateLocal(new Date()));
+            returnParams.set('restoreView', this.currentView || 'board');
+            const returnUrl = `index.html?${returnParams.toString()}`;
+            window.location.href = `wechat-upload.html?return=${encodeURIComponent(returnUrl)}`;
+            return;
+        }
+
         const fileInput = document.getElementById('fileInput');
         if (!fileInput) {
             return;
@@ -417,6 +437,10 @@ class OfficeDashboard {
         window.setTimeout(() => {
             fileInput.click();
         }, 0);
+    }
+
+    isWeChatBrowser() {
+        return /MicroMessenger/i.test(navigator.userAgent);
     }
 
     /**
@@ -7259,122 +7283,24 @@ class OfficeDashboard {
      * 显示识别日志弹窗
      */
     buildRecognitionSummaryHtml(fileName, result, isPreview = false) {
-        const sectionPrefix = isPreview ? '待' : '';
-        let logHtml = `<div style="text-align:left; max-height:500px; overflow-y:auto;color:inherit;">`;
-        logHtml += `<h4 style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-color,#eee);">📄 文件：${fileName}</h4>`;
-
-        const totalCount = (result.items?.length || 0) + (result.mergedItems?.length || 0) + (result.skippedItems?.length || 0);
-        logHtml += `<div style="margin-bottom:16px;padding:10px;background:var(--card-bg,#f8fafc);border-radius:6px;">`;
-        logHtml += `<b>${isPreview ? '识别预览' : '识别汇总'}：</b>共识别 ${totalCount} 条记录`;
-        logHtml += ` → <span style="color:#10b981;">${sectionPrefix}新增 ${result.items?.length || 0}</span>`;
-        logHtml += ` | <span style="color:#f59e0b;">${sectionPrefix}合并 ${result.mergedItems?.length || 0}</span>`;
-        logHtml += ` | <span style="color:#6b7280;">${sectionPrefix}跳过 ${result.skippedItems?.length || 0}</span>`;
-        logHtml += `</div>`;
-
-        if (result.items && result.items.length > 0) {
-            logHtml += `<div style="margin-bottom:16px;">`;
-            logHtml += `<h5 style="color:#10b981;margin-bottom:10px;padding:6px 10px;background:rgba(16,185,129,0.1);border-radius:4px;">✅ ${sectionPrefix}新增事项 (${result.items.length}个)</h5>`;
-            logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-            logHtml += `<tr style="background:var(--header-bg,#f1f5f9);"><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">类型</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">日期时间</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">事项名称</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">参会人员</th></tr>`;
-            result.items.forEach((item, idx) => {
-                if (!item) return;
-                const typeIcon = { meeting: '📅 会议', todo: '☑️ 待办', document: '📄 办文' }[item.type] || '📌';
-                const title = item.title || item.displayTitle || '未知事项';
-                let dateStr = item.date || '';
-                if (item.endDate && item.endDate !== item.date) {
-                    dateStr = `${item.date} 至 ${item.endDate}`;
-                }
-                let timeStr = item.time || '';
-                if (item.endTime) {
-                    timeStr = `${item.time}-${item.endTime}`;
-                }
-                const dateTime = dateStr + (timeStr ? ` ${timeStr}` : '');
-                const itemAttendees = item.attendees || [];
-                const attendeesStr = itemAttendees.length > 0 ? itemAttendees.join('、') : '-';
-                const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
-                logHtml += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${typeIcon}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);white-space:nowrap;color:inherit;">${dateTime || '-'}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${attendeesStr}</td></tr>`;
-            });
-            logHtml += `</table></div>`;
-        }
-
-        if (result.mergedItems && result.mergedItems.length > 0) {
-            logHtml += `<div style="margin-bottom:16px;">`;
-            logHtml += `<h5 style="color:#f59e0b;margin-bottom:10px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:4px;">🔄 ${sectionPrefix}合并参会人员 (${result.mergedItems.length}个)</h5>`;
-            logHtml += `<table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-            logHtml += `<tr style="background:var(--header-bg,#f1f5f9);"><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">识别事项</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">归并到</th><th style="padding:8px;text-align:left;border-bottom:1px solid var(--border-color,#ddd);color:inherit;">新增参会人员</th></tr>`;
-            result.mergedItems.forEach((item, idx) => {
-                const title = item.title || '未知事项';
-                const targetTitle = item.targetTitle || title;
-                const addedStr = item.addedAttendees?.length ? item.addedAttendees.join('、') : '-';
-                const bgColor = idx % 2 === 0 ? 'var(--row-bg-1,transparent)' : 'var(--row-bg-2,rgba(0,0,0,0.02))';
-                logHtml += `<tr style="background:${bgColor};"><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">📅 ${title}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:inherit;">${targetTitle}</td><td style="padding:8px;border-bottom:1px solid var(--border-color,#eee);color:#f59e0b;font-weight:500;">+${addedStr}</td></tr>`;
-            });
-            logHtml += `</table></div>`;
-        }
-
-        if (result.skippedItems && result.skippedItems.length > 0) {
-            logHtml += `<div style="margin-bottom:16px;">`;
-            logHtml += `<h5 style="color:#6b7280;margin-bottom:10px;padding:6px 10px;background:rgba(107,114,128,0.1);border-radius:4px;">⏭️ ${sectionPrefix}跳过重复 (${result.skippedItems.length}个)</h5>`;
-            logHtml += `<ul style="margin:0;padding-left:20px;font-size:12px;opacity:0.7;">`;
-            result.skippedItems.forEach(title => {
-                logHtml += `<li style="margin:4px 0;">${title}</li>`;
-            });
-            logHtml += `</ul></div>`;
-        }
-
-        if (isPreview) {
-            logHtml += `<div style="padding:10px 12px;border-radius:6px;background:rgba(37,99,235,0.08);color:var(--text-color,#334155);font-size:13px;">确认后才会写入面板；取消则不会新增或合并任何事项。</div>`;
-        }
-
-        logHtml += `</div>`;
-        return logHtml;
+        return window.UploadFlowUtils.buildRecognitionSummaryHtml(fileName, result, isPreview, 'detailed');
     }
 
     showRecognitionPreview(fileName, result) {
-        const hasActions = (result.items?.length || 0) > 0 || (result.mergedItems?.length || 0) > 0;
-        const content = this.buildRecognitionSummaryHtml(fileName, result, true);
-
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.id = 'recognitionPreviewModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 680px;">
-                    <div class="modal-header">
-                        <h3>识别前预览确认</h3>
-                        <button type="button" class="btn-close">×</button>
-                    </div>
-                    <div class="modal-body" style="padding: 16px;">
-                        ${content}
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn-secondary preview-cancel">${hasActions ? '取消保存' : '关闭'}</button>
-                        ${hasActions ? '<button type="button" class="btn-primary preview-confirm">确认保存</button>' : ''}
-                    </div>
-                </div>
-            `;
-
-            let settled = false;
-            const finish = (confirmed) => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                modal.remove();
-                resolve(confirmed);
-            };
-
-            modal.querySelector('.btn-close')?.addEventListener('click', () => finish(false));
-            modal.querySelector('.preview-cancel')?.addEventListener('click', () => finish(false));
-            modal.querySelector('.preview-confirm')?.addEventListener('click', () => finish(true));
-
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    finish(false);
-                }
-            });
-
-            document.body.appendChild(modal);
+        return window.UploadFlowUtils.showRecognitionPreviewModal(fileName, result, {
+            layout: 'detailed',
+            overlayClassName: 'modal active',
+            overlayId: 'recognitionPreviewModal',
+            dialogClassName: 'modal-content',
+            dialogStyle: 'max-width: 680px;',
+            headerClassName: 'modal-header',
+            headerHtml: '<h3>识别前预览确认</h3>',
+            closeButtonClass: 'btn-close',
+            bodyClassName: 'modal-body',
+            bodyStyle: 'padding: 16px;',
+            footerClassName: 'modal-actions',
+            cancelButtonClass: 'btn-secondary',
+            confirmButtonClass: 'btn-primary'
         });
     }
 
