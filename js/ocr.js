@@ -2094,6 +2094,7 @@ class OCRManager {
                 if (item.type === 'meeting' && batchDuplicate.existingItem) {
                     const existing = batchDuplicate.existingItem;
                     const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
+                    const matchedExistingSummary = this.buildExistingItemSummary(existing);
 
                     if (addedAttendees.length > 0) {
                         existing.attendees = mergedAttendees;
@@ -2102,12 +2103,14 @@ class OCRManager {
                             title: itemTitle,
                             targetTitle: existing.title || itemTitle,
                             addedAttendees,
-                            reason: '同一批次内识别到相同会议，自动合并新增参会人员'
+                            reason: this.buildMeetingMergeReason(itemData, existing, addedAttendees, '同一批次'),
+                            matchedExistingSummary
                         });
                     } else {
                         skippedItems.push({
                             title: itemTitle,
-                            reason: '同一批次内已存在相同会议，且没有新增参会人员'
+                            reason: this.buildMeetingSkipReason(itemData, existing, '同一批次'),
+                            matchedExistingSummary
                         });
                     }
                 } else {
@@ -2124,6 +2127,7 @@ class OCRManager {
                 if (item.type === 'meeting' && duplicateInfo.existingItem) {
                     const existing = duplicateInfo.existingItem;
                     const { mergedAttendees, addedAttendees } = this.mergeMeetingAttendees(existing, itemAttendees);
+                    const matchedExistingSummary = this.buildExistingItemSummary(existing);
 
                     if (addedAttendees.length > 0) {
                         existing.attendees = mergedAttendees;
@@ -2138,13 +2142,16 @@ class OCRManager {
                                     attendees: [...mergedAttendees],
                                     displayTitle: existing.displayTitle,
                                     addedAttendees: [...addedAttendees],
-                                    reason: '已匹配到面板内同一会议，自动合并新增参会人员'
+                                    reason: this.buildMeetingMergeReason(itemData, existing, addedAttendees, '面板内'),
+                                    matchedExistingSummary
                                 });
                             } else {
                                 const currentMerge = mergeUpdateMap.get(mergeKey);
                                 currentMerge.attendees = [...mergedAttendees];
                                 currentMerge.displayTitle = existing.displayTitle;
                                 currentMerge.addedAttendees = [...new Set([...currentMerge.addedAttendees, ...addedAttendees])];
+                                currentMerge.reason = this.buildMeetingMergeReason(itemData, existing, currentMerge.addedAttendees, '面板内');
+                                currentMerge.matchedExistingSummary = matchedExistingSummary;
                             }
                         }
 
@@ -2152,12 +2159,14 @@ class OCRManager {
                             title: itemTitle,
                             targetTitle: existing.title || itemTitle,
                             addedAttendees,
-                            reason: '已匹配到面板内同一会议，自动合并新增参会人员'
+                            reason: this.buildMeetingMergeReason(itemData, existing, addedAttendees, '面板内'),
+                            matchedExistingSummary
                         });
                     } else {
                         skippedItems.push({
                             title: itemTitle,
-                            reason: this.getDuplicateSkipReason(item, duplicateInfo)
+                            reason: this.getDuplicateSkipReason(item, duplicateInfo),
+                            matchedExistingSummary
                         });
                     }
                 } else {
@@ -2174,7 +2183,10 @@ class OCRManager {
                 ...itemData,
                 source: 'document',
                 sourceFile: fileName,
-                previewReason: this.getCreateReason(item)
+                previewReason: this.getCreateReason(item, workingExistingItems),
+                matchedExistingSummary: item.type === 'meeting'
+                    ? this.getClosestMeetingCandidateSummary(itemData, workingExistingItems)
+                    : null
             };
 
             createItems.push(newItem);
@@ -2204,9 +2216,9 @@ class OCRManager {
 
         for (const item of Array.isArray(actionPlan?.createItems) ? actionPlan.createItems : []) {
             try {
-                const { previewReason, ...persistedItem } = item;
+                const { previewReason, matchedExistingSummary, ...persistedItem } = item;
                 const id = await db.addItem(persistedItem);
-                createdItems.push({ id, ...persistedItem, previewReason });
+                createdItems.push({ id, ...persistedItem, previewReason, matchedExistingSummary });
             } catch (error) {
                 console.error('创建卡片失败:', error);
             }
@@ -2224,9 +2236,9 @@ class OCRManager {
         };
     }
 
-    getCreateReason(item) {
+    getCreateReason(item, existingItems = []) {
         if (item?.type === 'meeting') {
-            return '未匹配到同日期同主题的已有会议，准备新增';
+            return this.buildMeetingCreateReason(item.data || {}, existingItems);
         }
 
         if (item?.type === 'todo') {
@@ -2242,7 +2254,7 @@ class OCRManager {
 
     getDuplicateSkipReason(item, duplicateInfo) {
         if (item?.type === 'meeting') {
-            return '已匹配到面板内同一会议，且没有新增参会人员';
+            return this.buildMeetingSkipReason(item.data || {}, duplicateInfo?.existingItem, '面板内');
         }
 
         if (item?.type === 'todo') {
@@ -2258,6 +2270,171 @@ class OCRManager {
         }
 
         return '已匹配到相同事项，跳过重复写入';
+    }
+
+    getMeetingTitleSimilarityScore(newTitle, existingTitle) {
+        const normalizedNew = this.getMeetingCoreTitle(newTitle);
+        const normalizedExisting = this.getMeetingCoreTitle(existingTitle);
+        if (!normalizedNew || !normalizedExisting) {
+            return 0;
+        }
+
+        if (normalizedNew === normalizedExisting) {
+            return 1;
+        }
+
+        const minLength = Math.min(normalizedNew.length, normalizedExisting.length);
+        if (minLength >= 3 && (normalizedNew.includes(normalizedExisting) || normalizedExisting.includes(normalizedNew))) {
+            return minLength / Math.max(normalizedNew.length, normalizedExisting.length);
+        }
+
+        const charsA = [...new Set(normalizedNew.split(''))];
+        const charsB = new Set(normalizedExisting.split(''));
+        const commonCount = charsA.filter(char => charsB.has(char)).length;
+        return commonCount / Math.max(1, Math.min(charsA.length, charsB.size));
+    }
+
+    isMeetingDateOverlapping(newItemData, existingItem) {
+        const newStart = this.normalizeMeetingField(newItemData?.date);
+        const newEnd = this.normalizeMeetingField(newItemData?.endDate || newItemData?.date);
+        const existStart = this.normalizeMeetingField(existingItem?.date);
+        const existEnd = this.normalizeMeetingField(existingItem?.endDate || existingItem?.date);
+
+        if (!newStart || !newEnd || !existStart || !existEnd) {
+            return false;
+        }
+
+        return newStart <= existEnd && newEnd >= existStart;
+    }
+
+    getMeetingComparisonDetails(newItemData, existingItem) {
+        const titleScore = this.getMeetingTitleSimilarityScore(newItemData?.title, existingItem?.title);
+        const titleSimilar = titleScore >= 0.5;
+        const dateOverlapping = this.isMeetingDateOverlapping(newItemData, existingItem);
+        const sameDay = this.normalizeMeetingField(newItemData?.date) === this.normalizeMeetingField(existingItem?.date)
+            && this.normalizeMeetingField(newItemData?.endDate || newItemData?.date) === this.normalizeMeetingField(existingItem?.endDate || existingItem?.date);
+        const timeMatch = !this.normalizeMeetingField(newItemData?.time) || !this.normalizeMeetingField(existingItem?.time)
+            || this.normalizeMeetingField(newItemData?.time) === this.normalizeMeetingField(existingItem?.time);
+        const locationMatch = !this.normalizeMeetingField(newItemData?.location) || !this.normalizeMeetingField(existingItem?.location)
+            || this.normalizeMeetingField(newItemData?.location) === this.normalizeMeetingField(existingItem?.location);
+        const attendeeOverlap = this.hasMeetingAttendeeOverlap
+            ? this.hasMeetingAttendeeOverlap(newItemData?.attendees, existingItem?.attendees)
+            : false;
+
+        return {
+            titleScore,
+            titleSimilar,
+            dateOverlapping,
+            sameDay,
+            timeMatch,
+            locationMatch,
+            attendeeOverlap
+        };
+    }
+
+    buildExistingItemSummary(item) {
+        if (!item) {
+            return null;
+        }
+
+        if (item.type === 'meeting' || item.date) {
+            const date = item.endDate && item.endDate !== item.date
+                ? `${item.date} 至 ${item.endDate}`
+                : (item.date || '日期未识别');
+            const time = item.endTime ? `${item.time || ''}-${item.endTime}` : (item.time || '时间未识别');
+            const location = item.location || '地点未识别';
+            const attendees = Array.isArray(item.attendees) && item.attendees.length > 0
+                ? item.attendees.slice(0, 4).join('、')
+                : '参会人员未识别';
+            return {
+                title: item.title || item.displayTitle || '未知会议',
+                summaryText: `${date}｜${time}｜${location}｜参会：${attendees}`
+            };
+        }
+
+        return {
+            title: item.title || item.displayTitle || '未知事项',
+            summaryText: item.deadline || item.docNumber || '已有事项'
+        };
+    }
+
+    getClosestMeetingCandidate(newItemData, existingItems) {
+        const candidates = (Array.isArray(existingItems) ? existingItems : [])
+            .filter(item => item?.type === 'meeting')
+            .map(item => {
+                const details = this.getMeetingComparisonDetails(newItemData, item);
+                const score = details.titleScore
+                    + (details.dateOverlapping ? 0.2 : 0)
+                    + (details.timeMatch ? 0.1 : 0)
+                    + (details.locationMatch ? 0.1 : 0)
+                    + (details.attendeeOverlap ? 0.1 : 0);
+                return { item, details, score };
+            })
+            .sort((a, b) => b.score - a.score);
+
+        return candidates[0] || null;
+    }
+
+    getClosestMeetingCandidateSummary(newItemData, existingItems) {
+        const candidate = this.getClosestMeetingCandidate(newItemData, existingItems);
+        if (!candidate || candidate.details.titleScore < 0.5) {
+            return null;
+        }
+
+        return this.buildExistingItemSummary(candidate.item);
+    }
+
+    buildMeetingCreateReason(newItemData, existingItems) {
+        const candidate = this.getClosestMeetingCandidate(newItemData, existingItems);
+        if (!candidate || candidate.details.titleScore < 0.5) {
+            return '未匹配到足够接近的已有会议，准备新增';
+        }
+
+        const existing = candidate.item;
+        const details = candidate.details;
+        const newTime = newItemData?.endTime ? `${newItemData?.time || ''}-${newItemData?.endTime}` : (newItemData?.time || '时间未识别');
+        const existingTime = existing?.endTime ? `${existing?.time || ''}-${existing?.endTime}` : (existing?.time || '时间未识别');
+        const newLocation = newItemData?.location || '地点未识别';
+        const existingLocation = existing?.location || '地点未识别';
+        const newDate = newItemData?.endDate && newItemData?.endDate !== newItemData?.date
+            ? `${newItemData?.date} 至 ${newItemData?.endDate}`
+            : (newItemData?.date || '日期未识别');
+        const existingDate = existing?.endDate && existing?.endDate !== existing?.date
+            ? `${existing?.date} 至 ${existing?.endDate}`
+            : (existing?.date || '日期未识别');
+
+        if (!details.dateOverlapping) {
+            return `识别到与已有会议“${existing.title || '未知会议'}”主题接近，但日期不同（新 ${newDate} / 已有 ${existingDate}），因此准备新增`;
+        }
+
+        if (!details.timeMatch) {
+            return `识别到与已有会议“${existing.title || '未知会议'}”相同主题活动，但时间不同（新 ${newTime} / 已有 ${existingTime}），因此准备新增`;
+        }
+
+        if (!details.locationMatch) {
+            return `识别到与已有会议“${existing.title || '未知会议'}”主题和日期接近，但地点不同（新 ${newLocation} / 已有 ${existingLocation}），因此准备新增`;
+        }
+
+        if (!details.attendeeOverlap && Array.isArray(newItemData?.attendees) && newItemData.attendees.length > 0) {
+            return `识别到与已有会议“${existing.title || '未知会议'}”主题接近，但参会人员未重叠，因此准备新增`;
+        }
+
+        return `识别到与已有会议“${existing.title || '未知会议'}”主题接近，但不足以判定为同一会议，因此准备新增`;
+    }
+
+    buildMeetingMergeReason(newItemData, existingItem, addedAttendees, scopeLabel) {
+        const existingTitle = existingItem?.title || '未知会议';
+        const addedText = Array.isArray(addedAttendees) && addedAttendees.length > 0
+            ? `，并识别出新增参会人员：${addedAttendees.join('、')}`
+            : '';
+        const prefix = scopeLabel === '同一批次' ? '同一批次内已识别到' : '已匹配到';
+        return `${prefix}“${existingTitle}”，主题、日期与关键信息一致${addedText}，因此准备合并`;
+    }
+
+    buildMeetingSkipReason(newItemData, existingItem, scopeLabel) {
+        const existingTitle = existingItem?.title || '未知会议';
+        const prefix = scopeLabel === '同一批次' ? '同一批次内已识别到' : '已匹配到';
+        return `${prefix}“${existingTitle}”，主题、日期与关键信息一致，且没有新增参会人员，因此跳过重复写入`;
     }
 
     async captureItemsSnapshot() {
@@ -2778,6 +2955,8 @@ class OCRManager {
 5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色表述不同，但日期时间和会议主题相同，本质上仍是同一个会议，会议核心主题按去掉动作前缀后的名称理解
 6. **备注列优先当地点**：像“市人大机关一楼主任会议室”“局1405会议室”“南京金奥国际酒店”都应识别到location
 7. **动作词不要当会议主体**：像“参加”“组织召开”“出席”“赴”“前往”是动作前缀，真正用于去重的核心会议主题要尽量保留后面的主题内容
+8. **数字和专有名词优先逐字保留**：时间、房间号、楼层、酒店厅名、人名、处室名不要擅自改写成同音字或近形字
+9. **不确定时宁可保守**：如果某个字不确定，优先保留图中最接近的原字，不要自行脑补成常见词
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"
@@ -2837,7 +3016,12 @@ class OCRManager {
 
 每行输出一条记录，attendees只填该行“姓名（处室）”对应的人名，不要把其他行的人混进来！
 
-跨日期会议示例："3月24日-25日" → date和endDate都要填`
+跨日期会议示例："3月24日-25日" → date和endDate都要填
+
+- 请特别认真识别数字、时间、房间号、酒店厅名、人名、处室名
+- 看不清的字优先保留最接近原图的字形，不要擅自替换成你以为更通顺的字
+- 如果一行里出现“参加/出席/赴/组织召开”等动作词，标题仍要尽量完整保留动作词后面的会议主题
+`
 
                                 }
                             ]
@@ -2965,6 +3149,7 @@ ${ocrText}
 4. **同名会议**：同一会议出现在不同行（如"高新区经济大镇调研"有钱局和综合处），每行单独输出一条记录！
 5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色描述不同，但日期时间和会议主题相同，仍按同一个会议主题理解，核心标题要忽略动作前缀
 6. **地点优先来自备注列**：像"市人大机关一楼主任会议室""局1405会议室""南京金奥国际酒店"都应作为location
+7. **数字与专有名词优先逐字保留**：时间、房间号、楼层、酒店厅名、人名、处室名不要擅自改成同音字或常见词
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"
@@ -3022,7 +3207,9 @@ ${ocrText}
 1. 识别所有会议、待办、文件事项
 2. 纠正OCR识别错误（如日期、人名、地点）
 3. 日期格式YYYY-MM-DD，时间格式HH:MM
-4. 只返回JSON，不要解释`;
+4. 优先精确识别数字、时间、房间号、人名、处室名、地点专名
+5. 如果与原文不完全确定，宁可保守保留原字，不要臆造
+6. 只返回JSON，不要解释`;
 
             const response = await this.fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
                 method: 'POST',
