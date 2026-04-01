@@ -4337,51 +4337,88 @@ class OfficeDashboard {
         return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
     }
 
-    isMeetingCreatedAfterManualLayout(meeting, manualMeeting) {
-        if (!manualMeeting?.manualOrderUpdatedAt) {
-            return false;
-        }
-
-        return this.getComparableTimestamp(meeting?.createdAt || meeting?.updatedAt) >
-            this.getComparableTimestamp(manualMeeting.manualOrderUpdatedAt);
+    getCardPriorityBucket(item) {
+        if (item.pinned) return 0;
+        if (item.completed) return 3;
+        if (item.sunk) return 2;
+        return 1;
     }
 
-    compareMeetingsWithManualOrder(a, b, hasManualOrder) {
-        const aHasManualOrder = hasManualOrder(a);
-        const bHasManualOrder = hasManualOrder(b);
+    mergeMeetingListsByDefaultOrder(manualItems, insertItems) {
+        const merged = [];
+        let manualIndex = 0;
+        let insertIndex = 0;
 
-        if (!aHasManualOrder && !bHasManualOrder) {
-            return this.compareMeetingsByDefaultOrder(a, b);
-        }
+        while (manualIndex < manualItems.length && insertIndex < insertItems.length) {
+            const manualItem = manualItems[manualIndex];
+            const insertItem = insertItems[insertIndex];
 
-        if (aHasManualOrder && bHasManualOrder) {
-            const hasSameManualLayoutStamp = !!a.manualOrderUpdatedAt &&
-                a.manualOrderUpdatedAt === b.manualOrderUpdatedAt;
-
-            if (hasSameManualLayoutStamp && a.order !== b.order) {
-                return a.order - b.order;
-            }
-
-            if (a.order !== b.order) {
-                return a.order - b.order;
+            if (this.compareMeetingsByDefaultOrder(insertItem, manualItem) < 0) {
+                merged.push(insertItem);
+                insertIndex++;
+            } else {
+                merged.push(manualItem);
+                manualIndex++;
             }
         }
 
-        if (aHasManualOrder && !bHasManualOrder) {
-            if (!this.isMeetingCreatedAfterManualLayout(b, a)) {
-                return -1;
-            }
-            return this.compareMeetingsByDefaultOrder(a, b);
+        if (manualIndex < manualItems.length) {
+            merged.push(...manualItems.slice(manualIndex));
         }
 
-        if (bHasManualOrder && !aHasManualOrder) {
-            if (!this.isMeetingCreatedAfterManualLayout(a, b)) {
-                return 1;
-            }
-            return this.compareMeetingsByDefaultOrder(a, b);
+        if (insertIndex < insertItems.length) {
+            merged.push(...insertItems.slice(insertIndex));
         }
 
-        return this.compareMeetingsByDefaultOrder(a, b);
+        return merged;
+    }
+
+    sortMeetingItems(items, hasManualOrder) {
+        const buckets = new Map([
+            [0, []],
+            [1, []],
+            [2, []],
+            [3, []]
+        ]);
+
+        items.forEach(item => {
+            const bucket = this.getCardPriorityBucket(item);
+            if (!buckets.has(bucket)) {
+                buckets.set(bucket, []);
+            }
+            buckets.get(bucket).push(item);
+        });
+
+        const sortedItems = [];
+
+        [0, 1, 2, 3].forEach(bucket => {
+            const bucketItems = buckets.get(bucket) || [];
+            const manualItems = bucketItems
+                .filter(item => hasManualOrder(item))
+                .sort((a, b) => {
+                    if (a.order !== b.order) {
+                        return a.order - b.order;
+                    }
+                    return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
+                });
+            const insertItems = bucketItems
+                .filter(item => !hasManualOrder(item))
+                .sort((a, b) => this.compareMeetingsByDefaultOrder(a, b));
+
+            if (manualItems.length === 0) {
+                sortedItems.push(...insertItems);
+                return;
+            }
+
+            if (insertItems.length === 0) {
+                sortedItems.push(...manualItems);
+                return;
+            }
+
+            sortedItems.push(...this.mergeMeetingListsByDefaultOrder(manualItems, insertItems));
+        });
+
+        return sortedItems;
     }
 
     /**
@@ -4414,50 +4451,31 @@ class OfficeDashboard {
             completed: !!i.completed
         })));
 
-        items.sort((a, b) => {
-            // 计算优先级分数：分数小的排前面
-            // 置顶=0, 正常=1, 沉底=2, 已完成=3
-            const getPriority = (item) => {
-                if (item.pinned) return 0;
-                if (item.completed) return 3;
-                if (item.sunk) return 2;
-                return 1;
-            };
+        if (type === ITEM_TYPES.MEETING) {
+            items = this.sortMeetingItems(items, hasManualOrder);
+        } else {
+            items.sort((a, b) => {
+                const priorityA = this.getCardPriorityBucket(a);
+                const priorityB = this.getCardPriorityBucket(b);
 
-            const priorityA = getPriority(a);
-            const priorityB = getPriority(b);
+                if (priorityA !== priorityB) {
+                    return priorityA - priorityB;
+                }
 
-            if (priorityA !== priorityB) {
-                return priorityA - priorityB;
-            }
+                const aHasOrder = hasOrder(a);
+                const bHasOrder = hasOrder(b);
 
-            // 检查是否有用户拖动的排序（order值）
-            const aHasOrder = hasOrder(a);
-            const bHasOrder = hasOrder(b);
+                if (aHasOrder && bHasOrder) {
+                    if (a.order !== b.order) return a.order - b.order;
+                    return new Date(a.createdAt) - new Date(b.createdAt);
+                }
 
-            // 会议特殊处理：
-            // - 如果两个都有order值，优先用order（用户拖动结果）
-            // - 如果只有一个有order，有order的排前面
-            // - 如果都没有order，按领导级别+时间排序
-            if (type === ITEM_TYPES.MEETING) {
-                return this.compareMeetingsWithManualOrder(a, b, hasManualOrder);
-            }
+                if (aHasOrder && !bHasOrder) return -1;
+                if (bHasOrder && !aHasOrder) return 1;
 
-            // 非会议类型：有 order 值的按 order 排（用户拖拽的结果）
-
-            if (aHasOrder && bHasOrder) {
-                if (a.order !== b.order) return a.order - b.order;
-                // order 相同（理论上不会出现），按创建时间兜底
                 return new Date(a.createdAt) - new Date(b.createdAt);
-            }
-
-            // 有 order 的排在无 order 的前面（仅对非会议类型或同级别会议）
-            if (aHasOrder && !bHasOrder) return -1;
-            if (bHasOrder && !aHasOrder) return 1;
-
-            // 按创建时间排序兜底
-            return new Date(a.createdAt) - new Date(b.createdAt);
-        });
+            });
+        }
 
         // 调试：打印排序后的项目状态
         console.log(`[${type}] 排序后顺序:`, items.map(i => `${i.title}(order:${i.order})`));
