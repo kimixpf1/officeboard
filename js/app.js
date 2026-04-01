@@ -4316,6 +4316,74 @@ class OfficeDashboard {
         return Math.min(attendeeRank, titleRank);
     }
 
+    getComparableTimestamp(value) {
+        const timestamp = new Date(value || 0).getTime();
+        return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    compareMeetingsByDefaultOrder(a, b) {
+        const levelA = this.getMeetingLevel(a);
+        const levelB = this.getMeetingLevel(b);
+        if (levelA !== levelB) {
+            return levelA - levelB;
+        }
+
+        const timeA = a.time || '99:99';
+        const timeB = b.time || '99:99';
+        if (timeA !== timeB) {
+            return timeA.localeCompare(timeB);
+        }
+
+        return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
+    }
+
+    isMeetingCreatedAfterManualLayout(meeting, manualMeeting) {
+        if (!manualMeeting?.manualOrderUpdatedAt) {
+            return false;
+        }
+
+        return this.getComparableTimestamp(meeting?.createdAt || meeting?.updatedAt) >
+            this.getComparableTimestamp(manualMeeting.manualOrderUpdatedAt);
+    }
+
+    compareMeetingsWithManualOrder(a, b, hasManualOrder) {
+        const aHasManualOrder = hasManualOrder(a);
+        const bHasManualOrder = hasManualOrder(b);
+
+        if (!aHasManualOrder && !bHasManualOrder) {
+            return this.compareMeetingsByDefaultOrder(a, b);
+        }
+
+        if (aHasManualOrder && bHasManualOrder) {
+            const hasSameManualLayoutStamp = !!a.manualOrderUpdatedAt &&
+                a.manualOrderUpdatedAt === b.manualOrderUpdatedAt;
+
+            if (hasSameManualLayoutStamp && a.order !== b.order) {
+                return a.order - b.order;
+            }
+
+            if (a.order !== b.order) {
+                return a.order - b.order;
+            }
+        }
+
+        if (aHasManualOrder && !bHasManualOrder) {
+            if (!this.isMeetingCreatedAfterManualLayout(b, a)) {
+                return -1;
+            }
+            return this.compareMeetingsByDefaultOrder(a, b);
+        }
+
+        if (bHasManualOrder && !aHasManualOrder) {
+            if (!this.isMeetingCreatedAfterManualLayout(a, b)) {
+                return 1;
+            }
+            return this.compareMeetingsByDefaultOrder(a, b);
+        }
+
+        return this.compareMeetingsByDefaultOrder(a, b);
+    }
+
     /**
      * 渲染列
      */
@@ -4372,33 +4440,7 @@ class OfficeDashboard {
             // - 如果只有一个有order，有order的排前面
             // - 如果都没有order，按领导级别+时间排序
             if (type === ITEM_TYPES.MEETING) {
-                const aHasManualOrder = hasManualOrder(a);
-                const bHasManualOrder = hasManualOrder(b);
-
-                // 只有明确标记为手动拖动的会议，才按 order 排序
-                if (aHasManualOrder && bHasManualOrder) {
-                    if (a.order !== b.order) return a.order - b.order;
-                }
-
-                if (aHasManualOrder && !bHasManualOrder) return -1;
-                if (bHasManualOrder && !aHasManualOrder) return 1;
-
-                // 默认情况：按领导级别排序，历史旧数据里即使残留 order 也不影响默认领导排序
-                const levelA = this.getMeetingLevel(a);
-                const levelB = this.getMeetingLevel(b);
-                if (levelA !== levelB) {
-                    return levelA - levelB;
-                }
-
-                // 同级别按会议时间排序
-                const timeA = a.time || '99:99';
-                const timeB = b.time || '99:99';
-                if (timeA !== timeB) {
-                    return timeA.localeCompare(timeB);
-                }
-                
-                // 最后按创建时间
-                return new Date(a.createdAt) - new Date(b.createdAt);
+                return this.compareMeetingsWithManualOrder(a, b, hasManualOrder);
             }
 
             // 非会议类型：有 order 值的按 order 排（用户拖拽的结果）

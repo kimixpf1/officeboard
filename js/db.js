@@ -25,6 +25,7 @@ class Database {
         if (normalizedItem.type === 'meeting') {
             if (normalizedItem.manualOrder !== true) {
                 delete normalizedItem.order;
+                delete normalizedItem.manualOrderUpdatedAt;
                 normalizedItem.manualOrder = false;
             }
         }
@@ -321,6 +322,7 @@ class Database {
         if (!itemIds || itemIds.length === 0) return;
 
         const db = await this.init();
+        const manualOrderUpdatedAt = new Date().toISOString();
 
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORES.ITEMS, 'readwrite');
@@ -339,7 +341,8 @@ class Database {
                         // 更新 order 值（不检查 type，因为 DOM 中的卡片一定属于该容器）
                         item.order = index;
                         item.manualOrder = true;
-                        item.updatedAt = new Date().toISOString();
+                        item.manualOrderUpdatedAt = manualOrderUpdatedAt;
+                        item.updatedAt = manualOrderUpdatedAt;
                         items.push(item);
                     }
                     pendingGets--;
