@@ -130,6 +130,14 @@ class OfficeDashboard {
             this.currentView = restoreView;
         }
 
+        this.meetingLeaderPriorityGroups = [
+            ['钱局'],
+            ['吴局'],
+            ['盛局'],
+            ['陈局', '陈主任'],
+            ['房局']
+        ];
+
         // 多选功能状态
         this.selectedItems = new Set(); // 选中的事项ID
         this.batchMode = false; // 是否处于批量模式
@@ -149,6 +157,61 @@ class OfficeDashboard {
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const day = date.getDate().toString().padStart(2, '0');
         return `${year}-${month}-${day}`;
+    }
+
+    normalizeMeetingSortText(value) {
+        return (value || '')
+            .toString()
+            .replace(/[（）()【】\[\]\s]/g, '')
+            .replace(/[，,、；;。.!！?？]/g, '')
+            .trim();
+    }
+
+    getMeetingLeaderRankFromText(text) {
+        const normalized = this.normalizeMeetingSortText(text);
+        if (!normalized) {
+            return Number.MAX_SAFE_INTEGER;
+        }
+
+        for (let index = 0; index < this.meetingLeaderPriorityGroups.length; index++) {
+            const aliases = this.meetingLeaderPriorityGroups[index];
+            if (aliases.some(alias => normalized.includes(this.normalizeMeetingSortText(alias)))) {
+                return index + 1;
+            }
+        }
+
+        if (/局|主任/.test(text || '')) {
+            return this.meetingLeaderPriorityGroups.length + 1;
+        }
+
+        if (/处|室|科/.test(text || '')) {
+            return this.meetingLeaderPriorityGroups.length + 10;
+        }
+
+        return this.meetingLeaderPriorityGroups.length + 20;
+    }
+
+    sortMeetingAttendeesForDisplay(attendees = []) {
+        const uniqueAttendees = [];
+        const seen = new Set();
+
+        for (const attendee of Array.isArray(attendees) ? attendees : []) {
+            const normalized = this.normalizeMeetingSortText(attendee);
+            if (!normalized || seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            uniqueAttendees.push(attendee);
+        }
+
+        return uniqueAttendees.sort((a, b) => {
+            const rankA = this.getMeetingLeaderRankFromText(a);
+            const rankB = this.getMeetingLeaderRankFromText(b);
+            if (rankA !== rankB) {
+                return rankA - rankB;
+            }
+            return a.localeCompare(b, 'zh-CN');
+        });
     }
 
     /**
@@ -4245,27 +4308,12 @@ class OfficeDashboard {
      */
     getMeetingLevel(meeting) {
         const title = meeting.title || '';
-        const attendees = meeting.attendees || [];
-        const allText = title + ' ' + attendees.join(' ');
-
-        // 钱局 - 最高优先级（置顶）
-        if (allText.includes('钱局') || allText.includes('钱某某')) {
-            return 1;
-        }
-        // 局领导按特定顺序：吴局、盛局、陈主任/陈局、房局
-        if (allText.includes('吴局')) return 2;
-        if (allText.includes('盛局')) return 3;
-        if (allText.includes('陈主任') || allText.includes('陈局')) return 4;
-        if (allText.includes('房局')) return 5;
-        // 其他局长
-        if (/李局|王局|张局|刘局|杨局|赵局|黄局|周局/.test(allText)) {
-            return 6;
-        }
-        // 处室
-        if (allText.includes('处') || allText.includes('室') || allText.includes('科')) {
-            return 7;
-        }
-        return 8;
+        const attendees = this.sortMeetingAttendeesForDisplay(meeting.attendees || []);
+        const attendeeRank = attendees.length > 0
+            ? Math.min(...attendees.map(attendee => this.getMeetingLeaderRankFromText(attendee)))
+            : Number.MAX_SAFE_INTEGER;
+        const titleRank = this.getMeetingLeaderRankFromText(title);
+        return Math.min(attendeeRank, titleRank);
     }
 
     /**
@@ -4419,8 +4467,9 @@ class OfficeDashboard {
 
             case ITEM_TYPES.MEETING:
                 // 精简显示：【参会人员】会议名称+时间段+地点
-                const attendeeStr = item.attendees && item.attendees.length > 0
-                    ? (item.attendees.length > 3 ? item.attendees.slice(0, 3).join('、') + '等' : item.attendees.join('、'))
+                const sortedAttendees = this.sortMeetingAttendeesForDisplay(item.attendees || []);
+                const attendeeStr = sortedAttendees.length > 0
+                    ? (sortedAttendees.length > 3 ? sortedAttendees.slice(0, 3).join('、') + '等' : sortedAttendees.join('、'))
                     : '';
 
                 // 跨天会议显示日期范围
@@ -4445,7 +4494,7 @@ class OfficeDashboard {
                     ${timeLoc ? `<div class="card-time">${timeLoc}</div>` : ''}
                 `;
                 detailHtml = `
-                    ${item.attendees?.length ? `<div class="card-detail-section"><div class="detail-label">参会人员</div><div class="detail-content">${item.attendees.join('、')}</div></div>` : ''}
+                    ${sortedAttendees.length ? `<div class="card-detail-section"><div class="detail-label">参会人员</div><div class="detail-content">${sortedAttendees.join('、')}</div></div>` : ''}
                     ${item.date ? `<div class="card-detail-section"><div class="detail-label">日期</div><div class="detail-content">${item.date}${item.endDate && item.endDate !== item.date ? ' 至 ' + item.endDate : ''}</div></div>` : ''}
                     ${item.agenda ? `<div class="card-detail-section"><div class="detail-label">议程/备注</div><div class="detail-content">${this.escapeHtml(item.agenda)}</div></div>` : ''}
                     ${item.location ? `<div class="card-detail-section"><div class="detail-label">地点</div><div class="detail-content">${this.escapeHtml(item.location)}</div></div>` : ''}

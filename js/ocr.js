@@ -8,6 +8,23 @@ class OCRManager {
     constructor() {
         this.worker = null;
         this.isInitialized = false;
+        this.leaderPriorityGroups = [
+            ['钱局'],
+            ['吴局'],
+            ['盛局'],
+            ['陈局', '陈主任'],
+            ['房局']
+        ];
+        this.ocrAttendeeCorrectionMap = new Map([
+            ['钱居', '钱局'],
+            ['吴居', '吴局'],
+            ['盛居', '盛局'],
+            ['房居', '房局'],
+            ['陈主仼', '陈主任'],
+            ['陈主壬', '陈主任'],
+            ['陈主住', '陈主任'],
+            ['陈居', '陈局']
+        ]);
         // DeepSeek API配置
         this.deepseekApiKey = null;
         this.deepseekBaseUrl = 'https://api.deepseek.com';
@@ -120,11 +137,12 @@ class OCRManager {
      */
     formatMeetingTitle(data) {
         const parts = [];
+        const sortedAttendees = this.sortMeetingAttendees(data.attendees || []);
 
         // 参会人员
-        if (data.attendees && data.attendees.length > 0) {
-            const attendeeStr = data.attendees.slice(0, 3).join('、');
-            parts.push(`【${attendeeStr}${data.attendees.length > 3 ? '等' : ''}】`);
+        if (sortedAttendees.length > 0) {
+            const attendeeStr = sortedAttendees.slice(0, 3).join('、');
+            parts.push(`【${attendeeStr}${sortedAttendees.length > 3 ? '等' : ''}】`);
         }
 
         // 会议名称
@@ -459,6 +477,10 @@ class OCRManager {
             }
         }
 
+        if (item.type === 'meeting') {
+            data = this.applyMeetingSecondaryCorrections(data);
+        }
+
         // 确保待办事项有优先级
         if (item.type === 'todo' && !data.priority) {
             data.priority = 'medium';
@@ -487,6 +509,108 @@ class OCRManager {
         }
 
         return result;
+    }
+
+    applyMeetingSecondaryCorrections(data) {
+        const correctedData = { ...data };
+
+        correctedData.title = this.correctMeetingTitleText(correctedData.title);
+        correctedData.location = this.correctMeetingLocationText(correctedData.location);
+        correctedData.attendees = this.sortMeetingAttendees(
+            (Array.isArray(correctedData.attendees) ? correctedData.attendees : [])
+                .map(attendee => this.correctMeetingAttendee(attendee))
+                .filter(Boolean)
+        );
+
+        return correctedData;
+    }
+
+    correctMeetingTitleText(value) {
+        return (value || '')
+            .toString()
+            .replace(/主仼/g, '主任')
+            .replace(/局居/g, '局')
+            .replace(/楼屡/g, '楼层')
+            .trim();
+    }
+
+    correctMeetingLocationText(value) {
+        if (!value) {
+            return value;
+        }
+
+        return value
+            .toString()
+            .replace(/主仼/g, '主任')
+            .replace(/([0-9])O/g, '$10')
+            .replace(/([A-Za-z])O(?=\d)|O(?=\d)/g, '0')
+            .replace(/(?<=\d)[Il](?=\d)/g, '1')
+            .replace(/会议宝/g, '会议室')
+            .replace(/\s+/g, '')
+            .trim();
+    }
+
+    correctMeetingAttendee(value) {
+        const cleaned = (value || '')
+            .toString()
+            .replace(/[()（）]/g, '')
+            .replace(/\s+/g, '')
+            .replace(/主仼/g, '主任')
+            .trim();
+
+        if (!cleaned) {
+            return '';
+        }
+
+        return this.ocrAttendeeCorrectionMap.get(cleaned) || cleaned;
+    }
+
+    getLeaderPriority(attendee) {
+        const text = this.normalizeMeetingField(attendee);
+        if (!text) {
+            return Number.MAX_SAFE_INTEGER;
+        }
+
+        for (let index = 0; index < this.leaderPriorityGroups.length; index++) {
+            const aliases = this.leaderPriorityGroups[index];
+            if (aliases.some(alias => text.includes(this.normalizeMeetingField(alias)))) {
+                return index;
+            }
+        }
+
+        if (/局|主任/.test(attendee || '')) {
+            return this.leaderPriorityGroups.length;
+        }
+
+        if (/处|室|科/.test(attendee || '')) {
+            return this.leaderPriorityGroups.length + 10;
+        }
+
+        return this.leaderPriorityGroups.length + 20;
+    }
+
+    sortMeetingAttendees(attendees) {
+        const deduped = [];
+        const seen = new Set();
+
+        for (const attendee of Array.isArray(attendees) ? attendees : []) {
+            const corrected = this.correctMeetingAttendee(attendee);
+            const normalized = this.normalizeMeetingField(corrected);
+            if (!normalized || seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            deduped.push(corrected);
+        }
+
+        return deduped.sort((a, b) => {
+            const rankA = this.getLeaderPriority(a);
+            const rankB = this.getLeaderPriority(b);
+            if (rankA !== rankB) {
+                return rankA - rankB;
+            }
+            return a.localeCompare(b, 'zh-CN');
+        });
     }
 
     /**
@@ -2781,22 +2905,23 @@ class OCRManager {
     }
 
     mergeMeetingAttendees(existingMeeting, incomingAttendees) {
-        const existingAttendees = Array.isArray(existingMeeting.attendees) ? existingMeeting.attendees : [];
+        const existingAttendees = this.sortMeetingAttendees(Array.isArray(existingMeeting.attendees) ? existingMeeting.attendees : []);
         const normalizedExisting = new Set(existingAttendees.map(attendee => this.normalizeMeetingField(attendee)));
         const addedAttendees = [];
 
         for (const attendee of Array.isArray(incomingAttendees) ? incomingAttendees : []) {
-            const normalized = this.normalizeMeetingField(attendee);
+            const correctedAttendee = this.correctMeetingAttendee(attendee);
+            const normalized = this.normalizeMeetingField(correctedAttendee);
             if (!normalized || normalizedExisting.has(normalized)) {
                 continue;
             }
             normalizedExisting.add(normalized);
-            addedAttendees.push(attendee);
+            addedAttendees.push(correctedAttendee);
         }
 
         return {
-            mergedAttendees: [...existingAttendees, ...addedAttendees],
-            addedAttendees
+            mergedAttendees: this.sortMeetingAttendees([...existingAttendees, ...addedAttendees]),
+            addedAttendees: this.sortMeetingAttendees(addedAttendees)
         };
     }
 
