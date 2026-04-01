@@ -19,6 +19,19 @@ class Database {
         this.initPromise = null;
     }
 
+    normalizeItemForStorage(item) {
+        const normalizedItem = { ...item };
+
+        if (normalizedItem.type === 'meeting') {
+            if (normalizedItem.manualOrder !== true) {
+                delete normalizedItem.order;
+                normalizedItem.manualOrder = false;
+            }
+        }
+
+        return normalizedItem;
+    }
+
     /**
      * 初始化数据库
      */
@@ -100,15 +113,16 @@ class Database {
      */
     async addItem(item) {
         const db = await this.init();
+        const normalizedItem = this.normalizeItemForStorage(item);
 
         // 生成唯一标识（用于去重）
-        item.hash = this.generateHash(item);
+        normalizedItem.hash = this.generateHash(normalizedItem);
         // 保留原有的 createdAt 和 updatedAt（如果存在）
-        if (!item.createdAt) {
-            item.createdAt = new Date().toISOString();
+        if (!normalizedItem.createdAt) {
+            normalizedItem.createdAt = new Date().toISOString();
         }
-        if (!item.updatedAt) {
-            item.updatedAt = item.createdAt;
+        if (!normalizedItem.updatedAt) {
+            normalizedItem.updatedAt = normalizedItem.createdAt;
         }
 
         return new Promise((resolve, reject) => {
@@ -117,27 +131,27 @@ class Database {
             const index = store.index('hash');
 
             // 先检查是否存在
-            const checkRequest = index.get(item.hash);
+            const checkRequest = index.get(normalizedItem.hash);
 
             checkRequest.onsuccess = () => {
                 if (checkRequest.result) {
                     // 已存在相同的hash，但可能是不同的周期性任务
                     // 检查是否是同一周期的任务
                     const existing = checkRequest.result;
-                    if (item.recurringGroupId && existing.recurringGroupId === item.recurringGroupId) {
-                        console.log('同一周期任务已存在，跳过:', item.title, 'occurrenceIndex:', item.occurrenceIndex);
+                    if (normalizedItem.recurringGroupId && existing.recurringGroupId === normalizedItem.recurringGroupId) {
+                        console.log('同一周期任务已存在，跳过:', normalizedItem.title, 'occurrenceIndex:', normalizedItem.occurrenceIndex);
                         resolve(existing.id);
                         return;
                     }
                     // 不同周期的任务，修改hash后重新添加
-                    item.hash = item.hash + '_' + Date.now();
-                    console.log('hash冲突，重新生成hash:', item.title, 'new hash:', item.hash);
+                    normalizedItem.hash = normalizedItem.hash + '_' + Date.now();
+                    console.log('hash冲突，重新生成hash:', normalizedItem.title, 'new hash:', normalizedItem.hash);
                 }
 
                 // 不存在则添加
-                const addRequest = store.add(item);
+                const addRequest = store.add(normalizedItem);
                 addRequest.onsuccess = () => {
-                    console.log('添加事项成功:', item.title, 'id:', addRequest.result, 'recurringGroupId:', item.recurringGroupId);
+                    console.log('添加事项成功:', normalizedItem.title, 'id:', addRequest.result, 'recurringGroupId:', normalizedItem.recurringGroupId);
                     resolve(addRequest.result);
                 };
                 addRequest.onerror = () => reject(addRequest.error);
@@ -167,7 +181,11 @@ class Database {
                     return;
                 }
 
-                const updatedItem = { ...item, ...updates, updatedAt: new Date().toISOString() };
+                const updatedItem = this.normalizeItemForStorage({
+                    ...item,
+                    ...updates,
+                    updatedAt: new Date().toISOString()
+                });
                 updatedItem.hash = this.generateHash(updatedItem);
 
                 const putRequest = store.put(updatedItem);
@@ -320,6 +338,7 @@ class Database {
                     if (item) {
                         // 更新 order 值（不检查 type，因为 DOM 中的卡片一定属于该容器）
                         item.order = index;
+                        item.manualOrder = true;
                         item.updatedAt = new Date().toISOString();
                         items.push(item);
                     }

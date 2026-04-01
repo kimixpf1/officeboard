@@ -25,6 +25,16 @@ class OCRManager {
             ['陈主住', '陈主任'],
             ['陈居', '陈局']
         ]);
+        this.ocrTextCorrections = [
+            [/钱居/g, '钱局'],
+            [/吴居/g, '吴局'],
+            [/盛居/g, '盛局'],
+            [/房居/g, '房局'],
+            [/陈主仼|陈主壬|陈主住/g, '陈主任'],
+            [/陈居/g, '陈局'],
+            [/局居/g, '局'],
+            [/主仼/g, '主任']
+        ];
         // DeepSeek API配置
         this.deepseekApiKey = null;
         this.deepseekBaseUrl = 'https://api.deepseek.com';
@@ -525,11 +535,18 @@ class OCRManager {
         return correctedData;
     }
 
+    applyCommonMeetingTextCorrections(value) {
+        if (!value) {
+            return value;
+        }
+
+        return this.ocrTextCorrections.reduce((result, [pattern, replacement]) => {
+            return result.replace(pattern, replacement);
+        }, value.toString());
+    }
+
     correctMeetingTitleText(value) {
-        return (value || '')
-            .toString()
-            .replace(/主仼/g, '主任')
-            .replace(/局居/g, '局')
+        return this.applyCommonMeetingTextCorrections(value || '')
             .replace(/楼屡/g, '楼层')
             .trim();
     }
@@ -539,9 +556,7 @@ class OCRManager {
             return value;
         }
 
-        return value
-            .toString()
-            .replace(/主仼/g, '主任')
+        return this.applyCommonMeetingTextCorrections(value)
             .replace(/([0-9])O/g, '$10')
             .replace(/([A-Za-z])O(?=\d)|O(?=\d)/g, '0')
             .replace(/(?<=\d)[Il](?=\d)/g, '1')
@@ -555,14 +570,15 @@ class OCRManager {
             .toString()
             .replace(/[()（）]/g, '')
             .replace(/\s+/g, '')
-            .replace(/主仼/g, '主任')
+            .trim();
+        const corrected = this.applyCommonMeetingTextCorrections(cleaned)
             .trim();
 
-        if (!cleaned) {
+        if (!corrected) {
             return '';
         }
 
-        return this.ocrAttendeeCorrectionMap.get(cleaned) || cleaned;
+        return this.ocrAttendeeCorrectionMap.get(corrected) || corrected;
     }
 
     getLeaderPriority(attendee) {

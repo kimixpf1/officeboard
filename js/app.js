@@ -4335,6 +4335,7 @@ class OfficeDashboard {
 
         // 排序逻辑
         const hasOrder = (item) => item.order !== undefined && item.order !== null;
+        const hasManualOrder = (item) => hasOrder(item) && item.manualOrder === true;
 
         // 调试：打印排序前的状态（包含order值）
         console.log(`[${type}] 排序前项目:`, items.map(i => ({
@@ -4371,16 +4372,18 @@ class OfficeDashboard {
             // - 如果只有一个有order，有order的排前面
             // - 如果都没有order，按领导级别+时间排序
             if (type === ITEM_TYPES.MEETING) {
-                // 两个都有order值：按order排序（用户拖动结果）
-                if (aHasOrder && bHasOrder) {
+                const aHasManualOrder = hasManualOrder(a);
+                const bHasManualOrder = hasManualOrder(b);
+
+                // 只有明确标记为手动拖动的会议，才按 order 排序
+                if (aHasManualOrder && bHasManualOrder) {
                     if (a.order !== b.order) return a.order - b.order;
                 }
-                
-                // 有order的排在没有order的前面
-                if (aHasOrder && !bHasOrder) return -1;
-                if (bHasOrder && !aHasOrder) return 1;
-                
-                // 都没有order：按领导级别排序
+
+                if (aHasManualOrder && !bHasManualOrder) return -1;
+                if (bHasManualOrder && !aHasManualOrder) return 1;
+
+                // 默认情况：按领导级别排序，历史旧数据里即使残留 order 也不影响默认领导排序
                 const levelA = this.getMeetingLevel(a);
                 const levelB = this.getMeetingLevel(b);
                 if (levelA !== levelB) {
@@ -5272,8 +5275,12 @@ class OfficeDashboard {
                 item.endTime = document.getElementById('meetingEndTime').value || null;
                 item.location = document.getElementById('meetingLocation').value.trim();
                 const attendeesStr = document.getElementById('meetingAttendees').value.trim();
-                item.attendees = attendeesStr ? attendeesStr.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : [];
+                item.attendees = attendeesStr
+                    ? this.sortMeetingAttendeesForDisplay(attendeesStr.split(/[,，、]/).map(s => s.trim()).filter(Boolean))
+                    : [];
                 item.agenda = document.getElementById('meetingAgenda').value.trim();
+                item.manualOrder = false;
+                delete item.order;
                 break;
 
             case ITEM_TYPES.DOCUMENT:
