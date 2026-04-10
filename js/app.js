@@ -1243,6 +1243,19 @@ class OfficeDashboard {
     /**
      * 计算器输入
      */
+    safeMathEval(expr) {
+        const sanitized = expr.replace(/\s/g, '');
+        if (!/^[0-9+\-*/.()%]+$/.test(sanitized)) {
+            throw new Error('非法字符');
+        }
+        const fn = new Function('return (' + sanitized + ')');
+        const result = fn();
+        if (typeof result !== 'number' || !isFinite(result)) {
+            throw new Error('计算错误');
+        }
+        return result;
+    }
+
     calcInput(val) {
         const display = document.getElementById('calcDisplay');
         if (!display) return;
@@ -1259,11 +1272,11 @@ class OfficeDashboard {
             }
         } else if (val === '%') {
             try {
-                display.value = parseFloat(eval(current)) / 100;
+                display.value = this.safeMathEval(current) / 100;
             } catch (e) {}
         } else if (val === '=') {
             try {
-                display.value = eval(current);
+                display.value = this.safeMathEval(current);
             } catch (e) {
                 display.value = 'Error';
             }
@@ -2874,34 +2887,46 @@ class OfficeDashboard {
     /**
      * 打开同步弹窗
      */
-    openSyncModal() {
+    async openSyncModal() {
         this.updateLoginUI({
             isLoggedIn: syncManager.isLoggedIn(),
             username: syncManager.getUsername()
         });
         this.showModal('syncModal');
-        
-        // 自动填充记住的密码
-        this.loadRememberedLogin();
+
+        await this.loadRememberedLogin();
     }
 
     /**
      * 加载记住的登录信息
      */
-    loadRememberedLogin() {
+    async loadRememberedLogin() {
         const remembered = localStorage.getItem('office_remembered_login');
         if (remembered) {
             try {
                 const data = JSON.parse(remembered);
-                // 检查是否是相同设备
                 const currentDevice = navigator.userAgent.slice(0, 50);
                 if (data.device === currentDevice) {
                     const usernameInput = document.getElementById('loginUsername');
                     const passwordInput = document.getElementById('loginPassword');
                     const rememberCheckbox = document.getElementById('rememberPassword');
-                    
+
                     if (usernameInput) usernameInput.value = data.username || '';
-                    if (passwordInput) passwordInput.value = data.password ? atob(data.password) : '';
+                    if (passwordInput) {
+                        if (data.password) {
+                            if (data.enc === 'v2' && typeof cryptoManager !== 'undefined') {
+                                try {
+                                    passwordInput.value = await cryptoManager.decrypt(data.password);
+                                } catch (e) {
+                                    passwordInput.value = atob(data.password);
+                                }
+                            } else {
+                                passwordInput.value = atob(data.password);
+                            }
+                        } else {
+                            passwordInput.value = '';
+                        }
+                    }
                     if (rememberCheckbox) rememberCheckbox.checked = true;
                 }
             } catch (e) {
@@ -2969,11 +2994,24 @@ class OfficeDashboard {
 
             // 处理记住密码
             if (rememberPassword) {
-                localStorage.setItem('office_remembered_login', JSON.stringify({
-                    username: username,
-                    password: btoa(password), // 简单编码，非加密
-                    device: navigator.userAgent.slice(0, 50)
-                }));
+                try {
+                    const encPassword = (typeof cryptoManager !== 'undefined')
+                        ? await cryptoManager.encrypt(password)
+                        : btoa(password);
+                    localStorage.setItem('office_remembered_login', JSON.stringify({
+                        username: username,
+                        password: encPassword,
+                        enc: (typeof cryptoManager !== 'undefined') ? 'v2' : 'v1',
+                        device: navigator.userAgent.slice(0, 50)
+                    }));
+                } catch (e) {
+                    localStorage.setItem('office_remembered_login', JSON.stringify({
+                        username: username,
+                        password: btoa(password),
+                        enc: 'v1',
+                        device: navigator.userAgent.slice(0, 50)
+                    }));
+                }
             } else {
                 localStorage.removeItem('office_remembered_login');
             }

@@ -11,7 +11,7 @@
 
 class SyncManager {
     constructor() {
-        // Supabase配置
+        // Supabase配置（anon key 为公开密钥，安全性依赖 RLS 行级安全策略，非 service_role key）
         this.supabaseUrl = 'https://ejeiuqcmkznfbglvbkbe.supabase.co';
         this.supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqZWl1cWNta3puZmJnbHZia2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODU4NzIsImV4cCI6MjA4NzE2MTg3Mn0.NfmTSA9DhuP51XKF0qfTuPINtSc7i26u5yIbl69cdAg';
         this.supabase = null;
