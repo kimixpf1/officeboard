@@ -7241,13 +7241,9 @@ class OfficeDashboard {
      */
     async generateReport() {
         const reportType = document.querySelector('input[name="reportType"]:checked')?.value || 'daily';
-        const exportFormat = document.querySelector('input[name="exportFormat"]:checked')?.value || 'pdf';
-
-        // 获取自定义日期
         const customStart = document.getElementById('reportStartDate')?.value;
         const customEnd = document.getElementById('reportEndDate')?.value;
 
-        // 验证自定义日期
         if (reportType === 'custom') {
             if (!customStart || !customEnd) {
                 alert('请选择自定义时间段的开始和结束日期');
@@ -7264,14 +7260,7 @@ class OfficeDashboard {
         this.showLoading(true);
 
         try {
-            if (exportFormat === 'pdf') {
-                await reportGenerator.exportToPDF(reportType, start, end);
-            } else if (exportFormat === 'word') {
-                await reportGenerator.exportToWord(reportType, start, end);
-            } else {
-                await reportGenerator.exportToImage(reportType, start, end);
-            }
-
+            await reportGenerator.exportToImage(reportType, start, end);
             this.hideModal('reportModal');
 
         } catch (error) {
