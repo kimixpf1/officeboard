@@ -217,33 +217,34 @@ class ReportGenerator {
     }
 
     /**
-     * 动态加载docx库（多CDN备用）
+     * 动态加载docx库（本地优先，CDN备用）
      */
     async loadDocxLibrary() {
         // 检查是否已加载
         if (window.docx) return window.docx;
 
-        // 多个CDN源
-        const cdnSources = [
-            'https://unpkg.com/docx@8.2.0/build/index.umd.js',
-            'https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.umd.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.0/index.umd.min.js'
+        const sources = [
+            './vendor/docx.8.2.0.umd.cjs',
+            'https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.umd.cjs',
+            'https://unpkg.com/docx@8.2.0/build/index.umd.cjs'
         ];
+        const loadErrors = [];
 
-        // 尝试每个CDN
-        for (const src of cdnSources) {
+        for (const src of sources) {
             try {
                 await this.loadScript(src);
                 if (window.docx) {
                     console.log('docx库加载成功:', src);
                     return window.docx;
                 }
+                throw new Error('脚本已加载但未找到 window.docx');
             } catch (e) {
-                console.warn('CDN加载失败:', src, e.message);
+                loadErrors.push(`${src}: ${e.message}`);
+                console.warn('docx加载失败:', src, e.message);
             }
         }
 
-        throw new Error('所有CDN源均无法加载，请检查网络连接');
+        throw new Error(`所有docx源均无法加载：${loadErrors.join(' | ')}`);
     }
 
     /**
