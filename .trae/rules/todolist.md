@@ -1,6 +1,6 @@
 # Todolist
 
-## 当前优化方案总览（4批20项）
+## 当前优化方案总览（5批23项）
 
 ### 🔴 第1批：用户体验保护（7项） — ✅ 全部完成（2026-04-11）
 | # | 优化项 | 文件 | 说明 | 状态 |
@@ -37,6 +37,13 @@
 | 4-1 | 微信返回按钮处理 | wechat-upload.js | location.replace替代location.href，防止返回死循环 | ✅ 完成 |
 | 4-2 | 微信分享卡片 | index.html | 需要微信JS-SDK+后端签名，纯静态站无法实现 | ⏭️ 跳过 |
 | 4-3 | 微信环境检测增强 | app.js, wechat-upload.js | IndexedDB/FileReader可用性检测+微信能力探测 | ✅ 完成 |
+
+### 🟣 第5批：代码重构优化（3项） — ✅ 全部完成（2026-04-11）
+| # | 优化项 | 文件 | 说明 | 状态 |
+|---|--------|------|------|------|
+| 5-1 | 公共工具提取 | utils.js(新), app.js, ocr.js, sync.js, crypto.js, kimi.js | SafeStorage + fetchWithRetry 消除4文件重复代码 | ✅ 完成 |
+| 5-2 | 假期数据外置 | utils.js, app.js | HolidayData 集中管理2024-2026年假期+补班日，isWorkday/isHoliday统一委托 | ✅ 完成 |
+| 5-3 | 加密密钥迁移 | crypto.js, db.js | 主密钥从 localStorage 迁移到 IndexedDB，自动迁移旧数据 | ✅ 完成 |
 
 ---
 

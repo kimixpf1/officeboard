@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Kimi API 集成模块
  * 支持 Kimi Code API
  */
@@ -22,36 +22,12 @@ class KimiAPI {
     }
 
     /**
-     * 带重试机制的 fetch 请求
-     */
-    async fetchWithRetry(url, options, maxRetries = 3) {
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok && (response.status === 429 || response.status >= 500)) {
-                    if (i === maxRetries - 1) return response;
-                    const delay = 1000 * Math.pow(2, i); // 1s, 2s, 4s
-                    console.warn(`[Kimi API] 请求失败 (状态码: ${response.status}), ${delay}ms 后进行第 ${i + 1} 次重试...`);
-                    await new Promise(res => setTimeout(res, delay));
-                    continue;
-                }
-                return response;
-            } catch (e) {
-                if (i === maxRetries - 1) throw e;
-                const delay = 1000 * Math.pow(2, i);
-                console.warn(`[Kimi API] 网络请求异常: ${e.message}, ${delay}ms 后进行第 ${i + 1} 次重试...`);
-                await new Promise(res => setTimeout(res, delay));
-            }
-        }
-    }
-
-    /**
      * 测试API连接
      */
     async testConnection(apiKey) {
         try {
             // 直接测试 chat 接口
-            const response = await this.fetchWithRetry(`${this.baseUrl}/chat/completions`, {
+            const response = await fetchWithRetry(`${this.baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -112,7 +88,7 @@ class KimiAPI {
     async request(messages, temperature = 0.3) {
         const apiKey = await this.getApiKey();
 
-        const response = await this.fetchWithRetry(`${this.baseUrl}/chat/completions`, {
+        const response = await fetchWithRetry(`${this.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

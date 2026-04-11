@@ -8,6 +8,7 @@
 - supabase_setup_safe.sql：更安全的 Supabase 初始化脚本
 
 ## js 模块
+- js/utils.js：全局共享工具（SafeStorage 安全存储、fetchWithRetry 网络重试、HolidayData 假期数据）
 - js/app.js：主界面交互、视图切换、上传入口、识别预览确认
 - js/ocr.js：OCR/AI 识别、会议去重、识别动作计划、确认写入
 - js/upload-flow.js：共享的识别预览与确认逻辑（主页面与微信页共用）
@@ -102,3 +103,9 @@
 - wechat-upload.js init 增加 IndexedDB/FileReader 可用性检测，不支持时禁用按钮并提示
 - app.js 新增 checkWeChatCapabilities() 方法：检测 IndexedDB、FileReader、camera、微信版本号
 - 4-2 分享卡片跳过（需微信JS-SDK+后端签名，纯静态站无法实现）
+
+## 已完成的代码重构优化（第5批）
+- 5-1 公共工具提取：新增 js/utils.js，SafeStorage（安全 localStorage 封装）+ fetchWithRetry（网络重试）消除 4 文件重复代码
+- 5-2 假期数据外置：HolidayData 对象集中管理 2024-2026 年假期与补班日，isWorkday/isHoliday 统一委托，getNthWorkDayOfMonth 获得补班日支持
+- 5-3 加密密钥迁移：crypto.js 主密钥从 localStorage 迁移到 IndexedDB（db.getSetting/setSetting），自动迁移旧数据
+- 涉及文件：utils.js（新建）、app.js、ocr.js、sync.js、crypto.js、kimi.js、index.html、wechat-upload.html

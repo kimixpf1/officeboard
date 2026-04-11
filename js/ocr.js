@@ -1,15 +1,8 @@
-/**
+﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
  */
-
-function _safeGet(key) {
-    try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
-}
-function _safeSet(key, val) {
-    try { localStorage.setItem(key, val); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
-}
 
 class OCRManager {
     constructor() {
@@ -54,35 +47,11 @@ class OCRManager {
     }
 
     /**
-     * 带重试机制的 fetch 请求
-     */
-    async fetchWithRetry(url, options, maxRetries = 3) {
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok && (response.status === 429 || response.status >= 500)) {
-                    if (i === maxRetries - 1) return response;
-                    const delay = 1000 * Math.pow(2, i); // 1s, 2s, 4s
-                    console.warn(`[OCR API] 请求失败 (状态码: ${response.status}), ${delay}ms 后进行第 ${i + 1} 次重试...`);
-                    await new Promise(res => setTimeout(res, delay));
-                    continue;
-                }
-                return response;
-            } catch (e) {
-                if (i === maxRetries - 1) throw e;
-                const delay = 1000 * Math.pow(2, i);
-                console.warn(`[OCR API] 网络请求异常: ${e.message}, ${delay}ms 后进行第 ${i + 1} 次重试...`);
-                await new Promise(res => setTimeout(res, delay));
-            }
-        }
-    }
-
-    /**
      * 设置DeepSeek API Key
      */
     async setApiKey(key) {
         this.deepseekApiKey = key;
-        _safeSet('deepseekApiKey', key);
+        SafeStorage.set('deepseekApiKey', key);
         // 同时保存到 IndexedDB 以便跨设备同步
         if (typeof db !== 'undefined') {
             await db.setSetting('deepseek_api_key', key);
@@ -95,7 +64,7 @@ class OCRManager {
      */
     getApiKey() {
         if (!this.deepseekApiKey) {
-            this.deepseekApiKey = _safeGet('deepseekApiKey');
+            this.deepseekApiKey = SafeStorage.get('deepseekApiKey');
         }
         return this.deepseekApiKey;
     }
@@ -105,7 +74,7 @@ class OCRManager {
      */
     async setKimiApiKey(key) {
         this.kimiApiKey = key;
-        _safeSet('kimiApiKey', key);
+        SafeStorage.set('kimiApiKey', key);
         // 同时保存到 IndexedDB 以便跨设备同步
         if (typeof db !== 'undefined') {
             await db.setSetting('kimi_api_key', key);
@@ -118,7 +87,7 @@ class OCRManager {
      */
     getKimiApiKey() {
         if (!this.kimiApiKey) {
-            this.kimiApiKey = _safeGet('kimiApiKey');
+            this.kimiApiKey = SafeStorage.get('kimiApiKey');
         }
         return this.kimiApiKey;
     }
@@ -133,11 +102,11 @@ class OCRManager {
 
             if (deepseekKey && !this.deepseekApiKey) {
                 this.deepseekApiKey = deepseekKey;
-                _safeSet('deepseekApiKey', deepseekKey);
+                SafeStorage.set('deepseekApiKey', deepseekKey);
             }
             if (kimiKey && !this.kimiApiKey) {
                 this.kimiApiKey = kimiKey;
-                _safeSet('kimiApiKey', kimiKey);
+                SafeStorage.set('kimiApiKey', kimiKey);
             }
         }
     }
@@ -373,7 +342,7 @@ class OCRManager {
 4. 只返回JSON，不要解释`;
 
         try {
-            const response = await this.fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
+            const response = await fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3132,7 +3101,7 @@ class OCRManager {
 
 只返回JSON。`;
 
-            const response = await this.fetchWithRetry(`${this.kimiBaseUrl}/chat/completions`, {
+            const response = await fetchWithRetry(`${this.kimiBaseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3354,7 +3323,7 @@ ${ocrText}
 5. 如果与原文不完全确定，宁可保守保留原字，不要臆造
 6. 只返回JSON，不要解释`;
 
-            const response = await this.fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
+            const response = await fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

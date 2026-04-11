@@ -96,17 +96,9 @@ const SecurityUtils = {
         return Date.now().toString(36) + Math.random().toString(36).slice(2);
     },
 
-    safeGetStorage(key) {
-        try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
-    },
-
-    safeSetStorage(key, value) {
-        try { localStorage.setItem(key, value); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
-    },
-
-    safeRemoveStorage(key) {
-        try { localStorage.removeItem(key); } catch (e) { console.warn('localStorage删除失败:', key, e.message); }
-    },
+    safeGetStorage(key) { return SafeStorage.get(key); },
+    safeSetStorage(key, value) { return SafeStorage.set(key, value); },
+    safeRemoveStorage(key) { SafeStorage.remove(key); },
 
     /**
      * 内容安全策略检查
@@ -234,37 +226,11 @@ class OfficeDashboard {
     isWorkday(dateStr) {
         const date = new Date(dateStr);
         const dayOfWeek = date.getDay();
-        
-        // 周六(6)和周日(0)不是工作日
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            return false;
-        }
-        
-        // 2024-2025年法定节假日列表（可根据需要扩展）
-        const holidays = [
-            // 2024年
-            '2024-01-01', // 元旦
-            '2024-02-10', '2024-02-11', '2024-02-12', '2024-02-13', '2024-02-14', '2024-02-15', '2024-02-16', '2024-02-17', // 春节
-            '2024-04-04', '2024-04-05', '2024-04-06', // 清明节
-            '2024-05-01', '2024-05-02', '2024-05-03', '2024-05-04', '2024-05-05', // 劳动节
-            '2024-06-08', '2024-06-09', '2024-06-10', // 端午节
-            '2024-09-15', '2024-09-16', '2024-09-17', // 中秋节
-            '2024-10-01', '2024-10-02', '2024-10-03', '2024-10-04', '2024-10-05', '2024-10-06', '2024-10-07', // 国庆节
-            // 2025年
-            '2025-01-01', // 元旦
-            '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-01', '2025-02-02', '2025-02-03', '2025-02-04', // 春节
-            '2025-04-04', '2025-04-05', '2025-04-06', // 清明节
-            '2025-05-01', '2025-05-02', '2025-05-03', '2025-05-04', '2025-05-05', // 劳动节
-            '2025-05-31', '2025-06-01', '2025-06-02', // 端午节
-            '2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05', '2025-10-06', '2025-10-07', '2025-10-08', // 国庆+中秋
-        ];
-        
-        // 检查是否为节假日
-        if (holidays.includes(dateStr)) {
-            return false;
-        }
-        
-        return true;
+
+        if (HolidayData.isHoliday(dateStr)) return false;
+        if (HolidayData.isMakeupDay(dateStr)) return true;
+
+        return dayOfWeek !== 0 && dayOfWeek !== 6;
     }
 
     /**
@@ -7285,44 +7251,8 @@ class OfficeDashboard {
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
         const day = date.getDate();
-        
-        // 2024-2026年中国法定节假日（可根据需要扩展）
-        const holidays = {
-            // 2024年
-            2024: [
-                '2024-01-01', // 元旦
-                '2024-02-10', '2024-02-11', '2024-02-12', '2024-02-13', '2024-02-14', '2024-02-15', '2024-02-16', '2024-02-17', // 春节
-                '2024-04-04', '2024-04-05', '2024-04-06', // 清明
-                '2024-05-01', '2024-05-02', '2024-05-03', '2024-05-04', '2024-05-05', // 劳动节
-                '2024-06-08', '2024-06-09', '2024-06-10', // 端午
-                '2024-09-15', '2024-09-16', '2024-09-17', // 中秋
-                '2024-10-01', '2024-10-02', '2024-10-03', '2024-10-04', '2024-10-05', '2024-10-06', '2024-10-07', // 国庆
-            ],
-            // 2025年
-            2025: [
-                '2025-01-01', // 元旦
-                '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-01', '2025-02-02', '2025-02-03', '2025-02-04', // 春节
-                '2025-04-04', '2025-04-05', '2025-04-06', // 清明
-                '2025-05-01', '2025-05-02', '2025-05-03', '2025-05-04', '2025-05-05', // 劳动节
-                '2025-05-31', '2025-06-01', '2025-06-02', // 端午
-                '2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05', '2025-10-06', '2025-10-07', '2025-10-08', // 国庆+中秋
-            ],
-            // 2026年
-            2026: [
-                '2026-01-01', '2026-01-02', '2026-01-03', // 元旦
-                '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23', // 春节
-                '2026-04-05', '2026-04-06', '2026-04-07', // 清明
-                '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05', // 劳动节
-                '2026-05-31', '2026-06-01', '2026-06-02', // 端午
-                '2026-09-25', '2026-09-26', '2026-09-27', // 中秋
-                '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', // 国庆
-            ]
-        };
-        
         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const yearHolidays = holidays[year] || [];
-        
-        return yearHolidays.includes(dateStr);
+        return HolidayData.isHoliday(dateStr);
     }
 
     /**
@@ -7336,10 +7266,8 @@ class OfficeDashboard {
 
         let workDayCount = 0;
         while (workDayCount < n) {
-            const isWeekendDay = this.isWeekend(date);
-            const isHolidayDay = skipHolidays && this.isHoliday(date);
-            
-            if (!isWeekendDay && !isHolidayDay) {
+            const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            if (this.isWorkday(dateStr)) {
                 workDayCount++;
             }
             if (workDayCount < n) {

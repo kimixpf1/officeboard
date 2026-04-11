@@ -3,13 +3,6 @@
  * 用于本地安全存储敏感信息（如API Key）
  */
 
-function _safeGet(key) {
-    try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
-}
-function _safeSet(key, val) {
-    try { localStorage.setItem(key, val); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
-}
-
 class CryptoManager {
     constructor() {
         this.keyPair = null;
@@ -23,11 +16,18 @@ class CryptoManager {
         if (this.masterKey) return this.masterKey;
 
         try {
-            // 尝试从本地存储获取密钥
-            const storedKey = _safeGet('crypto_master_key');
+            let storedKey = await db.getSetting('crypto_master_key');
+
+            if (!storedKey) {
+                const legacyKey = SafeStorage.get('crypto_master_key');
+                if (legacyKey) {
+                    storedKey = legacyKey;
+                    await db.setSetting('crypto_master_key', legacyKey);
+                    SafeStorage.remove('crypto_master_key');
+                }
+            }
 
             if (storedKey) {
-                // 恢复密钥
                 const keyData = this.base64ToArrayBuffer(storedKey);
                 this.masterKey = await crypto.subtle.importKey(
                     'raw',
@@ -37,16 +37,14 @@ class CryptoManager {
                     ['encrypt', 'decrypt']
                 );
             } else {
-                // 生成新密钥
                 this.masterKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 },
                     true,
                     ['encrypt', 'decrypt']
                 );
 
-                // 导出并存储密钥
                 const exported = await crypto.subtle.exportKey('raw', this.masterKey);
-                _safeSet('crypto_master_key', this.arrayBufferToBase64(exported));
+                await db.setSetting('crypto_master_key', this.arrayBufferToBase64(exported));
             }
 
             return this.masterKey;

@@ -636,3 +636,43 @@
 ### 验证结果
 - node --check 两个文件均通过
 - 无新增诊断错误
+
+## 2026-04-11 第5批代码重构优化
+
+### 本次目标
+- 5-1：提取公共工具函数到 js/utils.js（SafeStorage、fetchWithRetry）
+- 5-2：假期数据外置 + 补班日支持（HolidayData）
+- 5-3：加密主密钥从 localStorage 迁移到 IndexedDB
+
+### 已完成
+
+#### 5-1 公共工具提取
+- ✅ 新建 js/utils.js，包含：
+  - `SafeStorage`：安全 localStorage 封装（get/set/remove + try-catch）
+  - `fetchWithRetry`：通用网络重试函数（指数退避，可配置 logPrefix）
+  - `HolidayData`：假期与补班日数据（5-2 添加）
+- ✅ sync.js：37 处 `_safeGet`/`_safeSet` → `SafeStorage.get`/`set`，删除 `_safeGet`/`_safeSet` 私有方法
+- ✅ ocr.js：删除 `_safeGet`/`_safeSet` + `fetchWithRetry` 实例方法，6 处 SafeStorage 调用 + 3 处全局 fetchWithRetry
+- ✅ crypto.js：删除 `_safeGet`/`_safeSet`，改用 SafeStorage
+- ✅ app.js：SecurityUtils 的 safeGetStorage/safeSetStorage/safeRemoveStorage 改为 SafeStorage 委托
+- ✅ kimi.js：删除 `fetchWithRetry` 实例方法，2 处改用全局函数
+- ✅ index.html + wechat-upload.html：添加 `<script src="js/utils.js?v=1">` 到 db.js 之前
+- 验证：0 处残留 `_safeGet`/`_safeSet`/`this.fetchWithRetry`，48 处正确 SafeStorage 调用
+
+#### 5-2 假期数据外置
+- ✅ utils.js 添加 `HolidayData` 对象：holidays（2024-2026）+ makeupDays（2024-2026）+ isHoliday/isMakeupDay 方法
+- ✅ app.js `isWorkday()`：35 行 → 8 行，委托 HolidayData，新增补班日支持
+- ✅ app.js `isHoliday()`：~45 行硬编码 → 7 行委托 HolidayData.isHoliday()
+- ✅ app.js `getNthWorkDayOfMonth()`：工作日计数改用 `isWorkday()`，获得补班日支持
+- 验证：0 处内联假期数组，3 处 HolidayData 引用
+
+#### 5-3 加密密钥迁移
+- ✅ crypto.js `getMasterKey()` 重写：
+  - 主路径：从 IndexedDB 读取（db.getSetting）
+  - 迁移路径：检查 localStorage 旧数据 → 迁移到 IndexedDB → 清除 localStorage
+  - 新建密钥：存入 IndexedDB（db.setSetting）
+- 验证：仅 2 处 SafeStorage 引用（均在迁移逻辑中）
+
+### 遗留事项
+- 无功能遗留
+- 可选优化：ocr.js/kimi.js 的 fetchWithRetry 调用可显式传入 logPrefix 以保留模块专属日志前缀
