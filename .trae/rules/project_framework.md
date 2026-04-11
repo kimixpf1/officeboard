@@ -56,6 +56,11 @@
 - app.js 10处静默吞错/空 catch 添加 console.warn（JSON.parse回退×7 + 空catch×3）
 - 空 catch 块全项目清零
 
+## 已完成的定时器清理（2-4）
+- 全项目29处 setTimeout/setInterval 审查
+- 1处 setInterval 未保存 ID 已修复（会议自动完成检查，保存到 this._meetingAutoCompleteTimer）
+- 其余均为一次性定时器或已有清理机制，无泄漏风险
+
 ## 已完成的预览优化
 - 主页面与微信页预览弹窗增加一次性关闭保护，防重复触发
 - 预览中展示新增/合并/跳过判断依据和匹配到的已有会议摘要

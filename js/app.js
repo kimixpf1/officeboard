@@ -6865,11 +6865,12 @@ class OfficeDashboard {
      * 会议开始后30分钟自动标记为已完成
      */
     startMeetingAutoCompleteCheck() {
-        // 立即检查一次
+        if (this._meetingAutoCompleteTimer) {
+            clearInterval(this._meetingAutoCompleteTimer);
+        }
         this.checkMeetingAutoComplete();
 
-        // 每分钟检查一次
-        setInterval(() => {
+        this._meetingAutoCompleteTimer = setInterval(() => {
             this.checkMeetingAutoComplete();
         }, 60000);
     }

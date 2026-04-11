@@ -468,5 +468,47 @@
 - GetDiagnostics 零错误通过
 
 ### 遗留事项
-- 第2批剩余：2-3~2-6 待执行
+- 第2批剩余：2-4~2-6 待执行
 - 第3批（性能微优化4项）、第4批（微信兼容3项）待执行
+
+## 2026-04-11 2-3 错误边界增强
+
+### 本次目标
+- 全项目 catch 块审查，静默吞错和空 catch 补充 console.warn
+
+### 审查范围
+- app.js（58处）、sync.js（20处）、ocr.js（16处）、db.js（13处）、upload-flow.js（5处）、wechat-upload.js（4处）、kimi.js（4处）、calendar.js（3处）
+- 合计 123 处 catch 块
+
+### 分类结论
+1. 已完善（~65处）：有 console.error/warn + 用户提示/回退逻辑
+2. 静默吞错（10处）：catch 内有回退操作但无日志
+3. 空 catch（3处）：catch 内完全为空
+4. 合理静默（~20处）：JSON.parse 的 try-catch 模式，失败即"无数据"语义
+5. 仅 console（~15处）：有日志但可补充回退
+
+### 已完成内容
+- 10处静默吞错/空 catch 添加 console.warn（app.js 10处）
+- 空 catch 全项目清零（最终 Grep 确认 0 处）
+
+### 遗留事项
+- 2-4 定时器清理、2-5 事件监听优化、2-6 .onerror 统一处理待执行
+
+## 2026-04-11 2-4 定时器清理
+
+### 本次目标
+- 审查全项目 setTimeout/setInterval，确保无资源泄漏
+
+### 审查范围
+- 29处定时器：app.js(19处)、sync.js(2处)、ocr.js(4处)、wechat-upload.js(1处)、kimi.js(2处)
+
+### 审查结论
+- 一次性 setTimeout（~22处）：UI 状态恢复、DOM 操作、消息自动移除等，无泄漏风险
+- 有清理机制的 setInterval（2处）：倒计时器（clearInterval）、同步定时器（stopPeriodicSync）
+- **无清理的 setInterval（1处）**：会议自动完成检查（app.js:6872）
+
+### 修复内容
+- startMeetingAutoCompleteCheck()：setInterval ID 保存到 this._meetingAutoCompleteTimer，启动前先清理旧定时器
+
+### 遗留事项
+- 2-5 事件监听优化、2-6 .onerror 统一处理待执行
