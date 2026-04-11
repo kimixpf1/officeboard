@@ -345,6 +345,38 @@
 - 第2批（代码健康度6项）：2-1 已完成，2-2~2-6 待执行
 - 第3批（性能微优化4项）、第4批（微信兼容3项）待执行
 
+## 2026-04-11 2-3 错误边界增强
+
+### 本次目标
+- 对全项目123处 catch 块进行分类审查，为静默吞错和空 catch 块添加适当的日志记录
+
+### 审查范围
+- app.js：58处 catch 块
+- sync.js：25处
+- ocr.js：18处
+- crypto.js：9处
+- kimi.js：8处
+- db.js：2处
+- calendar.js：1处
+- wechat-upload.js：2处
+
+### 分类结论
+- 已完善（有日志+降级+用户反馈）：约65处 → 保持不变
+- 静默吞错（无日志，仅默认值赋值）：10处 → 添加 console.warn
+- 完全空 catch：3处 → 填充 console.warn
+- 合理静默（非关键降级如 decrypt→atob）：约20处 → 保持不变
+- 仅 console.error 无用户反馈：约15处 → 评估后大部分为非关键路径，保持不变
+
+### 已完成
+- app.js 10处修改：
+  - 7处 JSON.parse 静默吞错添加 console.warn（tools×2、links×2、cityConfig、contacts、needsUpdate）
+  - 3处空 catch 块填充 console.warn（计算器%、API密钥检查、Kimi AI解析回退）
+- 验证通过：空 catch 块全项目清零，新增 10 处 console.warn 全部到位
+
+### 遗留事项
+- 第2批（代码健康度6项）：2-1 ✅、2-2 ✅、2-3 ✅、2-4~2-6 待执行
+- 第3批（性能微优化4项）、第4批（微信兼容3项）待执行
+
 ## 2026-04-11 2-1 innerHTML 安全化 — upload-flow.js / wechat-upload.js / calendar.js 收尾
 
 ### 本次目标

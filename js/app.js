@@ -291,6 +291,7 @@ class OfficeDashboard {
 
             setTimeout(() => {
                 this.checkApiKey().catch(err => {
+                    console.warn('API密钥检查失败:', err.message);
                 });
             }, 1000);
 
@@ -561,6 +562,7 @@ class OfficeDashboard {
                     tools = this.getDefaultTools();
                 }
             } catch (e) {
+                console.warn('工具数据解析失败，使用默认值:', e.message);
                 tools = this.getDefaultTools();
             }
         } else {
@@ -637,6 +639,7 @@ class OfficeDashboard {
             try {
                 currentTools = JSON.parse(saved);
             } catch (e) {
+                console.warn('工具数据解析失败，使用默认值:', e.message);
                 currentTools = this.getDefaultTools();
             }
         }
@@ -871,6 +874,7 @@ class OfficeDashboard {
             // 如果有旧默认网站、缺少新默认网站、或图标不正确，需要更新
             return hasOldDefault || !hasNewDefaults || hasWrongIcon;
         } catch (e) {
+            console.warn('检查默认网站更新失败，默认需要更新:', e.message);
             return true;
         }
     }
@@ -1062,6 +1066,7 @@ class OfficeDashboard {
             try {
                 currentLinks = JSON.parse(saved);
             } catch (e) {
+                console.warn('快捷链接数据解析失败，重置为空:', e.message);
                 currentLinks = [];
             }
         }
@@ -1173,6 +1178,7 @@ class OfficeDashboard {
             try {
                 links = JSON.parse(saved);
             } catch (e) {
+                console.warn('快捷链接数据解析失败，重置为空:', e.message);
                 links = [];
             }
         }
@@ -1312,7 +1318,9 @@ class OfficeDashboard {
         } else if (val === '%') {
             try {
                 display.value = this.safeMathEval(current) / 100;
-            } catch (e) {}
+            } catch (e) {
+                console.warn('计算器百分比运算失败:', e.message);
+            }
         } else if (val === '=') {
             try {
                 display.value = this.safeMathEval(current);
@@ -1341,6 +1349,7 @@ class OfficeDashboard {
                 try {
                     cityConfig = JSON.parse(savedCity);
                 } catch (e) {
+                    console.warn('城市配置解析失败，使用默认苏州:', e.message);
                     cityConfig = null;
                 }
             }
@@ -1831,6 +1840,7 @@ class OfficeDashboard {
             try {
                 contacts = JSON.parse(saved);
             } catch (e) {
+                console.warn('通讯录数据解析失败，重置为空:', e.message);
                 contacts = [];
             }
         }
@@ -3997,7 +4007,7 @@ class OfficeDashboard {
                         showStatus('正在使用AI解析...');
                         result = await kimiAPI.parseNaturalLanguage(text);
                     } catch (error) {
-
+                        console.warn('Kimi AI解析失败，将使用内置解析:', error.message);
                     }
                 }
 

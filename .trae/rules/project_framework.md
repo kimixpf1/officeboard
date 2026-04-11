@@ -51,6 +51,11 @@
 - 保留所有 console.error / console.warn 用于错误追踪
 - 涉及文件：sync.js(79)、app.js(104)、db.js(10)、ocr.js(5)、templates.js(1)、upload-flow.js(1)
 
+## 已完成的错误边界增强（2-3）
+- 全项目123处 catch 块审查分类（app.js 58、sync.js 25、ocr.js 18、crypto.js 9、kimi.js 8、db.js 2、calendar.js 1、wechat-upload.js 2）
+- app.js 10处静默吞错/空 catch 添加 console.warn（JSON.parse回退×7 + 空catch×3）
+- 空 catch 块全项目清零
+
 ## 已完成的预览优化
 - 主页面与微信页预览弹窗增加一次性关闭保护，防重复触发
 - 预览中展示新增/合并/跳过判断依据和匹配到的已有会议摘要
