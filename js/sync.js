@@ -195,51 +195,46 @@ class SyncManager {
             // 情况3: 两边都有数据，需要比较时间
             const cloudItems = cloudData.data.items || [];
 
-            
-            // 判断云端是否有更新（云端更新时间 > 上次同步时间）
-            const cloudHasUpdate = cloudUpdateTime && lastSyncTime && cloudUpdateTime > lastSyncTime;
-            
-            // 判断本地是否有修改（本地修改时间 > 上次同步时间）
-            const localHasModify = localModifyTime && lastSyncTime && localModifyTime > lastSyncTime;
+            const isFirstSync = !lastSyncTime;
 
-
-
-            if (cloudHasUpdate && localHasModify) {
-                // 两边都有更新：合并数据
-
+            if (isFirstSync) {
+                // 首次同步（新设备/清除过缓存）：走合并逻辑，避免任何一端数据丢失
                 await this.mergeData(localItems, cloudData);
-            } else if (cloudHasUpdate) {
-                // 只有云端有更新：下载
-
-                await this.downloadFromCloud(cloudData);
-            } else if (localHasModify) {
-                // 只有本地有修改：上传
-
-                await this.uploadToCloud();
             } else {
-                // 两边都没变化 - 但仍需同步备忘录
+                // 判断云端是否有更新（云端更新时间 > 上次同步时间）
+                const cloudHasUpdate = cloudUpdateTime && cloudUpdateTime > lastSyncTime;
 
-                if (cloudData?.data?.memo !== undefined) {
-                    const localMemo = _safeGet('office_memo_content') || '';
-                    const cloudMemo = cloudData.data.memo;
-                    if (cloudMemo !== localMemo) {
+                // 判断本地是否有修改（本地修改时间 > 上次同步时间）
+                const localHasModify = localModifyTime && localModifyTime > lastSyncTime;
 
-                        _safeSet('office_memo_content', cloudMemo);
-                        document.dispatchEvent(new CustomEvent('memoSynced', { 
-                            detail: { content: cloudMemo } 
-                        }));
+                if (cloudHasUpdate && localHasModify) {
+                    await this.mergeData(localItems, cloudData);
+                } else if (cloudHasUpdate) {
+                    await this.downloadFromCloud(cloudData);
+                } else if (localHasModify) {
+                    await this.uploadToCloud();
+                } else {
+                    // 两边都没变化 - 但仍需同步备忘录
+                    if (cloudData?.data?.memo !== undefined) {
+                        const localMemo = _safeGet('office_memo_content') || '';
+                        const cloudMemo = cloudData.data.memo;
+                        if (cloudMemo !== localMemo) {
+                            _safeSet('office_memo_content', cloudMemo);
+                            document.dispatchEvent(new CustomEvent('memoSynced', { 
+                                detail: { content: cloudMemo } 
+                            }));
+                        }
                     }
-                }
-                // 同步网站
-                if (cloudData?.data?.links !== undefined) {
-                    const localLinks = _safeGet('office_links') || '';
-                    const cloudLinks = cloudData.data.links;
-                    if (cloudLinks !== localLinks) {
-
-                        _safeSet('office_links', cloudLinks);
-                        document.dispatchEvent(new CustomEvent('linksSynced', { 
-                            detail: { links: JSON.parse(cloudLinks || '[]') } 
-                        }));
+                    // 同步网站
+                    if (cloudData?.data?.links !== undefined) {
+                        const localLinks = _safeGet('office_links') || '';
+                        const cloudLinks = cloudData.data.links;
+                        if (cloudLinks !== localLinks) {
+                            _safeSet('office_links', cloudLinks);
+                            document.dispatchEvent(new CustomEvent('linksSynced', { 
+                                detail: { links: JSON.parse(cloudLinks || '[]') } 
+                            }));
+                        }
                     }
                 }
             }
@@ -262,8 +257,22 @@ class SyncManager {
 
         try {
             const allItems = await db.getAllItems();
-            // 调试：打印上传数据的order值
-
+            
+            // 空数据保护：如果本地事项为空但云端可能有数据，先检查云端
+            if (allItems.length === 0) {
+                const { data: cloudRow } = await this.supabase
+                    .from('user_data')
+                    .select('data')
+                    .eq('user_id', this.currentUser.id)
+                    .maybeSingle();
+                const cloudItemCount = cloudRow?.data?.items?.length || 0;
+                if (cloudItemCount > 0) {
+                    console.warn('本地数据为空但云端有 ' + cloudItemCount + ' 条事项，跳过上传防止覆盖');
+                    // 从云端下载恢复到本地
+                    await this.downloadFromCloud(cloudRow);
+                    return { success: true, itemCount: cloudItemCount, recovered: true };
+                }
+            }
             
             const settings = {};
             const kimiKey = await db.getSetting('kimi_api_key');
@@ -287,22 +296,25 @@ class SyncManager {
                 device_info: navigator.userAgent
             };
 
-            const { error } = await this.supabase
+            const { data: upsertResult, error } = await this.supabase
                 .from('user_data')
                 .upsert({
                     user_id: this.currentUser.id,
                     data: syncData,
                     updated_at: syncTime
-                }, { onConflict: 'user_id' });
+                }, { onConflict: 'user_id' })
+                .select('updated_at')
+                .maybeSingle();
 
             if (error) {
                 console.error('上传失败:', error);
                 return { success: false, error: error.message };
             }
 
-            // 更新同步时间
-            this.lastCloudSyncTime = syncTime;
-            _safeSet('lastCloudSyncTime', syncTime);
+            // 使用云端实际返回的 updated_at（触发器会用 NOW() 覆盖）
+            const actualSyncTime = upsertResult?.updated_at || syncTime;
+            this.lastCloudSyncTime = actualSyncTime;
+            _safeSet('lastCloudSyncTime', actualSyncTime);
             
 
             return { success: true, itemCount: allItems.length };
@@ -369,9 +381,17 @@ class SyncManager {
 
             const deduplicatedItems = this.deduplicateItems(cloudItems);
             
-            await db.clearAllItems();
+            // 安全替换：先备份，再清空+导入，失败则回滚
+            const backupItems = await db.getAllItems();
+            try {
+                await db.clearAllItems();
+            } catch (clearErr) {
+                console.error('清空本地数据失败，中止下载:', clearErr);
+                return { success: false, error: '清空失败' };
+            }
             
             let importedCount = 0;
+            const importErrors = [];
             for (const item of deduplicatedItems) {
                 try {
                     const { id, ...itemData } = item;
@@ -379,7 +399,22 @@ class SyncManager {
                     importedCount++;
                 } catch (e) {
                     console.warn('导入失败:', e);
+                    importErrors.push(e);
                 }
+            }
+            
+            // 如果全部导入失败且本地有备份数据，回滚
+            if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
+                console.warn('全部导入失败，回滚到本地备份数据');
+                for (const item of backupItems) {
+                    try {
+                        const { id, ...itemData } = item;
+                        await db.addItem(itemData);
+                    } catch (rollbackErr) {
+                        console.error('回滚失败:', rollbackErr);
+                    }
+                }
+                return { success: false, error: '导入失败，已回滚' };
             }
 
             // 更新同步时间
@@ -447,15 +482,37 @@ class SyncManager {
             const mergedItems = Array.from(mergedMap.values());
 
 
-            // 保存合并后的数据
-            await db.clearAllItems();
+            // 保存合并后的数据（安全替换：失败回滚）
+            const backupItems = localItems.slice();
+            try {
+                await db.clearAllItems();
+            } catch (clearErr) {
+                console.error('清空本地数据失败，中止合并:', clearErr);
+                return { success: false, error: '清空失败' };
+            }
+            let savedCount = 0;
+            const saveErrors = [];
             for (const item of mergedItems) {
                 try {
                     const { id, source, ...itemData } = item;
                     await db.addItem(itemData);
+                    savedCount++;
                 } catch (e) {
                     console.warn('保存失败:', e);
+                    saveErrors.push(e);
                 }
+            }
+            if (savedCount === 0 && backupItems.length > 0 && saveErrors.length > 0) {
+                console.warn('合并后全部保存失败，回滚到本地数据');
+                for (const item of backupItems) {
+                    try {
+                        const { id, ...itemData } = item;
+                        await db.addItem(itemData);
+                    } catch (rollbackErr) {
+                        console.error('回滚失败:', rollbackErr);
+                    }
+                }
+                return { success: false, error: '合并保存失败，已回滚' };
             }
 
             // 同步备忘录（云端优先）
@@ -714,16 +771,21 @@ class SyncManager {
                 }));
             }
 
-            // 同步事项 - 带去重逻辑
+            // 同步事项 - 带去重逻辑（安全替换：失败回滚）
             const cloudItems = data.data.items || [];
             
-            // 先对云端数据本身去重
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
-            
-            await db.clearAllItems();
+            const backupItems = await db.getAllItems();
+            try {
+                await db.clearAllItems();
+            } catch (clearErr) {
+                console.error('静默同步清空失败:', clearErr);
+                return { success: false };
+            }
 
             let importedCount = 0;
+            const importErrors = [];
             for (const item of deduplicatedCloudItems) {
                 try {
                     const { id, ...itemData } = item;
@@ -731,7 +793,21 @@ class SyncManager {
                     importedCount++;
                 } catch (e) {
                     console.warn('导入项目失败:', e);
+                    importErrors.push(e);
                 }
+            }
+
+            if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
+                console.warn('静默同步全部导入失败，回滚到本地数据');
+                for (const item of backupItems) {
+                    try {
+                        const { id, ...itemData } = item;
+                        await db.addItem(itemData);
+                    } catch (rollbackErr) {
+                        console.error('回滚失败:', rollbackErr);
+                    }
+                }
+                return { success: false };
             }
 
             // 更新云端同步时间
@@ -1095,9 +1171,15 @@ class SyncManager {
             // 先对云端数据本身去重
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
-
+            let replaceBackup = [];
             if (mergeStrategy === 'replace') {
-                await db.clearAllItems();
+                replaceBackup = await db.getAllItems();
+                try {
+                    await db.clearAllItems();
+                } catch (clearErr) {
+                    console.error('清空本地数据失败:', clearErr);
+                    return { success: false, message: '清空本地数据失败' };
+                }
             }
 
             // 获取本地已有数据（用于与云端数据去重）
@@ -1106,17 +1188,16 @@ class SyncManager {
             let importedCount = 0;
             let mergedCount = 0;
             let skippedCount = 0;
+            const importErrors = [];
             
             for (const item of deduplicatedCloudItems) {
                 try {
                     const { id, ...itemData } = item;
                     
-                    // 检查是否与本地数据重复
                     if (mergeStrategy !== 'replace' && localItems.length > 0) {
                         const duplicateInfo = this.checkDuplicateWithLocal(item, localItems);
                         
                         if (duplicateInfo.isDuplicate) {
-                            // 会议类型：合并参会人员
                             if (item.type === 'meeting' && duplicateInfo.existingItem) {
                                 const existing = duplicateInfo.existingItem;
                                 const cloudAttendees = item.attendees || [];
@@ -1140,7 +1221,21 @@ class SyncManager {
                     importedCount++;
                 } catch (e) {
                     console.warn('导入项目失败:', e);
+                    importErrors.push(e);
                 }
+            }
+
+            if (mergeStrategy === 'replace' && importedCount === 0 && replaceBackup.length > 0 && importErrors.length > 0) {
+                console.warn('replace模式全部导入失败，回滚到本地数据');
+                for (const item of replaceBackup) {
+                    try {
+                        const { id, ...itemData } = item;
+                        await db.addItem(itemData);
+                    } catch (rollbackErr) {
+                        console.error('回滚失败:', rollbackErr);
+                    }
+                }
+                return { success: false, message: '导入失败，已回滚到本地数据' };
             }
 
             this.lastSyncTime = new Date().toISOString();
