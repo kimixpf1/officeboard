@@ -543,3 +543,39 @@
 - 两处修改 Grep 验证已正确持久化
 - toggleCardDetail 方法通过 querySelector 查找元素，不依赖类型判断，DOCUMENT 兼容
 - 无新增诊断错误
+
+## 2026-04-11 2-6 .onerror 统一处理
+
+### 本次目标
+- db.js 中 25 处 IndexedDB .onerror 回调，其中 3 处已有 console.error，22 处为裸 reject(request.error) 无日志
+- 新增 _rejectWithLog 辅助方法，统一加 console.error 日志 + 语义化上下文
+
+### 已完成
+- ✅ 新增 `_rejectWithLog(reject, error, context)` 辅助方法
+- ✅ 22 处裸 reject 全部替换完成（分两个会话，每个会话处理 11 处）
+- ✅ 3 处已有 console.error 保持不变
+- ✅ 1 处 transaction.onabort 补充语义化错误消息
+- ✅ 修复过程中 2 次 SearchReplace 误伤（getItemsByType JSDoc 合并、clearAllData 方法闭合丢失），均已即时修复
+
+### 替换明细（22处）
+- addItem：重复检查失败、写入失败、事务失败
+- updateItem：读取失败、写入失败、事务失败
+- deleteItem：删除失败、事务失败
+- getItem：读取失败
+- getItemByHash：读取失败
+- getAllItems：读取失败
+- getItemsByType：读取失败
+- setSetting：写入失败
+- getSetting：读取失败
+- addDocumentHash：写入失败
+- hasDocumentHash：读取失败
+- exportData：设置读取失败
+- importData：事项导入失败、设置导入失败
+- clearAllData：清空失败
+- clearAllItems：清空失败
+- getAllDocumentHashes：读取失败
+
+### 验证结果
+- Grep 验证：`_rejectWithLog` 出现 23 次（1 定义 + 22 调用）
+- Grep 验证：裸 `reject(request.error)` 仅剩 0 处，`reject(transaction.error)` 仅剩 1 处（已有 console.error）
+- 无新增诊断错误

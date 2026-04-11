@@ -19,6 +19,11 @@ class Database {
         this.initPromise = null;
     }
 
+    _rejectWithLog(reject, error, context) {
+        console.error(`[DB] ${context}:`, error);
+        reject(error);
+    }
+
     normalizeItemForStorage(item) {
         const normalizedItem = { ...item };
 
@@ -147,12 +152,12 @@ class Database {
                 addRequest.onsuccess = () => {
                     resolve(addRequest.result);
                 };
-                addRequest.onerror = () => reject(addRequest.error);
+                addRequest.onerror = () => this._rejectWithLog(reject, addRequest.error, 'addItem写入失败');
             };
 
-            checkRequest.onerror = () => reject(checkRequest.error);
+            checkRequest.onerror = () => this._rejectWithLog(reject, checkRequest.error, 'addItem重复检查失败');
 
-            transaction.onerror = () => reject(transaction.error);
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'addItem事务失败');
         });
     }
 
@@ -183,11 +188,11 @@ class Database {
 
                 const putRequest = store.put(updatedItem);
                 putRequest.onsuccess = () => resolve(updatedItem);
-                putRequest.onerror = () => reject(putRequest.error);
+                putRequest.onerror = () => this._rejectWithLog(reject, putRequest.error, 'updateItem写入失败');
             };
 
-            getRequest.onerror = () => reject(getRequest.error);
-            transaction.onerror = () => reject(transaction.error);
+            getRequest.onerror = () => this._rejectWithLog(reject, getRequest.error, 'updateItem读取失败');
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'updateItem事务失败');
         });
     }
 
@@ -202,8 +207,8 @@ class Database {
             const store = transaction.objectStore(STORES.ITEMS);
             const request = store.delete(id);
             request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-            transaction.onerror = () => reject(transaction.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'deleteItem删除失败');
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'deleteItem事务失败');
         });
     }
 
@@ -218,7 +223,7 @@ class Database {
             const store = transaction.objectStore(STORES.ITEMS);
             const request = store.get(id);
             request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getItem读取失败');
         });
     }
 
@@ -234,7 +239,7 @@ class Database {
             const index = store.index('hash');
             const request = index.get(hash);
             request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getItemByHash读取失败');
         });
     }
 
@@ -249,7 +254,7 @@ class Database {
             const store = transaction.objectStore(STORES.ITEMS);
             const request = store.getAll();
             request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getAllItems读取失败');
         });
     }
 
@@ -265,7 +270,7 @@ class Database {
             const index = store.index('type');
             const request = index.getAll(type);
             request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getItemsByType读取失败');
         });
     }
 
@@ -372,7 +377,7 @@ class Database {
         return new Promise((resolve, reject) => {
             const request = store.put({ key, value, updatedAt: new Date().toISOString() });
             request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'setSetting写入失败');
         });
     }
 
@@ -388,7 +393,7 @@ class Database {
                 const result = request.result;
                 resolve(result ? result.value : null);
             };
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getSetting读取失败');
         });
     }
 
@@ -405,7 +410,7 @@ class Database {
                 createdAt: new Date().toISOString()
             });
             request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'addDocumentHash写入失败');
         });
     }
 
@@ -421,7 +426,7 @@ class Database {
             try {
                 const request = store.get(hash);
                 request.onsuccess = () => resolve(!!request.result);
-                request.onerror = () => reject(request.error);
+                request.onerror = () => this._rejectWithLog(reject, request.error, 'hasDocumentHash读取失败');
             } catch (error) {
                 console.error('hasDocumentHash错误:', error);
                 resolve(false);
@@ -474,7 +479,7 @@ class Database {
             const store = await this.getStore(STORES.SETTINGS);
             const request = store.getAll();
             request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'exportData设置读取失败');
         });
 
         return {
@@ -502,7 +507,7 @@ class Database {
                 await new Promise((resolve, reject) => {
                     const request = store.add(item);
                     request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
+                    request.onerror = () => this._rejectWithLog(reject, request.error, 'importData事项导入失败');
                 });
             }
         }
@@ -514,7 +519,7 @@ class Database {
                 await new Promise((resolve, reject) => {
                     const request = store.put(setting);
                     request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
+                    request.onerror = () => this._rejectWithLog(reject, request.error, 'importData设置导入失败');
                 });
             }
         }
@@ -531,7 +536,7 @@ class Database {
             await new Promise((resolve, reject) => {
                 const request = store.clear();
                 request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
+                request.onerror = () => this._rejectWithLog(reject, request.error, 'clearAllData清空失败');
             });
         }
     }
@@ -544,7 +549,7 @@ class Database {
         return new Promise((resolve, reject) => {
             const request = store.clear();
             request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'clearAllItems清空失败');
         });
     }
 
@@ -556,7 +561,7 @@ class Database {
         return new Promise((resolve, reject) => {
             const request = store.getAll();
             request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getAllDocumentHashes读取失败');
         });
     }
 }

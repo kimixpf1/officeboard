@@ -78,6 +78,12 @@
 - wechat-upload.js setSummary 改为 replaceChildren() + 类型判断，全部 innerHTML 消除
 - 所有内联 onclick 改为 addEventListener
 
+## 已完成的 .onerror 统一处理（2-6）
+- db.js 新增 _rejectWithLog 辅助方法（console.error + reject 一步完成）
+- 22 处裸 reject(request.error) 统一替换为 _rejectWithLog，每处附带语义化上下文（如"addItem写入失败"、"getAllItems读取失败"）
+- 3 处已有 console.error 的 .onerror 保持不变（数据库打开失败、sortItems 获取失败、排序事务失败）
+- 1 处 transaction.onabort 添加语义化错误消息
+
 ## 已完成的事件监听优化（2-5）
 - 全项目 147 处 addEventListener 审查完毕，0 处 removeEventListener
 - createCard() 中 7 处直接按钮监听移除（expand/complete/pin/sink/delete/edit/title），统一到 bindBoardCardEvents() 容器级事件委托
