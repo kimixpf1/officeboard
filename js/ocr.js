@@ -4,6 +4,13 @@
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
  */
 
+function _safeGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
+}
+function _safeSet(key, val) {
+    try { localStorage.setItem(key, val); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
+}
+
 class OCRManager {
     constructor() {
         this.worker = null;
@@ -75,7 +82,7 @@ class OCRManager {
      */
     async setApiKey(key) {
         this.deepseekApiKey = key;
-        localStorage.setItem('deepseekApiKey', key);
+        _safeSet('deepseekApiKey', key);
         // 同时保存到 IndexedDB 以便跨设备同步
         if (typeof db !== 'undefined') {
             await db.setSetting('deepseek_api_key', key);
@@ -88,7 +95,7 @@ class OCRManager {
      */
     getApiKey() {
         if (!this.deepseekApiKey) {
-            this.deepseekApiKey = localStorage.getItem('deepseekApiKey');
+            this.deepseekApiKey = _safeGet('deepseekApiKey');
         }
         return this.deepseekApiKey;
     }
@@ -98,7 +105,7 @@ class OCRManager {
      */
     async setKimiApiKey(key) {
         this.kimiApiKey = key;
-        localStorage.setItem('kimiApiKey', key);
+        _safeSet('kimiApiKey', key);
         // 同时保存到 IndexedDB 以便跨设备同步
         if (typeof db !== 'undefined') {
             await db.setSetting('kimi_api_key', key);
@@ -111,7 +118,7 @@ class OCRManager {
      */
     getKimiApiKey() {
         if (!this.kimiApiKey) {
-            this.kimiApiKey = localStorage.getItem('kimiApiKey');
+            this.kimiApiKey = _safeGet('kimiApiKey');
         }
         return this.kimiApiKey;
     }
@@ -126,11 +133,11 @@ class OCRManager {
 
             if (deepseekKey && !this.deepseekApiKey) {
                 this.deepseekApiKey = deepseekKey;
-                localStorage.setItem('deepseekApiKey', deepseekKey);
+                _safeSet('deepseekApiKey', deepseekKey);
             }
             if (kimiKey && !this.kimiApiKey) {
                 this.kimiApiKey = kimiKey;
-                localStorage.setItem('kimiApiKey', kimiKey);
+                _safeSet('kimiApiKey', kimiKey);
             }
         }
     }

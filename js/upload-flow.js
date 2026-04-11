@@ -209,8 +209,52 @@
         });
     }
 
+    async function compressImageIfNeeded(file, maxSizeMB = 2) {
+        if (!file.type.startsWith('image/')) return file;
+        if (file.size <= maxSizeMB * 1024 * 1024) return file;
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                let { width, height } = img;
+                const maxDim = 2048;
+                if (width > maxDim || height > maxDim) {
+                    const ratio = Math.min(maxDim / width, maxDim / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob && blob.size < file.size) {
+                            const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+                            console.log(`图片压缩: ${(file.size / 1024 / 1024).toFixed(1)}MB → ${(compressed.size / 1024 / 1024).toFixed(1)}MB`);
+                            resolve(compressed);
+                        } else {
+                            resolve(file);
+                        }
+                    },
+                    'image/jpeg',
+                    0.8
+                );
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(file);
+            };
+            img.src = url;
+        });
+    }
+
     window.UploadFlowUtils = {
         buildRecognitionSummaryHtml,
-        showRecognitionPreviewModal
+        showRecognitionPreviewModal,
+        compressImageIfNeeded
     };
 })();

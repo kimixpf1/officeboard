@@ -277,6 +277,29 @@
 ### 遗留事项
 - vendor/docx.8.2.0.umd.cjs（732KB）和 report.js 中的 Word/PDF 导出方法已成为死代码，后续可考虑清理
 
+## 2026-04-11 第1批用户体验保护优化（7项）
+
+### 本次目标
+- 实施第1批优化：用户体验保护（7项），确保所有修改不影响现有功能
+
+### 已完成
+- ✅ 1-1 OCR识别失败重试：ocr.js + upload-flow.js，识别失败时展示重试按钮
+- ✅ 1-2 Loading状态完善：app.js + upload-flow.js + wechat-upload.js，异步操作添加loading防重复点击
+- ✅ 1-3 空 catch 补充友好提示：app.js，2处空catch块补充用户可见错误提示
+- ✅ 1-4 localStorage保护：app.js(SecurityUtils.safeGetStorage) + ocr.js/sync.js/crypto.js(独立_safeGet)，全部调用添加try-catch
+- ✅ 1-5 大图上传压缩：upload-flow.js compressImageIfNeeded（Canvas API，max 2048px，quality 0.8，阈值2MB），双入口共用
+- ✅ 1-6 同步失败用户提示：sync.js 派发 syncError CustomEvent → app.js 监听 showMessage('info')
+- ✅ 1-7 表单防抖：_syncBusy（syncToCloud/syncFromCloud）+ _loginBusy（handleLogin/handleRegister）
+
+### 验证结果
+- 本地 Python http.server 测试：页面加载正常，控制台零错误零警告
+- 代码grep验证：全部12个修改点确认存在
+- UI交互测试：页面结构完整，设置按钮点击弹窗正常
+- 版本号已递增：index.html + wechat-upload.html
+
+### 遗留事项
+- 第2批（代码健康度6项）、第3批（性能微优化4项）、第4批（微信兼容3项）待执行
+
 ## 2026-04-10 第1批安全修复（3项）
 
 ### 背景

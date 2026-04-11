@@ -96,6 +96,18 @@ const SecurityUtils = {
         return Date.now().toString(36) + Math.random().toString(36).slice(2);
     },
 
+    safeGetStorage(key) {
+        try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
+    },
+
+    safeSetStorage(key, value) {
+        try { localStorage.setItem(key, value); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
+    },
+
+    safeRemoveStorage(key) {
+        try { localStorage.removeItem(key); } catch (e) { console.warn('localStorage删除失败:', key, e.message); }
+    },
+
     /**
      * 内容安全策略检查
      */
@@ -560,7 +572,7 @@ class OfficeDashboard {
      */
     loadTools() {
         let tools;
-        const saved = localStorage.getItem('office_tools');
+        const saved = SecurityUtils.safeGetStorage('office_tools');
         if (saved) {
             try {
                 tools = JSON.parse(saved);
@@ -573,7 +585,7 @@ class OfficeDashboard {
         } else {
             tools = this.getDefaultTools();
         }
-        localStorage.setItem('office_tools', JSON.stringify(tools));
+        SecurityUtils.safeSetStorage('office_tools', JSON.stringify(tools));
         this.renderTools(tools);
     }
 
@@ -618,7 +630,7 @@ class OfficeDashboard {
         let currentTools = []; // 缓存当前工具列表
 
         // 获取当前工具列表
-        const saved = localStorage.getItem('office_tools');
+        const saved = SecurityUtils.safeGetStorage('office_tools');
         if (saved) {
             try {
                 currentTools = JSON.parse(saved);
@@ -684,7 +696,7 @@ class OfficeDashboard {
                 
                 // 更新缓存和localStorage
                 currentTools = newOrder;
-                localStorage.setItem('office_tools', JSON.stringify(newOrder));
+                SecurityUtils.safeSetStorage('office_tools', JSON.stringify(newOrder));
             });
         });
     }
@@ -775,7 +787,7 @@ class OfficeDashboard {
      */
     loadLinks() {
         let links;
-        const saved = localStorage.getItem('office_links');
+        const saved = SecurityUtils.safeGetStorage('office_links');
 
         // 检查是否需要更新默认网站
         const needsUpdate = this.checkLinksNeedUpdate(saved);
@@ -823,7 +835,7 @@ class OfficeDashboard {
         }
 
         // 确保数据保存到localStorage
-        localStorage.setItem('office_links', JSON.stringify(links));
+        SecurityUtils.safeSetStorage('office_links', JSON.stringify(links));
         this.renderLinks(links);
     }
 
@@ -1018,7 +1030,7 @@ class OfficeDashboard {
         let currentLinks = []; // 缓存当前链接列表
 
         // 获取当前链接列表
-        const saved = localStorage.getItem('office_links');
+        const saved = SecurityUtils.safeGetStorage('office_links');
         if (saved) {
             try {
                 currentLinks = JSON.parse(saved);
@@ -1077,7 +1089,7 @@ class OfficeDashboard {
                 
                 // 更新缓存和localStorage
                 currentLinks = newOrder;
-                localStorage.setItem('office_links', JSON.stringify(newOrder));
+                SecurityUtils.safeSetStorage('office_links', JSON.stringify(newOrder));
                 this.syncLinksToCloud(newOrder);
             });
         });
@@ -1103,7 +1115,7 @@ class OfficeDashboard {
         
         let links = [];
         try {
-            const saved = localStorage.getItem('office_links');
+            const saved = SecurityUtils.safeGetStorage('office_links');
             if (saved) {
                 const parsed = SecurityUtils.safeJsonParse(saved, []);
                 if (Array.isArray(parsed)) {
@@ -1115,7 +1127,7 @@ class OfficeDashboard {
         }
         
         links.push({ name, url, icon: this.getAutoIcon(url) });
-        localStorage.setItem('office_links', JSON.stringify(links));
+        SecurityUtils.safeSetStorage('office_links', JSON.stringify(links));
         this.renderLinks(links);
         this.showSuccess('网站已添加: ' + name);
 
@@ -1127,7 +1139,7 @@ class OfficeDashboard {
      * 删除网站
      */
     deleteLink(index) {
-        const saved = localStorage.getItem('office_links');
+        const saved = SecurityUtils.safeGetStorage('office_links');
         let links = [];
         
         if (saved) {
@@ -1139,7 +1151,7 @@ class OfficeDashboard {
         }
         
         links.splice(index, 1);
-        localStorage.setItem('office_links', JSON.stringify(links));
+        SecurityUtils.safeSetStorage('office_links', JSON.stringify(links));
         this.renderLinks(links);
 
         // 云端同步
@@ -1152,7 +1164,7 @@ class OfficeDashboard {
     async syncLinksToCloud(links) {
         if (syncManager.isLoggedIn()) {
             // 更新syncData中的links
-            localStorage.setItem('office_links', JSON.stringify(links));
+            SecurityUtils.safeSetStorage('office_links', JSON.stringify(links));
             await syncManager.immediateSyncToCloud();
         }
     }
@@ -1296,7 +1308,7 @@ class OfficeDashboard {
 
         try {
             // 读取用户保存的城市设置，默认苏州
-            const savedCity = localStorage.getItem('office_weather_city');
+            const savedCity = SecurityUtils.safeGetStorage('office_weather_city');
             let cityConfig;
             if (savedCity) {
                 try {
@@ -1445,7 +1457,7 @@ class OfficeDashboard {
         weatherBody.querySelectorAll('.city-btn[data-city]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const city = JSON.parse(btn.dataset.city);
-                localStorage.setItem('office_weather_city', JSON.stringify(city));
+                SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(city));
                 this.fetchWeather(city.lat, city.lon, city.name);
             });
         });
@@ -1464,7 +1476,7 @@ class OfficeDashboard {
                 return;
             }
             const city = { name, lat: parts[0], lon: parts[1] };
-            localStorage.setItem('office_weather_city', JSON.stringify(city));
+            SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(city));
             this.fetchWeather(city.lat, city.lon, city.name);
         });
     }
@@ -1687,7 +1699,7 @@ class OfficeDashboard {
         let contacts = [];
         
         // 从本地加载
-        const saved = localStorage.getItem('office_contacts');
+        const saved = SecurityUtils.safeGetStorage('office_contacts');
         if (saved) {
             try {
                 contacts = JSON.parse(saved);
@@ -1940,7 +1952,7 @@ class OfficeDashboard {
         const status = document.getElementById('contactsStatus');
         
         // 保存到本地
-        localStorage.setItem('office_contacts', JSON.stringify(this.contacts));
+        SecurityUtils.safeSetStorage('office_contacts', JSON.stringify(this.contacts));
 
         // 同步到云端
         if (syncManager.isLoggedIn()) {
@@ -2191,7 +2203,7 @@ class OfficeDashboard {
         if (!memoPanel || !memoToggle || !memoText) return;
 
         // 加载保存的内容
-        const savedMemo = localStorage.getItem('office_memo_content');
+        const savedMemo = SecurityUtils.safeGetStorage('office_memo_content');
         if (savedMemo) {
             memoText.value = savedMemo;
         }
@@ -2225,7 +2237,7 @@ class OfficeDashboard {
 
             saveTimeout = setTimeout(async () => {
                 // 1. 先保存到本地
-                localStorage.setItem('office_memo_content', memoText.value);
+                SecurityUtils.safeSetStorage('office_memo_content', memoText.value);
                 
                 // 2. 检查是否已登录，已登录则同步到云端
                 if (syncManager.isLoggedIn()) {
@@ -2280,7 +2292,7 @@ class OfficeDashboard {
             const newContent = e.detail.content;
             if (newContent !== memoText.value) {
                 memoText.value = newContent;
-                localStorage.setItem('office_memo_content', newContent);
+                SecurityUtils.safeSetStorage('office_memo_content', newContent);
                 if (memoStatus) {
                     memoStatus.textContent = '已从云端同步';
                     setTimeout(() => {
@@ -2882,6 +2894,11 @@ class OfficeDashboard {
                 await syncManager.smartSync();
             }
         });
+
+        document.addEventListener('syncError', (e) => {
+            const msg = e.detail?.message || '同步失败';
+            this.showMessage(msg, 'info');
+        });
     }
 
     /**
@@ -2901,7 +2918,7 @@ class OfficeDashboard {
      * 加载记住的登录信息
      */
     async loadRememberedLogin() {
-        const remembered = localStorage.getItem('office_remembered_login');
+        const remembered = SecurityUtils.safeGetStorage('office_remembered_login');
         if (remembered) {
             try {
                 const data = JSON.parse(remembered);
@@ -2976,6 +2993,7 @@ class OfficeDashboard {
      * 处理登录
      */
     async handleLogin() {
+        if (this._loginBusy) return;
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
         const rememberPassword = document.getElementById('rememberPassword')?.checked;
@@ -2985,6 +3003,7 @@ class OfficeDashboard {
             return;
         }
 
+        this._loginBusy = true;
         this.showLoading(true, '登录中...');
 
         try {
@@ -2998,14 +3017,14 @@ class OfficeDashboard {
                     const encPassword = (typeof cryptoManager !== 'undefined')
                         ? await cryptoManager.encrypt(password)
                         : btoa(password);
-                    localStorage.setItem('office_remembered_login', JSON.stringify({
+                    SecurityUtils.safeSetStorage('office_remembered_login', JSON.stringify({
                         username: username,
                         password: encPassword,
                         enc: (typeof cryptoManager !== 'undefined') ? 'v2' : 'v1',
                         device: navigator.userAgent.slice(0, 50)
                     }));
                 } catch (e) {
-                    localStorage.setItem('office_remembered_login', JSON.stringify({
+                    SecurityUtils.safeSetStorage('office_remembered_login', JSON.stringify({
                         username: username,
                         password: btoa(password),
                         enc: 'v1',
@@ -3013,7 +3032,7 @@ class OfficeDashboard {
                     }));
                 }
             } else {
-                localStorage.removeItem('office_remembered_login');
+                SecurityUtils.safeRemoveStorage('office_remembered_login');
             }
 
             // 登录成功后立即从云端同步数据
@@ -3029,6 +3048,7 @@ class OfficeDashboard {
             this.showError(error.message);
         } finally {
             this.showLoading(false);
+            this._loginBusy = false;
         }
     }
 
@@ -3036,6 +3056,7 @@ class OfficeDashboard {
      * 处理注册
      */
     async handleRegister() {
+        if (this._loginBusy) return;
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
 
@@ -3049,6 +3070,7 @@ class OfficeDashboard {
             return;
         }
 
+        this._loginBusy = true;
         this.showLoading(true, '注册中...');
 
         try {
@@ -3058,6 +3080,7 @@ class OfficeDashboard {
             this.showError(error.message);
         } finally {
             this.showLoading(false);
+            this._loginBusy = false;
         }
     }
 
@@ -3072,9 +3095,9 @@ class OfficeDashboard {
             // 清除本地数据
             await db.clearAllItems();
             // 清除网站和工具数据
-            localStorage.removeItem('office_links');
-            localStorage.removeItem('office_tools');
-            localStorage.removeItem('office_weather_city');
+            SecurityUtils.safeRemoveStorage('office_links');
+            SecurityUtils.safeRemoveStorage('office_tools');
+            SecurityUtils.safeRemoveStorage('office_weather_city');
             // 清除记住的登录信息（退出时不删除，让用户下次还能免输入）
             // localStorage.removeItem('office_remembered_login');
             // 清空登录表单
@@ -3082,7 +3105,7 @@ class OfficeDashboard {
             const passwordInput = document.getElementById('loginPassword');
             const rememberCheckbox = document.getElementById('rememberPassword');
             // 如果记住了密码，保留填充；否则清空
-            const remembered = localStorage.getItem('office_remembered_login');
+            const remembered = SecurityUtils.safeGetStorage('office_remembered_login');
             if (!remembered) {
                 if (usernameInput) usernameInput.value = '';
                 if (passwordInput) passwordInput.value = '';
@@ -3184,6 +3207,8 @@ class OfficeDashboard {
      * 同步到云端
      */
     async syncToCloud() {
+        if (this._syncBusy) return;
+        this._syncBusy = true;
         this.showLoading(true, '正在上传...');
 
         try {
@@ -3197,6 +3222,7 @@ class OfficeDashboard {
             this.showError('上传失败: ' + error.message);
         } finally {
             this.showLoading(false);
+            this._syncBusy = false;
         }
     }
 
@@ -3204,6 +3230,8 @@ class OfficeDashboard {
      * 从云端同步
      */
     async syncFromCloud() {
+        if (this._syncBusy) return;
+        this._syncBusy = true;
         this.showLoading(true, '正在下载...');
 
         try {
@@ -3213,11 +3241,12 @@ class OfficeDashboard {
 
             this.showSuccess(result.message);
             this.updateLoginUI({ isLoggedIn: true, username: syncManager.getUsername() });
-            await this.loadItems(); // 刷新数据
+            await this.loadItems();
         } catch (error) {
             this.showError('下载失败: ' + error.message);
         } finally {
             this.showLoading(false);
+            this._syncBusy = false;
         }
     }
 
@@ -3340,7 +3369,7 @@ class OfficeDashboard {
      */
     setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
+        SecurityUtils.safeSetStorage('theme', theme);
 
         // 更新选中状态
         document.querySelectorAll('.theme-option').forEach(option => {
@@ -3356,7 +3385,7 @@ class OfficeDashboard {
      * 加载保存的主题
      */
     loadTheme() {
-        const savedTheme = localStorage.getItem('theme') || 'default';
+        const savedTheme = SecurityUtils.safeGetStorage('theme') || 'default';
         this.setTheme(savedTheme);
     }
 
@@ -4026,7 +4055,6 @@ class OfficeDashboard {
         const files = event.target.files;
         if (!files || files.length === 0) return;
 
-        // 使用AI状态显示，不阻塞页面
         const statusEl = document.getElementById('aiStatus');
         const showStatus = (msg) => {
             if (statusEl) {
@@ -4040,79 +4068,110 @@ class OfficeDashboard {
             }
         };
 
-        showStatus('准备处理文件...');
+        const uploadBtn = document.getElementById('uploadBtn');
+        if (uploadBtn) uploadBtn.disabled = true;
 
-        // 异步处理，不阻塞UI
-        (async () => {
+        const processFile = async (file) => {
+            showStatus('准备处理文件...');
+
             try {
-                let hasCommittedChanges = false;
-                let shouldRefreshItems = false;
+                const fileType = file.type.toLowerCase();
+                const ext = file.name.split('.').pop().toLowerCase();
+                const isImage = fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext);
+                const isPDF = fileType === 'application/pdf' || ext === 'pdf';
 
-                for (const file of files) {
-                    // 检查文件类型
-                    const fileType = file.type.toLowerCase();
-                    const ext = file.name.split('.').pop().toLowerCase();
-
-                    // 支持图片和PDF
-                    const isImage = fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext);
-                    const isPDF = fileType === 'application/pdf' || ext === 'pdf';
-
-                    if (!isImage && !isPDF) {
-                        this.showError(`不支持的文件类型: ${file.name}，请上传图片(jpg/png)或PDF`);
-                        continue;
-                    }
-
-                    // 进度回调
-                    const progressCallback = (msg) => {
-                        showStatus(msg);
-                    };
-
-                    const itemsSnapshot = await ocrManager.captureItemsSnapshot();
-                    const previewResult = await ocrManager.analyzeDocument(file, progressCallback, { previewOnly: true });
-
-                    if (previewResult.duplicate) {
-                        this.showError(`文件"${file.name}"已被处理过`);
-                        continue;
-                    }
-
-                    const confirmed = await this.showRecognitionPreview(file.name, previewResult);
-                    if (!confirmed) {
-                        await ocrManager.restoreItemsSnapshot(itemsSnapshot);
-                        shouldRefreshItems = true;
-                        showStatus('已取消保存，本次识别结果未写入面板');
-                        continue;
-                    }
-
-                    showStatus('正在保存识别结果...');
-                    const result = await ocrManager.applyRecognitionActionPlan(previewResult.actionPlan, {
-                        text: previewResult.text,
-                        metadata: previewResult.metadata
-                    });
-
-                    hasCommittedChanges = true;
-                    shouldRefreshItems = true;
-                    this.showRecognitionLog('识别结果', this.buildRecognitionSummaryHtml(file.name, result, false));
+                if (!isImage && !isPDF) {
+                    this.showError(`不支持的文件类型: ${file.name}，请上传图片(jpg/png)或PDF`);
+                    return false;
                 }
 
-                // 刷新列表
-                if (shouldRefreshItems) {
-                    await this.loadItems();
+                let processedFile = file;
+                if (isImage && typeof UploadFlowUtils !== 'undefined') {
+                    processedFile = await UploadFlowUtils.compressImageIfNeeded(file);
                 }
 
-                // OCR提取后立即同步到云端
-                if (hasCommittedChanges && syncManager.isLoggedIn()) {
-                    console.log('文件上传后立即同步到云端...');
-                    await syncManager.immediateSyncToCloud();
+                const progressCallback = (msg) => showStatus(msg);
+                const itemsSnapshot = await ocrManager.captureItemsSnapshot();
+                const previewResult = await ocrManager.analyzeDocument(processedFile, progressCallback, { previewOnly: true });
+
+                if (previewResult.duplicate) {
+                    this.showError(`文件"${file.name}"已被处理过`);
+                    return false;
                 }
+
+                const confirmed = await this.showRecognitionPreview(file.name, previewResult);
+                if (!confirmed) {
+                    await ocrManager.restoreItemsSnapshot(itemsSnapshot);
+                    showStatus('已取消保存，本次识别结果未写入面板');
+                    return false;
+                }
+
+                showStatus('正在保存识别结果...');
+                const result = await ocrManager.applyRecognitionActionPlan(previewResult.actionPlan, {
+                    text: previewResult.text,
+                    metadata: previewResult.metadata
+                });
+
+                this.showRecognitionLog('识别结果', this.buildRecognitionSummaryHtml(file.name, result, false));
+                return true;
 
             } catch (error) {
                 console.error('文件处理失败:', error);
-                this.showError('文件处理失败: ' + error.message);
-            } finally {
-                hideStatus();
-                event.target.value = '';
+                this._showRetryableError('文件处理失败: ' + error.message, () => processFile(file));
+                return false;
             }
+        };
+
+        (async () => {
+            let hasCommittedChanges = false;
+            let shouldRefreshItems = false;
+
+            for (const file of files) {
+                const ok = await processFile(file);
+                if (ok) {
+                    hasCommittedChanges = true;
+                    shouldRefreshItems = true;
+                }
+            }
+
+            if (shouldRefreshItems) {
+                await this.loadItems();
+            }
+
+            if (hasCommittedChanges && syncManager.isLoggedIn()) {
+                console.log('文件上传后立即同步到云端...');
+                await syncManager.immediateSyncToCloud();
+            }
+
+            hideStatus();
+            event.target.value = '';
+            if (uploadBtn) uploadBtn.disabled = false;
         })();
+    }
+
+    _showRetryableError(message, retryFn) {
+        const color = { bg: '#ef4444', icon: '❌' };
+        const msgDiv = document.createElement('div');
+        msgDiv.style.cssText = `
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: ${color.bg}; color: white; padding: 12px 24px; border-radius: 8px;
+            z-index: 9999; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            animation: slideDown 0.3s ease; display: flex; align-items: center; gap: 10px;
+            max-width: 90vw;
+        `;
+        msgDiv.innerHTML = `<span style="font-size:16px">${color.icon}</span><span style="flex:1">${message}</span><button style="background:rgba(255,255,255,0.25);color:white;border:1px solid rgba(255,255,255,0.5);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;">重试</button>`;
+        const retryBtn = msgDiv.querySelector('button');
+        retryBtn.addEventListener('click', () => {
+            msgDiv.remove();
+            retryFn();
+        });
+        document.body.appendChild(msgDiv);
+        setTimeout(() => {
+            if (msgDiv.parentNode) {
+                msgDiv.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => msgDiv.remove(), 300);
+            }
+        }, 8000);
     }
 
     /**
@@ -5137,7 +5196,7 @@ class OfficeDashboard {
         } catch (error) {
             console.error('移动失败:', error);
             this.showError('移动失败，请重试');
-            try { await this.loadItems(); } catch(e) {}
+            try { await this.loadItems(); } catch(e) { console.warn('移动后刷新列表失败:', e.message); }
         }
 
         this.draggedItem = null;

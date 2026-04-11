@@ -9,6 +9,13 @@
  * 4. 数据合并：智能合并去重
  */
 
+function _safeGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
+}
+function _safeSet(key, val) {
+    try { localStorage.setItem(key, val); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
+}
+
 class SyncManager {
     constructor() {
         // Supabase配置（anon key 为公开密钥，安全性依赖 RLS 行级安全策略，非 service_role key）
@@ -23,8 +30,8 @@ class SyncManager {
         this.periodicSyncTimer = null;
 
         // 同步状态追踪
-        this.lastLocalModifyTime = localStorage.getItem('lastLocalModifyTime') || null;  // 本地最后修改时间
-        this.lastCloudSyncTime = localStorage.getItem('lastCloudSyncTime') || null;  // 最后成功同步到云端的时间
+        this.lastLocalModifyTime = _safeGet('lastLocalModifyTime') || null;  // 本地最后修改时间
+        this.lastCloudSyncTime = _safeGet('lastCloudSyncTime') || null;  // 最后成功同步到云端的时间
         this.isSyncing = false;  // 是否正在同步中
         
         // 调试：打印启动时的时间戳
@@ -51,7 +58,7 @@ class SyncManager {
      */
     recordLocalModify() {
         this.lastLocalModifyTime = new Date().toISOString();
-        localStorage.setItem('lastLocalModifyTime', this.lastLocalModifyTime);
+        _safeSet('lastLocalModifyTime', this.lastLocalModifyTime);
         console.log('记录本地修改时间:', this.lastLocalModifyTime);
     }
 
@@ -224,11 +231,11 @@ class SyncManager {
                 // 两边都没变化 - 但仍需同步备忘录
                 console.log('数据已是最新，检查备忘录同步...');
                 if (cloudData?.data?.memo !== undefined) {
-                    const localMemo = localStorage.getItem('office_memo_content') || '';
+                    const localMemo = _safeGet('office_memo_content') || '';
                     const cloudMemo = cloudData.data.memo;
                     if (cloudMemo !== localMemo) {
                         console.log('同步备忘录（云端较新）');
-                        localStorage.setItem('office_memo_content', cloudMemo);
+                        _safeSet('office_memo_content', cloudMemo);
                         document.dispatchEvent(new CustomEvent('memoSynced', { 
                             detail: { content: cloudMemo } 
                         }));
@@ -236,11 +243,11 @@ class SyncManager {
                 }
                 // 同步网站
                 if (cloudData?.data?.links !== undefined) {
-                    const localLinks = localStorage.getItem('office_links') || '';
+                    const localLinks = _safeGet('office_links') || '';
                     const cloudLinks = cloudData.data.links;
                     if (cloudLinks !== localLinks) {
                         console.log('同步网站（云端较新）');
-                        localStorage.setItem('office_links', cloudLinks);
+                        _safeSet('office_links', cloudLinks);
                         document.dispatchEvent(new CustomEvent('linksSynced', { 
                             detail: { links: JSON.parse(cloudLinks || '[]') } 
                         }));
@@ -250,6 +257,9 @@ class SyncManager {
 
         } catch (error) {
             console.error('智能同步失败:', error);
+            document.dispatchEvent(new CustomEvent('syncError', {
+                detail: { source: 'smartSync', message: '同步失败，请检查网络连接' }
+            }));
         }
 
         this.isSyncing = false;
@@ -282,9 +292,9 @@ class SyncManager {
                 sync_time: syncTime,
                 items: allItems,
                 settings: settings,
-                memo: localStorage.getItem('office_memo_content') || '',
-                links: localStorage.getItem('office_links') || '',
-                contacts: localStorage.getItem('office_contacts') || '',
+                memo: _safeGet('office_memo_content') || '',
+                links: _safeGet('office_links') || '',
+                contacts: _safeGet('office_contacts') || '',
                 device_info: navigator.userAgent
             };
 
@@ -303,7 +313,7 @@ class SyncManager {
 
             // 更新同步时间
             this.lastCloudSyncTime = syncTime;
-            localStorage.setItem('lastCloudSyncTime', syncTime);
+            _safeSet('lastCloudSyncTime', syncTime);
             
             console.log('上传成功，共', allItems.length, '个事项');
             return { success: true, itemCount: allItems.length };
@@ -326,14 +336,14 @@ class SyncManager {
                 const settings = cloudData.data.settings;
                 if (settings.kimi_api_key) {
                     await db.setSetting('kimi_api_key', settings.kimi_api_key);
-                    localStorage.setItem('kimiApiKey', settings.kimi_api_key);
+                    _safeSet('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
                     await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
                 }
                 if (settings.deepseek_api_key) {
                     await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
-                    localStorage.setItem('deepseekApiKey', settings.deepseek_api_key);
+                    _safeSet('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
@@ -342,7 +352,7 @@ class SyncManager {
 
             // 同步备忘录
             if (cloudData.data.memo !== undefined) {
-                localStorage.setItem('office_memo_content', cloudData.data.memo);
+                _safeSet('office_memo_content', cloudData.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: cloudData.data.memo } 
                 }));
@@ -350,7 +360,7 @@ class SyncManager {
 
             // 同步网站
             if (cloudData.data.links !== undefined) {
-                localStorage.setItem('office_links', cloudData.data.links);
+                _safeSet('office_links', cloudData.data.links);
                 document.dispatchEvent(new CustomEvent('linksSynced', {
                     detail: { links: JSON.parse(cloudData.data.links || '[]') }
                 }));
@@ -358,7 +368,7 @@ class SyncManager {
 
             // 同步通讯录
             if (cloudData.data.contacts !== undefined) {
-                localStorage.setItem('office_contacts', cloudData.data.contacts);
+                _safeSet('office_contacts', cloudData.data.contacts);
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
                     detail: { contacts: JSON.parse(cloudData.data.contacts || '[]') }
                 }));
@@ -386,7 +396,7 @@ class SyncManager {
             // 更新同步时间
             if (cloudData.updated_at) {
                 this.lastCloudSyncTime = cloudData.updated_at;
-                localStorage.setItem('lastCloudSyncTime', cloudData.updated_at);
+                _safeSet('lastCloudSyncTime', cloudData.updated_at);
             }
 
             console.log('下载成功，共', importedCount, '个事项');
@@ -462,10 +472,10 @@ class SyncManager {
             // 同步备忘录（云端优先）
             if (cloudData.data.memo !== undefined) {
                 const cloudMemo = cloudData.data.memo;
-                const localMemo = localStorage.getItem('office_memo_content') || '';
+                const localMemo = _safeGet('office_memo_content') || '';
                 if (cloudMemo !== localMemo) {
                     console.log('同步备忘录（云端版本）');
-                    localStorage.setItem('office_memo_content', cloudMemo);
+                    _safeSet('office_memo_content', cloudMemo);
                     document.dispatchEvent(new CustomEvent('memoSynced', { 
                         detail: { content: cloudMemo } 
                     }));
@@ -475,10 +485,10 @@ class SyncManager {
             // 同步网站（云端优先）
             if (cloudData.data.links !== undefined) {
                 const cloudLinks = cloudData.data.links;
-                const localLinks = localStorage.getItem('office_links') || '';
+                const localLinks = _safeGet('office_links') || '';
                 if (cloudLinks !== localLinks) {
                     console.log('同步网站（云端版本）');
-                    localStorage.setItem('office_links', cloudLinks);
+                    _safeSet('office_links', cloudLinks);
                     document.dispatchEvent(new CustomEvent('linksSynced', {
                         detail: { links: JSON.parse(cloudLinks || '[]') }
                     }));
@@ -488,10 +498,10 @@ class SyncManager {
             // 同步通讯录（云端优先）
             if (cloudData.data.contacts !== undefined) {
                 const cloudContacts = cloudData.data.contacts;
-                const localContacts = localStorage.getItem('office_contacts') || '';
+                const localContacts = _safeGet('office_contacts') || '';
                 if (cloudContacts !== localContacts) {
                     console.log('同步通讯录（云端版本）');
-                    localStorage.setItem('office_contacts', cloudContacts);
+                    _safeSet('office_contacts', cloudContacts);
                     document.dispatchEvent(new CustomEvent('contactsSynced', {
                         detail: { contacts: JSON.parse(cloudContacts || '[]') }
                     }));
@@ -677,14 +687,14 @@ class SyncManager {
                 const settings = data.data.settings;
                 if (settings.kimi_api_key) {
                     await db.setSetting('kimi_api_key', settings.kimi_api_key);
-                    localStorage.setItem('kimiApiKey', settings.kimi_api_key);
+                    _safeSet('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
                     await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
                 }
                 if (settings.deepseek_api_key) {
                     await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
-                    localStorage.setItem('deepseekApiKey', settings.deepseek_api_key);
+                    _safeSet('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
@@ -693,7 +703,7 @@ class SyncManager {
 
             // 同步备忘录
             if (data.data.memo !== undefined) {
-                localStorage.setItem('office_memo_content', data.data.memo);
+                _safeSet('office_memo_content', data.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: data.data.memo } 
                 }));
@@ -701,7 +711,7 @@ class SyncManager {
 
             // 同步网站
             if (data.data.links !== undefined) {
-                localStorage.setItem('office_links', data.data.links);
+                _safeSet('office_links', data.data.links);
                 document.dispatchEvent(new CustomEvent('linksSynced', {
                     detail: { links: JSON.parse(data.data.links || '[]') }
                 }));
@@ -709,7 +719,7 @@ class SyncManager {
 
             // 同步通讯录
             if (data.data.contacts !== undefined) {
-                localStorage.setItem('office_contacts', data.data.contacts);
+                _safeSet('office_contacts', data.data.contacts);
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
                     detail: { contacts: JSON.parse(data.data.contacts || '[]') }
                 }));
@@ -999,8 +1009,8 @@ class SyncManager {
                 sync_time: new Date().toISOString(),
                 items: allItems,
                 settings: settings,
-                memo: localStorage.getItem('office_memo_content') || '',
-                links: localStorage.getItem('office_links') || '',
+                memo: _safeGet('office_memo_content') || '',
+                links: _safeGet('office_links') || '',
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
@@ -1035,7 +1045,7 @@ class SyncManager {
             }
 
             this.lastSyncTime = new Date().toISOString();
-            localStorage.setItem('lastSyncTime', this.lastSyncTime);
+            _safeSet('lastSyncTime', this.lastSyncTime);
             if (progressCallback) progressCallback('上传完成');
             return { success: true, message: `已同步 ${allItems.length} 个事项到云端`, itemCount: allItems.length };
         } catch (error) {
@@ -1092,14 +1102,14 @@ class SyncManager {
                 const settings = data.data.settings;
                 if (settings.kimi_api_key) {
                     await db.setSetting('kimi_api_key', settings.kimi_api_key);
-                    localStorage.setItem('kimiApiKey', settings.kimi_api_key);
+                    _safeSet('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
                     await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
                 }
                 if (settings.deepseek_api_key) {
                     await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
-                    localStorage.setItem('deepseekApiKey', settings.deepseek_api_key);
+                    _safeSet('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
@@ -1109,7 +1119,7 @@ class SyncManager {
 
             // 同步备忘录
             if (data.data.memo !== undefined) {
-                localStorage.setItem('office_memo_content', data.data.memo);
+                _safeSet('office_memo_content', data.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: data.data.memo } 
                 }));
@@ -1118,7 +1128,7 @@ class SyncManager {
 
             // 同步网站
             if (data.data.links !== undefined) {
-                localStorage.setItem('office_links', data.data.links);
+                _safeSet('office_links', data.data.links);
                 document.dispatchEvent(new CustomEvent('linksSynced', {
                     detail: { links: JSON.parse(data.data.links || '[]') }
                 }));
@@ -1127,7 +1137,7 @@ class SyncManager {
 
             // 同步通讯录
             if (data.data.contacts !== undefined) {
-                localStorage.setItem('office_contacts', data.data.contacts);
+                _safeSet('office_contacts', data.data.contacts);
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
                     detail: { contacts: JSON.parse(data.data.contacts || '[]') }
                 }));
@@ -1190,7 +1200,7 @@ class SyncManager {
             }
 
             this.lastSyncTime = new Date().toISOString();
-            localStorage.setItem('lastSyncTime', this.lastSyncTime);
+            _safeSet('lastSyncTime', this.lastSyncTime);
             if (progressCallback) progressCallback('同步完成');
             
             let message = `从云端同步了 ${importedCount} 个事项`;

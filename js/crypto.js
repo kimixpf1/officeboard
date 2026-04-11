@@ -3,6 +3,13 @@
  * 用于本地安全存储敏感信息（如API Key）
  */
 
+function _safeGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { console.warn('localStorage读取失败:', key, e.message); return null; }
+}
+function _safeSet(key, val) {
+    try { localStorage.setItem(key, val); return true; } catch (e) { console.warn('localStorage写入失败:', key, e.message); return false; }
+}
+
 class CryptoManager {
     constructor() {
         this.keyPair = null;
@@ -17,7 +24,7 @@ class CryptoManager {
 
         try {
             // 尝试从本地存储获取密钥
-            const storedKey = localStorage.getItem('crypto_master_key');
+            const storedKey = _safeGet('crypto_master_key');
 
             if (storedKey) {
                 // 恢复密钥
@@ -39,7 +46,7 @@ class CryptoManager {
 
                 // 导出并存储密钥
                 const exported = await crypto.subtle.exportKey('raw', this.masterKey);
-                localStorage.setItem('crypto_master_key', this.arrayBufferToBase64(exported));
+                _safeSet('crypto_master_key', this.arrayBufferToBase64(exported));
             }
 
             return this.masterKey;

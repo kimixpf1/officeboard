@@ -65,9 +65,13 @@
         summaryEl.style.display = 'none';
 
         try {
+            let processedFile = file;
+            if (file.type.startsWith('image/') && typeof UploadFlowUtils !== 'undefined') {
+                processedFile = await UploadFlowUtils.compressImageIfNeeded(file);
+            }
             const progressCallback = (message) => setStatus(message);
             const itemsSnapshot = await ocrManager.captureItemsSnapshot();
-            const previewResult = await ocrManager.analyzeDocument(file, progressCallback, { previewOnly: true });
+            const previewResult = await ocrManager.analyzeDocument(processedFile, progressCallback, { previewOnly: true });
             const confirmed = await showPreviewDialog(file.name, previewResult);
 
             if (!confirmed) {
@@ -95,7 +99,18 @@
             }, 1200);
         } catch (error) {
             setStatus(`识别失败：${error.message}`);
-            setSummary(`<div>识别失败：${error.message}</div>`, true);
+            setSummary(
+                `<div style="color:#dc2626;font-weight:600;margin-bottom:8px;">识别失败：${error.message}</div>
+                 <button id="retryUploadBtn" style="background:#3b82f6;color:white;border:none;padding:8px 20px;border-radius:6px;font-size:14px;cursor:pointer;">重新识别</button>`,
+                true
+            );
+            const retryBtn = document.getElementById('retryUploadBtn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    retryBtn.remove();
+                    processFile(file);
+                });
+            }
         } finally {
             fileInput.value = '';
             if (!shouldStayDisabled) {
