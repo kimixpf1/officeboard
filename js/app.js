@@ -5433,15 +5433,14 @@ class OfficeDashboard {
      */
     formatDeadline(deadline, completed = false) {
         if (!deadline) {
-            return completed ? '<span class="status-completed">✓ 已完成</span>' : '';
+            return completed ? '✓ 已完成' : '';
         }
         
         const date = new Date(deadline);
-        const now = new Date();
         const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
         
         if (completed) {
-            return `<span class="status-completed">✓ 已完成</span> ${dateStr}`;
+            return `✓ 已完成 ${dateStr}`;
         }
         
         return `${dateStr}截止`;
