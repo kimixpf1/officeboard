@@ -20,7 +20,7 @@
 | 2-2 | console 清理 | 全部 JS | 285处→全部console.log清零，保留console.error/warn | ✅ 完成 |
 | 2-3 | 错误边界增强 | app.js | 123处catch块审查分类；10处静默吞错/空catch添加console.warn；空catch清零 | ✅ 完成 |
 | 2-4 | 定时器清理 | app.js, sync.js | 29处审查；1处setInterval未保存ID已修复（会议自动完成）；其余均为一次性/已有清理 | ✅ 完成 |
-| 2-5 | 事件监听优化 | app.js | 133处 addEventListener 检查是否有重复绑定或未解绑 | ⬜ 待做 |
+| 2-5 | 事件监听优化 | app.js | 147处addEventListener审查；createCard 7处直接绑定移除，统一到 bindBoardCardEvents 事件委托；DOCUMENT类型纳入委托覆盖 | ✅ 完成 |
 | 2-6 | .onerror 统一处理 | db.js | 28处 .onerror 统一为可追踪的错误处理 | ⬜ 待做 |
 
 ### 🟢 第3批：性能微优化（4项）

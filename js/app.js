@@ -2573,7 +2573,7 @@ class OfficeDashboard {
     }
 
     bindBoardCardEvents() {
-        [ITEM_TYPES.TODO, ITEM_TYPES.MEETING].forEach(type => {
+        [ITEM_TYPES.TODO, ITEM_TYPES.MEETING, ITEM_TYPES.DOCUMENT].forEach(type => {
             const container = document.getElementById(type + 'List');
             if (!container) return;
 
@@ -5261,37 +5261,6 @@ class OfficeDashboard {
 
         card.addEventListener('dragstart', (e) => this.handleDragStart(e, item));
         card.addEventListener('dragend', (e) => this.handleDragEnd(e));
-
-        expandBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isExpanded = cardDetail.style.display !== 'none';
-            cardDetail.style.display = isExpanded ? 'none' : 'block';
-            this.updateExpandButtonIcon(expandBtn, !isExpanded);
-        });
-        completeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleItemComplete(item.id, item.type, !item.completed);
-        });
-        pinBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleItemPin(item.id, item.type, !item.pinned);
-        });
-        sinkBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleItemSink(item.id, item.type, !item.sunk);
-        });
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.showDeleteConfirm(item.id);
-        });
-        editBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.editItem(item);
-        });
-        const titleEl = cardMain.querySelector('.card-title');
-        if (titleEl) {
-            titleEl.addEventListener('click', () => this.editItem(item));
-        }
 
         return card;
     }

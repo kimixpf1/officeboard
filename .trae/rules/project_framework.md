@@ -77,3 +77,9 @@
 - calendar.js 新增 createCalendarItem 辅助函数（返回 DOM 元素），renderWeekView/renderMonthView 改为纯 DOM 构建
 - wechat-upload.js setSummary 改为 replaceChildren() + 类型判断，全部 innerHTML 消除
 - 所有内联 onclick 改为 addEventListener
+
+## 已完成的事件监听优化（2-5）
+- 全项目 147 处 addEventListener 审查完毕，0 处 removeEventListener
+- createCard() 中 7 处直接按钮监听移除（expand/complete/pin/sink/delete/edit/title），统一到 bindBoardCardEvents() 容器级事件委托
+- bindBoardCardEvents 覆盖范围从 TODO+MEETING 扩展为 TODO+MEETING+DOCUMENT
+- 仅保留 dragstart/dragend 为直接绑定（拖拽事件不适合委托）

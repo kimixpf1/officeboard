@@ -512,3 +512,34 @@
 
 ### 遗留事项
 - 2-5 事件监听优化、2-6 .onerror 统一处理待执行
+
+## 2026-04-11 2-5 事件监听优化
+
+### 本次目标
+- 审查全项目 addEventListener 使用情况，识别重复绑定和未解绑风险
+
+### 审查范围
+- 全项目 147 处 addEventListener，0 处 removeEventListener
+- app.js：136处，upload-flow.js：4处，wechat-upload.js：4处，calendar.js：2处，ocr.js：1处
+
+### 分类结论
+- A类（~80处）：一次性 init 绑定（bindEvents/bindSyncEvents/bindTransferEvents）→ 安全
+- B类（~40处）：create* 方法中创建新 DOM 后绑定，配合 replaceChildren → 安全
+- C类（~10处）：临时弹窗绑定，用完即 remove → 安全
+- D类（关键问题）：createCard() 与 bindBoardCardEvents() 的重复监听
+
+### 核心问题
+- createCard() 为每个卡片的 expand/complete/pin/sink/delete/edit/title 按钮直接绑定 click（带 stopPropagation）
+- bindBoardCardEvents() 又在容器级用事件委托监听完全相同的操作
+- 虽然 stopPropagation 阻止了当前双重触发，但属于冗余脆弱设计
+- bindBoardCardEvents 只覆盖 TODO 和 MEETING，DOCUMENT 类型缺失事件委托
+
+### 已完成
+- 移除 createCard() 中 7 处直接按钮 addEventListener（expand/complete/pin/sink/delete/edit/title），仅保留 dragstart/dragend
+- 统一到 bindBoardCardEvents() 容器级事件委托
+- 扩展 bindBoardCardEvents 覆盖 DOCUMENT 类型
+
+### 验证结果
+- 两处修改 Grep 验证已正确持久化
+- toggleCardDetail 方法通过 querySelector 查找元素，不依赖类型判断，DOCUMENT 兼容
+- 无新增诊断错误
