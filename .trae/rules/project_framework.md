@@ -90,6 +90,13 @@
 - bindBoardCardEvents 覆盖范围从 TODO+MEETING 扩展为 TODO+MEETING+DOCUMENT
 - 仅保留 dragstart/dragend 为直接绑定（拖拽事件不适合委托）
 
+## 已完成的跨设备同步数据丢失修复
+- sync.js smartSync：首次同步（lastSyncTime为null）走合并逻辑，防止新设备空数据覆盖云端
+- sync.js uploadToCloud：空数据保护，本地为空时先检查云端是否有数据，有则改为下载而非上传空数据
+- sync.js uploadToCloud：upsert后用 .select('updated_at').maybeSingle() 读取云端实际 updated_at，解决 Supabase BEFORE UPDATE 触发器用 NOW() 覆盖代码传入值导致的时间戳漂移
+- sync.js downloadFromCloud / mergeData / silentSyncFromCloud / syncFromCloud：全部 clearAllItems 调用前加备份（getAllItems），失败时回滚
+- sync.js clearAllItems：全部加 try-catch，清空失败时中止操作而非继续导入
+
 ## 已完成的微信兼容优化（4-1 + 4-3）
 - wechat-upload.js 成功返回改用 location.replace() 替代 location.href，防止微信返回键死循环
 - wechat-upload.js init 增加 IndexedDB/FileReader 可用性检测，不支持时禁用按钮并提示

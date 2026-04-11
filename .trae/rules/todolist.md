@@ -66,3 +66,10 @@
 - 持续渐进优化，确保所有功能稳定运行
 - 优化方案写入todolist.md并实时更新，避免遗忘
 - 规则文件维护坚持不重不漏原则
+
+## 已完成（2026-04-11 跨设备同步修复）
+- ✅ smartSync首次同步走合并逻辑
+- ✅ uploadToCloud空数据保护
+- ✅ uploadToCloud读取云端实际updated_at
+- ✅ downloadFromCloud/mergeData/silentSyncFromCloud/syncFromCloud全部加备份回滚
+- ✅ clearAllItems全部加try-catch

@@ -544,6 +544,34 @@
 - toggleCardDetail 方法通过 querySelector 查找元素，不依赖类型判断，DOCUMENT 兼容
 - 无新增诊断错误
 
+## 2026-04-11 跨设备同步数据丢失修复
+
+### 问题描述
+- 用户反馈：电脑端新增事项后，手机端登录发现没有那条，再回电脑端看也没了
+- 根本原因：跨设备同步存在5个联动缺陷导致数据丢失
+
+### 根因分析（5个缺陷）
+1. smartSync 在 lastSyncTime 为 null 时（新设备/清缓存后）走"无更新"分支跳过同步，导致云端数据未拉取
+2. uploadToCloud 不检查本地是否为空就上传，空数组直接覆盖云端所有数据
+3. uploadToCloud 传入的 updated_at 被 Supabase BEFORE UPDATE 触发器用 NOW() 覆盖，导致时间戳漂移
+4. downloadFromCloud/mergeData/syncFromCloud 中 clearAllItems 无备份，清空后导入失败则数据全丢
+5. silentSyncFromCloud 同样缺少备份回滚保护
+
+### 修复方案（5项）
+1. smartSync：lastSyncTime 为 null 时走合并逻辑而非跳过
+2. uploadToCloud：空数据保护，本地为空时先检查云端，有数据则改为下载
+3. uploadToCloud：upsert 后 .select('updated_at').maybeSingle() 读取云端实际时间戳
+4. downloadFromCloud / mergeData / silentSyncFromCloud / syncFromCloud：全部加备份回滚
+5. 全部 clearAllItems 加 try-catch，清空失败时中止操作
+
+### 验证结果
+- node -c sync.js 语法检查通过
+- 4处 clearAllItems 全部有备份+try-catch 保护
+- git push 成功（commit 027d7ef）
+
+### 提交记录
+- `027d7ef` fix: 修复跨设备同步数据丢失问题（5项关键修复）
+
 ## 2026-04-11 2-6 .onerror 统一处理
 
 ### 本次目标
