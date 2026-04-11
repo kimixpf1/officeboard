@@ -272,48 +272,27 @@ class OfficeDashboard {
      */
     async init() {
         try {
-            console.log('开始初始化应用...');
-
-            // 初始化数据库
-            console.log('正在连接本地数据库...');
             await db.init();
-            console.log('数据库连接成功');
 
-            // 等待同步管理器初始化完成
             await syncManager.waitForInit();
-            
-            // 调试：打印登录状态
-            console.log('[app.init] 登录状态:', syncManager.isLoggedIn());
 
-            // 检查登录状态，未登录则清除本地数据
             if (!syncManager.isLoggedIn()) {
-                console.log('未登录，清除本地数据...');
                 await db.clearAllItems();
             }
 
-            // 绑定事件（先绑定事件，让用户可以交互）
-            console.log('绑定用户交互事件...');
             this.initializeRecurringFieldOptions();
             this.bindEvents();
 
-            // 加载数据
-            console.log('加载本地数据...');
             await this.loadItems();
 
-            // 初始化日期选择器
             this.initDatePicker();
 
-            // 更新日期显示
             this.updateDateDisplay();
 
-            // 延迟检查API Key（避免阻塞界面）
             setTimeout(() => {
                 this.checkApiKey().catch(err => {
-                    console.log('API Key检查失败（不影响基本功能）:', err);
                 });
             }, 1000);
-
-            console.log('智能工作面板初始化完成');
 
             // 启动会议自动完成检查
             this.startMeetingAutoCompleteCheck();
@@ -346,19 +325,21 @@ class OfficeDashboard {
         if (kimiKey) configured.push('Kimi');
         if (deepseekKey) configured.push('DeepSeek');
 
-        if (configured.length > 0) {
-            statusEl.className = 'api-key-status configured';
-            statusEl.innerHTML = `
-                <span class="status-icon">✅</span>
-                <span class="status-text">AI增强已启用（${configured.join(' + ')}）</span>
-            `;
-        } else {
-            statusEl.className = 'api-key-status';
-            statusEl.innerHTML = `
-                <span class="status-icon">○</span>
-                <span class="status-text">使用基础解析</span>
-            `;
-        }
+        statusEl.className = configured.length > 0
+            ? 'api-key-status configured'
+            : 'api-key-status';
+
+        const icon = document.createElement('span');
+        icon.className = 'status-icon';
+        icon.textContent = configured.length > 0 ? '✅' : '○';
+
+        const text = document.createElement('span');
+        text.className = 'status-text';
+        text.textContent = configured.length > 0
+            ? `AI增强已启用（${configured.join(' + ')}）`
+            : '使用基础解析';
+
+        statusEl.replaceChildren(icon, text);
     }
 
     /**
@@ -596,21 +577,43 @@ class OfficeDashboard {
         const grid = document.getElementById('toolsGrid');
         if (!grid) return;
 
-        grid.innerHTML = tools.map((tool, index) => {
-            const isLink = tool.type === 'link';
-            const tag = isLink ? 'a' : 'div';
-            const linkAttrs = isLink ? `href="${tool.url}" target="_blank"` : `data-tool="${tool.id}"`;
-            
-            return `
-                <${tag} ${linkAttrs} class="tool-item" data-index="${index}" draggable="true">
-                    <span class="tool-drag" title="拖动排序">⋮⋮</span>
-                    <div class="tool-icon ${tool.iconClass}">${tool.icon}</div>
-                    <span>${tool.name}</span>
-                </${tag}>
-            `;
-        }).join('');
+        const fragment = document.createDocumentFragment();
 
-        // 绑定工具点击事件（非链接类型）
+        tools.forEach((tool, index) => {
+            const isLink = tool.type === 'link';
+            const item = document.createElement(isLink ? 'a' : 'div');
+            item.className = 'tool-item';
+            item.dataset.index = String(index);
+            item.draggable = true;
+
+            if (isLink) {
+                if (SecurityUtils.isValidUrl(tool.url)) {
+                    item.href = tool.url;
+                }
+                item.target = '_blank';
+                item.rel = 'noopener noreferrer';
+            } else {
+                item.dataset.tool = tool.id;
+            }
+
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'tool-drag';
+            dragHandle.title = '拖动排序';
+            dragHandle.textContent = '⋮⋮';
+
+            const icon = document.createElement('div');
+            icon.className = `tool-icon ${tool.iconClass}`;
+            icon.textContent = tool.icon;
+
+            const name = document.createElement('span');
+            name.textContent = tool.name;
+
+            item.append(dragHandle, icon, name);
+            fragment.appendChild(item);
+        });
+
+        grid.replaceChildren(fragment);
+
         grid.querySelectorAll('.tool-item[data-tool]').forEach(item => {
             item.addEventListener('click', () => {
                 const toolId = item.dataset.tool;
@@ -618,7 +621,6 @@ class OfficeDashboard {
             });
         });
 
-        // 初始化拖动排序
         this.initToolsDragSort(grid);
     }
 
@@ -989,27 +991,53 @@ class OfficeDashboard {
         const linksList = document.getElementById('linksList');
         if (!linksList) return;
 
-        linksList.innerHTML = links.map((link, index) => `
-            <div class="link-item" data-index="${index}" data-url="${SecurityUtils.escapeHtml(link.url)}" draggable="true">
-                <span class="link-drag" title="拖动排序">⋮⋮</span>
-                <span class="link-icon">${link.icon || '🔗'}</span>
-                <span class="link-name">${SecurityUtils.escapeHtml(link.name)}</span>
-                <button type="button" class="link-delete" data-index="${index}" title="删除">×</button>
-            </div>
-        `).join('');
+        const fragment = document.createDocumentFragment();
 
-        // 绑定点击跳转事件
+        links.forEach((link, index) => {
+            const item = document.createElement('div');
+            item.className = 'link-item';
+            item.dataset.index = String(index);
+            item.draggable = true;
+            if (SecurityUtils.isValidUrl(link.url)) {
+                item.dataset.url = link.url;
+            }
+
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'link-drag';
+            dragHandle.title = '拖动排序';
+            dragHandle.textContent = '⋮⋮';
+
+            const iconEl = document.createElement('span');
+            iconEl.className = 'link-icon';
+            iconEl.textContent = link.icon || '🔗';
+
+            const nameEl = document.createElement('span');
+            nameEl.className = 'link-name';
+            nameEl.textContent = link.name || '';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'link-delete';
+            deleteBtn.dataset.index = String(index);
+            deleteBtn.title = '删除';
+            deleteBtn.textContent = '×';
+
+            item.append(dragHandle, iconEl, nameEl, deleteBtn);
+            fragment.appendChild(item);
+        });
+
+        linksList.replaceChildren(fragment);
+
         linksList.querySelectorAll('.link-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 if (e.target.classList.contains('link-delete') || e.target.classList.contains('link-drag')) return;
                 const url = item.dataset.url;
                 if (url) {
-                    window.open(url, '_blank');
+                    window.open(url, '_blank', 'noopener');
                 }
             });
         });
 
-        // 绑定删除事件
         linksList.querySelectorAll('.link-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1018,7 +1046,6 @@ class OfficeDashboard {
             });
         });
 
-        // 绑定拖动排序事件
         this.initLinksDragSort(linksList);
     }
 
@@ -1304,7 +1331,7 @@ class OfficeDashboard {
         const weatherBody = document.getElementById('weatherBody');
         if (!weatherBody) return;
 
-        weatherBody.innerHTML = '<div class="weather-loading">正在获取天气...</div>';
+        this.renderWeatherStatus('正在获取天气...', 'weather-loading');
 
         try {
             // 读取用户保存的城市设置，默认苏州
@@ -1324,8 +1351,19 @@ class OfficeDashboard {
             await this.fetchWeather(cityConfig.lat, cityConfig.lon, cityConfig.name);
         } catch (e) {
             console.error('天气加载失败:', e);
-            weatherBody.innerHTML = '<div class="weather-loading">获取天气失败</div>';
+            this.renderWeatherStatus('获取天气失败', 'weather-loading');
         }
+    }
+
+    renderWeatherStatus(message, className = 'weather-loading') {
+        const weatherBody = document.getElementById('weatherBody');
+        if (!weatherBody) return;
+
+        const statusEl = document.createElement('div');
+        statusEl.className = className;
+        statusEl.textContent = message;
+
+        weatherBody.replaceChildren(statusEl);
     }
 
     /**
@@ -1333,9 +1371,10 @@ class OfficeDashboard {
      */
     async fetchWeather(lat, lon, cityName) {
         const weatherBody = document.getElementById('weatherBody');
+        if (!weatherBody) return;
         
         try {
-            weatherBody.innerHTML = '<div class="weather-loading">正在加载天气...</div>';
+            this.renderWeatherStatus('正在加载天气...', 'weather-loading');
             
             // 使用 open-meteo 免费天气API（无需key，国内可访问）
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FShanghai&forecast_days=3`;
@@ -1366,54 +1405,110 @@ class OfficeDashboard {
             const code = data.current.weather_code;
             const desc = this.getWeatherDesc(code);
             const icon = this.getWeatherIcon(code);
+
+            const weatherInfo = document.createElement('div');
+            weatherInfo.className = 'weather-info';
+
+            const iconEl = document.createElement('div');
+            iconEl.className = 'weather-icon';
+            iconEl.textContent = icon;
+
+            const tempEl = document.createElement('div');
+            tempEl.className = 'weather-temp';
+            tempEl.textContent = `${temp}°C`;
+
+            const descEl = document.createElement('div');
+            descEl.className = 'weather-desc';
+            descEl.textContent = desc;
+
+            const detailEl = document.createElement('div');
+            detailEl.className = 'weather-detail';
+            detailEl.textContent = `湿度 ${humidity}% · 风速 ${windSpeed}km/h`;
+
+            const cityRowEl = document.createElement('div');
+            cityRowEl.className = 'weather-city-row';
+
+            const cityEl = document.createElement('span');
+            cityEl.className = 'weather-city';
+            cityEl.textContent = cityName;
+
+            const changeBtn = document.createElement('button');
+            changeBtn.type = 'button';
+            changeBtn.className = 'weather-change-btn';
+            changeBtn.id = 'weatherChangeBtn';
+            changeBtn.textContent = '切换城市';
+            changeBtn.addEventListener('click', () => {
+                this.showCitySelector();
+            });
+
+            cityRowEl.append(cityEl, changeBtn);
+            weatherInfo.append(iconEl, tempEl, descEl, detailEl, cityRowEl);
             
-            // 未来3天预报
-            let forecastHtml = '';
             if (data.daily && data.daily.time) {
-                forecastHtml = '<div class="weather-forecast">';
+                const forecastEl = document.createElement('div');
+                forecastEl.className = 'weather-forecast';
                 const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
                 for (let i = 0; i < Math.min(3, data.daily.time.length); i++) {
                     const d = new Date(data.daily.time[i]);
                     const dayName = i === 0 ? '今天' : dayNames[d.getDay()];
                     const maxT = Math.round(data.daily.temperature_2m_max[i]);
                     const minT = Math.round(data.daily.temperature_2m_min[i]);
                     const dayIcon = this.getWeatherIcon(data.daily.weather_code[i]);
-                    forecastHtml += `<div class="forecast-day"><span class="forecast-name">${dayName}</span><span class="forecast-icon">${dayIcon}</span><span class="forecast-temp">${minT}~${maxT}°</span></div>`;
+
+                    const forecastDayEl = document.createElement('div');
+                    forecastDayEl.className = 'forecast-day';
+
+                    const forecastNameEl = document.createElement('span');
+                    forecastNameEl.className = 'forecast-name';
+                    forecastNameEl.textContent = dayName;
+
+                    const forecastIconEl = document.createElement('span');
+                    forecastIconEl.className = 'forecast-icon';
+                    forecastIconEl.textContent = dayIcon;
+
+                    const forecastTempEl = document.createElement('span');
+                    forecastTempEl.className = 'forecast-temp';
+                    forecastTempEl.textContent = `${minT}~${maxT}°`;
+
+                    forecastDayEl.append(forecastNameEl, forecastIconEl, forecastTempEl);
+                    forecastEl.appendChild(forecastDayEl);
                 }
-                forecastHtml += '</div>';
+
+                weatherInfo.appendChild(forecastEl);
             }
             
-            weatherBody.innerHTML = `
-                <div class="weather-info">
-                    <div class="weather-icon">${icon}</div>
-                    <div class="weather-temp">${temp}°C</div>
-                    <div class="weather-desc">${desc}</div>
-                    <div class="weather-detail">湿度 ${humidity}% · 风速 ${windSpeed}km/h</div>
-                    <div class="weather-city-row">
-                        <span class="weather-city">${cityName}</span>
-                        <button type="button" class="weather-change-btn" id="weatherChangeBtn">切换城市</button>
-                    </div>
-                    ${forecastHtml}
-                </div>
-            `;
-            
-            // 绑定切换城市按钮
-            document.getElementById('weatherChangeBtn')?.addEventListener('click', () => {
-                this.showCitySelector();
-            });
+            weatherBody.replaceChildren(weatherInfo);
         } catch (e) {
             console.error('天气获取失败:', e);
-            weatherBody.innerHTML = `
-                <div class="weather-error">
-                    <div>🌤️</div>
-                    <div>天气获取失败</div>
-                    <div style="font-size:12px;color:var(--gray-500);margin-top:8px;">请检查网络连接</div>
-                    <button type="button" class="weather-change-btn" id="weatherRetryChangeBtn" style="margin-top:10px;">切换城市</button>
-                </div>
-            `;
-            document.getElementById('weatherRetryChangeBtn')?.addEventListener('click', () => {
+
+            const errorEl = document.createElement('div');
+            errorEl.className = 'weather-error';
+
+            const iconEl = document.createElement('div');
+            iconEl.textContent = '🌤️';
+
+            const titleEl = document.createElement('div');
+            titleEl.textContent = '天气获取失败';
+
+            const detailEl = document.createElement('div');
+            detailEl.style.fontSize = '12px';
+            detailEl.style.color = 'var(--gray-500)';
+            detailEl.style.marginTop = '8px';
+            detailEl.textContent = '请检查网络连接';
+
+            const retryBtn = document.createElement('button');
+            retryBtn.type = 'button';
+            retryBtn.className = 'weather-change-btn';
+            retryBtn.id = 'weatherRetryChangeBtn';
+            retryBtn.style.marginTop = '10px';
+            retryBtn.textContent = '切换城市';
+            retryBtn.addEventListener('click', () => {
                 this.showCitySelector();
             });
+
+            errorEl.append(iconEl, titleEl, detailEl, retryBtn);
+            weatherBody.replaceChildren(errorEl);
         }
     }
 
@@ -1439,33 +1534,61 @@ class OfficeDashboard {
             { name: '昆山', lat: 31.3848, lon: 120.9580 }
         ];
 
-        weatherBody.innerHTML = `
-            <div class="city-selector">
-                <div class="city-selector-title">选择城市</div>
-                <div class="city-grid">
-                    ${cities.map(c => `<button type="button" class="city-btn" data-city='${JSON.stringify(c)}'>${c.name}</button>`).join('')}
-                </div>
-                <div class="city-custom" style="margin-top:10px;">
-                    <input type="text" id="customCityName" placeholder="自定义城市名" style="width:45%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;">
-                    <input type="text" id="customCityCoords" placeholder="纬度,经度" style="width:35%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;">
-                    <button type="button" class="city-btn" id="customCityBtn" style="width:18%;">确定</button>
-                </div>
-            </div>
-        `;
+        const selectorEl = document.createElement('div');
+        selectorEl.className = 'city-selector';
 
-        // 绑定城市按钮
-        weatherBody.querySelectorAll('.city-btn[data-city]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const city = JSON.parse(btn.dataset.city);
+        const titleEl = document.createElement('div');
+        titleEl.className = 'city-selector-title';
+        titleEl.textContent = '选择城市';
+
+        const gridEl = document.createElement('div');
+        gridEl.className = 'city-grid';
+
+        cities.forEach(city => {
+            const cityBtn = document.createElement('button');
+            cityBtn.type = 'button';
+            cityBtn.className = 'city-btn';
+            cityBtn.textContent = city.name;
+            cityBtn.addEventListener('click', () => {
                 SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(city));
                 this.fetchWeather(city.lat, city.lon, city.name);
             });
+            gridEl.appendChild(cityBtn);
         });
 
-        // 自定义城市
-        document.getElementById('customCityBtn')?.addEventListener('click', () => {
-            const name = document.getElementById('customCityName')?.value.trim();
-            const coords = document.getElementById('customCityCoords')?.value.trim();
+        const customEl = document.createElement('div');
+        customEl.className = 'city-custom';
+        customEl.style.marginTop = '10px';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.id = 'customCityName';
+        nameInput.placeholder = '自定义城市名';
+        nameInput.style.width = '45%';
+        nameInput.style.padding = '6px 8px';
+        nameInput.style.border = '1px solid var(--border-color)';
+        nameInput.style.borderRadius = '4px';
+        nameInput.style.fontSize = '12px';
+
+        const coordsInput = document.createElement('input');
+        coordsInput.type = 'text';
+        coordsInput.id = 'customCityCoords';
+        coordsInput.placeholder = '纬度,经度';
+        coordsInput.style.width = '35%';
+        coordsInput.style.padding = '6px 8px';
+        coordsInput.style.border = '1px solid var(--border-color)';
+        coordsInput.style.borderRadius = '4px';
+        coordsInput.style.fontSize = '12px';
+
+        const customBtn = document.createElement('button');
+        customBtn.type = 'button';
+        customBtn.className = 'city-btn';
+        customBtn.id = 'customCityBtn';
+        customBtn.style.width = '18%';
+        customBtn.textContent = '确定';
+        customBtn.addEventListener('click', () => {
+            const name = nameInput.value.trim();
+            const coords = coordsInput.value.trim();
             if (!name || !coords) {
                 this.showError('请输入城市名和坐标（纬度,经度）');
                 return;
@@ -1479,6 +1602,10 @@ class OfficeDashboard {
             SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(city));
             this.fetchWeather(city.lat, city.lon, city.name);
         });
+
+        customEl.append(nameInput, coordsInput, customBtn);
+        selectorEl.append(titleEl, gridEl, customEl);
+        weatherBody.replaceChildren(selectorEl);
     }
 
     /**
@@ -1685,7 +1812,7 @@ class OfficeDashboard {
             const newContacts = e.detail.contacts;
             this.contacts = newContacts;
             this.renderContacts(newContacts);
-            console.log('通讯录已从云端同步');
+
         });
 
         // 初始加载
@@ -1717,6 +1844,108 @@ class OfficeDashboard {
         this.renderContacts(contacts);
     }
 
+    appendHighlightedText(container, text, keyword) {
+        const normalizedText = typeof text === 'string' ? text : String(text || '');
+        if (!keyword) {
+            container.textContent = normalizedText;
+            return;
+        }
+
+        const regex = new RegExp(`(${this.escapeRegex(keyword)})`, 'gi');
+        const parts = normalizedText.split(regex);
+        const fragment = document.createDocumentFragment();
+
+        parts.forEach(part => {
+            if (!part) return;
+
+            if (part.toLowerCase() === keyword.toLowerCase()) {
+                const mark = document.createElement('mark');
+                mark.className = 'highlight';
+                mark.textContent = part;
+                fragment.appendChild(mark);
+            } else {
+                fragment.appendChild(document.createTextNode(part));
+            }
+        });
+
+        container.replaceChildren(fragment);
+    }
+
+    createContactItem(contact, index, highlightKeyword) {
+        const contactId = String(contact.id || index);
+        const isMatched = highlightKeyword && (
+            contact.name.toLowerCase().includes(highlightKeyword.toLowerCase()) ||
+            contact.phone.includes(highlightKeyword) ||
+            (contact.phone.length >= 4 && contact.phone.slice(-4) === highlightKeyword)
+        );
+
+        const item = document.createElement('div');
+        item.className = `contact-item${isMatched ? ' matched' : ''}`;
+        item.dataset.index = String(index);
+        item.dataset.id = contactId;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'contact-checkbox';
+        checkbox.dataset.id = contactId;
+        checkbox.addEventListener('change', () => {
+            this.updateBatchDeleteButton();
+        });
+
+        const info = document.createElement('div');
+        info.className = 'contact-info';
+        info.addEventListener('dblclick', () => {
+            this.editContact(contactId);
+        });
+
+        const name = document.createElement('div');
+        name.className = 'contact-name';
+        this.appendHighlightedText(name, contact.name, highlightKeyword);
+
+        const phone = document.createElement('div');
+        phone.className = 'contact-phone';
+        this.appendHighlightedText(phone, contact.phone, highlightKeyword);
+
+        info.append(name, phone);
+
+        const actions = document.createElement('div');
+        actions.className = 'contact-actions';
+
+        const callBtn = document.createElement('button');
+        callBtn.type = 'button';
+        callBtn.className = 'contact-call';
+        callBtn.textContent = '拨打';
+        callBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.open(`tel:${contact.phone}`);
+        });
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'contact-edit';
+        editBtn.dataset.id = contactId;
+        editBtn.textContent = '编辑';
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.editContact(contactId);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'contact-delete';
+        deleteBtn.dataset.id = contactId;
+        deleteBtn.textContent = '删除';
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.deleteContact(contactId);
+        });
+
+        actions.append(callBtn, editBtn, deleteBtn);
+        item.append(checkbox, info, actions);
+
+        return item;
+    }
+
     /**
      * 渲染通讯录列表
      * @param {Array} contacts - 联系人数组
@@ -1728,80 +1957,32 @@ class OfficeDashboard {
 
         if (!list) return;
 
-        // 未登录提示
         if (!syncManager.isLoggedIn()) {
-            list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">请登录后使用通讯录功能</div>';
+            const loginTip = document.createElement('div');
+            loginTip.style.textAlign = 'center';
+            loginTip.style.color = 'var(--text-secondary)';
+            loginTip.style.padding = '20px';
+            loginTip.textContent = '请登录后使用通讯录功能';
+            list.replaceChildren(loginTip);
             if (status) status.textContent = '请登录';
             return;
         }
 
         if (contacts.length === 0) {
-            list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">暂无联系人</div>';
-            // 隐藏批量删除按钮
+            const emptyTip = document.createElement('div');
+            emptyTip.style.textAlign = 'center';
+            emptyTip.style.color = 'var(--text-secondary)';
+            emptyTip.style.padding = '20px';
+            emptyTip.textContent = '暂无联系人';
+            list.replaceChildren(emptyTip);
             const batchDeleteBtn = document.getElementById('batchDeleteContactsBtn');
             if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
         } else {
-            list.innerHTML = contacts.map((contact, index) => {
-                // 高亮匹配的文字
-                let displayName = this.escapeHtml(contact.name);
-                let displayPhone = this.escapeHtml(contact.phone);
-
-                if (highlightKeyword) {
-                    // 高亮姓名中的匹配文字
-                    const nameRegex = new RegExp(`(${this.escapeRegex(highlightKeyword)})`, 'gi');
-                    displayName = displayName.replace(nameRegex, '<mark class="highlight">$1</mark>');
-
-                    // 高亮电话号码中的匹配文字（包括后四位）
-                    const phoneRegex = new RegExp(`(${this.escapeRegex(highlightKeyword)})`, 'gi');
-                    displayPhone = displayPhone.replace(phoneRegex, '<mark class="highlight">$1</mark>');
-                }
-
-                const isMatched = highlightKeyword && (
-                    contact.name.toLowerCase().includes(highlightKeyword.toLowerCase()) ||
-                    contact.phone.includes(highlightKeyword) ||
-                    (contact.phone.length >= 4 && contact.phone.slice(-4) === highlightKeyword)
-                );
-
-                return `
-                    <div class="contact-item ${isMatched ? 'matched' : ''}" data-index="${index}" data-id="${contact.id || index}">
-                        <input type="checkbox" class="contact-checkbox" data-id="${contact.id || index}">
-                        <div class="contact-info" ondblclick="app.editContact('${contact.id || index}')">
-                            <div class="contact-name">${displayName}</div>
-                            <div class="contact-phone">${displayPhone}</div>
-                        </div>
-                        <div class="contact-actions">
-                            <button type="button" class="contact-call" onclick="window.open('tel:${contact.phone}')">拨打</button>
-                            <button type="button" class="contact-edit" data-id="${contact.id || index}">编辑</button>
-                            <button type="button" class="contact-delete" data-id="${contact.id || index}">删除</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            // 绑定删除事件
-            list.querySelectorAll('.contact-delete').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const id = e.target.dataset.id;
-                    this.deleteContact(id);
-                });
+            const fragment = document.createDocumentFragment();
+            contacts.forEach((contact, index) => {
+                fragment.appendChild(this.createContactItem(contact, index, highlightKeyword));
             });
-
-            // 绑定编辑事件
-            list.querySelectorAll('.contact-edit').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const id = e.target.dataset.id;
-                    this.editContact(id);
-                });
-            });
-
-            // 绑定复选框事件
-            list.querySelectorAll('.contact-checkbox').forEach(cb => {
-                cb.addEventListener('change', () => {
-                    this.updateBatchDeleteButton();
-                });
-            });
+            list.replaceChildren(fragment);
         }
 
         if (status) {
@@ -1959,7 +2140,7 @@ class OfficeDashboard {
             if (status) status.textContent = '同步中...';
             try {
                 await syncManager.immediateSyncToCloud();
-                console.log('通讯录已同步到云端');
+
                 if (status) status.textContent = `共 ${this.contacts.length} 个联系人 ✓ 已同步`;
                 setTimeout(() => {
                     if (status) status.textContent = `共 ${this.contacts.length} 个联系人`;
@@ -2094,7 +2275,7 @@ class OfficeDashboard {
             if (nameColIndex === -1) nameColIndex = 0;
             if (phoneColIndex === -1) phoneColIndex = 1;
 
-            console.log(`识别到姓名列: ${nameColIndex}, 电话列: ${phoneColIndex}`);
+
 
             // 解析数据
             let imported = 0;
@@ -2140,7 +2321,7 @@ class OfficeDashboard {
                     }
                 } else if (name || phone) {
                     skipped++;
-                    console.log(`跳过无效行 ${i}: 姓名="${name}", 电话="${phone}"`);
+
                 }
             }
 
@@ -2252,7 +2433,7 @@ class OfficeDashboard {
                                 memoStatus.textContent = '已同步到云端';
                                 memoStatus.classList.remove('saving');
                             }
-                            console.log('备忘录已同步到云端');
+
                         } else {
                             if (memoStatus) {
                                 memoStatus.textContent = '同步失败';
@@ -2497,82 +2678,260 @@ class OfficeDashboard {
             };
     }
 
+    createRecurringFormGroup({ id, labelText, inputElement, hidden = false }) {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+        if (id) {
+            group.id = id;
+        }
+        if (hidden) {
+            group.style.display = 'none';
+        }
+
+        if (labelText) {
+            const label = document.createElement('label');
+            label.textContent = labelText;
+            group.appendChild(label);
+        }
+
+        if (inputElement) {
+            group.appendChild(inputElement);
+        }
+
+        return group;
+    }
+
+    createRecurringInput(type, options = {}) {
+        const input = document.createElement('input');
+        input.type = type;
+
+        if (options.id) input.id = options.id;
+        if (options.min !== undefined) input.min = String(options.min);
+        if (options.max !== undefined) input.max = String(options.max);
+        if (options.value !== undefined) input.value = String(options.value);
+        if (options.placeholder) input.placeholder = options.placeholder;
+        if (options.checked) input.checked = true;
+
+        return input;
+    }
+
+    createRecurringSelect(id) {
+        const select = document.createElement('select');
+        select.id = id;
+        return select;
+    }
+
+    createRecurringCheckboxGroup(checkboxId, text, checked = false) {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.className = 'checkbox-label';
+
+        const input = this.createRecurringInput('checkbox', {
+            id: checkboxId,
+            checked
+        });
+        const span = document.createElement('span');
+        span.textContent = text;
+
+        label.append(input, span);
+        group.appendChild(label);
+
+        return group;
+    }
+
+    _createSvgIcon(pathsData) {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        pathsData.forEach(({ tag, attrs }) => {
+            const el = document.createElementNS(svgNS, tag);
+            Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+            svg.appendChild(el);
+        });
+        return svg;
+    }
+
+    createPinIcon(filled) {
+        return this._createSvgIcon([
+            { tag: 'path', attrs: { d: 'M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z', fill: filled ? 'currentColor' : 'none' } }
+        ]);
+    }
+
+    createSinkIcon(filled) {
+        return this._createSvgIcon([
+            { tag: 'path', attrs: { d: 'M12 22L8.91 15.74L2 14.73L7 9.86L5.82 2.98L12 6.23L18.18 2.98L17 9.86L22 14.73L15.09 15.74L12 22Z', fill: filled ? 'currentColor' : 'none' } }
+        ]);
+    }
+
+    createCheckIcon() {
+        return this._createSvgIcon([
+            { tag: 'polyline', attrs: { points: '20 6 9 17 4 12' } }
+        ]);
+    }
+
+    createEditIcon() {
+        return this._createSvgIcon([
+            { tag: 'path', attrs: { d: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' } },
+            { tag: 'path', attrs: { d: 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' } }
+        ]);
+    }
+
+    createDeleteIcon() {
+        return this._createSvgIcon([
+            { tag: 'polyline', attrs: { points: '3 6 5 6 21 6' } },
+            { tag: 'path', attrs: { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' } }
+        ]);
+    }
+
+    createExpandIcon(isExpanded) {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+
+        const polyline = document.createElementNS(svgNS, 'polyline');
+        polyline.setAttribute('points', isExpanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9');
+        svg.appendChild(polyline);
+
+        return svg;
+    }
+
+    updateExpandButtonIcon(expandBtn, isExpanded) {
+        if (!expandBtn) return;
+        expandBtn.replaceChildren(this.createExpandIcon(isExpanded));
+    }
+
     renderRecurringFieldTemplate(isDocument = false) {
         const config = this.getRecurringFieldConfig(isDocument);
         const container = document.getElementById(config.containerId);
         if (!container) return;
 
-        container.innerHTML = `
-            <div class="form-row">
-                <div class="form-group">
-                    <label>周期类型</label>
-                    <select id="${config.typeSelectId}"></select>
-                </div>
-                <div class="form-group">
-                    <label>生成数量</label>
-                    <input type="number" id="${config.countId}" min="1" max="365" value="20" placeholder="生成几个">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group" id="${config.monthlyDateGroupId}">
-                    <label>每月几号</label>
-                    <input type="number" id="${config.dayInputId}" min="1" max="31" placeholder="如：13">
-                </div>
-                <div class="form-group" id="${config.nthWorkDayGroupId}" style="display:none;">
-                    <label>第几个工作日</label>
-                    <input type="number" id="${config.nthWorkDayInputId}" min="1" max="23" placeholder="如：1=第一个工作日">
-                </div>
-                <div class="form-group" id="${config.weekDayGroupId}" style="display:none;">
-                    <label>每周几</label>
-                    <select id="${config.weekDaySelectId}"></select>
-                </div>
-                <div class="form-group" id="${config.weekMultiGroupId}" style="display:none;">
-                    <label>选择星期（可多选）</label>
-                    <div class="weekday-checkboxes" id="${config.weekDaysContainerId}"></div>
-                </div>
-                <div class="form-group" id="${config.monthlyWeekDayGroupId}" style="display:none;">
-                    <div class="form-row">
-                        <div style="flex:1;">
-                            <label>第几个</label>
-                            <select id="${config.nthWeekSelectId}"></select>
-                        </div>
-                        <div style="flex:1;">
-                            <label>星期</label>
-                            <select id="${config.monthlyWeekDayValueId}"></select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="${config.skipWeekendsId}" checked>
-                    <span>跳过周末（顺延到下一工作日）</span>
-                </label>
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="${config.skipHolidaysId}">
-                    <span>跳过法定节假日（顺延到下一工作日）</span>
-                </label>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>生效开始日期</label>
-                    <input type="date" id="${config.startDateId}" placeholder="留空则从今天开始">
-                </div>
-                <div class="form-group">
-                    <label>生效结束日期</label>
-                    <input type="date" id="${config.endDateId}" placeholder="留空则不限结束">
-                </div>
-            </div>
-        `;
+        const typeRow = document.createElement('div');
+        typeRow.className = 'form-row';
+        typeRow.append(
+            this.createRecurringFormGroup({
+                labelText: '周期类型',
+                inputElement: this.createRecurringSelect(config.typeSelectId)
+            }),
+            this.createRecurringFormGroup({
+                labelText: '生成数量',
+                inputElement: this.createRecurringInput('number', {
+                    id: config.countId,
+                    min: 1,
+                    max: 365,
+                    value: 20,
+                    placeholder: '生成几个'
+                })
+            })
+        );
+
+        const monthlyWeekRow = document.createElement('div');
+        monthlyWeekRow.className = 'form-row';
+
+        const nthWeekWrapper = document.createElement('div');
+        nthWeekWrapper.style.flex = '1';
+        const nthWeekLabel = document.createElement('label');
+        nthWeekLabel.textContent = '第几个';
+        nthWeekWrapper.append(nthWeekLabel, this.createRecurringSelect(config.nthWeekSelectId));
+
+        const weekDayValueWrapper = document.createElement('div');
+        weekDayValueWrapper.style.flex = '1';
+        const weekDayValueLabel = document.createElement('label');
+        weekDayValueLabel.textContent = '星期';
+        weekDayValueWrapper.append(weekDayValueLabel, this.createRecurringSelect(config.monthlyWeekDayValueId));
+
+        monthlyWeekRow.append(nthWeekWrapper, weekDayValueWrapper);
+
+        const optionsRow = document.createElement('div');
+        optionsRow.className = 'form-row';
+        optionsRow.append(
+            this.createRecurringFormGroup({
+                id: config.monthlyDateGroupId,
+                labelText: '每月几号',
+                inputElement: this.createRecurringInput('number', {
+                    id: config.dayInputId,
+                    min: 1,
+                    max: 31,
+                    placeholder: '如：13'
+                })
+            }),
+            this.createRecurringFormGroup({
+                id: config.nthWorkDayGroupId,
+                labelText: '第几个工作日',
+                hidden: true,
+                inputElement: this.createRecurringInput('number', {
+                    id: config.nthWorkDayInputId,
+                    min: 1,
+                    max: 23,
+                    placeholder: '如：1=第一个工作日'
+                })
+            }),
+            this.createRecurringFormGroup({
+                id: config.weekDayGroupId,
+                labelText: '每周几',
+                hidden: true,
+                inputElement: this.createRecurringSelect(config.weekDaySelectId)
+            }),
+            this.createRecurringFormGroup({
+                id: config.weekMultiGroupId,
+                labelText: '选择星期（可多选）',
+                hidden: true,
+                inputElement: Object.assign(document.createElement('div'), {
+                    className: 'weekday-checkboxes',
+                    id: config.weekDaysContainerId
+                })
+            }),
+            this.createRecurringFormGroup({
+                id: config.monthlyWeekDayGroupId,
+                hidden: true,
+                inputElement: monthlyWeekRow
+            })
+        );
+
+        const dateRow = document.createElement('div');
+        dateRow.className = 'form-row';
+        dateRow.append(
+            this.createRecurringFormGroup({
+                labelText: '生效开始日期',
+                inputElement: this.createRecurringInput('date', {
+                    id: config.startDateId,
+                    placeholder: '留空则从今天开始'
+                })
+            }),
+            this.createRecurringFormGroup({
+                labelText: '生效结束日期',
+                inputElement: this.createRecurringInput('date', {
+                    id: config.endDateId,
+                    placeholder: '留空则不限结束'
+                })
+            })
+        );
+
+        container.replaceChildren(
+            typeRow,
+            optionsRow,
+            this.createRecurringCheckboxGroup(config.skipWeekendsId, '跳过周末（顺延到下一工作日）', true),
+            this.createRecurringCheckboxGroup(config.skipHolidaysId, '跳过法定节假日（顺延到下一工作日）'),
+            dateRow
+        );
     }
 
     renderRecurringTypeSelect(selectId) {
         const select = document.getElementById(selectId);
         if (!select) return;
 
-        select.innerHTML = '';
+        select.replaceChildren();
         const fragment = document.createDocumentFragment();
 
         RECURRING_OPTION_GROUPS.forEach(group => {
@@ -2596,7 +2955,7 @@ class OfficeDashboard {
         const select = document.getElementById(selectId);
         if (!select) return;
 
-        select.innerHTML = '';
+        select.replaceChildren();
         const fragment = document.createDocumentFragment();
 
         options.forEach(option => {
@@ -2613,7 +2972,8 @@ class OfficeDashboard {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        container.innerHTML = '';
+        container.replaceChildren();
+
         const fragment = document.createDocumentFragment();
 
         WEEKDAY_OPTIONS.forEach(option => {
@@ -2642,9 +3002,7 @@ class OfficeDashboard {
 
         const isExpanded = detailEl.style.display !== 'none';
         detailEl.style.display = isExpanded ? 'none' : 'block';
-        expandBtn.innerHTML = isExpanded
-            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
-            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+        this.updateExpandButtonIcon(expandBtn, !isExpanded);
     }
 
     /**
@@ -2727,12 +3085,12 @@ class OfficeDashboard {
                     completedAt: new Date().toISOString(),
                             ...(type === ITEM_TYPES.DOCUMENT && { progress: DOCUMENT_PROGRESS.COMPLETED })
                 });
-                console.log('更新事项成功:', itemId, result);
+
             }
 
             // 强制重新加载数据
             await this.loadItems();
-            console.log('loadItems完成');
+
 
             // 同步到云端
             if (syncManager.isLoggedIn()) {
@@ -2787,7 +3145,7 @@ class OfficeDashboard {
                 const item = await db.getItem(itemId);
                 if (item) deletedItems.push(item);
                 await db.deleteItem(itemId);
-                console.log('删除事项成功:', itemId);
+
             }
 
             // 保存历史用于撤回
@@ -2797,7 +3155,7 @@ class OfficeDashboard {
 
             // 强制重新加载数据
             await this.loadItems();
-            console.log('loadItems完成');
+
 
             // 同步到云端
             if (syncManager.isLoggedIn()) {
@@ -2871,7 +3229,7 @@ class OfficeDashboard {
 
         // 监听云端数据同步完成（恢复会话时）
         document.addEventListener('syncDataLoaded', async (e) => {
-            console.log('收到云端数据同步通知:', e.detail);
+
             await this.loadItems(); // 刷新数据
             if (e.detail.syncResult && e.detail.syncResult.itemCount > 0) {
                 this.showSuccess(`已从云端同步 ${e.detail.syncResult.itemCount} 个事项`);
@@ -2881,7 +3239,7 @@ class OfficeDashboard {
         // 监听远程数据变更（实时同步）
         // 使用智能同步，自动判断同步方向
         document.addEventListener('syncRemoteDataChanged', async (e) => {
-            console.log('收到远程数据变更通知，执行智能同步...');
+
             if (!syncManager.isSyncing) {
                 await syncManager.smartSync();
             }
@@ -2890,7 +3248,7 @@ class OfficeDashboard {
         // 页面获得焦点时执行智能同步
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible' && syncManager.isLoggedIn()) {
-                console.log('页面获得焦点，执行智能同步...');
+
                 await syncManager.smartSync();
             }
         });
@@ -3040,7 +3398,7 @@ class OfficeDashboard {
             const syncResult = await syncManager.syncFromCloud((progress) => {
                 this.updateLoadingText(progress);
             });
-            console.log('同步结果:', syncResult);
+
 
             await this.loadItems(); // 刷新数据
             this.showSuccess(`登录成功！${syncResult.message}`);
@@ -3430,19 +3788,21 @@ class OfficeDashboard {
         if (kimiKey) configured.push('Kimi');
         if (deepseekKey) configured.push('DeepSeek');
 
-        if (configured.length > 0) {
-            statusEl.className = 'api-key-status configured';
-            statusEl.innerHTML = `
-                <span class="status-icon">✅</span>
-                <span class="status-text">AI增强已启用（${configured.join(' + ')}）</span>
-            `;
-        } else {
-            statusEl.className = 'api-key-status';
-            statusEl.innerHTML = `
-                <span class="status-icon">○</span>
-                <span class="status-text">使用基础解析</span>
-            `;
-        }
+        statusEl.className = configured.length > 0
+            ? 'api-key-status configured'
+            : 'api-key-status';
+
+        const icon = document.createElement('span');
+        icon.className = 'status-icon';
+        icon.textContent = configured.length > 0 ? '✅' : '○';
+
+        const text = document.createElement('span');
+        text.className = 'status-text';
+        text.textContent = configured.length > 0
+            ? `AI增强已启用（${configured.join(' + ')}）`
+            : '使用基础解析';
+
+        statusEl.replaceChildren(icon, text);
     }
 
     /**
@@ -3637,7 +3997,7 @@ class OfficeDashboard {
                         showStatus('正在使用AI解析...');
                         result = await kimiAPI.parseNaturalLanguage(text);
                     } catch (error) {
-                        console.log('Kimi API解析失败，使用内置解析:', error.message);
+
                     }
                 }
 
@@ -3665,7 +4025,7 @@ class OfficeDashboard {
                     return;
                 }
 
-                console.log('AI解析结果:', result);
+
 
                 // 根据操作类型执行不同的处理
                 const action = result.action || 'add';
@@ -3694,7 +4054,7 @@ class OfficeDashboard {
 
                 // 立即同步到云端
                 if (syncManager.isLoggedIn()) {
-                    console.log('自然语言解析后立即同步到云端...');
+
                     await syncManager.immediateSyncToCloud();
                 }
 
@@ -3713,7 +4073,7 @@ class OfficeDashboard {
     async executeAIAddCommand(result) {
         // 处理周期性任务
         if (result.isRecurring && result.recurringRule) {
-            console.log('检测到周期性任务:', result.recurringRule);
+
 
             const recurringItems = this.generateRecurringItems(
                 { type: result.type, ...result.data, source: 'nlp' },
@@ -3721,7 +4081,7 @@ class OfficeDashboard {
                 result.recurringCount || 6
             );
 
-            console.log('生成的周期性任务数量:', recurringItems.length);
+
 
             for (const item of recurringItems) {
                 await db.addItem(item);
@@ -3965,36 +4325,65 @@ class OfficeDashboard {
             const modal = document.createElement('div');
             modal.className = 'modal active';
             modal.id = 'aiCommandConfirmModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 500px;">
-                    <div class="modal-header">
-                        <h3>${title}</h3>
-                    </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 15px; color: #666;">${description}</p>
-                        <div style="max-height: 200px; overflow-y: auto; background: var(--card-bg, #f8fafc); padding: 10px; border-radius: 6px; margin-bottom: 15px;">
-                            <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
-                                ${items.map(item => `<li style="margin: 4px 0;">${this.escapeHtml(item)}</li>`).join('')}
-                            </ul>
-                            ${suffix ? `<p style="margin-top: 10px; color: #999; font-size: 12px;">${suffix}</p>` : ''}
-                        </div>
-                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <button type="button" class="btn-secondary" id="aiCmdCancel" style="padding: 8px 20px;">取消</button>
-                            <button type="button" class="btn-danger" id="aiCmdConfirm" style="padding: 8px 20px; background: #ef4444; color: white;">确认执行</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
 
-            document.getElementById('aiCmdCancel').onclick = () => {
-                modal.remove();
-                resolve(false);
-            };
-            document.getElementById('aiCmdConfirm').onclick = () => {
-                modal.remove();
-                resolve(true);
-            };
+            const modalContent = document.createElement('div');
+            modalContent.className = 'modal-content';
+            modalContent.style.maxWidth = '500px';
+
+            const modalHeader = document.createElement('div');
+            modalHeader.className = 'modal-header';
+            const h3 = document.createElement('h3');
+            h3.textContent = title;
+            modalHeader.appendChild(h3);
+
+            const modalBody = document.createElement('div');
+            modalBody.className = 'modal-body';
+            modalBody.style.padding = '20px';
+
+            const descP = document.createElement('p');
+            descP.style.cssText = 'margin-bottom: 15px; color: #666;';
+            descP.textContent = description;
+            modalBody.appendChild(descP);
+
+            const listContainer = document.createElement('div');
+            listContainer.style.cssText = 'max-height: 200px; overflow-y: auto; background: var(--card-bg, #f8fafc); padding: 10px; border-radius: 6px; margin-bottom: 15px;';
+            const ul = document.createElement('ul');
+            ul.style.cssText = 'margin: 0; padding-left: 20px; font-size: 14px;';
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.style.margin = '4px 0';
+                li.textContent = item;
+                ul.appendChild(li);
+            });
+            listContainer.appendChild(ul);
+            if (suffix) {
+                const suffixP = document.createElement('p');
+                suffixP.style.cssText = 'margin-top: 10px; color: #999; font-size: 12px;';
+                suffixP.textContent = suffix;
+                listContainer.appendChild(suffixP);
+            }
+            modalBody.appendChild(listContainer);
+
+            const btnRow = document.createElement('div');
+            btnRow.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'btn-secondary';
+            cancelBtn.style.padding = '8px 20px';
+            cancelBtn.textContent = '取消';
+            cancelBtn.addEventListener('click', () => { modal.remove(); resolve(false); });
+            const confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.className = 'btn-danger';
+            confirmBtn.style.cssText = 'padding: 8px 20px; background: #ef4444; color: white;';
+            confirmBtn.textContent = '确认执行';
+            confirmBtn.addEventListener('click', () => { modal.remove(); resolve(true); });
+            btnRow.append(cancelBtn, confirmBtn);
+            modalBody.appendChild(btnRow);
+
+            modalContent.append(modalHeader, modalBody);
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
         });
     }
 
@@ -4005,46 +4394,82 @@ class OfficeDashboard {
         const modal = document.createElement('div');
         modal.className = 'modal active';
         modal.id = 'queryResultModal';
-        
         const typeLabels = { todo: '待办', meeting: '会议', document: '办文' };
-        
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
-                <div class="modal-header">
-                    <h3>查询结果</h3>
-                    <button type="button" class="modal-close" onclick="this.closest('.modal').remove()">×</button>
-                </div>
-                <div class="modal-body" style="padding: 20px;">
-                    <p style="margin-bottom: 15px; color: #666;">找到 ${items.length} 个匹配的事项：</p>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                            <thead>
-                                <tr style="background: var(--header-bg, #f1f5f9);">
-                                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">类型</th>
-                                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">标题</th>
-                                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">日期</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${items.map(item => {
-                                    const date = item.deadline?.split('T')[0] || item.date || item.docStartDate || '-';
-                                    return `
-                                        <tr>
-                                            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${typeLabels[item.type] || item.type}</td>
-                                            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${this.escapeHtml(item.title || '未命名')}</td>
-                                            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${date}</td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div style="margin-top: 15px; text-align: right;">
-                        <button type="button" class="btn-primary" onclick="this.closest('.modal').remove()" style="padding: 8px 20px;">关闭</button>
-                    </div>
-                </div>
-            </div>
-        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.maxWidth = '600px';
+
+        const modalHeader = document.createElement('div');
+        modalHeader.className = 'modal-header';
+        const h3 = document.createElement('h3');
+        h3.textContent = '查询结果';
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'modal-close';
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => modal.remove());
+        modalHeader.append(h3, closeBtn);
+
+        const modalBody = document.createElement('div');
+        modalBody.className = 'modal-body';
+        modalBody.style.padding = '20px';
+
+        const countP = document.createElement('p');
+        countP.style.cssText = 'margin-bottom: 15px; color: #666;';
+        countP.textContent = `找到 ${items.length} 个匹配的事项：`;
+        modalBody.appendChild(countP);
+
+        const tableWrap = document.createElement('div');
+        tableWrap.style.cssText = 'max-height: 400px; overflow-y: auto;';
+        const table = document.createElement('table');
+        table.style.cssText = 'width: 100%; border-collapse: collapse; font-size: 14px;';
+
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        headRow.style.background = 'var(--header-bg, #f1f5f9)';
+        ['类型', '标题', '日期'].forEach(text => {
+            const th = document.createElement('th');
+            th.style.cssText = 'padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);';
+            th.textContent = text;
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        items.forEach(item => {
+            const date = item.deadline?.split('T')[0] || item.date || item.docStartDate || '-';
+            const tr = document.createElement('tr');
+            const tdType = document.createElement('td');
+            tdType.style.cssText = 'padding: 8px; border-bottom: 1px solid var(--border-color);';
+            tdType.textContent = typeLabels[item.type] || item.type;
+            const tdTitle = document.createElement('td');
+            tdTitle.style.cssText = 'padding: 8px; border-bottom: 1px solid var(--border-color);';
+            tdTitle.textContent = item.title || '未命名';
+            const tdDate = document.createElement('td');
+            tdDate.style.cssText = 'padding: 8px; border-bottom: 1px solid var(--border-color);';
+            tdDate.textContent = date;
+            tr.append(tdType, tdTitle, tdDate);
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
+        modalBody.appendChild(tableWrap);
+
+        const footerDiv = document.createElement('div');
+        footerDiv.style.cssText = 'margin-top: 15px; text-align: right;';
+        const footerBtn = document.createElement('button');
+        footerBtn.type = 'button';
+        footerBtn.className = 'btn-primary';
+        footerBtn.style.padding = '8px 20px';
+        footerBtn.textContent = '关闭';
+        footerBtn.addEventListener('click', () => modal.remove());
+        footerDiv.appendChild(footerBtn);
+        modalBody.appendChild(footerDiv);
+
+        modalContent.append(modalHeader, modalBody);
+        modal.appendChild(modalContent);
         document.body.appendChild(modal);
     }
 
@@ -4139,7 +4564,7 @@ class OfficeDashboard {
             }
 
             if (hasCommittedChanges && syncManager.isLoggedIn()) {
-                console.log('文件上传后立即同步到云端...');
+
                 await syncManager.immediateSyncToCloud();
             }
 
@@ -4159,12 +4584,20 @@ class OfficeDashboard {
             animation: slideDown 0.3s ease; display: flex; align-items: center; gap: 10px;
             max-width: 90vw;
         `;
-        msgDiv.innerHTML = `<span style="font-size:16px">${color.icon}</span><span style="flex:1">${message}</span><button style="background:rgba(255,255,255,0.25);color:white;border:1px solid rgba(255,255,255,0.5);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;">重试</button>`;
-        const retryBtn = msgDiv.querySelector('button');
+        const iconSpan = document.createElement('span');
+        iconSpan.style.fontSize = '16px';
+        iconSpan.textContent = color.icon;
+        const textSpan = document.createElement('span');
+        textSpan.style.flex = '1';
+        textSpan.textContent = message;
+        const retryBtn = document.createElement('button');
+        retryBtn.style.cssText = 'background:rgba(255,255,255,0.25);color:white;border:1px solid rgba(255,255,255,0.5);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;';
+        retryBtn.textContent = '重试';
         retryBtn.addEventListener('click', () => {
             msgDiv.remove();
             retryFn();
         });
+        msgDiv.append(iconSpan, textSpan, retryBtn);
         document.body.appendChild(msgDiv);
         setTimeout(() => {
             if (msgDiv.parentNode) {
@@ -4295,12 +4728,7 @@ class OfficeDashboard {
         const allItems = await db.getAllItems();
 
         // 调试：打印所有数据的 order 值
-        console.log('[loadItems] 从 IndexedDB 加载数据, 总数:', allItems.length);
-        console.log('[loadItems] 所有数据的 order:', allItems.map(m => ({
-            title: m.title,
-            order: m.order,
-            type: m.type
-        })));
+
 
         // 日视图：按选中日期筛选
         let items = allItems;
@@ -4533,20 +4961,14 @@ class OfficeDashboard {
         }
 
         // 清空容器
-        container.innerHTML = '';
+        container.replaceChildren();
 
         // 排序逻辑
         const hasOrder = (item) => item.order !== undefined && item.order !== null;
         const hasManualOrder = (item) => hasOrder(item) && item.manualOrder === true;
 
         // 调试：打印排序前的状态（包含order值）
-        console.log(`[${type}] 排序前项目:`, items.map(i => ({
-            title: i.title,
-            order: i.order,
-            pinned: !!i.pinned,
-            sunk: !!i.sunk,
-            completed: !!i.completed
-        })));
+
 
         if (type === ITEM_TYPES.MEETING) {
             items = this.sortMeetingItems(items, hasManualOrder);
@@ -4575,7 +4997,7 @@ class OfficeDashboard {
         }
 
         // 调试：打印排序后的项目状态
-        console.log(`[${type}] 排序后顺序:`, items.map(i => `${i.title}(order:${i.order})`));
+
 
         // 渲染卡片
         items.forEach(item => {
@@ -4584,9 +5006,42 @@ class OfficeDashboard {
         });
     }
 
-    /**
-     * 创建卡片
-     */
+    _createSelectCheckbox(itemId, itemType) {
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'item-select-checkbox';
+        input.dataset.id = itemId;
+        input.dataset.type = itemType;
+        input.title = '选择';
+        return input;
+    }
+
+    _createDetailSection(label, content) {
+        const section = document.createElement('div');
+        section.className = 'card-detail-section';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'detail-label';
+        labelEl.textContent = label;
+        const contentEl = document.createElement('div');
+        contentEl.className = 'detail-content';
+        if (typeof content === 'string') {
+            contentEl.textContent = content;
+        } else {
+            contentEl.appendChild(content);
+        }
+        section.append(labelEl, contentEl);
+        return section;
+    }
+
+    _createCardActionBtn(className, title, svgIcon) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = className;
+        btn.title = title;
+        btn.appendChild(svgIcon);
+        return btn;
+    }
+
     createCard(item) {
         const card = document.createElement('div');
         card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}${item.pinned ? ' pinned' : ''}${item.sunk ? ' sunk' : ''}`;
@@ -4597,190 +5052,235 @@ class OfficeDashboard {
         card.dataset.sunk = String(!!item.sunk);
         card.draggable = true;
 
-        let contentHtml = '';
-        let detailHtml = '';
+        const cardMain = document.createElement('div');
+        cardMain.className = 'card-main';
+        const cardDetail = document.createElement('div');
+        cardDetail.className = 'card-detail';
+        cardDetail.style.display = 'none';
+        const cardActions = document.createElement('div');
+        cardActions.className = 'card-actions';
 
-        // 多选复选框（所有类型都显示）
-        const selectCheckboxHtml = `
-            <input type="checkbox" class="item-select-checkbox" data-id="${item.id}" data-type="${item.type}" title="选择">
-        `;
+        const headerRow = document.createElement('div');
+        headerRow.className = 'card-header-row';
+        headerRow.appendChild(this._createSelectCheckbox(item.id, item.type));
+
+        const pinBtn = this._createCardActionBtn(
+            `card-action-btn pin-btn${item.pinned ? ' pinned' : ''}`,
+            item.pinned ? '取消置顶' : '置顶',
+            this.createPinIcon(item.pinned)
+        );
+        const sinkBtn = this._createCardActionBtn(
+            `card-action-btn sink-btn${item.sunk ? ' sunk' : ''}`,
+            item.sunk ? '取消沉底' : '沉底',
+            this.createSinkIcon(item.sunk)
+        );
+        const completeBtn = this._createCardActionBtn(
+            `card-action-btn complete-btn${item.completed ? ' completed' : ''}`,
+            item.completed ? '已完成' : '标记完成',
+            this.createCheckIcon()
+        );
+        const expandBtn = this._createCardActionBtn('card-action-btn expand-btn', '展开/收起详情', this.createExpandIcon(false));
+        const editBtn = this._createCardActionBtn('card-action-btn edit-btn', '编辑', this.createEditIcon());
+        const deleteBtn = this._createCardActionBtn('card-action-btn delete-btn', '删除', this.createDeleteIcon());
+        cardActions.append(pinBtn, sinkBtn, completeBtn, expandBtn, editBtn, deleteBtn);
 
         switch (item.type) {
-            case ITEM_TYPES.TODO:
+            case ITEM_TYPES.TODO: {
                 const priorityClass = `priority-${item.priority || 'medium'}`;
                 const priorityText = { high: '急', medium: '中', low: '低' }[item.priority] || '中';
-                // 周期性任务标志
-                const recurringBadge = item.isRecurring ? '<span class="recurring-badge" title="周期性任务">🔄</span>' : '';
-                contentHtml = `
-                    <div class="card-header-row">
-                        ${selectCheckboxHtml}
-                        <span class="priority-tag ${priorityClass}">${priorityText}</span>
-                        ${recurringBadge}
-                    </div>
-                    <div class="card-title ${item.completed ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
-                    <div class="card-time">${this.formatDeadline(item.deadline, item.completed)}</div>
-                `;
-                detailHtml = `
-                    ${item.description ? `<div class="card-detail-section"><div class="detail-label">备注</div><div class="detail-content">${this.escapeHtml(item.description)}</div></div>` : ''}
-                `;
-                break;
+                const priorityTag = document.createElement('span');
+                priorityTag.className = `priority-tag ${priorityClass}`;
+                priorityTag.textContent = priorityText;
+                headerRow.appendChild(priorityTag);
+                if (item.isRecurring) {
+                    const badge = document.createElement('span');
+                    badge.className = 'recurring-badge';
+                    badge.title = '周期性任务';
+                    badge.textContent = '🔄';
+                    headerRow.appendChild(badge);
+                }
+                cardMain.appendChild(headerRow);
 
-            case ITEM_TYPES.MEETING:
-                // 精简显示：【参会人员】会议名称+时间段+地点
+                const titleEl = document.createElement('div');
+                titleEl.className = `card-title${item.completed ? ' completed-text' : ''}`;
+                titleEl.textContent = item.title;
+                cardMain.appendChild(titleEl);
+
+                const timeEl = document.createElement('div');
+                timeEl.className = 'card-time';
+                timeEl.textContent = this.formatDeadline(item.deadline, item.completed);
+                cardMain.appendChild(timeEl);
+
+                if (item.description) {
+                    cardDetail.appendChild(this._createDetailSection('备注', item.description));
+                }
+                break;
+            }
+
+            case ITEM_TYPES.MEETING: {
                 const sortedAttendees = this.sortMeetingAttendeesForDisplay(item.attendees || []);
                 const attendeeStr = sortedAttendees.length > 0
                     ? (sortedAttendees.length > 3 ? sortedAttendees.slice(0, 3).join('、') + '等' : sortedAttendees.join('、'))
                     : '';
 
-                // 跨天会议显示日期范围
                 let dateDisplay = '';
                 if (item.endDate && item.endDate !== item.date) {
-                    // 跨天会议：显示开始-结束日期
                     const startDate = item.date ? item.date.substring(5).replace('-', '/') : '';
                     const endDate = item.endDate.substring(5).replace('-', '/');
                     dateDisplay = `${startDate}-${endDate}`;
                 }
 
                 const meetingTitle = attendeeStr ? `【${attendeeStr}】${item.title}` : item.title;
+                cardMain.appendChild(headerRow);
+
+                const titleEl = document.createElement('div');
+                titleEl.className = `card-title meeting-title${item.completed ? ' completed-text' : ''}`;
+                titleEl.textContent = meetingTitle;
+                cardMain.appendChild(titleEl);
+
+                if (dateDisplay) {
+                    const dateRangeEl = document.createElement('div');
+                    dateRangeEl.className = 'card-date-range';
+                    dateRangeEl.textContent = dateDisplay;
+                    cardMain.appendChild(dateRangeEl);
+                }
+
                 const timeStr = item.endTime ? `${item.time}-${item.endTime}` : item.time;
                 const timeLoc = [timeStr, item.location].filter(Boolean).join(' ');
+                if (timeLoc) {
+                    const timeEl = document.createElement('div');
+                    timeEl.className = 'card-time';
+                    timeEl.textContent = timeLoc;
+                    cardMain.appendChild(timeEl);
+                }
 
-                contentHtml = `
-                    <div class="card-header-row">
-                        ${selectCheckboxHtml}
-                    </div>
-                    <div class="card-title meeting-title ${item.completed ? 'completed-text' : ''}">${this.escapeHtml(meetingTitle)}</div>
-                    ${dateDisplay ? `<div class="card-date-range">${dateDisplay}</div>` : ''}
-                    ${timeLoc ? `<div class="card-time">${timeLoc}</div>` : ''}
-                `;
-                detailHtml = `
-                    ${sortedAttendees.length ? `<div class="card-detail-section"><div class="detail-label">参会人员</div><div class="detail-content">${sortedAttendees.join('、')}</div></div>` : ''}
-                    ${item.date ? `<div class="card-detail-section"><div class="detail-label">日期</div><div class="detail-content">${item.date}${item.endDate && item.endDate !== item.date ? ' 至 ' + item.endDate : ''}</div></div>` : ''}
-                    ${item.agenda ? `<div class="card-detail-section"><div class="detail-label">议程/备注</div><div class="detail-content">${this.escapeHtml(item.agenda)}</div></div>` : ''}
-                    ${item.location ? `<div class="card-detail-section"><div class="detail-label">地点</div><div class="detail-content">${this.escapeHtml(item.location)}</div></div>` : ''}
-                `;
+                if (sortedAttendees.length) {
+                    cardDetail.appendChild(this._createDetailSection('参会人员', sortedAttendees.join('、')));
+                }
+                if (item.date) {
+                    const dateContent = item.endDate && item.endDate !== item.date
+                        ? `${item.date} 至 ${item.endDate}`
+                        : item.date;
+                    cardDetail.appendChild(this._createDetailSection('日期', dateContent));
+                }
+                if (item.agenda) {
+                    cardDetail.appendChild(this._createDetailSection('议程/备注', item.agenda));
+                }
+                if (item.location) {
+                    cardDetail.appendChild(this._createDetailSection('地点', item.location));
+                }
                 break;
+            }
 
-            case ITEM_TYPES.DOCUMENT:
-                // 办文新设计：收/发/流转 + 完成状态
+            case ITEM_TYPES.DOCUMENT: {
                 const docTypeIcon = { receive: '收', send: '发', transfer: '转' }[item.docType] || '文';
                 const docTypeClass = item.docType || 'receive';
                 const isCompleted = item.progress === DOCUMENT_PROGRESS.COMPLETED;
 
-                // 办文日期范围显示
+                const docTypeTag = document.createElement('span');
+                docTypeTag.className = `doc-type-tag ${docTypeClass}`;
+                docTypeTag.textContent = docTypeIcon;
+                headerRow.appendChild(docTypeTag);
+                cardMain.appendChild(headerRow);
+
+                const titleEl = document.createElement('div');
+                titleEl.className = `card-title${isCompleted ? ' completed-text' : ''}`;
+                titleEl.textContent = item.title;
+                cardMain.appendChild(titleEl);
+
                 let docDateDisplay = '';
                 const docStartDate = item.docStartDate || item.docDate;
                 if (docStartDate && item.docEndDate) {
-                    // 跨天办文
                     const start = docStartDate.substring(5).replace('-', '/');
                     const end = item.docEndDate.substring(5).replace('-', '/');
                     docDateDisplay = `${start}-${end}`;
                 }
+                if (docDateDisplay) {
+                    const dateRangeEl = document.createElement('div');
+                    dateRangeEl.className = 'card-date-range';
+                    dateRangeEl.textContent = docDateDisplay;
+                    cardMain.appendChild(dateRangeEl);
+                }
 
-                contentHtml = `
-                    <div class="card-header-row">
-                        ${selectCheckboxHtml}
-                        <span class="doc-type-tag ${docTypeClass}">${docTypeIcon}</span>
-                    </div>
-                    <div class="card-title ${isCompleted ? 'completed-text' : ''}">${this.escapeHtml(item.title)}</div>
-                    ${docDateDisplay ? `<div class="card-date-range">${docDateDisplay}</div>` : ''}
-                    ${item.handler ? `<div class="card-handler">当前：${this.escapeHtml(item.handler)}</div>` : ''}
-                `;
-                detailHtml = `
-                    ${item.docNumber ? `<div class="card-detail-section"><div class="detail-label">文号</div><div class="detail-content">${this.escapeHtml(item.docNumber)}</div></div>` : ''}
-                    ${item.source ? `<div class="card-detail-section"><div class="detail-label">来文单位</div><div class="detail-content">${this.escapeHtml(item.source)}</div></div>` : ''}
-                    ${docStartDate ? `<div class="card-detail-section"><div class="detail-label">日期</div><div class="detail-content">${docStartDate}${item.docEndDate ? ' 至 ' + item.docEndDate : ''}</div></div>` : ''}
-                    ${item.handler ? `<div class="card-detail-section"><div class="detail-label">当前处理人</div><div class="detail-content">${this.escapeHtml(item.handler)}</div></div>` : ''}
-                    ${item.transferHistory?.length ? `<div class="card-detail-section"><div class="detail-label">流转记录</div><div class="detail-content transfer-list">${item.transferHistory.map(t => `<div>${t.time} → ${t.to}</div>`).join('')}</div></div>` : ''}
-                    ${item.content ? `<div class="card-detail-section"><div class="detail-label">内容摘要</div><div class="detail-content">${this.escapeHtml(item.content)}</div></div>` : ''}
-                `;
+                if (item.handler) {
+                    const handlerEl = document.createElement('div');
+                    handlerEl.className = 'card-handler';
+                    handlerEl.textContent = `当前：${item.handler}`;
+                    cardMain.appendChild(handlerEl);
+                }
+
+                if (item.docNumber) {
+                    cardDetail.appendChild(this._createDetailSection('文号', item.docNumber));
+                }
+                if (item.source) {
+                    cardDetail.appendChild(this._createDetailSection('来文单位', item.source));
+                }
+                if (docStartDate) {
+                    const dateContent = item.docEndDate ? `${docStartDate} 至 ${item.docEndDate}` : docStartDate;
+                    cardDetail.appendChild(this._createDetailSection('日期', dateContent));
+                }
+                if (item.handler) {
+                    cardDetail.appendChild(this._createDetailSection('当前处理人', item.handler));
+                }
+                if (item.transferHistory?.length) {
+                    const listContainer = document.createElement('div');
+                    item.transferHistory.forEach(t => {
+                        const row = document.createElement('div');
+                        row.textContent = `${t.time} → ${t.to}`;
+                        listContainer.appendChild(row);
+                    });
+                    const section = document.createElement('div');
+                    section.className = 'card-detail-section';
+                    const labelEl = document.createElement('div');
+                    labelEl.className = 'detail-label';
+                    labelEl.textContent = '流转记录';
+                    const contentEl = document.createElement('div');
+                    contentEl.className = 'detail-content transfer-list';
+                    contentEl.appendChild(listContainer);
+                    section.append(labelEl, contentEl);
+                    cardDetail.appendChild(section);
+                }
+                if (item.content) {
+                    cardDetail.appendChild(this._createDetailSection('内容摘要', item.content));
+                }
                 break;
+            }
         }
 
-        card.innerHTML = `
-            <div class="card-main">${contentHtml}</div>
-            <div class="card-detail" style="display: none;">${detailHtml}</div>
-            <div class="card-actions">
-                <button type="button" class="card-action-btn pin-btn ${item.pinned ? 'pinned' : ''}" title="${item.pinned ? '取消置顶' : '置顶'}">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>
-                    </svg>
-                </button>
-                <button type="button" class="card-action-btn sink-btn ${item.sunk ? 'sunk' : ''}" title="${item.sunk ? '取消沉底' : '沉底'}">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.sunk ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22L8.91 15.74L2 14.73L7 9.86L5.82 2.98L12 6.23L18.18 2.98L17 9.86L22 14.73L15.09 15.74L12 22Z"></path>
-                    </svg>
-                </button>
-                <button type="button" class="card-action-btn complete-btn ${item.completed ? 'completed' : ''}" title="${item.completed ? '已完成' : '标记完成'}">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                </button>
-                <button type="button" class="card-action-btn expand-btn" title="展开/收起详情">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </button>
-                <button type="button" class="card-action-btn edit-btn" title="编辑">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                </button>
-                <button type="button" class="card-action-btn delete-btn" title="删除">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
+        card.append(cardMain, cardDetail, cardActions);
 
-        // 绑定展开/收起事件
-        // 绑定拖拽事件
         card.addEventListener('dragstart', (e) => this.handleDragStart(e, item));
         card.addEventListener('dragend', (e) => this.handleDragEnd(e));
 
-        if (item.type === ITEM_TYPES.DOCUMENT) {
-            const expandBtn = card.querySelector('.expand-btn');
-            const detailEl = card.querySelector('.card-detail');
-            expandBtn?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isExpanded = detailEl.style.display !== 'none';
-                detailEl.style.display = isExpanded ? 'none' : 'block';
-                expandBtn.innerHTML = isExpanded
-                    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
-                    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
-            });
-
-            card.querySelector('.complete-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleItemComplete(item.id, item.type, !item.completed);
-            });
-
-            card.querySelector('.pin-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleItemPin(item.id, item.type, !item.pinned);
-            });
-
-            card.querySelector('.sink-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleItemSink(item.id, item.type, !item.sunk);
-            });
-
-            card.querySelector('.delete-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showDeleteConfirm(item.id);
-            });
-
-            card.querySelector('.card-title')?.addEventListener('click', () => {
-                this.editItem(item);
-            });
-
-            card.querySelector('.edit-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.editItem(item);
-            });
+        expandBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isExpanded = cardDetail.style.display !== 'none';
+            cardDetail.style.display = isExpanded ? 'none' : 'block';
+            this.updateExpandButtonIcon(expandBtn, !isExpanded);
+        });
+        completeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleItemComplete(item.id, item.type, !item.completed);
+        });
+        pinBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleItemPin(item.id, item.type, !item.pinned);
+        });
+        sinkBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleItemSink(item.id, item.type, !item.sunk);
+        });
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showDeleteConfirm(item.id);
+        });
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.editItem(item);
+        });
+        const titleEl = cardMain.querySelector('.card-title');
+        if (titleEl) {
+            titleEl.addEventListener('click', () => this.editItem(item));
         }
 
         return card;
@@ -4991,7 +5491,7 @@ class OfficeDashboard {
      * 拖拽开始
      */
     handleDragStart(e, item) {
-        console.log('[handleDragStart] 开始拖动:', item.title, 'type:', item.type, 'id:', item.id);
+
         this.draggedItem = item;
         this.draggedElement = e.target;
         e.target.classList.add('dragging');
@@ -5005,7 +5505,7 @@ class OfficeDashboard {
      * 这里只需清理handleDrop未涉及的样式（如拖拽取消的情况）
      */
     handleDragEnd(e) {
-        console.log('[handleDragEnd] 拖动结束');
+
         e.target.classList.remove('dragging');
         document.querySelectorAll('.column-content').forEach(col => {
             col.classList.remove('drag-over');
@@ -5023,7 +5523,7 @@ class OfficeDashboard {
         setTimeout(() => {
             // 只有在 handleDrop 还没清空时才清空（拖放取消的情况）
             if (this.draggedItem) {
-                console.log('[handleDragEnd] 拖放被取消，清空状态');
+
                 this.draggedItem = null;
                 this.draggedElement = null;
             }
@@ -5102,15 +5602,15 @@ class OfficeDashboard {
      * - 跨列拖动：需要更新类型并重新渲染
      */
     async handleDrop(e) {
-        console.log('[handleDrop] 触发 drop 事件');
+
         e.preventDefault();
         e.currentTarget.classList.remove('drag-over');
 
         if (!this.draggedItem) {
-            console.log('[handleDrop] 无拖动项目，返回');
+
             return;
         }
-        console.log('[handleDrop] 拖动项目:', this.draggedItem.title);
+
 
         // 取消未执行的 rAF，确保用最终位置
         if (this._dragOverRAF) {
@@ -5171,9 +5671,9 @@ class OfficeDashboard {
             }
 
             // 批量更新排序
-            console.log('[handleDrop] 正在保存排序, 类型:', newType, '顺序:', orderedIds);
+
             await db.updateItemOrder(newType, orderedIds);
-            console.log('[handleDrop] 排序保存完成');
+
 
             if (isSameColumn) {
                 // 同列拖动：DOM已经正确，不需要重新渲染
@@ -5241,14 +5741,14 @@ class OfficeDashboard {
         document.getElementById(type + 'Fields')?.classList.add('active');
 
         // 使用用户选择的日期作为默认日期
-        console.log('showAddModal - selectedDate:', this.selectedDate);
+
         const dateStr = this.selectedDate;
         const now = new Date();
         const timeStr = now.toTimeString().slice(0, 5);
 
         if (type === ITEM_TYPES.TODO) {
             const deadlineEl = document.getElementById('todoDeadline');
-            console.log('设置待办截止时间:', `${dateStr}T${timeStr}`);
+
             if (deadlineEl) deadlineEl.value = `${dateStr}T${timeStr}`;
 
             // 重置周期性选项
@@ -5259,7 +5759,7 @@ class OfficeDashboard {
         } else if (type === ITEM_TYPES.MEETING) {
             const dateEl = document.getElementById('meetingDate');
             const timeEl = document.getElementById('meetingTime');
-            console.log('设置会议日期:', dateStr);
+
             if (dateEl) dateEl.value = dateStr;
             if (timeEl) timeEl.value = timeStr;
         } else if (type === ITEM_TYPES.DOCUMENT) {
@@ -5421,7 +5921,7 @@ class OfficeDashboard {
                     item.recurringRule = rule;
                     item.recurringCount = recurringCount;
 
-                    console.log('周期性任务配置:', { rule, recurringCount });
+
                 }
                 break;
 
@@ -5489,7 +5989,7 @@ class OfficeDashboard {
                     item.isRecurring = true;
                     item.recurringRule = rule;
                     item.recurringCount = docRecurringCount;
-                    console.log('办文周期性任务配置:', { rule, docRecurringCount });
+
                 }
                 break;
         }
@@ -5501,14 +6001,14 @@ class OfficeDashboard {
                 const recurringGroupId = document.getElementById('recurringGroupId')?.value;
                 const occurrenceIndex = parseInt(document.getElementById('occurrenceIndex')?.value) || 0;
 
-                console.log('编辑模式检查周期性任务:', { recurringGroupId, occurrenceIndex, originalItem });
+
 
                 // 检查是否是编辑已有的周期性任务
                 if (recurringGroupId && originalItem && originalItem.isRecurring) {
                     // 弹出选择框
                     const choice = await this.showRecurringEditChoice();
 
-                    console.log('用户选择:', choice);
+
 
                     if (choice === 'cancel') {
                         return; // 用户取消
@@ -5647,18 +6147,18 @@ class OfficeDashboard {
             } else {
                 // 新建模式
                 // 检查是否是周期性任务
-                console.log('检查周期性任务:', { isRecurring: item.isRecurring, recurringRule: item.recurringRule });
+
 
                 if (item.isRecurring && item.recurringRule) {
-                    console.log('开始生成周期性任务...');
+
                     const recurringItems = this.generateRecurringItems(item, item.recurringRule, item.recurringCount || 20);
 
-                    console.log('生成的任务列表:', recurringItems);
+
 
                     if (recurringItems.length > 0) {
                         const addedIds = [];
                         for (const recurringItem of recurringItems) {
-                            console.log('保存任务:', recurringItem);
+
                             const addedItem = await db.addItem(recurringItem);
                             if (addedItem && addedItem.id) {
                                 addedIds.push(addedItem.id);
@@ -5686,10 +6186,10 @@ class OfficeDashboard {
 
             // 立即同步到云端（确保新数据上传）
             if (syncManager.isLoggedIn()) {
-                console.log('保存事项后立即同步到云端...');
+
                 const result = await syncManager.immediateSyncToCloud();
                 if (result.success) {
-                    console.log('同步成功，云端数据已更新');
+
                 } else {
                     console.error('同步失败:', result.error);
                 }
@@ -5701,62 +6201,59 @@ class OfficeDashboard {
         }
     }
 
-    /**
-     * 显示周期性任务编辑选择框
-     * @returns {Promise<string>} 'this' | 'this_detach' | 'future' | 'cancel'
-     */
-    showRecurringEditChoice() {
+    _createChoiceModal({ title, description, maxWidth, buttons }) {
         return new Promise((resolve) => {
-            // 创建选择弹窗
             const modal = document.createElement('div');
             modal.className = 'modal active';
-            modal.id = 'recurringChoiceModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 450px;">
-                    <div class="modal-header">
-                        <h3>修改周期性任务</h3>
-                    </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何修改？</p>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button type="button" class="btn-primary" id="recurringChoiceThis" style="width: 100%; padding: 12px;">
-                                仅修改本项（保留周期性）
-                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">独立记录当天的内容，不影响其他周期任务</div>
-                            </button>
-                            <button type="button" class="btn-secondary" id="recurringChoiceFuture" style="width: 100%; padding: 12px;">
-                                修改本项及未来所有周期
-                                <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新标题、经办人等信息到后续所有周期（日期保持不变）</div>
-                            </button>
-                            <button type="button" class="btn-secondary" id="recurringChoiceDetach" style="width: 100%; padding: 12px; border-color: #f59e0b; color: #f59e0b;">
-                                仅修改本项（脱离周期）
-                                <div style="font-size: 12px; color: #999; margin-top: 4px;">将此项变为独立任务，不再属于周期组</div>
-                            </button>
-                            <button type="button" class="btn-text" id="recurringChoiceCancel" style="width: 100%; padding: 8px;">
-                                取消
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const content = document.createElement('div');
+            content.className = 'modal-content';
+            content.style.maxWidth = maxWidth || '400px';
+            const header = document.createElement('div');
+            header.className = 'modal-header';
+            const h3 = document.createElement('h3');
+            h3.textContent = title;
+            header.appendChild(h3);
+            const body = document.createElement('div');
+            body.className = 'modal-body';
+            body.style.padding = '20px';
+            const p = document.createElement('p');
+            p.style.cssText = 'margin-bottom: 20px; color: #666;';
+            p.textContent = description;
+            const btnContainer = document.createElement('div');
+            btnContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+            for (const cfg of buttons) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = cfg.className || 'btn-secondary';
+                btn.style.cssText = cfg.style || 'width: 100%; padding: 12px;';
+                btn.textContent = cfg.label;
+                if (cfg.subLabel) {
+                    const sub = document.createElement('div');
+                    sub.style.cssText = cfg.subStyle || 'font-size: 12px; color: #666; margin-top: 4px;';
+                    sub.textContent = cfg.subLabel;
+                    btn.appendChild(sub);
+                }
+                btn.addEventListener('click', () => { modal.remove(); resolve(cfg.value); });
+                btnContainer.appendChild(btn);
+            }
+            body.append(p, btnContainer);
+            content.append(header, body);
+            modal.appendChild(content);
             document.body.appendChild(modal);
+        });
+    }
 
-            // 绑定事件
-            document.getElementById('recurringChoiceThis').onclick = () => {
-                modal.remove();
-                resolve('this');
-            };
-            document.getElementById('recurringChoiceFuture').onclick = () => {
-                modal.remove();
-                resolve('future');
-            };
-            document.getElementById('recurringChoiceDetach').onclick = () => {
-                modal.remove();
-                resolve('this_detach');
-            };
-            document.getElementById('recurringChoiceCancel').onclick = () => {
-                modal.remove();
-                resolve('cancel');
-            };
+    showRecurringEditChoice() {
+        return this._createChoiceModal({
+            title: '修改周期性任务',
+            description: '这是一个周期性任务，您想如何修改？',
+            maxWidth: '450px',
+            buttons: [
+                { label: '仅修改本项（保留周期性）', subLabel: '独立记录当天的内容，不影响其他周期任务', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: 'this' },
+                { label: '修改本项及未来所有周期', subLabel: '同步更新标题、经办人等信息到后续所有周期（日期保持不变）', className: 'btn-secondary', value: 'future' },
+                { label: '仅修改本项（脱离周期）', subLabel: '将此项变为独立任务，不再属于周期组', className: 'btn-secondary', style: 'width: 100%; padding: 12px; border-color: #f59e0b; color: #f59e0b;', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: 'this_detach' },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
         });
     }
 
@@ -5804,7 +6301,7 @@ class OfficeDashboard {
         delete fieldsToUpdate.completedAt;
         delete fieldsToUpdate.hash;
 
-        console.log('批量更新周期组:', { groupId, fromIndex, itemCount: groupItems.length, fieldsToUpdate });
+
 
         // 批量更新
         for (const groupItem of groupItems) {
@@ -5820,45 +6317,14 @@ class OfficeDashboard {
      * @param {string} actionName - 操作名称
      */
     showRecurringChoice(actionType, actionName) {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.id = 'recurringStatusChoiceModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 400px;">
-                    <div class="modal-header">
-                        <h3>周期性任务 - ${actionType}</h3>
-                    </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 20px; color: #666;">这是周期性任务，您想如何操作？</p>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button type="button" class="btn-secondary" id="recurringStatusChoiceThis" style="width: 100%; padding: 12px;">
-                                仅本项${actionName}
-                            </button>
-                            <button type="button" class="btn-primary" id="recurringStatusChoiceAll" style="width: 100%; padding: 12px;">
-                                所有后续周期都${actionName}
-                            </button>
-                            <button type="button" class="btn-text" id="recurringStatusChoiceCancel" style="width: 100%; padding: 8px;">
-                                取消
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('recurringStatusChoiceThis').onclick = () => {
-                modal.remove();
-                resolve('this');
-            };
-            document.getElementById('recurringStatusChoiceAll').onclick = () => {
-                modal.remove();
-                resolve('all');
-            };
-            document.getElementById('recurringStatusChoiceCancel').onclick = () => {
-                modal.remove();
-                resolve('cancel');
-            };
+        return this._createChoiceModal({
+            title: '周期性任务 - ' + actionType,
+            description: '这是周期性任务，您想如何操作？',
+            buttons: [
+                { label: '仅本项' + actionName, className: 'btn-secondary', value: 'this' },
+                { label: '所有后续周期都' + actionName, className: 'btn-primary', value: 'all' },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
         });
     }
 
@@ -5869,47 +6335,14 @@ class OfficeDashboard {
      * @returns {Promise<string>} 'this' | 'all' | 'cancel'
      */
     showCrossDateDocChoice(actionType, actionName) {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.id = 'crossDateDocChoiceModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 400px;">
-                    <div class="modal-header">
-                        <h3>跨日期办文 - ${actionType}</h3>
-                    </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 20px; color: #666;">这是一个跨日期办文，您想如何操作？</p>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button type="button" class="btn-primary" id="crossDateChoiceThis" style="width: 100%; padding: 12px;">
-                                仅当天${actionName}
-                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">独立记录当天的状态，不影响其他日期</div>
-                            </button>
-                            <button type="button" class="btn-secondary" id="crossDateChoiceAll" style="width: 100%; padding: 12px;">
-                                全部日期都${actionName}
-                                <div style="font-size: 12px; color: #666; margin-top: 4px;">同步更新所有日期的状态</div>
-                            </button>
-                            <button type="button" class="btn-text" id="crossDateChoiceCancel" style="width: 100%; padding: 8px;">
-                                取消
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('crossDateChoiceThis').onclick = () => {
-                modal.remove();
-                resolve('this');
-            };
-            document.getElementById('crossDateChoiceAll').onclick = () => {
-                modal.remove();
-                resolve('all');
-            };
-            document.getElementById('crossDateChoiceCancel').onclick = () => {
-                modal.remove();
-                resolve('cancel');
-            };
+        return this._createChoiceModal({
+            title: '跨日期办文 - ' + actionType,
+            description: '这是一个跨日期办文，您想如何操作？',
+            buttons: [
+                { label: '仅当天' + actionName, subLabel: '独立记录当天的状态，不影响其他日期', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: 'this' },
+                { label: '全部日期都' + actionName, subLabel: '同步更新所有日期的状态', className: 'btn-secondary', value: 'all' },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
         });
     }
 
@@ -5945,27 +6378,8 @@ class OfficeDashboard {
      * @param {Object} updates - 更新内容
      */
     async updateRecurringGroupStatus(originalItem, updates) {
-        console.log('=== updateRecurringGroupStatus 开始 ===');
-        console.log('原始任务:', originalItem);
-        console.log('更新内容:', updates);
-        console.log('recurringGroupId:', originalItem?.recurringGroupId);
-        console.log('occurrenceIndex:', originalItem?.occurrenceIndex);
-        
-        // 获取所有事项
         const allItems = await db.getAllItems();
-        console.log('数据库中所有事项数量:', allItems.length);
-        
-        // 检查周期性任务
         const allRecurringTasks = allItems.filter(i => i.recurringGroupId);
-        console.log('所有周期性任务数量:', allRecurringTasks.length);
-        console.log('所有周期性任务详情:', allRecurringTasks.map(i => ({
-            id: i.id,
-            title: i.title,
-            recurringGroupId: i.recurringGroupId,
-            occurrenceIndex: i.occurrenceIndex,
-            sunk: i.sunk,
-            pinned: i.pinned
-        })));
         
         // 检查 recurringGroupId 是否存在
         if (!originalItem.recurringGroupId) {
@@ -5982,27 +6396,12 @@ class OfficeDashboard {
         const targetGroupId = String(originalItem.recurringGroupId);
         const currentIndex = parseInt(originalItem.occurrenceIndex) || 0;
         
-        console.log('筛选条件 - targetGroupId:', targetGroupId, 'currentIndex:', currentIndex);
-        
         const groupItems = allItems.filter(item => {
             if (!item.recurringGroupId) return false;
-            
             const itemGroupId = String(item.recurringGroupId);
             const itemIndex = parseInt(item.occurrenceIndex) || 0;
-            const matches = itemGroupId === targetGroupId && itemIndex >= currentIndex;
-            
-            console.log(`检查任务: id=${item.id}, title="${item.title}", groupId=${itemGroupId}, index=${itemIndex}, 匹配=${matches}`);
-            
-            return matches;
+            return itemGroupId === targetGroupId && itemIndex >= currentIndex;
         });
-
-        console.log('✅ 找到的周期任务数量:', groupItems.length);
-        console.log('匹配的任务:', groupItems.map(i => ({
-            id: i.id,
-            title: i.title,
-            occurrenceIndex: i.occurrenceIndex,
-            sunk: i.sunk
-        })));
 
         if (groupItems.length === 0) {
             console.warn('⚠️ 没有找到后续周期任务，只更新当前项');
@@ -6024,24 +6423,17 @@ class OfficeDashboard {
                 if (updateData[key] === undefined) delete updateData[key];
             });
             
-            console.log(`更新任务 ${groupItem.id} (${groupItem.title}):`, updateData);
-            
             try {
                 await db.updateItem(groupItem.id, updateData);
                 successCount++;
-                console.log(`✅ 更新成功: ${groupItem.id}`);
             } catch (err) {
                 console.error(`❌ 更新失败: ${groupItem.id}`, err);
             }
         }
 
-        console.log(`=== 批量更新完成，成功 ${successCount}/${groupItems.length} 项 ===`);
-        
         await this.loadItems();
         
-        // 立即同步到云端
         if (syncManager.isLoggedIn()) {
-            console.log('同步到云端...');
             await syncManager.immediateSyncToCloud();
         }
         
@@ -6068,7 +6460,6 @@ class OfficeDashboard {
      * 通用切换完成状态（所有类型）
      */
     async toggleItemComplete(id, type, completed) {
-        console.log(`toggleItemComplete: id=${id}, type=${type}, completed=${completed}`);
         try {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
@@ -6111,7 +6502,6 @@ class OfficeDashboard {
                     
                     this.saveUndoHistory('update', { item: originalItem });
                     await db.updateItem(id, { dayStates });
-                    console.log('跨日期办文更新当天状态:', this.selectedDate, dayStates[this.selectedDate]);
                     await this.loadItems();
                     if (syncManager.isLoggedIn()) {
                         await syncManager.immediateSyncToCloud();
@@ -6147,9 +6537,7 @@ class OfficeDashboard {
                 // 办文类型额外更新progress字段
                 ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING })
             });
-            console.log('updateItem 结果:', result);
             await this.loadItems();
-            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
                 await syncManager.immediateSyncToCloud();
             }
@@ -6166,19 +6554,14 @@ class OfficeDashboard {
         try {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
-            console.log('toggleItemPin:', { id, pinned, recurringGroupId: originalItem?.recurringGroupId });
             
             if (originalItem && originalItem.recurringGroupId) {
                 // 办文类型默认独立操作，不弹出选择框
                 if (originalItem.type !== ITEM_TYPES.DOCUMENT) {
                     const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
-                    console.log('用户选择:', choice);
-                    
                     if (choice === 'cancel') return;
                     
                     if (choice === 'all') {
-                        // 更新所有后续周期
-                        console.log('执行批量置顶更新...');
                         await this.updateRecurringGroupStatus(originalItem, { 
                             pinned, 
                             sunk: pinned ? false : undefined // 置顶时取消沉底
@@ -6209,7 +6592,6 @@ class OfficeDashboard {
                     
                     this.saveUndoHistory('update', { item: originalItem });
                     await db.updateItem(id, { dayStates });
-                    console.log('跨日期办文更新当天置顶状态:', this.selectedDate, dayStates[this.selectedDate]);
                     await this.loadItems();
                     if (syncManager.isLoggedIn()) {
                         await syncManager.immediateSyncToCloud();
@@ -6263,19 +6645,14 @@ class OfficeDashboard {
         try {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
-            console.log('toggleItemSink:', { id, sunk, recurringGroupId: originalItem?.recurringGroupId });
             
             if (originalItem && originalItem.recurringGroupId) {
                 // 办文类型默认独立操作，不弹出选择框
                 if (originalItem.type !== ITEM_TYPES.DOCUMENT) {
                     const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
-                    console.log('用户选择:', choice);
-                    
                     if (choice === 'cancel') return;
                     
                     if (choice === 'all') {
-                        // 更新所有后续周期
-                        console.log('执行批量沉底更新...');
                         await this.updateRecurringGroupStatus(originalItem, { 
                             sunk, 
                             pinned: sunk ? false : undefined // 沉底时取消置顶
@@ -6306,7 +6683,6 @@ class OfficeDashboard {
                     
                     this.saveUndoHistory('update', { item: originalItem });
                     await db.updateItem(id, { dayStates });
-                    console.log('跨日期办文更新当天沉底状态:', this.selectedDate, dayStates[this.selectedDate]);
                     await this.loadItems();
                     if (syncManager.isLoggedIn()) {
                         await syncManager.immediateSyncToCloud();
@@ -6511,7 +6887,6 @@ class OfficeDashboard {
 
                     // 如果当前时间已经超过会议开始后30分钟
                     if (now >= autoCompleteTime) {
-                        console.log(`会议 "${meeting.title}" 已自动完成`);
                         await db.updateItem(meeting.id, {
                             completed: true,
                             completedAt: now.toISOString()
@@ -6611,9 +6986,6 @@ class OfficeDashboard {
         // 如果有开始日期且早于今天，从开始日期开始
         const firstDate = startDate && startDate > today ? startDate : today;
 
-        console.log('生成周期性任务:', { baseItem, rule, count, startDate, endDate, firstDate });
-
-        // 复制基础数据，移除周期相关字段和需要重新计算的字段
         const cleanItem = { ...baseItem };
         delete cleanItem.isRecurring;
         delete cleanItem.recurringRule;
@@ -6793,7 +7165,6 @@ class OfficeDashboard {
                 break;
         }
 
-        console.log('生成的周期性任务:', items);
         return items;
     }
 
@@ -7103,94 +7474,26 @@ class OfficeDashboard {
      * 显示周期性任务删除选择框
      */
     showRecurringDeleteChoice() {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.id = 'recurringDeleteModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 400px;">
-                    <div class="modal-header">
-                        <h3>删除周期性任务</h3>
-                    </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 20px; color: #666;">这是一个周期性任务，您想如何删除？</p>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button type="button" class="btn-secondary" id="recurringDeleteThis" style="width: 100%; padding: 12px;">
-                                仅删除本项
-                            </button>
-                            <button type="button" class="btn-danger" id="recurringDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
-                                删除本项及后续所有周期
-                            </button>
-                            <button type="button" class="btn-text" id="recurringDeleteCancel" style="width: 100%; padding: 8px;">
-                                取消
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('recurringDeleteThis').onclick = () => {
-                modal.remove();
-                resolve('this');
-            };
-            document.getElementById('recurringDeleteAll').onclick = () => {
-                modal.remove();
-                resolve('all');
-            };
-            document.getElementById('recurringDeleteCancel').onclick = () => {
-                modal.remove();
-                resolve('cancel');
-            };
+        return this._createChoiceModal({
+            title: '删除周期性任务',
+            description: '这是一个周期性任务，您想如何删除？',
+            buttons: [
+                { label: '仅删除本项', className: 'btn-secondary', value: 'this' },
+                { label: '删除本项及后续所有周期', className: 'btn-danger', style: 'width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;', value: 'all' },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
         });
     }
 
-    /**
-     * 显示跨日期办文删除选择框
-     * @returns {Promise<string>} 'this' | 'all' | 'cancel'
-     */
     showCrossDateDocDeleteChoice() {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.id = 'crossDateDocDeleteModal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 400px;">
-                    <div class="modal-header">
-                        <h3>删除跨日期办文</h3>
-                    </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 20px; color: #666;">这是一个跨日期办文，您想如何删除？</p>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button type="button" class="btn-secondary" id="crossDateDeleteThis" style="width: 100%; padding: 12px;">
-                                仅从当天移除
-                                <div style="font-size: 12px; color: #666; margin-top: 4px;">其他日期仍可看到此办文</div>
-                            </button>
-                            <button type="button" class="btn-danger" id="crossDateDeleteAll" style="width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;">
-                                彻底删除
-                                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">从所有日期删除此办文</div>
-                            </button>
-                            <button type="button" class="btn-text" id="crossDateDeleteCancel" style="width: 100%; padding: 8px;">
-                                取消
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('crossDateDeleteThis').onclick = () => {
-                modal.remove();
-                resolve('this');
-            };
-            document.getElementById('crossDateDeleteAll').onclick = () => {
-                modal.remove();
-                resolve('all');
-            };
-            document.getElementById('crossDateDeleteCancel').onclick = () => {
-                modal.remove();
-                resolve('cancel');
-            };
+        return this._createChoiceModal({
+            title: '删除跨日期办文',
+            description: '这是一个跨日期办文，您想如何删除？',
+            buttons: [
+                { label: '仅从当天移除', subLabel: '其他日期仍可看到此办文', className: 'btn-secondary', value: 'this' },
+                { label: '彻底删除', subLabel: '从所有日期删除此办文', className: 'btn-danger', style: 'width: 100%; padding: 12px; background: #ef4444; color: white; border-color: #ef4444;', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: 'all' },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
         });
     }
 
@@ -7209,9 +7512,6 @@ class OfficeDashboard {
                 (parseInt(i.occurrenceIndex) || 0) >= currentIndex
             );
 
-            console.log('删除周期组:', { targetGroupId, currentIndex, itemCount: groupItems.length });
-
-            // 保存所有要删除的项目用于撤回
             this.saveUndoHistory('delete', { items: groupItems });
 
             // 批量删除
@@ -7437,8 +7737,6 @@ class OfficeDashboard {
      * @param {string} type - 消息类型: 'error' | 'success' | 'info'
      */
     showMessage(message, type = 'error') {
-        console.log(`[${type}] ${message}`);
-
         const colors = {
             error: { bg: '#ef4444', icon: '✗' },
             success: { bg: '#10b981', icon: '✓' },
@@ -7465,7 +7763,12 @@ class OfficeDashboard {
             align-items: center;
             gap: 8px;
         `;
-        msgDiv.innerHTML = `<span style="font-size:16px">${color.icon}</span><span>${message}</span>`;
+        const iconSpan = document.createElement('span');
+        iconSpan.style.fontSize = '16px';
+        iconSpan.textContent = color.icon;
+        const textSpan = document.createElement('span');
+        textSpan.textContent = message;
+        msgDiv.append(iconSpan, textSpan);
         document.body.appendChild(msgDiv);
 
         setTimeout(() => {
@@ -7507,27 +7810,48 @@ class OfficeDashboard {
     }
 
     showRecognitionLog(title, content) {
-        // 创建日志弹窗
         const modal = document.createElement('div');
         modal.className = 'modal active';
         modal.id = 'recognitionLogModal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h3>${title}</h3>
-                    <button type="button" class="btn-close" onclick="this.closest('.modal').remove()">×</button>
-                </div>
-                <div class="modal-body" style="padding: 16px;">
-                    ${content}
-                </div>
-                <div class="modal-actions" style="justify-content: center;">
-                    <button type="button" class="btn-primary" onclick="this.closest('.modal').remove()">确定</button>
-                </div>
-            </div>
-        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.maxWidth = '500px';
+
+        const modalHeader = document.createElement('div');
+        modalHeader.className = 'modal-header';
+        const h3 = document.createElement('h3');
+        h3.textContent = title;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close';
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => modal.remove());
+        modalHeader.append(h3, closeBtn);
+
+        const modalBody = document.createElement('div');
+        modalBody.className = 'modal-body';
+        modalBody.style.padding = '16px';
+        if (typeof content === 'string') {
+            modalBody.innerHTML = content;
+        } else {
+            modalBody.appendChild(content);
+        }
+
+        const modalActions = document.createElement('div');
+        modalActions.className = 'modal-actions';
+        modalActions.style.justifyContent = 'center';
+        const okBtn = document.createElement('button');
+        okBtn.type = 'button';
+        okBtn.className = 'btn-primary';
+        okBtn.textContent = '确定';
+        okBtn.addEventListener('click', () => modal.remove());
+        modalActions.appendChild(okBtn);
+
+        modalContent.append(modalHeader, modalBody, modalActions);
+        modal.appendChild(modalContent);
         document.body.appendChild(modal);
 
-        // 点击背景关闭
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.remove();
         });

@@ -790,5 +790,3 @@ Object.values(ITEM_TEMPLATES).forEach(category => {
 // 导出
 window.TemplateMatcher = TemplateMatcher;
 window.ITEM_TEMPLATES = ITEM_TEMPLATES;
-
-console.log('事项模板库加载完成，共', new TemplateMatcher().getTemplateCount(), '个模板');

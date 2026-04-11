@@ -50,12 +50,10 @@ class Database {
 
                 request.onsuccess = () => {
                     this.db = request.result;
-                    console.log('数据库连接成功');
                     resolve(this.db);
                 };
 
                 request.onupgradeneeded = (event) => {
-                    console.log('数据库升级中...');
                     const db = event.target.result;
 
                     // 创建事项表
@@ -65,20 +63,17 @@ class Database {
                         itemsStore.createIndex('date', 'date', { unique: false });
                         itemsStore.createIndex('hash', 'hash', { unique: false });
                         itemsStore.createIndex('createdAt', 'createdAt', { unique: false });
-                        console.log('事项表创建成功');
                     }
 
                     // 创建设置表
                     if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
                         db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
-                        console.log('设置表创建成功');
                     }
 
                     // 创建文档哈希表（用于去重）
                     if (!db.objectStoreNames.contains(STORES.DOCUMENT_HASHES)) {
                         const hashStore = db.createObjectStore(STORES.DOCUMENT_HASHES, { keyPath: 'hash' });
                         hashStore.createIndex('createdAt', 'createdAt', { unique: false });
-                        console.log('文档哈希表创建成功');
                     }
                 };
             } catch (error) {
@@ -140,19 +135,16 @@ class Database {
                     // 检查是否是同一周期的任务
                     const existing = checkRequest.result;
                     if (normalizedItem.recurringGroupId && existing.recurringGroupId === normalizedItem.recurringGroupId) {
-                        console.log('同一周期任务已存在，跳过:', normalizedItem.title, 'occurrenceIndex:', normalizedItem.occurrenceIndex);
                         resolve(existing.id);
                         return;
                     }
                     // 不同周期的任务，修改hash后重新添加
                     normalizedItem.hash = normalizedItem.hash + '_' + Date.now();
-                    console.log('hash冲突，重新生成hash:', normalizedItem.title, 'new hash:', normalizedItem.hash);
                 }
 
                 // 不存在则添加
                 const addRequest = store.add(normalizedItem);
                 addRequest.onsuccess = () => {
-                    console.log('添加事项成功:', normalizedItem.title, 'id:', addRequest.result, 'recurringGroupId:', normalizedItem.recurringGroupId);
                     resolve(addRequest.result);
                 };
                 addRequest.onerror = () => reject(addRequest.error);
@@ -361,8 +353,6 @@ class Database {
             });
 
             transaction.oncomplete = () => {
-                console.log(`排序保存成功: ${updatedCount} 个项目, 类型: ${type}`);
-                console.log('更新后的 order 值:', items.map(i => ({ title: i.title, order: i.order })));
                 resolve();
             };
             transaction.onerror = () => {
@@ -573,3 +563,4 @@ class Database {
 
 // 创建全局数据库实例
 const db = new Database();
+window.db = db;

@@ -297,8 +297,92 @@
 - UI交互测试：页面结构完整，设置按钮点击弹窗正常
 - 版本号已递增：index.html + wechat-upload.html
 
+## 2026-04-11 第2批代码健康度 → 2-1 innerHTML 安全化
+
+### 本次目标
+- 实施第2批优化中 2-1 innerHTML 安全化：将 app.js 中所有高风险 innerHTML 改为 DOM API
+
+### 已完成 — SVG 辅助函数
+- `_createSvgIcon(pathsData)`：通用 SVG DOM 构建器（createElementNS）
+- `createPinIcon(filled)` / `createSinkIcon(filled)` / `createCheckIcon()` / `createEditIcon()` / `createDeleteIcon()`：5个图标辅助函数
+- `createExpandIcon(isExpanded)` / `updateExpandButtonIcon(expandBtn, isExpanded)`：展开/折叠图标
+
+### 已完成 — 模板与渲染辅助函数
+- `createRecurringFormGroup` / `createRecurringInput` / `createRecurringSelect` / `createRecurringCheckboxGroup`：recurring 字段 DOM 化
+- `appendHighlightedText(container, text, keyword)`：高亮文本渲染
+- `createContactItem(contact, index, highlightKeyword)`：联系人条目 DOM 化
+
+### 已完成 — 函数 DOM 化改造（innerHTML → DOM API）
+- `showMessage`：toast 通知改为 DOM 构建
+- `_showRetryableError`：带重试的错误提示改为 DOM 构建
+- `renderTools`：工具面板渲染改为 DOM 构建
+- `renderContacts`：联系人渲染改为 DOM 构建
+- `renderRecurringFieldTemplate`：recurring 字段模板改为 DOM 构建
+- `toggleCardDetail` SVG：展开/折叠图标切换改为 DOM API
+- 文档卡片展开事件 SVG：同上
+- `showRecognitionLog`：识别日志弹窗改为 DOM 构建
+- `showAICommandConfirm`：AI 指令确认弹窗改为 DOM 构建
+- `showQueryResult`：查询结果弹窗改为 DOM 构建
+
+### 已完成 — createCard 完整 DOM 化改造（本轮最大改动）
+- 消除 `card.innerHTML = ...`（约200行模板字符串 → DOM API）
+- 新增3个辅助函数：`_createSelectCheckbox` / `_createDetailSection` / `_createCardActionBtn`
+- 6个操作按钮（置顶/沉底/完成/展开/编辑/删除）全部通过 DOM API 创建
+- 事件绑定从 querySelector 后绑定改为直接在元素引用上 addEventListener
+- 修复原代码缺陷：TODO/MEETING 类型卡片原本无按钮事件（原代码事件绑定仅在 DOCUMENT 块内）
+- transferHistory 渲染从 `.map().join('')` 改为 `forEach + createElement`
+- 所有 `escapeHtml()` 调用替换为 `textContent`（textContent 本身防注入）
+
+### 验证结果
+- GetDiagnostics 零错误通过
+- 所有高风险 innerHTML 已消除
+
 ### 遗留事项
-- 第2批（代码健康度6项）、第3批（性能微优化4项）、第4批（微信兼容3项）待执行
+- 剩余低优先级 innerHTML（清空型 `el.innerHTML = ''`、select option 填充等）待后续处理
+- upload-flow.js / wechat-upload.js / calendar.js 中的 innerHTML 待排查
+
+### 遗留事项
+- 第2批（代码健康度6项）：2-1 已完成，2-2~2-6 待执行
+- 第3批（性能微优化4项）、第4批（微信兼容3项）待执行
+
+## 2026-04-11 2-1 innerHTML 安全化 — upload-flow.js / wechat-upload.js / calendar.js 收尾
+
+### 本次目标
+- 完成 upload-flow.js、wechat-upload.js、calendar.js 中剩余 innerHTML 的 DOM 化改造
+- 修复前序会话遗留的联动断裂和参数不匹配问题
+
+### 已完成 — upload-flow.js（前序会话）
+- buildRecognitionSummaryHtml：从返回 HTML 字符串改为返回 DOM 元素
+- showRecognitionPreviewModal：headerHtml(string) → headerContent(DOM element) 参数迁移
+- 所有模板字符串渲染改为 DOM 构建
+
+### 已完成 — app.js 联动修复
+- showRecognitionLog（line 7934）：modalBody.innerHTML = content → typeof content 判断，支持 string/HTMLElement 双模式
+- showRecognitionPreviewModal 调用方（line 7901）：headerHtml → headerContent + IIFE 创建 DOM 元素
+
+### 已完成 — wechat-upload.js（全部 innerHTML 消除，0 残留）
+- setSummary 函数：innerHTML → replaceChildren() + typeof 判断
+- 成功保存：模板字符串混合 DOM 元素 → 纯 DOM 构建
+- 错误重试：HTML 字符串 + getElementById → 纯 DOM + 直接变量引用
+- headerHtml → headerContent 参数迁移
+
+### 已完成 — calendar.js（全部 innerHTML 消除，0 残留）
+- 新增 createCalendarItem：返回 DOM 元素，支持 compact/full 两种渲染模式
+- renderCalendarItem 保留为薄包装调用 createCalendarItem
+- renderWeekView：HTML 字符串构建 → DOM 构建 + replaceChildren()
+- renderMonthView：同上模式转换
+- 所有内联 onclick → addEventListener('click', ...)
+
+### 全局验证
+- grep 确认整个 js 目录仅剩 app.js 中 3 处 innerHTML：
+  - 2 处 escapeHtml 工具函数（安全用法，保留不改）
+  - 1 处 showRecognitionLog 类型兼容处理（安全且必要）
+- GetDiagnostics：app.js / wechat-upload.js / calendar.js 三个文件 0 错误
+
+### 最终结论
+- 2-1 innerHTML 安全化任务全部完成
+- 所有高风险 innerHTML 已改为 DOM API
+- 仅保留 3 处安全/必要的 innerHTML（工具函数 + 类型兼容）
 
 ## 2026-04-10 第1批安全修复（3项）
 
@@ -327,3 +411,30 @@
 
 ### 遗留事项
 - 后续待执行第2批（🟡中等优先24项）和第3批（🟢低优先8项）优化
+
+## 2026-04-11 2-2 console 清理
+
+### 本次目标
+- 全项目 console.log 清零，保留 console.error / console.warn
+
+### 清理范围
+- sync.js：79处 console.log 移除
+- app.js：104处 console.log 移除（含多行 .map() 调试输出）
+- db.js：10处移除
+- ocr.js：5处移除
+- templates.js：1处移除
+- upload-flow.js：1处移除
+- calendar.js / crypto.js / kimi.js：仅含 console.error/warn，无需处理
+
+### 关键改动
+- updateRecurringGroupStatus：18处调试日志移除，filter 回调简化为单行 return
+- toggleItemComplete / toggleItemPin / toggleItemSink：各3~4处调试日志移除
+- showMessage / 会议自动完成 / 生成周期性任务 / 删除周期组：各1~2处移除
+
+### 验证结果
+- Grep 确认全项目 js/ 目录下 console.log = 0 处
+- GetDiagnostics 零错误通过
+
+### 遗留事项
+- 第2批剩余：2-3~2-6 待执行
+- 第3批（性能微优化4项）、第4批（微信兼容3项）待执行

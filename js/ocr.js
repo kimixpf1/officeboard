@@ -244,8 +244,6 @@ class OCRManager {
         const apiKey = this.getApiKey();
 
         if (!apiKey) {
-            // 如果没有API Key，使用本地规则解析
-            console.log('未配置DeepSeek API Key，使用本地规则解析');
             return this.parseWithRules(text);
         }
 
@@ -3055,7 +3053,6 @@ class OCRManager {
             script.onload = () => {
                 // 设置worker路径
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                console.log('PDF.js加载成功');
                 resolve();
             };
             script.onerror = () => {
@@ -3190,7 +3187,6 @@ class OCRManager {
                     if (retryCount < 3) {
                         const waitTime = (retryCount + 1) * 3000; // 3秒、6秒、9秒
                         if (progressCallback) progressCallback(`Kimi服务繁忙，${waitTime/1000}秒后重试 (${retryCount + 1}/3)...`);
-                        console.log(`Kimi API过载，${waitTime}ms后重试 (${retryCount + 1}/3)`);
                         await new Promise(resolve => setTimeout(resolve, waitTime));
                         return this.recognizeImageWithKimi(file, progressCallback, retryCount + 1);
                     }
@@ -3201,7 +3197,6 @@ class OCRManager {
             }
 
             const data = await response.json();
-            console.log('Kimi API响应成功');
             const content = data.choices[0]?.message?.content;
 
             if (!content) {
@@ -3398,8 +3393,6 @@ ${ocrText}
                 }
             }
 
-            // AI解析失败，降级到本地规则
-            console.log('AI解析未返回有效JSON，使用本地规则');
             return this.parseWithRules(ocrText);
 
         } catch (error) {

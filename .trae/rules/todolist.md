@@ -16,8 +16,8 @@
 ### 🟡 第2批：代码健康度（6项）
 | # | 优化项 | 文件 | 说明 | 状态 |
 |---|--------|------|------|------|
-| 2-1 | innerHTML 安全化 | app.js, upload-flow.js, wechat-upload.js, calendar.js | 37处 innerHTML 改为 textContent 或模板方式，防XSS | ⬜ 待做 |
-| 2-2 | console 清理 | 全部 JS | 285处 console.log/warn/error 区分保留/降级/移除 | ⬜ 待做 |
+| 2-1 | innerHTML 安全化 | app.js, upload-flow.js, wechat-upload.js, calendar.js | 全部高风险innerHTML已DOM化；仅剩app.js中3处安全用法（2处escapeHtml工具函数+1处类型兼容处理）；calendar.js新增createCalendarItem+renderWeekView/renderMonthView纯DOM构建；wechat-upload.js全部消除 | ✅ 完成 |
+| 2-2 | console 清理 | 全部 JS | 285处→全部console.log清零，保留console.error/warn | ✅ 完成 |
 | 2-3 | 错误边界增强 | 全部 JS | 100+ catch 块统一错误分类和恢复策略 | ⬜ 待做 |
 | 2-4 | 定时器清理 | app.js, sync.js, report.js | 27处 setTimeout/setInterval 确保页面切换时清理 | ⬜ 待做 |
 | 2-5 | 事件监听优化 | app.js | 133处 addEventListener 检查是否有重复绑定或未解绑 | ⬜ 待做 |

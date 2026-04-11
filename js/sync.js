@@ -35,10 +35,7 @@ class SyncManager {
         this.isSyncing = false;  // 是否正在同步中
         
         // 调试：打印启动时的时间戳
-        console.log('[SyncManager] 初始化, 时间戳:', {
-            lastLocalModifyTime: this.lastLocalModifyTime,
-            lastCloudSyncTime: this.lastCloudSyncTime
-        });
+
 
         // 初始化Supabase
         this.initPromise = this.initSupabase();
@@ -59,14 +56,13 @@ class SyncManager {
     recordLocalModify() {
         this.lastLocalModifyTime = new Date().toISOString();
         _safeSet('lastLocalModifyTime', this.lastLocalModifyTime);
-        console.log('记录本地修改时间:', this.lastLocalModifyTime);
+
     }
 
     /**
      * 初始化Supabase客户端
      */
     async initSupabase() {
-        console.log('=== Supabase 初始化开始 ===');
 
         // 等待Supabase库加载（最多等待20秒）
         let waitTime = 0;
@@ -75,11 +71,11 @@ class SyncManager {
             await new Promise(resolve => setTimeout(resolve, 200));
             waitTime += 200;
             if (waitTime % 2000 === 0) {
-                console.log('等待Supabase加载...', waitTime / 1000, '秒');
+
             }
         }
 
-        console.log('window.supabase 类型:', typeof window.supabase);
+
 
         if (typeof window.supabase === 'undefined') {
             this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。';
@@ -87,7 +83,7 @@ class SyncManager {
             return;
         }
 
-        console.log('Supabase库已加载，开始创建客户端...');
+
 
         try {
             // ES模块导出的是{ createClient }，需要检查
@@ -104,7 +100,7 @@ class SyncManager {
                     detectSessionInUrl: true
                 }
             });
-            console.log('Supabase客户端创建成功');
+
 
             // 尝试获取会话
             try {
@@ -113,7 +109,7 @@ class SyncManager {
                     console.warn('获取会话失败:', error.message);
                 } else if (data.session) {
                     this.currentUser = data.session.user;
-                    console.log('已恢复登录状态:', this.currentUser.email);
+
                     this.updateLoginUI();
 
                     // 执行智能同步
@@ -137,24 +133,23 @@ class SyncManager {
      */
     async smartSync() {
         if (!this.supabase || !this.currentUser) {
-            console.log('未登录，跳过智能同步');
+
             return;
         }
 
         if (this.isSyncing) {
-            console.log('正在同步中，跳过');
+
             return;
         }
 
         this.isSyncing = true;
-        console.log('=== 开始智能同步 ===');
+
 
         try {
             // 1. 获取本地数据
             const localItems = await db.getAllItems();
-            console.log('本地事项数量:', localItems.length);
-            // 调试：打印本地数据的order值
-            console.log('本地数据order值:', localItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
+
+
 
             // 2. 获取云端数据和时间戳
             const { data: cloudData, error } = await this.supabase
@@ -178,15 +173,10 @@ class SyncManager {
             const localModifyTime = this.lastLocalModifyTime ? new Date(this.lastLocalModifyTime) : null;
             const lastSyncTime = this.lastCloudSyncTime ? new Date(this.lastCloudSyncTime) : null;
 
-            console.log('同步时间分析:', {
-                cloudUpdateTime: cloudUpdateTime?.toISOString() || '无',
-                localModifyTime: localModifyTime?.toISOString() || '无',
-                lastSyncTime: lastSyncTime?.toISOString() || '无'
-            });
 
             // 情况1: 云端无数据
             if (!cloudData || !cloudData.data) {
-                console.log('云端无数据，上传本地数据');
+
                 if (localItems.length > 0) {
                     await this.uploadToCloud();
                 }
@@ -196,7 +186,7 @@ class SyncManager {
 
             // 情况2: 本地无数据
             if (localItems.length === 0) {
-                console.log('本地无数据，从云端下载');
+
                 await this.downloadFromCloud(cloudData);
                 this.isSyncing = false;
                 return;
@@ -204,8 +194,7 @@ class SyncManager {
 
             // 情况3: 两边都有数据，需要比较时间
             const cloudItems = cloudData.data.items || [];
-            // 调试：打印云端数据的order值
-            console.log('云端数据order值:', cloudItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
+
             
             // 判断云端是否有更新（云端更新时间 > 上次同步时间）
             const cloudHasUpdate = cloudUpdateTime && lastSyncTime && cloudUpdateTime > lastSyncTime;
@@ -213,28 +202,28 @@ class SyncManager {
             // 判断本地是否有修改（本地修改时间 > 上次同步时间）
             const localHasModify = localModifyTime && lastSyncTime && localModifyTime > lastSyncTime;
 
-            console.log('同步判断:', { cloudHasUpdate, localHasModify });
+
 
             if (cloudHasUpdate && localHasModify) {
                 // 两边都有更新：合并数据
-                console.log('两边都有更新，执行智能合并');
+
                 await this.mergeData(localItems, cloudData);
             } else if (cloudHasUpdate) {
                 // 只有云端有更新：下载
-                console.log('云端有更新，下载');
+
                 await this.downloadFromCloud(cloudData);
             } else if (localHasModify) {
                 // 只有本地有修改：上传
-                console.log('本地有修改，上传');
+
                 await this.uploadToCloud();
             } else {
                 // 两边都没变化 - 但仍需同步备忘录
-                console.log('数据已是最新，检查备忘录同步...');
+
                 if (cloudData?.data?.memo !== undefined) {
                     const localMemo = _safeGet('office_memo_content') || '';
                     const cloudMemo = cloudData.data.memo;
                     if (cloudMemo !== localMemo) {
-                        console.log('同步备忘录（云端较新）');
+
                         _safeSet('office_memo_content', cloudMemo);
                         document.dispatchEvent(new CustomEvent('memoSynced', { 
                             detail: { content: cloudMemo } 
@@ -246,7 +235,7 @@ class SyncManager {
                     const localLinks = _safeGet('office_links') || '';
                     const cloudLinks = cloudData.data.links;
                     if (cloudLinks !== localLinks) {
-                        console.log('同步网站（云端较新）');
+
                         _safeSet('office_links', cloudLinks);
                         document.dispatchEvent(new CustomEvent('linksSynced', { 
                             detail: { links: JSON.parse(cloudLinks || '[]') } 
@@ -269,12 +258,12 @@ class SyncManager {
      * 上传本地数据到云端
      */
     async uploadToCloud() {
-        console.log('=== 上传数据到云端 ===');
+
 
         try {
             const allItems = await db.getAllItems();
             // 调试：打印上传数据的order值
-            console.log('上传数据order值:', allItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
+
             
             const settings = {};
             const kimiKey = await db.getSetting('kimi_api_key');
@@ -315,7 +304,7 @@ class SyncManager {
             this.lastCloudSyncTime = syncTime;
             _safeSet('lastCloudSyncTime', syncTime);
             
-            console.log('上传成功，共', allItems.length, '个事项');
+
             return { success: true, itemCount: allItems.length };
 
         } catch (error) {
@@ -328,7 +317,7 @@ class SyncManager {
      * 从云端下载数据
      */
     async downloadFromCloud(cloudData) {
-        console.log('=== 从云端下载数据 ===');
+
 
         try {
             // 同步设置
@@ -377,7 +366,7 @@ class SyncManager {
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
             // 调试：打印下载的数据的order值
-            console.log('[downloadFromCloud] 下载数据 order:', cloudItems.slice(0, 5).map(i => ({ title: i.title, order: i.order })));
+
             const deduplicatedItems = this.deduplicateItems(cloudItems);
             
             await db.clearAllItems();
@@ -399,7 +388,7 @@ class SyncManager {
                 _safeSet('lastCloudSyncTime', cloudData.updated_at);
             }
 
-            console.log('下载成功，共', importedCount, '个事项');
+
 
             // 通知应用刷新
             const event = new CustomEvent('syncDataLoaded', {
@@ -419,9 +408,9 @@ class SyncManager {
      * 智能合并本地和云端数据
      */
     async mergeData(localItems, cloudData) {
-        console.log('=== 智能合并数据 ===');
+
         const cloudItems = cloudData.data.items || [];
-        console.log('本地:', localItems.length, '云端:', cloudItems.length);
+
 
         try {
             // 创建合并后的数据
@@ -456,7 +445,7 @@ class SyncManager {
             }
 
             const mergedItems = Array.from(mergedMap.values());
-            console.log('合并后:', mergedItems.length, '个事项');
+
 
             // 保存合并后的数据
             await db.clearAllItems();
@@ -474,7 +463,7 @@ class SyncManager {
                 const cloudMemo = cloudData.data.memo;
                 const localMemo = _safeGet('office_memo_content') || '';
                 if (cloudMemo !== localMemo) {
-                    console.log('同步备忘录（云端版本）');
+
                     _safeSet('office_memo_content', cloudMemo);
                     document.dispatchEvent(new CustomEvent('memoSynced', { 
                         detail: { content: cloudMemo } 
@@ -487,7 +476,7 @@ class SyncManager {
                 const cloudLinks = cloudData.data.links;
                 const localLinks = _safeGet('office_links') || '';
                 if (cloudLinks !== localLinks) {
-                    console.log('同步网站（云端版本）');
+
                     _safeSet('office_links', cloudLinks);
                     document.dispatchEvent(new CustomEvent('linksSynced', {
                         detail: { links: JSON.parse(cloudLinks || '[]') }
@@ -500,7 +489,7 @@ class SyncManager {
                 const cloudContacts = cloudData.data.contacts;
                 const localContacts = _safeGet('office_contacts') || '';
                 if (cloudContacts !== localContacts) {
-                    console.log('同步通讯录（云端版本）');
+
                     _safeSet('office_contacts', cloudContacts);
                     document.dispatchEvent(new CustomEvent('contactsSynced', {
                         detail: { contacts: JSON.parse(cloudContacts || '[]') }
@@ -574,7 +563,7 @@ class SyncManager {
      * 立即同步到云端（本地修改后调用）
      */
     async immediateSyncToCloud() {
-        console.log('=== 立即同步到云端 ===');
+
 
         if (!this.supabase || !this.currentUser) {
             console.warn('未登录，跳过同步');
@@ -604,12 +593,12 @@ class SyncManager {
         // 每10分钟检查一次
         this.periodicSyncTimer = setInterval(async () => {
             if (this.isLoggedIn() && !this.isSyncing) {
-                console.log('定时同步检查...');
+
                 await this.smartSync();
             }
         }, 600000);
 
-        console.log('定时同步已启动（每10分钟）');
+
     }
 
     /**
@@ -628,7 +617,7 @@ class SyncManager {
     initRealtimeSubscription() {
         if (!this.supabase || !this.currentUser) return;
 
-        console.log('初始化实时订阅...');
+
 
         this.realtimeChannel = this.supabase
             .channel(`user_data_changes_${this.currentUser.id}`)
@@ -641,7 +630,7 @@ class SyncManager {
                     filter: `user_id=eq.${this.currentUser.id}`
                 },
                 async (payload) => {
-                    console.log('收到数据变更通知');
+
                     // 收到其他设备的更新通知，执行智能同步
                     if (payload.eventType === 'UPDATE' && !this.isSyncing) {
                         await this.smartSync();
@@ -649,7 +638,7 @@ class SyncManager {
                 }
             )
             .subscribe((status) => {
-                console.log('实时订阅状态:', status);
+
             });
     }
 
@@ -730,7 +719,7 @@ class SyncManager {
             
             // 先对云端数据本身去重
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
-            console.log('云端数据去重:', cloudItems.length, '->', deduplicatedCloudItems.length);
+
             
             await db.clearAllItems();
 
@@ -750,7 +739,7 @@ class SyncManager {
                 this.lastCloudSyncTime = data.updated_at;
             }
 
-            console.log('静默下载成功，共', importedCount, '个事项');
+
             return { success: true, itemCount: importedCount };
         } catch (error) {
             console.error('静默下载异常:', error);
@@ -769,13 +758,7 @@ class SyncManager {
      * 注册用户
      */
     async register(username, password) {
-        console.log('=== 注册请求 ===');
-        console.log('用户名:', username);
-
-        // 等待初始化完成
         await this.waitForInit();
-        console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
-
         if (!username || username.length < 2) {
             throw new Error('用户名至少需要2个字符');
         }
@@ -788,7 +771,7 @@ class SyncManager {
         }
 
         const email = `${username}@office.local`;
-        console.log('注册邮箱:', email);
+
 
         try {
             const { data, error } = await this.supabase.auth.signUp({
@@ -799,7 +782,7 @@ class SyncManager {
                 }
             });
 
-            console.log('注册结果:', { user: data.user?.id, session: !!data.session, error: error?.message });
+
 
             if (error) {
                 if (error.message.includes('already registered') || error.message.includes('already been registered')) {
@@ -834,9 +817,6 @@ class SyncManager {
      * 用户登录
      */
     async login(username, password) {
-        console.log('=== 登录请求 ===');
-        console.log('用户名:', username);
-
         if (!username || !password) {
             throw new Error('请输入用户名和密码');
         }
@@ -848,7 +828,6 @@ class SyncManager {
 
         // 等待初始化完成
         await this.waitForInit();
-        console.log('Supabase状态:', this.isSupabaseReady() ? '可用' : '不可用');
 
         if (!this.isSupabaseReady()) {
             const errorMsg = this.initError || '网络服务初始化失败，请刷新页面重试。';
@@ -856,7 +835,6 @@ class SyncManager {
         }
 
         const email = `${username}@office.local`;
-        console.log('登录邮箱:', email);
 
         try {
             const { data, error } = await this.supabase.auth.signInWithPassword({
@@ -864,7 +842,6 @@ class SyncManager {
                 password: password
             });
 
-            console.log('登录结果:', { user: data.user?.id, session: !!data.session, error: error?.message });
 
             if (error) {
                 if (error.message.includes('Invalid login credentials')) {
@@ -877,7 +854,6 @@ class SyncManager {
             }
 
             this.currentUser = data.user;
-            console.log('登录成功:', this.currentUser.email);
             this.updateLoginUI();
 
             // 执行智能同步
@@ -900,10 +876,6 @@ class SyncManager {
      * 修改密码
      */
     async changePassword(username, oldPassword, newPassword) {
-        console.log('=== 修改密码请求 ===');
-        console.log('用户名:', username);
-
-        // 等待初始化完成
         await this.waitForInit();
 
         if (!username || !oldPassword || !newPassword) {
@@ -922,7 +894,6 @@ class SyncManager {
 
         try {
             // 1. 先验证原密码（尝试登录）
-            console.log('验证原密码...');
             const { data: loginData, error: loginError } = await this.supabase.auth.signInWithPassword({
                 email: email,
                 password: oldPassword
@@ -935,9 +906,6 @@ class SyncManager {
                 throw new Error('验证失败: ' + loginError.message);
             }
 
-            console.log('原密码验证成功，开始修改密码...');
-
-            // 2. 修改密码
             const { error: updateError } = await this.supabase.auth.updateUser({
                 password: newPassword
             });
@@ -951,7 +919,7 @@ class SyncManager {
             this.currentUser = null;
             this.updateLoginUI();
 
-            console.log('密码修改成功');
+
             return { success: true, message: '密码修改成功，请使用新密码登录' };
         } catch (error) {
             console.error('修改密码失败:', error);
@@ -972,7 +940,6 @@ class SyncManager {
             }
             this.currentUser = null;
             this.updateLoginUI();
-            console.log('已退出登录');
         } catch (error) {
             console.error('退出登录失败:', error);
         }
@@ -989,9 +956,6 @@ class SyncManager {
         try {
             if (progressCallback) progressCallback('正在准备数据...');
             const allItems = await db.getAllItems();
-            console.log('=== 上传数据 ===');
-            console.log('用户ID:', this.currentUser.id);
-            console.log('事项数量:', allItems.length);
 
             // 获取设置数据（包括API Key）
             const settings = {};
@@ -1020,24 +984,10 @@ class SyncManager {
                 data: syncData,
                 updated_at: new Date().toISOString()
             };
-            console.log('上传数据摘要:', {
-                userId: this.currentUser.id,
-                itemCount: allItems.length,
-                hasKimiKey: Boolean(kimiKey),
-                hasDeepSeekKey: Boolean(deepseekKey),
-                hasMemo: Boolean(syncData.memo),
-                hasLinks: Boolean(syncData.links)
-            });
-
             const { data, error } = await this.supabase
                 .from('user_data')
                 .upsert(upsertData, { onConflict: 'user_id' })
                 .select();
-
-            console.log('上传响应状态:', {
-                success: !error,
-                recordCount: Array.isArray(data) ? data.length : (data ? 1 : 0)
-            });
 
             if (error) {
                 console.error('上传失败:', error);
@@ -1063,8 +1013,7 @@ class SyncManager {
             return { success: false, message: '请先登录' };
         }
         try {
-            console.log('=== 下载数据 ===');
-            console.log('用户ID:', this.currentUser.id);
+
 
             if (progressCallback) progressCallback('正在从云端获取数据...');
 
@@ -1075,23 +1024,18 @@ class SyncManager {
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 
-            console.log('查询结果摘要:', {
-                success: !error,
-                hasData: Boolean(data)
-            });
-
             if (error) {
                 console.error('查询失败:', error);
                 throw error;
             }
 
             if (!data) {
-                console.log('云端暂无此用户数据');
+
                 return { success: true, message: '云端暂无数据', itemCount: 0 };
             }
 
             if (!data.data) {
-                console.log('数据字段为空');
+
                 return { success: true, message: '云端数据为空', itemCount: 0 };
             }
 
@@ -1114,7 +1058,7 @@ class SyncManager {
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
                 }
-                console.log('已同步API Key设置');
+
             }
 
             // 同步备忘录
@@ -1123,7 +1067,7 @@ class SyncManager {
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: data.data.memo } 
                 }));
-                console.log('已同步备忘录');
+
             }
 
             // 同步网站
@@ -1132,7 +1076,7 @@ class SyncManager {
                 document.dispatchEvent(new CustomEvent('linksSynced', {
                     detail: { links: JSON.parse(data.data.links || '[]') }
                 }));
-                console.log('已同步网站');
+
             }
 
             // 同步通讯录
@@ -1141,16 +1085,16 @@ class SyncManager {
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
                     detail: { contacts: JSON.parse(data.data.contacts || '[]') }
                 }));
-                console.log('已同步通讯录');
+
             }
 
             // 同步事项数据
             const cloudItems = data.data.items || [];
-            console.log('云端事项数量:', cloudItems.length);
+
 
             // 先对云端数据本身去重
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
-            console.log('云端数据去重后:', deduplicatedCloudItems.length, '个事项');
+
 
             if (mergeStrategy === 'replace') {
                 await db.clearAllItems();
@@ -1182,11 +1126,11 @@ class SyncManager {
                                 if (mergedAttendees.length > localAttendees.length) {
                                     await db.updateItem(existing.id, { attendees: mergedAttendees });
                                     mergedCount++;
-                                    console.log('合并参会人员:', item.title);
+
                                 }
                             } else {
                                 skippedCount++;
-                                console.log('跳过重复事项:', item.title);
+
                             }
                             continue;
                         }

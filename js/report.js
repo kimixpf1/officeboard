@@ -1,204 +1,218 @@
 /**
  * 报告生成模块
- * 支持生成日报/周报/月报，导出Word文档或高清长图
+ * 支持生成日报/周报/月报，导出高清长图
  */
-
-const ReportOfficeConstants = window.OfficeConstants || {};
-const REPORT_ITEM_TYPES = ReportOfficeConstants.ITEM_TYPES || {
-    TODO: 'todo',
-    MEETING: 'meeting',
-    DOCUMENT: 'document'
-};
-const REPORT_DOCUMENT_PROGRESS = ReportOfficeConstants.DOCUMENT_PROGRESS || {
-    PENDING: 'pending',
-    PROCESSING: 'processing',
-    COMPLETED: 'completed'
-};
 
 class ReportGenerator {
     constructor() {
-        this.companyName = '办公室';
-        this.department = '';
+        this.itemTypes = window.OfficeConstants?.ITEM_TYPES || {
+            TODO: 'todo',
+            MEETING: 'meeting',
+            DOCUMENT: 'document'
+        };
+    }
+
+    /**
+     * 获取全部事项
+     */
+    async getAllItems() {
+        if (!window.db || typeof window.db.getAllItems !== 'function') {
+            throw new Error('数据源未就绪，请刷新页面后重试');
+        }
+
+        const items = await window.db.getAllItems();
+        return Array.isArray(items) ? items : [];
+    }
+
+    /**
+     * 判断日期是否在范围内
+     */
+    isDateInRange(dateStr, startDate, endDate) {
+        if (!dateStr) return false;
+        return dateStr >= startDate && dateStr <= endDate;
+    }
+
+    /**
+     * 获取事项日期
+     */
+    getItemDate(item) {
+        if (!item) return '';
+
+        if (item.type === this.itemTypes.TODO) {
+            return item.deadline?.split('T')[0] || item.createdAt?.split('T')[0] || '';
+        }
+
+        if (item.type === this.itemTypes.MEETING) {
+            return item.date || '';
+        }
+
+        if (item.type === this.itemTypes.DOCUMENT) {
+            return item.docStartDate || item.docDate || item.date || '';
+        }
+
+        return item.deadline?.split('T')[0] || item.date || item.docStartDate || item.docDate || item.createdAt?.split('T')[0] || '';
     }
 
     /**
      * 生成报告数据
      */
     async generateReportData(reportType, startDate, endDate) {
-        // 获取日期范围内的事项
-        const items = await db.getItemsByDateRange(startDate, endDate);
+        const allItems = await this.getAllItems();
 
-        // 分类统计
-        const stats = {
-            todo: { total: 0, completed: 0, pending: 0, highPriority: 0 },
-            meeting: { total: 0, upcoming: 0 },
-            document: { total: 0, completed: 0, processing: 0, pending: 0 }
-        };
+        const todos = allItems.filter(item =>
+            item?.type === this.itemTypes.TODO && this.isDateInRange(this.getItemDate(item), startDate, endDate)
+        );
 
-        const categorized = {
-            todo: [],
-            meeting: [],
-            document: []
-        };
+        const meetings = allItems.filter(item =>
+            item?.type === this.itemTypes.MEETING && this.isDateInRange(this.getItemDate(item), startDate, endDate)
+        );
 
-        for (const item of items) {
-            switch (item.type) {
-                case REPORT_ITEM_TYPES.TODO:
-                    categorized.todo.push(item);
-                    stats.todo.total++;
-                    if (item.completed) {
-                        stats.todo.completed++;
-                    } else {
-                        stats.todo.pending++;
-                    }
-                    if (item.priority === 'high') {
-                        stats.todo.highPriority++;
-                    }
-                    break;
-
-                case REPORT_ITEM_TYPES.MEETING:
-                    categorized.meeting.push(item);
-                    stats.meeting.total++;
-                    if (item.date >= new Date().toISOString().split('T')[0]) {
-                        stats.meeting.upcoming++;
-                    }
-                    break;
-
-                case REPORT_ITEM_TYPES.DOCUMENT:
-                    categorized.document.push(item);
-                    stats.document.total++;
-                    if (item.progress === REPORT_DOCUMENT_PROGRESS.COMPLETED) {
-                        stats.document.completed++;
-                    } else if (item.progress === REPORT_DOCUMENT_PROGRESS.PROCESSING) {
-                        stats.document.processing++;
-                    } else {
-                        stats.document.pending++;
-                    }
-                    break;
-            }
-        }
+        const documents = allItems.filter(item =>
+            item?.type === this.itemTypes.DOCUMENT && this.isDateInRange(this.getItemDate(item), startDate, endDate)
+        );
 
         return {
-            type: reportType,
-            startDate,
-            endDate,
-            generatedAt: new Date().toISOString(),
-            stats,
-            items: categorized
+            todos,
+            meetings,
+            documents,
+            stats: {
+                todo: {
+                    total: todos.length,
+                    completed: todos.filter(t => t.completed).length,
+                    pending: todos.filter(t => !t.completed).length,
+                    highPriority: todos.filter(t => t.priority === 'high').length
+                },
+                meeting: {
+                    total: meetings.length,
+                    important: meetings.filter(m => m.isImportant).length,
+                    withLeaders: meetings.filter(m => Array.isArray(m.attendees) && m.attendees.length > 0).length
+                },
+                document: {
+                    total: documents.length,
+                    processed: documents.filter(d => d.progress === 'completed' || d.status === 'processed').length,
+                    pending: documents.filter(d => d.progress === 'pending' || d.status === 'pending').length
+                }
+            }
         };
     }
 
     /**
-     * 生成报告标题
+     * 获取报告标题
      */
     getReportTitle(reportType, date) {
-        const titles = {
-            daily: '工作日报',
-            weekly: '工作周报',
-            monthly: '工作月报',
-            yearly: '工作年报',
-            custom: '工作报告'
-        };
-        return titles[reportType] || '工作报告';
-    }
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
 
-    /**
-     * 格式化日期范围
-     */
-    formatDateRange(startDate, endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        const format = (date) => {
-            return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-        };
-
-        if (startDate === endDate) {
-            return format(start);
+        switch (reportType) {
+            case 'daily':
+                return `${year}年${month}月${day}日工作日报`;
+            case 'weekly':
+                return `${year}年第${this.getWeekNumber(d)}周工作周报`;
+            case 'monthly':
+                return `${year}年${month}月工作月报`;
+            case 'yearly':
+                return `${year}年工作年报`;
+            case 'custom':
+                return `工作报告`;
+            default:
+                return '工作报告';
         }
-
-        return `${format(start)} 至 ${format(end)}`;
     }
 
     /**
-     * 生成报告内容（文本格式）
+     * 获取周数
+     */
+    getWeekNumber(date) {
+        const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+        const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+        return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+    }
+
+    /**
+     * 生成报告内容
      */
     async generateReportContent(reportType, startDate, endDate) {
         const data = await this.generateReportData(reportType, startDate, endDate);
-        const title = this.getReportTitle(reportType, startDate);
-        const dateRange = this.formatDateRange(startDate, endDate);
+        const dateRange = startDate === endDate ? startDate : `${startDate} 至 ${endDate}`;
 
-        let content = `${this.companyName}${title}\n`;
+        let content = '';
+
+        // 标题
+        content += `${this.getReportTitle(reportType, startDate)}\n`;
         content += `报告期间：${dateRange}\n`;
-        content += `生成时间：${new Date().toLocaleString('zh-CN')}\n`;
-        content += '\n';
+        content += `生成时间：${new Date().toLocaleString('zh-CN')}\n\n`;
 
-        // 工作概述
-        content += '一、工作概述\n';
-        content += `本${reportType === 'daily' ? '日' : reportType === 'weekly' ? '周' : '月'}共处理待办事项${data.stats.todo.total}项`;
-        content += `（已完成${data.stats.todo.completed}项，待完成${data.stats.todo.pending}项），`;
-        content += `安排会议${data.stats.meeting.total}场，`;
-        content += `处理文件${data.stats.document.total}件。\n\n`;
+        // 工作概况
+        content += '一、工作概况\n';
+        content += `本期间共处理工作事项 ${data.stats.todo.total} 项，`;
+        content += `完成 ${data.stats.todo.completed} 项，`;
+        content += `待处理 ${data.stats.todo.pending} 项。\n`;
+        content += `组织会议活动 ${data.stats.meeting.total} 场，`;
+        content += `处理办文 ${data.stats.document.total} 件。\n\n`;
 
         // 待办事项
-        if (data.items.todo.length > 0) {
-            content += '二、待办事项完成情况\n';
-            data.items.todo.forEach((item, index) => {
-                const status = item.completed ? '已完成' : '进行中';
-                const priority = item.priority === 'high' ? '【高优先级】' : '';
-                content += `${index + 1}. ${priority}${item.title} - ${status}\n`;
-                if (item.deadline) {
-                    content += `   截止时间：${new Date(item.deadline).toLocaleString('zh-CN')}\n`;
+        content += '二、待办事项完成情况\n';
+        if (data.todos.length > 0) {
+            data.todos.forEach((todo, index) => {
+                content += `${index + 1}. ${todo.text}\n`;
+                content += `   状态：${todo.completed ? '已完成' : '待处理'}`;
+                content += `，优先级：${this.getPriorityText(todo.priority)}\n`;
+                if (todo.description) {
+                    content += `   说明：${todo.description}\n`;
                 }
             });
-            content += '\n';
+        } else {
+            content += '本期间无待办事项记录。\n';
         }
+        content += '\n';
 
         // 会议活动
-        if (data.items.meeting.length > 0) {
-            content += '三、会议活动安排\n';
-            data.items.meeting.forEach((item, index) => {
-                content += `${index + 1}. ${item.title}\n`;
-                if (item.date) {
-                    content += `   时间：${item.date}`;
-                    if (item.time) content += ` ${item.time}`;
-                    content += '\n';
+        content += '三、会议活动情况\n';
+        if (data.meetings.length > 0) {
+            data.meetings.forEach((meeting, index) => {
+                content += `${index + 1}. ${meeting.title}\n`;
+                content += `   时间：${meeting.date} ${meeting.time || ''}\n`;
+                if (meeting.attendees && meeting.attendees.length > 0) {
+                    content += `   参会人员：${meeting.attendees.join('、')}\n`;
                 }
-                if (item.location) content += `   地点：${item.location}\n`;
-                if (item.attendees && item.attendees.length > 0) {
-                    content += `   参会人员：${item.attendees.join('、')}\n`;
+                if (meeting.location) {
+                    content += `   地点：${meeting.location}\n`;
                 }
             });
-            content += '\n';
+        } else {
+            content += '本期间无会议活动记录。\n';
         }
+        content += '\n';
 
         // 办文情况
-        if (data.items.document.length > 0) {
-            content += '四、文件办理情况\n';
-            data.items.document.forEach((item, index) => {
-                const progressMap = {
-                    [REPORT_DOCUMENT_PROGRESS.PENDING]: '待办',
-                    [REPORT_DOCUMENT_PROGRESS.PROCESSING]: '办理中',
-                    [REPORT_DOCUMENT_PROGRESS.COMPLETED]: '已办结'
-                };
-                const progress = progressMap[item.progress] || item.progress;
-                content += `${index + 1}. ${item.title} - ${progress}\n`;
-                if (item.docNumber) content += `   文号：${item.docNumber}\n`;
-                if (item.source) content += `   来文单位：${item.source}\n`;
+        content += '四、办文情况\n';
+        if (data.documents.length > 0) {
+            data.documents.forEach((doc, index) => {
+                content += `${index + 1}. ${doc.title}\n`;
+                content += `   类型：${doc.type || '未分类'}，状态：${this.getStatusText(doc.status)}\n`;
+                if (doc.documentNumber) {
+                    content += `   文号：${doc.documentNumber}\n`;
+                }
             });
-            content += '\n';
+        } else {
+            content += '本期间无办文记录。\n';
         }
+        content += '\n';
 
-        // 工作总结
-        content += '五、工作总结\n';
-        content += `本${reportType === 'daily' ? '日' : reportType === 'weekly' ? '周' : '月'}工作按计划有序推进，`;
-        if (data.stats.todo.pending > 0) {
-            content += `有${data.stats.todo.pending}项待办事项需继续跟进，`;
+        // 重点工作
+        content += '五、重点工作总结\n';
+        if (data.stats.todo.highPriority > 0) {
+            content += `本期间有 ${data.stats.todo.highPriority} 项高优先级工作需要重点关注。\n`;
         }
-        if (data.stats.document.processing > 0) {
-            content += `${data.stats.document.processing}件文件正在办理中。`;
+        if (data.stats.meeting.important > 0) {
+            content += `组织了 ${data.stats.meeting.important} 场重要会议活动。\n`;
         }
-        content += '\n\n';
+        if (data.stats.document.pending > 0) {
+            content += `当前还有 ${data.stats.document.pending} 件办文待处理。\n`;
+        }
+        content += '\n';
 
         // 下一步计划
         content += '六、下一步工作计划\n';
@@ -214,159 +228,6 @@ class ReportGenerator {
             content,
             data
         };
-    }
-
-    /**
-     * 动态加载docx库（本地优先，CDN备用）
-     */
-    async loadDocxLibrary() {
-        // 检查是否已加载
-        if (window.docx) return window.docx;
-
-        const sources = [
-            './vendor/docx.8.2.0.umd.cjs',
-            'https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.umd.cjs',
-            'https://unpkg.com/docx@8.2.0/build/index.umd.cjs'
-        ];
-        const loadErrors = [];
-
-        for (const src of sources) {
-            try {
-                await this.loadScript(src);
-                if (window.docx) {
-                    console.log('docx库加载成功:', src);
-                    return window.docx;
-                }
-                throw new Error('脚本已加载但未找到 window.docx');
-            } catch (e) {
-                loadErrors.push(`${src}: ${e.message}`);
-                console.warn('docx加载失败:', src, e.message);
-            }
-        }
-
-        throw new Error(`所有docx源均无法加载：${loadErrors.join(' | ')}`);
-    }
-
-    /**
-     * 加载单个脚本
-     */
-    loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const existingScript = Array.from(document.scripts).find(script => script.src === src);
-            if (existingScript) {
-                if (existingScript.dataset.loaded === 'true') {
-                    resolve();
-                    return;
-                }
-
-                existingScript.addEventListener('load', () => resolve(), { once: true });
-                existingScript.addEventListener('error', () => reject(new Error('脚本加载失败')), { once: true });
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = src;
-            const timeoutId = setTimeout(() => reject(new Error('加载超时')), 10000);
-            script.onload = () => {
-                clearTimeout(timeoutId);
-                script.dataset.loaded = 'true';
-                resolve();
-            };
-            script.onerror = () => {
-                clearTimeout(timeoutId);
-                reject(new Error('脚本加载失败'));
-            };
-            document.head.appendChild(script);
-        });
-    }
-
-    /**
-     * 导出为Word文档
-     */
-    async exportToWord(reportType, startDate, endDate) {
-        // 动态加载docx库
-        let docxLib;
-        try {
-            docxLib = await this.loadDocxLibrary();
-        } catch (error) {
-            throw new Error('Word导出库加载失败: ' + error.message);
-        }
-
-        const report = await this.generateReportContent(reportType, startDate, endDate);
-
-        // 使用docx.js生成Word文档
-        const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } = docxLib;
-
-        const children = [
-            new Paragraph({
-                text: report.title,
-                heading: HeadingLevel.HEADING_1,
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 }
-            }),
-            new Paragraph({
-                children: [
-                    new TextRun({ text: '报告期间：', bold: true }),
-                    new TextRun(report.dateRange)
-                ],
-                spacing: { after: 200 }
-            }),
-            new Paragraph({
-                children: [
-                    new TextRun({ text: '生成时间：', bold: true }),
-                    new TextRun(new Date().toLocaleString('zh-CN'))
-                ],
-                spacing: { after: 400 }
-            })
-        ];
-
-        // 解析内容并添加到文档
-        const sections = report.content.split('\n\n');
-        for (const section of sections) {
-            const lines = section.trim().split('\n');
-            for (const line of lines) {
-                if (line.startsWith('一、') || line.startsWith('二、') ||
-                    line.startsWith('三、') || line.startsWith('四、') ||
-                    line.startsWith('五、') || line.startsWith('六、')) {
-                    children.push(new Paragraph({
-                        text: line,
-                        heading: HeadingLevel.HEADING_2,
-                        spacing: { before: 300, after: 200 }
-                    }));
-                } else if (line.match(/^\d+\./)) {
-                    children.push(new Paragraph({
-                        text: line,
-                        spacing: { before: 100, after: 100 },
-                        indent: { left: 400 }
-                    }));
-                } else if (line.trim()) {
-                    children.push(new Paragraph({
-                        text: line,
-                        spacing: { after: 100 }
-                    }));
-                }
-            }
-        }
-
-        const doc = new Document({
-            sections: [{
-                properties: {},
-                children
-            }]
-        });
-
-        // 生成并下载
-        const blob = await Packer.toBlob(doc);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${report.title}_${startDate}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        return true;
     }
 
     /**
@@ -539,136 +400,28 @@ class ReportGenerator {
     }
 
     /**
-     * 动态加载jsPDF库
+     * 获取优先级文本
      */
-    async loadJsPDFLibrary() {
-        if (window.jspdf) return window.jspdf;
-
-        const cdnSources = [
-            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-            'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
-        ];
-
-        for (const src of cdnSources) {
-            try {
-                await this.loadScript(src);
-                if (window.jspdf) {
-                    console.log('jsPDF库加载成功:', src);
-                    return window.jspdf;
-                }
-            } catch (e) {
-                console.warn('CDN加载失败:', src, e.message);
-            }
-        }
-
-        throw new Error('jsPDF库加载失败，请检查网络连接');
+    getPriorityText(priority) {
+        const priorityMap = {
+            high: '高',
+            medium: '中',
+            low: '低'
+        };
+        return priorityMap[priority] || priority;
     }
 
     /**
-     * 导出为PDF文档
+     * 获取状态文本
      */
-    async exportToPDF(reportType, startDate, endDate) {
-        const report = await this.generateReportContent(reportType, startDate, endDate);
-
-        let jsPDFLib;
-        try {
-            jsPDFLib = await this.loadJsPDFLibrary();
-        } catch (error) {
-            throw new Error('PDF导出库加载失败: ' + error.message);
-        }
-
-        const { jsPDF } = jsPDFLib;
-        const doc = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        });
-
-        // 添加字体支持（使用内置字体）
-        doc.setFont('helvetica');
-
-        let yPosition = 20;
-        const pageHeight = 280;
-        const leftMargin = 15;
-        const lineHeight = 7;
-
-        // 标题
-        doc.setFontSize(18);
-        doc.text(report.title, 105, yPosition, { align: 'center' });
-        yPosition += 15;
-
-        // 日期和生成时间
-        doc.setFontSize(10);
-        doc.text(`报告期间：${report.dateRange}`, leftMargin, yPosition);
-        yPosition += 6;
-        doc.text(`生成时间：${new Date().toLocaleString('zh-CN')}`, leftMargin, yPosition);
-        yPosition += 12;
-
-        // 分割线
-        doc.setDrawColor(200);
-        doc.line(leftMargin, yPosition, 195, yPosition);
-        yPosition += 8;
-
-        // 内容
-        doc.setFontSize(11);
-        const lines = report.content.split('\n');
-
-        for (const line of lines) {
-            // 跳过标题和日期行（已处理）
-            if (line.includes(report.title) || line.startsWith('报告期间：') || line.startsWith('生成时间：')) {
-                continue;
-            }
-
-            // 检查是否需要换页
-            if (yPosition > pageHeight) {
-                doc.addPage();
-                yPosition = 20;
-            }
-
-            if (line.startsWith('一、') || line.startsWith('二、') ||
-                line.startsWith('三、') || line.startsWith('四、') ||
-                line.startsWith('五、') || line.startsWith('六、')) {
-                // 章节标题
-                doc.setFontSize(13);
-                doc.setFont('helvetica', 'bold');
-                yPosition += 3;
-                doc.text(line, leftMargin, yPosition);
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(11);
-                yPosition += lineHeight + 2;
-            } else if (line.match(/^\d+\./)) {
-                // 列表项
-                doc.text('  ' + line, leftMargin, yPosition);
-                yPosition += lineHeight;
-            } else if (line.trim()) {
-                // 普通文本，处理自动换行
-                const maxWidth = 180;
-                const splitText = doc.splitTextToSize(line, maxWidth);
-                for (const text of splitText) {
-                    if (yPosition > pageHeight) {
-                        doc.addPage();
-                        yPosition = 20;
-                    }
-                    doc.text(text, leftMargin, yPosition);
-                    yPosition += lineHeight;
-                }
-            } else {
-                yPosition += 3; // 空行
-            }
-        }
-
-        // 添加页脚
-        const pageCount = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.text(`第 ${i} 页 / 共 ${pageCount} 页`, 105, 290, { align: 'center' });
-        }
-
-        // 下载
-        doc.save(`${report.title}_${startDate}.pdf`);
-
-        return true;
+    getStatusText(status) {
+        const statusMap = {
+            pending: '待处理',
+            processing: '处理中',
+            processed: '已处理',
+            archived: '已归档'
+        };
+        return statusMap[status] || status;
     }
 }
 

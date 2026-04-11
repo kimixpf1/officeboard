@@ -167,7 +167,12 @@ class CalendarView {
         } catch (error) {
             console.error('渲染日历失败:', error);
             if (this.container) {
-                this.container.innerHTML = '<div style="text-align:center;padding:40px;color:#666;">加载日历失败，请刷新重试</div>';
+                const errorEl = document.createElement('div');
+                errorEl.style.textAlign = 'center';
+                errorEl.style.padding = '40px';
+                errorEl.style.color = '#666';
+                errorEl.textContent = '加载日历失败，请刷新重试';
+                this.container.replaceChildren(errorEl);
             }
         }
     }
@@ -240,22 +245,24 @@ class CalendarView {
      * 渲染周视图
      */
     renderWeekView(items) {
-        // 获取本周的日期范围（周一到周日）
         const weekDates = this.getWeekDates(this.currentDate);
         const today = new Date();
         const todayStr = this.formatLocalDate(today);
 
-        // 计算是该月的第几周
         const weekStart = weekDates[0];
         const weekOfMonth = this.getWeekOfMonth(weekStart);
         const monthLabel = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月第${weekOfMonth}周`;
 
-        let html = '<div class="week-view">';
+        const container = document.createElement('div');
+        container.className = 'week-view';
 
-        // 第一行：周标题（跨7列）
-        html += `<div class="week-title" style="grid-column: 1 / span 7; text-align: center;">${monthLabel}</div>`;
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'week-title';
+        titleDiv.style.gridColumn = '1 / span 7';
+        titleDiv.style.textAlign = 'center';
+        titleDiv.textContent = monthLabel;
+        container.appendChild(titleDiv);
 
-        // 第二行：星期表头（7列）
         const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
         for (let i = 0; i < 7; i++) {
             const date = weekDates[i];
@@ -263,72 +270,57 @@ class CalendarView {
             const isToday = dateStr === todayStr;
             const dayLabel = `${weekDayNames[i]} ${date.getMonth() + 1}/${date.getDate()}`;
 
-            html += `<div class="week-header ${isToday ? 'today' : ''}">${dayLabel}</div>`;
+            const headerDiv = document.createElement('div');
+            headerDiv.className = `week-header${isToday ? ' today' : ''}`;
+            headerDiv.textContent = dayLabel;
+            container.appendChild(headerDiv);
         }
 
-        // 第三行起：每天的事项（7列）
         for (let i = 0; i < 7; i++) {
             const date = weekDates[i];
             const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
 
-            // 筛选当天的事项
             const dayItems = items.filter(item => {
-                // 会议：检查日期范围
                 if (item.type === 'meeting' && item.date) {
-                    if (item.endDate) {
-                        return dateStr >= item.date && dateStr <= item.endDate;
-                    }
+                    if (item.endDate) return dateStr >= item.date && dateStr <= item.endDate;
                     return item.date === dateStr;
                 }
-                // 待办：按截止日期
                 if (item.type === 'todo' && item.deadline) {
-                    const deadlineDate = item.deadline.split('T')[0];
-                    return deadlineDate === dateStr;
+                    return item.deadline.split('T')[0] === dateStr;
                 }
-                // 办文：按办文日期范围（支持跨天），支持跳过周末
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
-                    
-                    // 首先检查当前日期是否在办文日期范围内
                     let inRange = false;
-                    if (startDate && endDate) {
-                        // 跨天办文：检查日期范围
-                        inRange = dateStr >= startDate && dateStr <= endDate;
-                    } else if (startDate) {
-                        // 单天办文
-                        inRange = startDate === dateStr;
-                    } else if (item.createdAt) {
-                        // 兼容旧数据：按创建日期
-                        const createdDate = item.createdAt.split('T')[0];
-                        inRange = createdDate === dateStr;
-                    }
-                    
-                    // 如果在范围内且启用了跳过周末，检查是否是工作日
-                    if (inRange && item.skipWeekend) {
-                        return this.isWorkday(dateStr);
-                    }
-                    
+                    if (startDate && endDate) inRange = dateStr >= startDate && dateStr <= endDate;
+                    else if (startDate) inRange = startDate === dateStr;
+                    else if (item.createdAt) inRange = item.createdAt.split('T')[0] === dateStr;
+                    if (inRange && item.skipWeekend) return this.isWorkday(dateStr);
                     return inRange;
                 }
                 return false;
             });
 
-            // 排序：待办→会议→文件，再按时间
             const sortedItems = this.sortItems(dayItems);
 
-            html += `
-                <div class="week-cell ${isToday ? 'today' : ''}" 
-                     data-date="${dateStr}" 
-                     onclick="window.calendarView.goToDate('${dateStr}')">
-                    ${sortedItems.length > 0 ? sortedItems.map(item => this.renderCalendarItem(item, true)).join('') : '<div style="color: #ccc; text-align: center; padding-top: 20px;">-</div>'}
-                </div>
-            `;
+            const cellDiv = document.createElement('div');
+            cellDiv.className = `week-cell${isToday ? ' today' : ''}`;
+            cellDiv.dataset.date = dateStr;
+            cellDiv.addEventListener('click', () => this.goToDate(dateStr));
+
+            if (sortedItems.length > 0) {
+                sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
+            } else {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.style.cssText = 'color:#ccc;text-align:center;padding-top:20px;';
+                emptyDiv.textContent = '-';
+                cellDiv.appendChild(emptyDiv);
+            }
+            container.appendChild(cellDiv);
         }
 
-        html += '</div>';
-        this.container.innerHTML = html;
+        this.container.replaceChildren(container);
     }
 
     /**
@@ -376,107 +368,99 @@ class CalendarView {
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
-        const startDayOfWeek = firstDay.getDay() || 7; // 周一为1，周日为7
+        const startDayOfWeek = firstDay.getDay() || 7;
 
         const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
         const today = new Date();
         const todayStr = this.formatLocalDate(today);
 
-        let html = '<div class="month-view">';
+        const container = document.createElement('div');
+        container.className = 'month-view';
 
-        // 月份标题
-        html += `<div class="month-title" style="grid-column: 1 / span 7; text-align: center;">${year}年${month + 1}月</div>`;
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'month-title';
+        titleDiv.style.gridColumn = '1 / span 7';
+        titleDiv.style.textAlign = 'center';
+        titleDiv.textContent = `${year}年${month + 1}月`;
+        container.appendChild(titleDiv);
 
-        // 表头
         weekDays.forEach(day => {
-            html += `<div class="month-header">周${day}</div>`;
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'month-header';
+            headerDiv.textContent = `周${day}`;
+            container.appendChild(headerDiv);
         });
 
-        // 上月空白
         for (let i = 1; i < startDayOfWeek; i++) {
-            html += '<div class="month-cell other-month"></div>';
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'month-cell other-month';
+            container.appendChild(emptyDiv);
         }
 
-        // 当月日期
         for (let day = 1; day <= daysInMonth; day++) {
-            // 使用本地时间构建日期字符串，避免时区问题
             const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
             const isToday = dateStr === todayStr;
 
-            // 修复：支持跨天会议显示
             const dayItems = items.filter(item => {
-                // 会议：检查日期范围
                 if (item.type === 'meeting' && item.date) {
-                    if (item.endDate) {
-                        // 跨天会议：检查当前日期是否在范围内
-                        return dateStr >= item.date && dateStr <= item.endDate;
-                    }
+                    if (item.endDate) return dateStr >= item.date && dateStr <= item.endDate;
                     return item.date === dateStr;
                 }
-                // 待办：按截止日期
                 if (item.type === 'todo' && item.deadline) {
                     return item.deadline.startsWith(dateStr);
                 }
-                // 办文：按办文日期范围（支持跨天），支持跳过周末
                 if (item.type === 'document') {
                     const startDate = item.docStartDate || item.docDate;
                     const endDate = item.docEndDate;
-                    
-                    // 首先检查当前日期是否在办文日期范围内
                     let inRange = false;
-                    if (startDate && endDate) {
-                        // 跨天办文：检查日期范围
-                        inRange = dateStr >= startDate && dateStr <= endDate;
-                    } else if (startDate) {
-                        // 单天办文
-                        inRange = startDate === dateStr;
-                    } else if (item.createdAt) {
-                        // 兼容旧数据：按创建日期
-                        inRange = item.createdAt.startsWith(dateStr);
-                    }
-                    
-                    // 如果在范围内且启用了跳过周末，检查是否是工作日
-                    if (inRange && item.skipWeekend) {
-                        return this.isWorkday(dateStr);
-                    }
-                    
+                    if (startDate && endDate) inRange = dateStr >= startDate && dateStr <= endDate;
+                    else if (startDate) inRange = startDate === dateStr;
+                    else if (item.createdAt) inRange = item.createdAt.startsWith(dateStr);
+                    if (inRange && item.skipWeekend) return this.isWorkday(dateStr);
                     return inRange;
                 }
                 return false;
             });
 
-            // 排序：待办→会议→文件，再按时间
             const sortedItems = this.sortItems(dayItems);
 
+            const cellDiv = document.createElement('div');
+            cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}`;
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
-            // 所有日期都可以点击进入日视图
-            html += `
-                <div class="month-cell ${isToday ? 'today' : ''} ${sortedItems.length === 0 ? 'empty-cell' : ''}" data-date="${fullDateLabel}" onclick="window.calendarView.goToDate('${dateStr}')">
-                    <div class="month-cell-date">${day}</div>
-                    ${sortedItems.map(item => this.renderCalendarItem(item, true)).join('')}
-                </div>
-            `;
+            cellDiv.dataset.date = fullDateLabel;
+            cellDiv.addEventListener('click', () => this.goToDate(dateStr));
+
+            const dateLabelDiv = document.createElement('div');
+            dateLabelDiv.className = 'month-cell-date';
+            dateLabelDiv.textContent = day;
+            cellDiv.appendChild(dateLabelDiv);
+
+            sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
+            container.appendChild(cellDiv);
         }
 
-        // 下月空白
         const remainingCells = (7 - ((startDayOfWeek - 1 + daysInMonth) % 7)) % 7;
         for (let i = 1; i <= remainingCells; i++) {
-            html += '<div class="month-cell other-month"></div>';
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'month-cell other-month';
+            container.appendChild(emptyDiv);
         }
 
-        html += '</div>';
-        this.container.innerHTML = html;
+        this.container.replaceChildren(container);
     }
 
     /**
      * 渲染日历中的事项
      */
     renderCalendarItem(item, compact = false) {
+        return this.createCalendarItem(item, compact);
+    }
+
+    createCalendarItem(item, compact = false) {
         const typeClass = `${item.type}-card`;
         const typeLabels = { todo: '待办', meeting: '会议', document: '文件' };
         const typeLabel = typeLabels[item.type] || item.type;
 
-        // 会议特殊格式：【参会人员】会议名称-时间-地点
         let displayTitle = item.title;
         if (item.type === 'meeting') {
             const parts = [];
@@ -484,48 +468,48 @@ class CalendarView {
                 parts.push(`【${item.attendees.join('、')}】`);
             }
             parts.push(item.title);
-            if (item.time) {
-                parts.push(`-${item.time}`);
-            }
-            if (item.location) {
-                parts.push(`-${item.location}`);
-            }
+            if (item.time) parts.push(`-${item.time}`);
+            if (item.location) parts.push(`-${item.location}`);
             displayTitle = parts.join('');
         }
 
+        const el = document.createElement('div');
+        el.className = `calendar-item ${typeClass}`;
+        el.dataset.id = item.id;
+        el.title = displayTitle;
+        el.style.cursor = 'pointer';
+        el.style.whiteSpace = 'normal';
+
+        const baseColor = this.getTypeColor(item.type);
+        const bgColor = this.getTypeColor(item.type, 0.1);
+
         if (compact) {
-            return `
-                <div class="calendar-item ${typeClass}" data-id="${item.id}" style="
-                    padding: 6px 8px;
-                    margin: 4px 0;
-                    border-radius: 6px;
-                    font-size: 13px;
-                    background: ${this.getTypeColor(item.type, 0.1)};
-                    border-left: 4px solid ${this.getTypeColor(item.type)};
-                    cursor: pointer;
-                    white-space: normal;
-                    line-height: 1.4;
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-                " title="${displayTitle}">
-                    <strong>[${typeLabel}]</strong> ${displayTitle}
-                </div>
-            `;
+            el.style.cssText = `padding:6px 8px;margin:4px 0;border-radius:6px;font-size:13px;background:${bgColor};border-left:4px solid ${baseColor};cursor:pointer;white-space:normal;line-height:1.4;box-shadow:0 1px 2px rgba(0,0,0,0.1);`;
+            const strong = document.createElement('strong');
+            strong.textContent = `[${typeLabel}]`;
+            el.appendChild(strong);
+            el.appendChild(document.createTextNode(` ${displayTitle}`));
+        } else {
+            el.style.cssText = `padding:8px 12px;margin:4px 0;border-radius:6px;background:${bgColor};border-left:4px solid ${baseColor};cursor:pointer;`;
+            const titleDiv = document.createElement('div');
+            titleDiv.style.cssText = 'font-weight:600;font-size:13px;';
+            titleDiv.textContent = displayTitle;
+            el.appendChild(titleDiv);
+            if (item.type !== 'meeting' && item.time) {
+                const timeDiv = document.createElement('div');
+                timeDiv.style.cssText = 'font-size:11px;color:#666;';
+                timeDiv.textContent = `⏰ ${item.time}`;
+                el.appendChild(timeDiv);
+            }
+            if (item.type !== 'meeting' && item.location) {
+                const locDiv = document.createElement('div');
+                locDiv.style.cssText = 'font-size:11px;color:#666;';
+                locDiv.textContent = `📍 ${item.location}`;
+                el.appendChild(locDiv);
+            }
         }
 
-        return `
-            <div class="calendar-item ${typeClass}" data-id="${item.id}" style="
-                padding: 8px 12px;
-                margin: 4px 0;
-                border-radius: 6px;
-                background: ${this.getTypeColor(item.type, 0.1)};
-                border-left: 4px solid ${this.getTypeColor(item.type)};
-                cursor: pointer;
-            ">
-                <div style="font-weight:600;font-size:13px;">${displayTitle}</div>
-                ${item.type !== 'meeting' && item.time ? `<div style="font-size:11px;color:#666;">⏰ ${item.time}</div>` : ''}
-                ${item.type !== 'meeting' && item.location ? `<div style="font-size:11px;color:#666;">📍 ${item.location}</div>` : ''}
-            </div>
-        `;
+        return el;
     }
 
     /**

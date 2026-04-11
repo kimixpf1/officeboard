@@ -13,12 +13,14 @@
         }
     }
 
-    function setSummary(html, isError = false) {
-        if (!summaryEl) {
-            return;
+    function setSummary(content, isError = false) {
+        if (!summaryEl) return;
+        summaryEl.replaceChildren();
+        if (typeof content === 'string') {
+            summaryEl.textContent = content;
+        } else if (content instanceof HTMLElement) {
+            summaryEl.appendChild(content);
         }
-
-        summaryEl.innerHTML = html;
         summaryEl.style.display = 'block';
         summaryEl.classList.toggle('error', isError);
     }
@@ -30,7 +32,7 @@
             dialogClassName: 'modal-card',
             dialogStyle: '',
             headerClassName: 'modal-header',
-            headerHtml: '<strong>识别前预览确认</strong>',
+            headerContent: (() => { const s = document.createElement('strong'); s.textContent = '识别前预览确认'; return s; })(),
             showCloseButton: false,
             bodyClassName: 'modal-body',
             footerClassName: 'modal-footer',
@@ -88,10 +90,13 @@
             });
 
             setStatus('识别完成，结果已保存到本地，正在返回主页面...');
-            setSummary(
-                `${window.UploadFlowUtils.buildRecognitionSummaryHtml(file.name, result, false, 'compact')}
-                <div style="margin-top:12px;padding:10px;background:#eff6ff;border-radius:8px;color:#1e40af;">已保存成功，约 1 秒后自动返回主页面。</div>`
-            );
+            const successContainer = document.createElement('div');
+            successContainer.appendChild(window.UploadFlowUtils.buildRecognitionSummaryHtml(file.name, result, false, 'compact'));
+            const successTip = document.createElement('div');
+            successTip.style.cssText = 'margin-top:12px;padding:10px;background:#eff6ff;border-radius:8px;color:#1e40af;';
+            successTip.textContent = '已保存成功，约 1 秒后自动返回主页面。';
+            successContainer.appendChild(successTip);
+            setSummary(successContainer);
 
             shouldStayDisabled = true;
             window.setTimeout(() => {
@@ -99,18 +104,21 @@
             }, 1200);
         } catch (error) {
             setStatus(`识别失败：${error.message}`);
-            setSummary(
-                `<div style="color:#dc2626;font-weight:600;margin-bottom:8px;">识别失败：${error.message}</div>
-                 <button id="retryUploadBtn" style="background:#3b82f6;color:white;border:none;padding:8px 20px;border-radius:6px;font-size:14px;cursor:pointer;">重新识别</button>`,
-                true
-            );
-            const retryBtn = document.getElementById('retryUploadBtn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    retryBtn.remove();
-                    processFile(file);
-                });
-            }
+            const errorContainer = document.createElement('div');
+            const errorMsg = document.createElement('div');
+            errorMsg.style.cssText = 'color:#dc2626;font-weight:600;margin-bottom:8px;';
+            errorMsg.textContent = `识别失败：${error.message}`;
+            errorContainer.appendChild(errorMsg);
+            const retryBtn = document.createElement('button');
+            retryBtn.style.cssText = 'background:#3b82f6;color:white;border:none;padding:8px 20px;border-radius:6px;font-size:14px;cursor:pointer;';
+            retryBtn.textContent = '重新识别';
+            retryBtn.addEventListener('click', () => {
+                retryBtn.remove();
+                errorMsg.remove();
+                processFile(file);
+            });
+            errorContainer.appendChild(retryBtn);
+            setSummary(errorContainer, true);
         } finally {
             fileInput.value = '';
             if (!shouldStayDisabled) {
