@@ -23,20 +23,20 @@
 | 2-5 | 事件监听优化 | app.js | 147处addEventListener审查；createCard 7处直接绑定移除，统一到 bindBoardCardEvents 事件委托；DOCUMENT类型纳入委托覆盖 | ✅ 完成 |
 | 2-6 | .onerror 统一处理 | db.js | 22处裸reject统一为_rejectWithLog，加语义化上下文日志 | ✅ 完成 |
 
-### 🟢 第3批：性能微优化（4项）
+### 🟢 第3批：性能微优化（4项） — ⏭️ 跳过（收益有限）
 | # | 优化项 | 文件 | 说明 | 状态 |
 |---|--------|------|------|------|
-| 3-1 | DOM 操作批量处理 | app.js | 414处 querySelector/getElementById 中识别可合并的DOM操作 | ⬜ 待做 |
-| 3-2 | 资源懒加载 | index.html | 非首屏JS文件延迟加载，加快首屏速度 | ⬜ 待做 |
-| 3-3 | 缓存策略优化 | sync.js, db.js | IndexedDB 查询结果缓存，减少重复查询 | ⬜ 待做 |
-| 3-4 | 脚本版本号自动化 | index.html | 当前手动维护 ?v=63，改为构建时自动更新 | ⬜ 待做 |
+| 3-1 | DOM 操作批量处理 | app.js | 事件驱动型应用，无批量渲染场景 | ⏭️ 跳过 |
+| 3-2 | 资源懒加载 | index.html | defer方案用户选择跳过 | ⏭️ 跳过 |
+| 3-3 | 缓存策略优化 | sync.js, db.js | 重复查询频率低，收益有限 | ⏭️ 跳过 |
+| 3-4 | 脚本版本号自动化 | index.html | 纯静态项目无构建流程 | ⏭️ 跳过 |
 
 ### 🔵 第4批：微信兼容（3项）
 | # | 优化项 | 文件 | 说明 | 状态 |
 |---|--------|------|------|------|
-| 4-1 | 微信返回按钮处理 | wechat-upload.js | 微信内置浏览器返回行为适配 | ⬜ 待做 |
-| 4-2 | 微信分享卡片 | index.html | 配置微信分享时的标题、描述和图标 | ⬜ 待做 |
-| 4-3 | 微信环境检测增强 | app.js, wechat-upload.js | 更精确的微信环境检测和降级方案 | ⬜ 待做 |
+| 4-1 | 微信返回按钮处理 | wechat-upload.js | location.replace替代location.href，防止返回死循环 | ✅ 完成 |
+| 4-2 | 微信分享卡片 | index.html | 需要微信JS-SDK+后端签名，纯静态站无法实现 | ⏭️ 跳过 |
+| 4-3 | 微信环境检测增强 | app.js, wechat-upload.js | IndexedDB/FileReader可用性检测+微信能力探测 | ✅ 完成 |
 
 ---
 

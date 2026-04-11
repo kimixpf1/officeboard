@@ -500,6 +500,20 @@ class OfficeDashboard {
         return /MicroMessenger/i.test(navigator.userAgent);
     }
 
+    checkWeChatCapabilities() {
+        const ua = navigator.userAgent;
+        const isWeChat = /MicroMessenger/i.test(ua);
+        if (!isWeChat) return null;
+
+        const capabilities = {
+            indexedDB: !!window.indexedDB,
+            fileReader: !!window.FileReader,
+            camera: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+            wechatVersion: (ua.match(/MicroMessenger\/([\d.]+)/) || [])[1] || 'unknown'
+        };
+        return capabilities;
+    }
+
     /**
      * 初始化所有右侧折叠面板
      */

@@ -579,3 +579,32 @@
 - Grep 验证：`_rejectWithLog` 出现 23 次（1 定义 + 22 调用）
 - Grep 验证：裸 `reject(request.error)` 仅剩 0 处，`reject(transaction.error)` 仅剩 1 处（已有 console.error）
 - 无新增诊断错误
+
+## 2026-04-11 第3批性能微优化 — ⏭️ 整批跳过
+
+### 评估结论
+- 3-1 DOM批量处理：事件驱动型应用，无批量渲染场景，收益低
+- 3-2 资源懒加载：分析10个脚本依赖链，defer方案用户选择跳过
+- 3-3 缓存策略：IndexedDB重复查询频率低，收益有限
+- 3-4 版本号自动化：纯静态项目无构建流程，高成本低收益
+
+## 2026-04-11 第4批微信兼容 4-1 + 4-3
+
+### 本次目标
+- 4-1：修复微信内置浏览器中，上传成功后按返回键再次进入上传页的问题
+- 4-3：增强微信环境检测，添加关键 API 可用性检测和降级提示
+
+### 已完成
+- ✅ 4-1：wechat-upload.js 两处 `window.location.href = returnUrl` 改为 `window.location.replace(returnUrl)`
+  - 成功自动返回（setTimeout 1200ms）
+  - 手动点击返回按钮
+- ✅ 4-3：wechat-upload.js init 增加 IndexedDB/FileReader 可用性前置检测
+  - 不支持时禁用选择按钮、保留返回按钮、显示明确提示
+- ✅ 4-3：app.js 新增 `checkWeChatCapabilities()` 方法
+  - 检测 indexedDB、FileReader、camera、wechatVersion
+  - 非微信环境返回 null
+- ⏭️ 4-2 分享卡片跳过（需微信JS-SDK+后端签名，纯静态站无法实现）
+
+### 验证结果
+- node --check 两个文件均通过
+- 无新增诊断错误

@@ -89,3 +89,9 @@
 - createCard() 中 7 处直接按钮监听移除（expand/complete/pin/sink/delete/edit/title），统一到 bindBoardCardEvents() 容器级事件委托
 - bindBoardCardEvents 覆盖范围从 TODO+MEETING 扩展为 TODO+MEETING+DOCUMENT
 - 仅保留 dragstart/dragend 为直接绑定（拖拽事件不适合委托）
+
+## 已完成的微信兼容优化（4-1 + 4-3）
+- wechat-upload.js 成功返回改用 location.replace() 替代 location.href，防止微信返回键死循环
+- wechat-upload.js init 增加 IndexedDB/FileReader 可用性检测，不支持时禁用按钮并提示
+- app.js 新增 checkWeChatCapabilities() 方法：检测 IndexedDB、FileReader、camera、微信版本号
+- 4-2 分享卡片跳过（需微信JS-SDK+后端签名，纯静态站无法实现）

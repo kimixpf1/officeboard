@@ -43,6 +43,18 @@
 
     async function init() {
         try {
+            if (!window.indexedDB) {
+                setStatus('当前浏览器不支持本地存储，无法使用识别功能。');
+                chooseBtn.disabled = true;
+                backBtn.disabled = false;
+                return;
+            }
+            if (!window.FileReader) {
+                setStatus('当前浏览器不支持文件读取，无法使用识别功能。');
+                chooseBtn.disabled = true;
+                backBtn.disabled = false;
+                return;
+            }
             setStatus('正在初始化识别环境...');
             await db.init();
             if (typeof ocrManager?.loadApiKeysFromDB === 'function') {
@@ -100,7 +112,7 @@
 
             shouldStayDisabled = true;
             window.setTimeout(() => {
-                window.location.href = returnUrl;
+                window.location.replace(returnUrl);
             }, 1200);
         } catch (error) {
             setStatus(`识别失败：${error.message}`);
@@ -135,7 +147,7 @@
     });
 
     backBtn?.addEventListener('click', () => {
-        window.location.href = returnUrl;
+        window.location.replace(returnUrl);
     });
 
     fileInput?.addEventListener('change', async (event) => {
