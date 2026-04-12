@@ -675,8 +675,32 @@
 
 ### 遗留事项
 - 无功能遗留
-- 可选优化：ocr.js/kimi.js 的 fetchWithRetry 调用可显式传入 logPrefix 以保留模块专属日志前缀
 
+## 2026-04-12 A3 safeJsonParse 工具函数优化
+
+### 本次目标
+- 将 app.js 和 sync.js 中重复的 JSON.parse + try/catch 模式统一收敛到 utils.js 的 safeJsonParse 全局工具函数
+- 删除 app.js 中已有的 SecurityUtils.safeJsonParse 内部方法，统一使用全局版本
+
+### 替换范围
+- app.js：5 处（loadRememberedLogin 2处 + deleteLink 1处 + loadWeather/loadContacts 各1处）
+- sync.js：9 处（linksSynced/contactsSynced 事件数据解析，涉及 L231/L361/L369/L534/L547/L757/L765/L1148/L1157）
+- 不在范围：ocr.js/kimi.js AI 响应解析（有特定错误处理）、sync.js 文件导入（有特定错误消息）、app.js 深拷贝
+
+### 已完成
+- ✅ utils.js v3：新增 `safeJsonParse(str, defaultValue = null)` 全局函数
+- ✅ app.js v67：5 处替换 + 删除 SecurityUtils.safeJsonParse 方法 + loadRememberedLogin 早返回重构
+- ✅ sync.js v18：9 处 `JSON.parse(xxx || '[]')` → `safeJsonParse(xxx, [])`
+- ✅ 版本号更新：index.html（utils.js v3, sync.js v18, app.js v67）+ wechat-upload.html（utils.js v3）
+
+### 验证结果
+- `node --check` 三个文件全部通过
+- GetDiagnostics 三个文件零错误
+- 本地 HTTP 服务器验证：4 个资源（index.html + 3 个 JS）全部正常加载
+- git push 成功（commit 653b797, 9 files changed, +130 -179, 净减 49 行）
+
+### 遗留事项
+- 无功能遗留
 ## 2026-04-12 可观测性增强：fetchWithRetry logPrefix 补齐
 
 ### 本次目标

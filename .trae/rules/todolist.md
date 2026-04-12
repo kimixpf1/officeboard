@@ -84,5 +84,15 @@
 ### 遗留事项
 - 无功能遗留
 
+### 2026-04-12 A3 safeJsonParse 工具函数优化
+- ✅ utils.js v3：新增全局 safeJsonParse(str, defaultValue) 函数
+- ✅ app.js v67：5处 JSON.parse + try/catch → safeJsonParse，删除 SecurityUtils.safeJsonParse 内部方法
+- ✅ sync.js v18：9处 JSON.parse(xxx || '[]') → safeJsonParse(xxx, [])
+- ✅ 净减 49 行代码（130 增 / 179 删）
+- 不在替换范围：ocr.js/kimi.js AI 响应解析、sync.js 文件导入、app.js 深拷贝
+
 ### 可选后续优化
-- 可考虑为 sync.js 中的 fetchWithRetry 调用也补齐 logPrefix（当前 sync.js 直接使用原生 fetch，未走 fetchWithRetry）
+- A1: db.js 事务模式统一（all→readonly/readwrite 按需）
+- A2: sync.js Supabase 查询合并（单次 .select 替代多次 .eq）
+- A4: ocr.js/kimi.js AI 响应 JSON 解析统一为 safeJsonParse
+- B1-B5: 低风险优化（错误分类细化、Supabase 错误码映射、离线检测、缓存过期、事件节流）

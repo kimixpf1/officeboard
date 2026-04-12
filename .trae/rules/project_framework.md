@@ -8,7 +8,7 @@
 - supabase_setup_safe.sql：更安全的 Supabase 初始化脚本
 
 ## js 模块
-- js/utils.js：全局共享工具（SafeStorage 安全存储、fetchWithRetry 网络重试、HolidayData 假期数据）
+- js/utils.js：全局共享工具（SafeStorage 安全存储、fetchWithRetry 网络重试、HolidayData 假期数据、safeJsonParse 安全 JSON 解析）
 - js/app.js：主界面交互、视图切换、上传入口、识别预览确认
 - js/ocr.js：OCR/AI 识别、会议去重、识别动作计划、确认写入
 - js/upload-flow.js：共享的识别预览与确认逻辑（主页面与微信页共用）
