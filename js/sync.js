@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -173,7 +173,7 @@ class SyncManager {
             if (!cloudData || !cloudData.data) {
 
                 if (localItems.length > 0) {
-                    await this.uploadToCloud();
+                    await this.uploadToCloud(cloudData);
                 }
                 this.isSyncing = false;
                 return;
@@ -207,7 +207,7 @@ class SyncManager {
                 } else if (cloudHasUpdate) {
                     await this.downloadFromCloud(cloudData);
                 } else if (localHasModify) {
-                    await this.uploadToCloud();
+                    await this.uploadToCloud(cloudData);
                 } else {
                     // 两边都没变化 - 但仍需同步备忘录
                     if (cloudData?.data?.memo !== undefined) {
@@ -258,7 +258,7 @@ class SyncManager {
     /**
      * 上传本地数据到云端
      */
-    async uploadToCloud() {
+    async uploadToCloud(existingCloudData = null) {
 
 
         try {
@@ -266,15 +266,18 @@ class SyncManager {
             
             // 空数据保护：如果本地事项为空但云端可能有数据，先检查云端
             if (allItems.length === 0) {
-                const { data: cloudRow } = await this.supabase
-                    .from('user_data')
-                    .select('data')
-                    .eq('user_id', this.currentUser.id)
-                    .maybeSingle();
+                let cloudRow = existingCloudData;
+                if (!cloudRow) {
+                    const { data } = await this.supabase
+                        .from('user_data')
+                        .select('data')
+                        .eq('user_id', this.currentUser.id)
+                        .maybeSingle();
+                    cloudRow = data;
+                }
                 const cloudItemCount = cloudRow?.data?.items?.length || 0;
                 if (cloudItemCount > 0) {
                     console.warn('本地数据为空但云端有 ' + cloudItemCount + ' 条事项，跳过上传防止覆盖');
-                    // 从云端下载恢复到本地
                     await this.downloadFromCloud(cloudRow);
                     return { success: true, itemCount: cloudItemCount, recovered: true };
                 }
@@ -582,7 +585,7 @@ class SyncManager {
             }
 
             // 上传合并后的数据到云端
-            await this.uploadToCloud();
+            await this.uploadToCloud(cloudData);
 
             // 通知应用刷新
             const event = new CustomEvent('syncDataLoaded', {
