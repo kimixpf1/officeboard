@@ -3560,23 +3560,23 @@ mark.highlight {
 /* 日程面板 */
 .schedule-body {
     padding: 12px;
-    overflow-y: auto;
 }
 
 .schedule-body textarea {
     width: 100%;
-    min-height: 280px;
+    height: 100%;
+    min-height: 250px;
+    padding: 12px;
+    font-family: var(--font-family);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--gray-700);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 13px;
-    line-height: 1.6;
     resize: vertical;
-    background: var(--bg-primary);
-    color: var(--gray-800);
     outline: none;
     transition: border-color 0.2s;
-    font-family: inherit;
 }
 
 .schedule-body textarea:focus {
@@ -3985,7 +3985,8 @@ mark.highlight {
     color: var(--gray-600);
 }
 
-[data-theme="dark"] .memo-body textarea {
+[data-theme="dark"] .memo-body textarea,
+[data-theme="dark"] .schedule-body textarea {
     background: var(--bg-tertiary);
     color: var(--gray-600);
 }
