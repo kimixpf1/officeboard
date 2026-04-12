@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -227,7 +227,7 @@ class SyncManager {
                         if (cloudLinks !== localLinks) {
                             SafeStorage.set('office_links', cloudLinks);
                             document.dispatchEvent(new CustomEvent('linksSynced', { 
-                                detail: { links: JSON.parse(cloudLinks || '[]') } 
+                                detail: { links: safeJsonParse(cloudLinks, []) } 
                             }));
                         }
                     }
@@ -358,7 +358,7 @@ class SyncManager {
             if (cloudData.data.links !== undefined) {
                 SafeStorage.set('office_links', cloudData.data.links);
                 document.dispatchEvent(new CustomEvent('linksSynced', {
-                    detail: { links: JSON.parse(cloudData.data.links || '[]') }
+                    detail: { links: safeJsonParse(cloudData.data.links, []) }
                 }));
             }
 
@@ -366,7 +366,7 @@ class SyncManager {
             if (cloudData.data.contacts !== undefined) {
                 SafeStorage.set('office_contacts', cloudData.data.contacts);
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
-                    detail: { contacts: JSON.parse(cloudData.data.contacts || '[]') }
+                    detail: { contacts: safeJsonParse(cloudData.data.contacts, []) }
                 }));
             }
 
@@ -531,7 +531,7 @@ class SyncManager {
 
                     SafeStorage.set('office_links', cloudLinks);
                     document.dispatchEvent(new CustomEvent('linksSynced', {
-                        detail: { links: JSON.parse(cloudLinks || '[]') }
+                        detail: { links: safeJsonParse(cloudLinks, []) }
                     }));
                 }
             }
@@ -544,7 +544,7 @@ class SyncManager {
 
                     SafeStorage.set('office_contacts', cloudContacts);
                     document.dispatchEvent(new CustomEvent('contactsSynced', {
-                        detail: { contacts: JSON.parse(cloudContacts || '[]') }
+                        detail: { contacts: safeJsonParse(cloudContacts, []) }
                     }));
                 }
             }
@@ -754,7 +754,7 @@ class SyncManager {
             if (data.data.links !== undefined) {
                 SafeStorage.set('office_links', data.data.links);
                 document.dispatchEvent(new CustomEvent('linksSynced', {
-                    detail: { links: JSON.parse(data.data.links || '[]') }
+                    detail: { links: safeJsonParse(data.data.links, []) }
                 }));
             }
 
@@ -762,7 +762,7 @@ class SyncManager {
             if (data.data.contacts !== undefined) {
                 SafeStorage.set('office_contacts', data.data.contacts);
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
-                    detail: { contacts: JSON.parse(data.data.contacts || '[]') }
+                    detail: { contacts: safeJsonParse(data.data.contacts, []) }
                 }));
             }
 
@@ -1145,7 +1145,7 @@ class SyncManager {
             if (data.data.links !== undefined) {
                 SafeStorage.set('office_links', data.data.links);
                 document.dispatchEvent(new CustomEvent('linksSynced', {
-                    detail: { links: JSON.parse(data.data.links || '[]') }
+                    detail: { links: safeJsonParse(data.data.links, []) }
                 }));
 
             }
@@ -1154,7 +1154,7 @@ class SyncManager {
             if (data.data.contacts !== undefined) {
                 SafeStorage.set('office_contacts', data.data.contacts);
                 document.dispatchEvent(new CustomEvent('contactsSynced', {
-                    detail: { contacts: JSON.parse(data.data.contacts || '[]') }
+                    detail: { contacts: safeJsonParse(data.data.contacts, []) }
                 }));
 
             }

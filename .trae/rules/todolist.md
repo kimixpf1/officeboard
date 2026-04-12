@@ -80,3 +80,9 @@
 - ✅ uploadToCloud读取云端实际updated_at
 - ✅ downloadFromCloud/mergeData/silentSyncFromCloud/syncFromCloud全部加备份回滚
 - ✅ clearAllItems全部加try-catch
+
+### 遗留事项
+- 无功能遗留
+
+### 可选后续优化
+- 可考虑为 sync.js 中的 fetchWithRetry 调用也补齐 logPrefix（当前 sync.js 直接使用原生 fetch，未走 fetchWithRetry）

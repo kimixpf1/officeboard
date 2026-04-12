@@ -77,19 +77,6 @@ const SecurityUtils = {
     },
 
     /**
-     * 安全的JSON解析
-     */
-    safeJsonParse(str, defaultValue = null) {
-        if (!str || typeof str !== 'string') return defaultValue;
-        try {
-            return JSON.parse(str);
-        } catch {
-            console.warn('JSON解析失败');
-            return defaultValue;
-        }
-    },
-
-    /**
      * 生成安全的随机ID
      */
     generateId() {
@@ -533,19 +520,9 @@ class OfficeDashboard {
      * 加载工具列表
      */
     loadTools() {
-        let tools;
         const saved = SecurityUtils.safeGetStorage('office_tools');
-        if (saved) {
-            try {
-                tools = JSON.parse(saved);
-                if (!Array.isArray(tools) || tools.length === 0) {
-                    tools = this.getDefaultTools();
-                }
-            } catch (e) {
-                console.warn('工具数据解析失败，使用默认值:', e.message);
-                tools = this.getDefaultTools();
-            }
-        } else {
+        let tools = saved ? safeJsonParse(saved, null) : null;
+        if (!Array.isArray(tools) || tools.length === 0) {
             tools = this.getDefaultTools();
         }
         SecurityUtils.safeSetStorage('office_tools', JSON.stringify(tools));
@@ -613,15 +590,10 @@ class OfficeDashboard {
         let draggedItem = null;
         let currentTools = []; // 缓存当前工具列表
 
-        // 获取当前工具列表
         const saved = SecurityUtils.safeGetStorage('office_tools');
-        if (saved) {
-            try {
-                currentTools = JSON.parse(saved);
-            } catch (e) {
-                console.warn('工具数据解析失败，使用默认值:', e.message);
-                currentTools = this.getDefaultTools();
-            }
+        currentTools = saved ? safeJsonParse(saved, []) : [];
+        if (!Array.isArray(currentTools) || currentTools.length === 0) {
+            currentTools = this.getDefaultTools();
         }
 
         container.querySelectorAll('.tool-item').forEach(item => {
@@ -774,48 +746,31 @@ class OfficeDashboard {
         let links;
         const saved = SecurityUtils.safeGetStorage('office_links');
 
-        // 检查是否需要更新默认网站
         const needsUpdate = this.checkLinksNeedUpdate(saved);
 
         if (saved && !needsUpdate) {
-            try {
-                links = JSON.parse(saved);
-                if (!Array.isArray(links) || links.length === 0) {
-                    links = this.getDefaultLinks();
-                }
-            } catch (e) {
-                console.error('解析网站数据失败:', e);
+            links = safeJsonParse(saved, null);
+            if (!Array.isArray(links) || links.length === 0) {
                 links = this.getDefaultLinks();
             }
         } else if (saved && needsUpdate) {
-            // 需要更新但保留用户添加的网站
-            try {
-                links = JSON.parse(saved);
-                if (!Array.isArray(links)) {
-                    links = this.getDefaultLinks();
-                } else {
-                    // 更新默认网站的图标，并添加缺失的默认网站
-                    const defaultLinks = this.getDefaultLinks();
-                    defaultLinks.forEach(defaultLink => {
-                        const existingIndex = links.findIndex(l => l.url === defaultLink.url);
-                        if (existingIndex >= 0) {
-                            // 更新图标
-                            links[existingIndex].icon = defaultLink.icon;
-                            links[existingIndex].name = defaultLink.name;
-                        } else {
-                            // 添加缺失的默认网站
-                            links.push(defaultLink);
-                        }
-                    });
-                    // 移除旧的默认网站（微信读书、苏州统计局）
-                    links = links.filter(l => !l.url || (!l.url.includes('weread.qq.com') && !l.url.includes('tjj.suzhou.gov.cn')));
-                }
-            } catch (e) {
-                console.error('处理网站数据失败:', e);
+            links = safeJsonParse(saved, null);
+            if (!Array.isArray(links)) {
                 links = this.getDefaultLinks();
+            } else {
+                const defaultLinks = this.getDefaultLinks();
+                defaultLinks.forEach(defaultLink => {
+                    const existingIndex = links.findIndex(l => l.url === defaultLink.url);
+                    if (existingIndex >= 0) {
+                        links[existingIndex].icon = defaultLink.icon;
+                        links[existingIndex].name = defaultLink.name;
+                    } else {
+                        links.push(defaultLink);
+                    }
+                });
+                links = links.filter(l => !l.url || (!l.url.includes('weread.qq.com') && !l.url.includes('tjj.suzhou.gov.cn')));
             }
         } else {
-            // 无数据，使用新的默认列表
             links = this.getDefaultLinks();
         }
 
@@ -830,33 +785,24 @@ class OfficeDashboard {
     checkLinksNeedUpdate(saved) {
         if (!saved) return true;
 
-        try {
-            const links = JSON.parse(saved);
-            if (!Array.isArray(links) || links.length === 0) return true;
+        const links = safeJsonParse(saved, null);
+        if (!Array.isArray(links) || links.length === 0) return true;
 
-            // 检查是否包含旧的默认网站（微信读书）
-            const hasOldDefault = links.some(l =>
-                l.url && l.url.includes('weread.qq.com')
-            );
+        const hasOldDefault = links.some(l =>
+            l.url && l.url.includes('weread.qq.com')
+        );
 
-            // 检查是否缺少新的默认网站
-            const defaultLinks = this.getDefaultLinks();
-            const hasNewDefaults = defaultLinks.every(defaultLink =>
-                links.some(l => l.url === defaultLink.url)
-            );
+        const defaultLinks = this.getDefaultLinks();
+        const hasNewDefaults = defaultLinks.every(defaultLink =>
+            links.some(l => l.url === defaultLink.url)
+        );
 
-            // 检查默认网站的图标是否正确
-            const hasWrongIcon = defaultLinks.some(defaultLink => {
-                const existingLink = links.find(l => l.url === defaultLink.url);
-                return existingLink && existingLink.icon !== defaultLink.icon;
-            });
+        const hasWrongIcon = defaultLinks.some(defaultLink => {
+            const existingLink = links.find(l => l.url === defaultLink.url);
+            return existingLink && existingLink.icon !== defaultLink.icon;
+        });
 
-            // 如果有旧默认网站、缺少新默认网站、或图标不正确，需要更新
-            return hasOldDefault || !hasNewDefaults || hasWrongIcon;
-        } catch (e) {
-            console.warn('检查默认网站更新失败，默认需要更新:', e.message);
-            return true;
-        }
+        return hasOldDefault || !hasNewDefaults || hasWrongIcon;
     }
 
     /**
@@ -1038,17 +984,11 @@ class OfficeDashboard {
      */
     initLinksDragSort(container) {
         let draggedItem = null;
-        let currentLinks = []; // 缓存当前链接列表
+        let currentLinks = [];
 
-        // 获取当前链接列表
         const saved = SecurityUtils.safeGetStorage('office_links');
         if (saved) {
-            try {
-                currentLinks = JSON.parse(saved);
-            } catch (e) {
-                console.warn('快捷链接数据解析失败，重置为空:', e.message);
-                currentLinks = [];
-            }
+            currentLinks = safeJsonParse(saved, []);
         }
 
         container.querySelectorAll('.link-item').forEach(item => {
@@ -1126,16 +1066,12 @@ class OfficeDashboard {
         }
         
         let links = [];
-        try {
-            const saved = SecurityUtils.safeGetStorage('office_links');
-            if (saved) {
-                const parsed = SecurityUtils.safeJsonParse(saved, []);
-                if (Array.isArray(parsed)) {
-                    links = parsed;
-                }
+        const saved = SecurityUtils.safeGetStorage('office_links');
+        if (saved) {
+            const parsed = safeJsonParse(saved, []);
+            if (Array.isArray(parsed)) {
+                links = parsed;
             }
-        } catch (e) {
-            console.error('读取网站列表失败:', e);
         }
         
         links.push({ name, url, icon: this.getAutoIcon(url) });
@@ -1152,16 +1088,7 @@ class OfficeDashboard {
      */
     deleteLink(index) {
         const saved = SecurityUtils.safeGetStorage('office_links');
-        let links = [];
-        
-        if (saved) {
-            try {
-                links = JSON.parse(saved);
-            } catch (e) {
-                console.warn('快捷链接数据解析失败，重置为空:', e.message);
-                links = [];
-            }
-        }
+        let links = saved ? safeJsonParse(saved, []) : [];
         
         links.splice(index, 1);
         SecurityUtils.safeSetStorage('office_links', JSON.stringify(links));
@@ -1324,15 +1251,7 @@ class OfficeDashboard {
         try {
             // 读取用户保存的城市设置，默认苏州
             const savedCity = SecurityUtils.safeGetStorage('office_weather_city');
-            let cityConfig;
-            if (savedCity) {
-                try {
-                    cityConfig = JSON.parse(savedCity);
-                } catch (e) {
-                    console.warn('城市配置解析失败，使用默认苏州:', e.message);
-                    cityConfig = null;
-                }
-            }
+            let cityConfig = savedCity ? safeJsonParse(savedCity, null) : null;
             if (!cityConfig) {
                 cityConfig = { name: '苏州', lat: 31.2989, lon: 120.5853 };
             }
@@ -1812,18 +1731,8 @@ class OfficeDashboard {
      * 加载通讯录
      */
     async loadContacts() {
-        let contacts = [];
-        
-        // 从本地加载
         const saved = SecurityUtils.safeGetStorage('office_contacts');
-        if (saved) {
-            try {
-                contacts = JSON.parse(saved);
-            } catch (e) {
-                console.warn('通讯录数据解析失败，重置为空:', e.message);
-                contacts = [];
-            }
-        }
+        let contacts = saved ? safeJsonParse(saved, []) : [];
 
         // 未登录时清空数据
         if (!syncManager.isLoggedIn()) {
@@ -3267,37 +3176,35 @@ class OfficeDashboard {
      */
     async loadRememberedLogin() {
         const remembered = SecurityUtils.safeGetStorage('office_remembered_login');
-        if (remembered) {
-            try {
-                const data = JSON.parse(remembered);
-                const currentDevice = navigator.userAgent.slice(0, 50);
-                if (data.device === currentDevice) {
-                    const usernameInput = document.getElementById('loginUsername');
-                    const passwordInput = document.getElementById('loginPassword');
-                    const rememberCheckbox = document.getElementById('rememberPassword');
+        if (!remembered) return;
 
-                    if (usernameInput) usernameInput.value = data.username || '';
-                    if (passwordInput) {
-                        if (data.password) {
-                            if (data.enc === 'v2' && typeof cryptoManager !== 'undefined') {
-                                try {
-                                    passwordInput.value = await cryptoManager.decrypt(data.password);
-                                } catch (e) {
-                                    passwordInput.value = atob(data.password);
-                                }
-                            } else {
-                                passwordInput.value = atob(data.password);
-                            }
-                        } else {
-                            passwordInput.value = '';
-                        }
+        const data = safeJsonParse(remembered, null);
+        if (!data) return;
+
+        const currentDevice = navigator.userAgent.slice(0, 50);
+        if (data.device !== currentDevice) return;
+
+        const usernameInput = document.getElementById('loginUsername');
+        const passwordInput = document.getElementById('loginPassword');
+        const rememberCheckbox = document.getElementById('rememberPassword');
+
+        if (usernameInput) usernameInput.value = data.username || '';
+        if (passwordInput) {
+            if (data.password) {
+                if (data.enc === 'v2' && typeof cryptoManager !== 'undefined') {
+                    try {
+                        passwordInput.value = await cryptoManager.decrypt(data.password);
+                    } catch (e) {
+                        passwordInput.value = atob(data.password);
                     }
-                    if (rememberCheckbox) rememberCheckbox.checked = true;
+                } else {
+                    passwordInput.value = atob(data.password);
                 }
-            } catch (e) {
-                console.warn('加载记住的登录信息失败:', e);
+            } else {
+                passwordInput.value = '';
             }
         }
+        if (rememberCheckbox) rememberCheckbox.checked = true;
     }
 
     /**

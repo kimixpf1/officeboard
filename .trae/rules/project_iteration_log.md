@@ -676,3 +676,25 @@
 ### 遗留事项
 - 无功能遗留
 - 可选优化：ocr.js/kimi.js 的 fetchWithRetry 调用可显式传入 logPrefix 以保留模块专属日志前缀
+
+## 2026-04-12 可观测性增强：fetchWithRetry logPrefix 补齐
+
+### 本次目标
+- 给所有 fetchWithRetry 调用补充显式 logPrefix 参数，使线上日志能快速区分 OCR / Kimi / DeepSeek 请求来源
+
+### 已完成
+- ✅ ocr.js L345：DeepSeek OCR 识别调用 → `, 3, 'OCR-DeepSeek'`（前序已完成）
+- ✅ ocr.js L3104：Kimi 视觉识别调用 → `, 3, 'OCR-Kimi'`（前序已完成）
+- ✅ ocr.js L3326：DeepSeek 结构化提取调用 → `, 3, 'OCR-DeepSeek'`（本轮修复）
+- ✅ kimi.js L30：testConnection → `, 3, 'KimiAPI'`（前序已完成）
+- ✅ kimi.js L91：request 方法 → `, 3, 'KimiAPI'`（本轮修复）
+- ✅ 版本号提升：ocr.js v31→v32、kimi.js v14→v15（index.html + wechat-upload.html 同步更新）
+
+### 验证结果
+- `node --check js/ocr.js` 通过
+- `node --check js/kimi.js` 通过
+- GetDiagnostics 两个文件零错误
+- git push 成功（commit 568553d）
+
+### 遗留事项
+- 无功能遗留

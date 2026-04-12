@@ -1,7 +1,17 @@
 /**
- * 全局共享工具函数
+ * 全局共享工具函数 v3
  * 消除跨模块重复代码
  */
+
+function safeJsonParse(str, defaultValue = null) {
+    if (!str || typeof str !== 'string') return defaultValue;
+    try {
+        return JSON.parse(str);
+    } catch {
+        console.warn('JSON解析失败');
+        return defaultValue;
+    }
+}
 
 const SafeStorage = {
     get(key) {

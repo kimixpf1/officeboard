@@ -109,3 +109,9 @@
 - 5-2 假期数据外置：HolidayData 对象集中管理 2024-2026 年假期与补班日，isWorkday/isHoliday 统一委托，getNthWorkDayOfMonth 获得补班日支持
 - 5-3 加密密钥迁移：crypto.js 主密钥从 localStorage 迁移到 IndexedDB（db.getSetting/setSetting），自动迁移旧数据
 - 涉及文件：utils.js（新建）、app.js、ocr.js、sync.js、crypto.js、kimi.js、index.html、wechat-upload.html
+
+## 已完成的可观测性增强
+- fetchWithRetry 全部 5 处调用已补齐显式 logPrefix 参数
+  - ocr.js 3处：OCR-DeepSeek(L345)、OCR-Kimi(L3104)、OCR-DeepSeek(L3326)
+  - kimi.js 2处：KimiAPI(L30)、KimiAPI(L91)
+- 版本号：ocr.js v32、kimi.js v15
