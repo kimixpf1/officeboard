@@ -131,3 +131,10 @@
   - sync.js：9处替换
   - ocr.js：3处 AI 响应 JSON 解析替换
   - kimi.js：4处 AI 响应 JSON 解析替换
+
+## 已完成的 B 类低风险优化
+- B1: 错误分类细化 — 评估跳过，现有 showMessage error/success/info 三级已够用
+- B2: Supabase 错误码映射 — 评估跳过，无实际需求场景
+- B3: 离线检测 — sync.js 新增 isOnline() 方法，8处网络请求入口加离线拦截（smartSync/immediateSyncToCloud/silentSyncFromCloud/syncToCloud/syncFromCloud/login/register/changePassword）；app.js 新增 online/offline 事件监听，离线提示+恢复自动同步
+- B4: 缓存过期 — 评估跳过，查询频率低收益有限
+- B5: 事件节流 — 评估跳过，已有 500ms debounce

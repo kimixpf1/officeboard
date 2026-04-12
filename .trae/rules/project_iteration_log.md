@@ -1,5 +1,27 @@
 # 项目迭代记录
 
+## 2026-04-12
+
+### 本次目标
+- 完成 A 类代码质量优化（A1/A2/A4）
+- 完成 B 类低风险优化评估与实施（B1-B5）
+
+### 当前状态
+- ✅ A1: db.js 事务模式审查通过（全部18+方法已正确使用 readonly/readwrite）
+- ✅ A2: sync.js Supabase 查询合并（commit a655140）
+- ✅ A4: ocr.js/kimi.js safeJsonParse 统一替换（commit 24de164）
+- ✅ B1/B2/B4/B5: 评估后跳过（现有实现已够用或收益有限）
+- ✅ B3: 离线检测实现（commit abbb3bd）
+
+### 提交记录
+- `a655140` A2: sync.js uploadToCloud 消除冗余查询
+- `24de164` A4: ocr.js/kimi.js AI响应JSON解析统一为safeJsonParse
+- `4c61bd6` 规则文件更新
+- `abbb3bd` B3: 离线检测 - sync.js 8处离线拦截 + app.js online/offline事件提示
+
+### 遗留事项
+- 无
+
 ## 2026-03-31 当前轮次
 
 ### 已有背景

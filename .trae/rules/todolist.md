@@ -101,4 +101,8 @@
 - ~~A1: db.js 事务模式统一（all→readonly/readwrite 按需）~~ ✅ 审查完成，全部已正确无需修改
 - ~~A2: sync.js Supabase 查询合并（单次 .select 替代多次 .eq）~~ ✅ 完成（commit a655140）
 - ~~A4: ocr.js/kimi.js AI 响应 JSON 解析统一为 safeJsonParse~~ ✅ 完成（commit 24de164）
-- B1-B5: 低风险优化（错误分类细化、Supabase 错误码映射、离线检测、缓存过期、事件节流）
+- ~~B1: 错误分类细化~~ ⏭️ 评估跳过（现有 showMessage error/success/info 三级已够用）
+- ~~B2: Supabase 错误码映射~~ ⏭️ 评估跳过（无实际需求场景）
+- ~~B3: 离线检测~~ ✅ 完成（commit abbb3bd）— sync.js 8处网络方法加离线拦截 + app.js online/offline 事件提示
+- ~~B4: 缓存过期~~ ⏭️ 评估跳过（查询频率低，收益有限）
+- ~~B5: 事件节流~~ ⏭️ 评估跳过（已有 500ms debounce，无需额外节流）
