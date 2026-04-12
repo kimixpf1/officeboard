@@ -98,7 +98,7 @@
 - ✅ js/sync.js：7处同步路径添加 schedule 字段（uploadToCloud×2/smartSync/downloadFromCloud/mergeData/silentSyncFromCloud/syncFromCloud）
 
 ### 可选后续优化
-- A1: db.js 事务模式统一（all→readonly/readwrite 按需）
-- A2: sync.js Supabase 查询合并（单次 .select 替代多次 .eq）
-- A4: ocr.js/kimi.js AI 响应 JSON 解析统一为 safeJsonParse
+- ~~A1: db.js 事务模式统一（all→readonly/readwrite 按需）~~ ✅ 审查完成，全部已正确无需修改
+- ~~A2: sync.js Supabase 查询合并（单次 .select 替代多次 .eq）~~ ✅ 完成（commit a655140）
+- ~~A4: ocr.js/kimi.js AI 响应 JSON 解析统一为 safeJsonParse~~ ✅ 完成（commit 24de164）
 - B1-B5: 低风险优化（错误分类细化、Supabase 错误码映射、离线检测、缓存过期、事件节流）

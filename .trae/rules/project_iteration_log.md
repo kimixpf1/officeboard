@@ -676,6 +676,45 @@
 ### 遗留事项
 - 无功能遗留
 
+## 2026-04-12 A类代码质量优化（3项）
+
+### 本次目标
+- A1: db.js 事务模式统一审查（all→readonly/readwrite 按需）
+- A2: sync.js Supabase 查询合并优化
+- A4: ocr.js/kimi.js AI 响应 JSON 解析统一为 safeJsonParse
+
+### A1 审查结论
+- ✅ db.js 全部18+方法的事务模式已正确使用 readonly/readwrite，无需修改
+
+### A2 已完成
+- ✅ sync.js v20：uploadToCloud 新增 existingCloudData 可选参数
+- smartSync() 两处调用 + mergeData() 一处调用改为传参 this.uploadToCloud(cloudData)
+- 消除 smartSync→uploadToCloud 路径上的冗余 Supabase 查询（1-2次/次）
+- commit a655140 已推送
+
+### A4 已完成
+- ✅ ocr.js 3处 JSON.parse(jsonMatch[0]) → safeJsonParse(jsonMatch[0], null)，加 null 检查
+  - L378: DeepSeek OCR 识别解析
+  - L3178: Kimi OCR 识别解析
+  - L3354: DeepSeek 二次识别解析
+- ✅ kimi.js 4处 JSON.parse(response) → safeJsonParse
+  - L265: 命令识别 → safeJsonParse(response, null) + null检查
+  - L385: 文档解析 → safeJsonParse(response, null) + null→[]
+  - L433: 报告生成 → safeJsonParse(response, null) + null→response
+  - L509: 推荐获取 → safeJsonParse(response, { reminders: [], suggestions: [] })
+- commit 24de164 已推送
+
+### 验证结果
+- `node --check js/sync.js` 通过
+- `node --check js/ocr.js` 通过
+- `node --check js/kimi.js` 通过
+- ocr.js JSON.parse 残留：0处
+- kimi.js JSON.parse 残留：0处
+
+### 遗留事项
+- 无功能遗留
+- B1-B5 低风险优化待后续评估
+
 ## 2026-04-12 日程折叠面板功能
 
 ### 本次目标

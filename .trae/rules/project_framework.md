@@ -121,4 +121,13 @@
 - fetchWithRetry 全部 5 处调用已补齐显式 logPrefix 参数
   - ocr.js 3处：OCR-DeepSeek(L345)、OCR-Kimi(L3104)、OCR-DeepSeek(L3326)
   - kimi.js 2处：KimiAPI(L30)、KimiAPI(L91)
-- 版本号：ocr.js v32、kimi.js v15
+
+## 已完成的 A 类代码质量优化
+- A1: db.js 事务模式审查 — 全部18+方法已正确使用 readonly/readwrite，无需修改
+- A2: sync.js uploadToCloud 接受已有云端数据参数，消除 smartSync→uploadToCloud 冗余查询（1-2次/次）
+- A3: safeJsonParse 工具函数 — 全项目 JSON.parse + try/catch 统一替换
+  - utils.js：全局 safeJsonParse(str, defaultValue) 函数
+  - app.js：5处替换，删除 SecurityUtils.safeJsonParse 内部方法
+  - sync.js：9处替换
+  - ocr.js：3处 AI 响应 JSON 解析替换
+  - kimi.js：4处 AI 响应 JSON 解析替换
