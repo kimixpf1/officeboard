@@ -3257,6 +3257,17 @@ class OfficeDashboard {
             const msg = e.detail?.message || '同步失败';
             this.showMessage(msg, 'info');
         });
+
+        window.addEventListener('offline', () => {
+            this.showMessage('网络已断开，部分功能暂不可用', 'info');
+        });
+
+        window.addEventListener('online', () => {
+            this.showMessage('网络已恢复', 'success');
+            if (syncManager.isLoggedIn()) {
+                syncManager.smartSync();
+            }
+        });
     }
 
     /**

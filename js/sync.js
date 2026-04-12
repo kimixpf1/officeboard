@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -28,12 +28,14 @@ class SyncManager {
         this.lastLocalModifyTime = SafeStorage.get('lastLocalModifyTime') || null;  // 本地最后修改时间
         this.lastCloudSyncTime = SafeStorage.get('lastCloudSyncTime') || null;  // 最后成功同步到云端的时间
         this.isSyncing = false;  // 是否正在同步中
-        
-        // 调试：打印启动时的时间戳
-
+        this._offlineNotified = false;
 
         // 初始化Supabase
         this.initPromise = this.initSupabase();
+    }
+
+    isOnline() {
+        return navigator.onLine !== false;
     }
 
     /**
@@ -128,12 +130,15 @@ class SyncManager {
      */
     async smartSync() {
         if (!this.supabase || !this.currentUser) {
+            return;
+        }
 
+        if (!this.isOnline()) {
+            console.warn('离线状态，跳过同步');
             return;
         }
 
         if (this.isSyncing) {
-
             return;
         }
 
@@ -650,11 +655,14 @@ class SyncManager {
      * 立即同步到云端（本地修改后调用）
      */
     async immediateSyncToCloud() {
-
-
         if (!this.supabase || !this.currentUser) {
             console.warn('未登录，跳过同步');
             return { success: false };
+        }
+
+        if (!this.isOnline()) {
+            console.warn('离线状态，跳过同步');
+            return { success: false, offline: true };
         }
 
         // 记录本地修改时间
@@ -745,6 +753,10 @@ class SyncManager {
     async silentSyncFromCloud() {
         if (!this.supabase || !this.currentUser) {
             return { success: false };
+        }
+
+        if (!this.isOnline()) {
+            return { success: false, offline: true };
         }
 
         try {
@@ -880,6 +892,10 @@ class SyncManager {
             throw new Error('密码至少需要6个字符');
         }
 
+        if (!this.isOnline()) {
+            throw new Error('网络不可用，请检查网络连接后重试');
+        }
+
         if (!this.isSupabaseReady()) {
             throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
         }
@@ -933,6 +949,10 @@ class SyncManager {
     async login(username, password) {
         if (!username || !password) {
             throw new Error('请输入用户名和密码');
+        }
+
+        if (!this.isOnline()) {
+            throw new Error('网络不可用，请检查网络连接后重试');
         }
 
         // 检查Supabase库是否加载
@@ -998,6 +1018,10 @@ class SyncManager {
 
         if (newPassword.length < 6) {
             throw new Error('新密码至少需要6位');
+        }
+
+        if (!this.isOnline()) {
+            throw new Error('网络不可用，请检查网络连接后重试');
         }
 
         if (!this.isSupabaseReady()) {
@@ -1067,6 +1091,11 @@ class SyncManager {
             console.warn('未登录，跳过同步');
             return { success: false, message: '请先登录' };
         }
+
+        if (!this.isOnline()) {
+            return { success: false, message: '网络不可用，请检查网络连接', offline: true };
+        }
+
         try {
             if (progressCallback) progressCallback('正在准备数据...');
             const allItems = await db.getAllItems();
@@ -1127,9 +1156,12 @@ class SyncManager {
             console.warn('未登录，跳过同步');
             return { success: false, message: '请先登录' };
         }
+
+        if (!this.isOnline()) {
+            return { success: false, message: '网络不可用，请检查网络连接', offline: true };
+        }
+
         try {
-
-
             if (progressCallback) progressCallback('正在从云端获取数据...');
 
             // 查询当前用户数据
