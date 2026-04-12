@@ -1613,6 +1613,14 @@ body {
     background: linear-gradient(180deg, #a5b4fc, #6366f1);
 }
 
+[data-theme="blue"] .schedule-toggle {
+    background: linear-gradient(180deg, #22d3ee, #0891b2);
+}
+
+[data-theme="blue"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+}
+
 /* ========== 青瓷色 - 古典雅致 ========== */
 [data-theme="teal"] {
     --primary-color: #0f766e;
@@ -1647,6 +1655,14 @@ body {
 
 [data-theme="teal"] .memo-toggle:hover {
     background: linear-gradient(180deg, #bef264, #84cc16);
+}
+
+[data-theme="teal"] .schedule-toggle {
+    background: linear-gradient(180deg, #38bdf8, #0284c7);
+}
+
+[data-theme="teal"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #7dd3fc, #0ea5e9);
 }
 
 /* ========== 翠竹绿 - 自然生机 ========== */
@@ -1684,6 +1700,14 @@ body {
     background: linear-gradient(180deg, #fcd34d, #f59e0b);
 }
 
+[data-theme="green"] .schedule-toggle {
+    background: linear-gradient(180deg, #22d3ee, #0891b2);
+}
+
+[data-theme="green"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+}
+
 /* ========== 玫瑰红 - 优雅浪漫 ========== */
 [data-theme="rose"] {
     --primary-color: #be123c;
@@ -1717,6 +1741,14 @@ body {
 
 [data-theme="rose"] .memo-toggle:hover {
     background: linear-gradient(180deg, #d8b4fe, #a855f7);
+}
+
+[data-theme="rose"] .schedule-toggle {
+    background: linear-gradient(180deg, #22d3ee, #0891b2);
+}
+
+[data-theme="rose"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
 }
 
 /* ========== 中国红 - 经典庄重 ========== */
@@ -1754,6 +1786,14 @@ body {
     background: linear-gradient(180deg, #fcd34d, #f59e0b);
 }
 
+[data-theme="red"] .schedule-toggle {
+    background: linear-gradient(180deg, #22d3ee, #0891b2);
+}
+
+[data-theme="red"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+}
+
 /* ========== 琥珀橙 - 温暖活力 ========== */
 [data-theme="orange"] {
     --primary-color: #c2410c;
@@ -1789,6 +1829,14 @@ body {
     background: linear-gradient(180deg, #bef264, #84cc16);
 }
 
+[data-theme="orange"] .schedule-toggle {
+    background: linear-gradient(180deg, #22d3ee, #0891b2);
+}
+
+[data-theme="orange"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+}
+
 /* ========== 幻影紫 - 神秘高贵 ========== */
 [data-theme="violet"] {
     --primary-color: #6d28d9;
@@ -1822,6 +1870,14 @@ body {
 
 [data-theme="violet"] .memo-toggle:hover {
     background: linear-gradient(180deg, #7dd3fc, #0ea5e9);
+}
+
+[data-theme="violet"] .schedule-toggle {
+    background: linear-gradient(180deg, #2dd4bf, #0d9488);
+}
+
+[data-theme="violet"] .schedule-toggle:hover {
+    background: linear-gradient(180deg, #5eead4, #14b8a6);
 }
 
 /* 深色主题 */
@@ -2848,13 +2904,27 @@ body {
     letter-spacing: 2px;
 }
 
-/* 工具面板（上）- 橙色 */
+/* 日程面板（最上）- 青色 */
+.schedule-panel {
+    z-index: 1003;
+}
+.schedule-toggle {
+    background: linear-gradient(180deg, #22d3ee, #0891b2);
+    top: calc(50% - 176px);
+    right: 4px;
+    border-right: 2px solid rgba(255,255,255,0.15);
+}
+.schedule-toggle:hover {
+    background: linear-gradient(180deg, #67e8f9, #06b6d4);
+}
+
+/* 工具面板 - 橙色 */
 .tools-panel {
     z-index: 1002;
 }
 .tools-toggle {
     background: linear-gradient(180deg, #fb923c, #ea580c);
-    top: calc(50% - 132px);
+    top: calc(50% - 88px);
     right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
@@ -2862,13 +2932,13 @@ body {
     background: linear-gradient(180deg, #fdba74, #f97316);
 }
 
-/* 网站面板（中）- 蓝色 */
+/* 网站面板 - 蓝色 */
 .links-panel {
     z-index: 1001;
 }
 .links-toggle {
     background: linear-gradient(180deg, #38bdf8, #0284c7);
-    top: calc(50% - 44px);
+    top: 50%;
     right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
@@ -2882,7 +2952,7 @@ body {
 }
 .memo-toggle {
     background: linear-gradient(180deg, #a78bfa, #7c3aed);
-    top: calc(50% + 44px);
+    top: calc(50% + 88px);
     right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
@@ -2896,7 +2966,7 @@ body {
 }
 .contacts-toggle {
     background: linear-gradient(180deg, #34d399, #059669);
-    top: calc(50% + 132px);
+    top: calc(50% + 176px);
     right: 4px;
     border-right: 2px solid rgba(255,255,255,0.15);
 }
@@ -3169,7 +3239,10 @@ mark.highlight {
     right: 360px;
 }
 
-/* 展开时网站和备忘按钮需要补偿原始偏移 */
+/* 展开时各面板按钮需要补偿原始偏移 */
+.schedule-panel.expanded .panel-toggle {
+    right: 360px;
+}
 .links-panel.expanded .panel-toggle {
     right: 362px;
 }
@@ -3482,6 +3555,32 @@ mark.highlight {
 
 .memo-body textarea:focus {
     border-color: var(--primary-color);
+}
+
+/* 日程面板 */
+.schedule-body {
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.schedule-body textarea {
+    width: 100%;
+    min-height: 280px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    resize: vertical;
+    background: var(--bg-primary);
+    color: var(--gray-800);
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.schedule-body textarea:focus {
+    border-color: #0891b2;
 }
 
 /* 面板底部 */
@@ -3918,26 +4017,32 @@ mark.highlight {
         letter-spacing: 2px;
     }
 
+    .schedule-toggle {
+        top: calc(50% - 210px);
+        right: 0;
+    }
+
     .tools-toggle {
-        top: calc(50% - 100px);
+        top: calc(50% - 140px);
         right: 0;
     }
 
     .links-toggle {
-        top: calc(50% - 30px);
+        top: calc(50% - 70px);
         right: 0;
     }
 
     .memo-toggle {
-        top: calc(50% + 40px);
+        top: calc(50% + 0px);
         right: 0;
     }
 
     .contacts-toggle {
-        top: calc(50% + 110px);
+        top: calc(50% + 70px);
         right: 0;
     }
 
+    .schedule-panel.expanded .panel-toggle,
     .links-panel.expanded .panel-toggle,
     .memo-panel.expanded .panel-toggle,
     .contacts-panel.expanded .panel-toggle {

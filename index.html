@@ -711,6 +711,35 @@
         <span class="loading-text">处理中...</span>
     </div>
 
+    <!-- 右侧日程折叠框（最上） -->
+    <div id="schedulePanel" class="side-panel schedule-panel">
+        <div class="panel-toggle schedule-toggle" id="scheduleToggle" title="日程记录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+                <line x1="9" y1="14" x2="9" y2="14.01"></line>
+                <line x1="15" y1="14" x2="15" y2="14.01"></line>
+                <line x1="9" y1="18" x2="9" y2="18.01"></line>
+                <line x1="15" y1="18" x2="15" y2="18.01"></line>
+            </svg>
+            <span class="panel-toggle-text">日程</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>日程记录</h3>
+                <button type="button" class="panel-close" id="scheduleClose" title="收起">×</button>
+            </div>
+            <div class="panel-body schedule-body">
+                <textarea id="scheduleText" placeholder="记录今日日程安排、重要时间节点...&#10;&#10;此便签跨设备同步保存。"></textarea>
+            </div>
+            <div class="panel-footer">
+                <span class="panel-status" id="scheduleStatus">自动保存</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 右侧工具折叠框（上） -->
     <div id="toolsPanel" class="side-panel tools-panel">
         <div class="panel-toggle tools-toggle" id="toolsToggle" title="常用工具">

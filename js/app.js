@@ -471,6 +471,7 @@ class OfficeDashboard {
      * 初始化所有右侧折叠面板
      */
     initSidePanels() {
+        this.initSchedulePanel();
         this.initToolsPanel();
         this.initLinksPanel();
         this.initContactsPanel();
@@ -2273,6 +2274,106 @@ class OfficeDashboard {
     /**
      * 初始化便签备忘录
      */
+    initSchedulePanel() {
+        const schedulePanel = document.getElementById('schedulePanel');
+        const scheduleToggle = document.getElementById('scheduleToggle');
+        const scheduleClose = document.getElementById('scheduleClose');
+        const scheduleText = document.getElementById('scheduleText');
+        const scheduleStatus = document.getElementById('scheduleStatus');
+
+        if (!schedulePanel || !scheduleToggle || !scheduleText) return;
+
+        const savedSchedule = SecurityUtils.safeGetStorage('office_schedule_content');
+        if (savedSchedule) {
+            scheduleText.value = savedSchedule;
+        }
+
+        scheduleToggle.addEventListener('click', () => {
+            if (schedulePanel.classList.contains('expanded')) {
+                schedulePanel.classList.remove('expanded');
+            } else {
+                schedulePanel.classList.add('expanded');
+                scheduleText.focus();
+            }
+        });
+
+        scheduleClose.addEventListener('click', () => {
+            schedulePanel.classList.remove('expanded');
+        });
+
+        let saveTimeout = null;
+
+        scheduleText.addEventListener('input', () => {
+            if (scheduleStatus) {
+                scheduleStatus.textContent = '保存中...';
+                scheduleStatus.classList.add('saving');
+            }
+
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+
+            saveTimeout = setTimeout(async () => {
+                SecurityUtils.safeSetStorage('office_schedule_content', scheduleText.value);
+
+                if (syncManager.isLoggedIn()) {
+                    if (scheduleStatus) {
+                        scheduleStatus.textContent = '同步中...';
+                    }
+
+                    try {
+                        const result = await syncManager.immediateSyncToCloud();
+                        if (result && result.success) {
+                            if (scheduleStatus) {
+                                scheduleStatus.textContent = '已同步到云端';
+                                scheduleStatus.classList.remove('saving');
+                            }
+                        } else {
+                            if (scheduleStatus) {
+                                scheduleStatus.textContent = '同步失败';
+                            }
+                        }
+                    } catch (e) {
+                        console.error('日程同步异常:', e);
+                        if (scheduleStatus) {
+                            scheduleStatus.textContent = '同步失败';
+                        }
+                    }
+
+                    setTimeout(() => {
+                        if (scheduleStatus) {
+                            scheduleStatus.textContent = '自动保存';
+                        }
+                    }, 3000);
+                } else {
+                    if (scheduleStatus) {
+                        scheduleStatus.textContent = '已保存到本地';
+                        scheduleStatus.classList.remove('saving');
+                    }
+                    setTimeout(() => {
+                        if (scheduleStatus) {
+                            scheduleStatus.textContent = '登录后可同步云端';
+                        }
+                    }, 2000);
+                }
+            }, 500);
+        });
+
+        document.addEventListener('scheduleSynced', (e) => {
+            const newContent = e.detail.content;
+            if (newContent !== scheduleText.value) {
+                scheduleText.value = newContent;
+                SecurityUtils.safeSetStorage('office_schedule_content', newContent);
+                if (scheduleStatus) {
+                    scheduleStatus.textContent = '已从云端同步';
+                    setTimeout(() => {
+                        scheduleStatus.textContent = '自动保存';
+                    }, 3000);
+                }
+            }
+        });
+    }
+
     initMemoPanel() {
         const memoPanel = document.getElementById('memoPanel');
         const memoToggle = document.getElementById('memoToggle');

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -231,6 +231,17 @@ class SyncManager {
                             }));
                         }
                     }
+                    // 同步日程
+                    if (cloudData?.data?.schedule !== undefined) {
+                        const localSchedule = SafeStorage.get('office_schedule_content') || '';
+                        const cloudSchedule = cloudData.data.schedule;
+                        if (cloudSchedule !== localSchedule) {
+                            SafeStorage.set('office_schedule_content', cloudSchedule);
+                            document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                                detail: { content: cloudSchedule } 
+                            }));
+                        }
+                    }
                 }
             }
 
@@ -286,6 +297,7 @@ class SyncManager {
                 items: allItems,
                 settings: settings,
                 memo: SafeStorage.get('office_memo_content') || '',
+                schedule: SafeStorage.get('office_schedule_content') || '',
                 links: SafeStorage.get('office_links') || '',
                 contacts: SafeStorage.get('office_contacts') || '',
                 device_info: navigator.userAgent
@@ -351,6 +363,14 @@ class SyncManager {
                 SafeStorage.set('office_memo_content', cloudData.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: cloudData.data.memo } 
+                }));
+            }
+
+            // 同步日程
+            if (cloudData.data.schedule !== undefined) {
+                SafeStorage.set('office_schedule_content', cloudData.data.schedule);
+                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                    detail: { content: cloudData.data.schedule } 
                 }));
             }
 
@@ -519,6 +539,18 @@ class SyncManager {
                     SafeStorage.set('office_memo_content', cloudMemo);
                     document.dispatchEvent(new CustomEvent('memoSynced', { 
                         detail: { content: cloudMemo } 
+                    }));
+                }
+            }
+
+            // 同步日程（云端优先）
+            if (cloudData.data.schedule !== undefined) {
+                const cloudSchedule = cloudData.data.schedule;
+                const localSchedule = SafeStorage.get('office_schedule_content') || '';
+                if (cloudSchedule !== localSchedule) {
+                    SafeStorage.set('office_schedule_content', cloudSchedule);
+                    document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                        detail: { content: cloudSchedule } 
                     }));
                 }
             }
@@ -747,6 +779,14 @@ class SyncManager {
                 SafeStorage.set('office_memo_content', data.data.memo);
                 document.dispatchEvent(new CustomEvent('memoSynced', { 
                     detail: { content: data.data.memo } 
+                }));
+            }
+
+            // 同步日程
+            if (data.data.schedule !== undefined) {
+                SafeStorage.set('office_schedule_content', data.data.schedule);
+                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                    detail: { content: data.data.schedule } 
                 }));
             }
 
@@ -1045,6 +1085,7 @@ class SyncManager {
                 items: allItems,
                 settings: settings,
                 memo: SafeStorage.get('office_memo_content') || '',
+                schedule: SafeStorage.get('office_schedule_content') || '',
                 links: SafeStorage.get('office_links') || '',
                 device_info: navigator.userAgent
             };
@@ -1139,6 +1180,14 @@ class SyncManager {
                     detail: { content: data.data.memo } 
                 }));
 
+            }
+
+            // 同步日程
+            if (data.data.schedule !== undefined) {
+                SafeStorage.set('office_schedule_content', data.data.schedule);
+                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                    detail: { content: data.data.schedule } 
+                }));
             }
 
             // 同步网站
