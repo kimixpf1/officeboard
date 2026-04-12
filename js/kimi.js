@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿/**
  * Kimi API 集成模块
  * 支持 Kimi Code API
  */
@@ -100,7 +100,7 @@ class KimiAPI {
                 temperature,
                 response_format: { type: 'json_object' }
             })
-        });
+        }, 3, 'KimiAPI');
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
