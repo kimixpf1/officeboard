@@ -98,6 +98,13 @@
 - sync.js downloadFromCloud / mergeData / silentSyncFromCloud / syncFromCloud：全部 clearAllItems 调用前加备份（getAllItems），失败时回滚
 - sync.js clearAllItems：全部加 try-catch，清空失败时中止操作而非继续导入
 
+## 已完成的日程折叠面板
+- 右侧面板5个折叠按钮（从上到下）：日程/工具/网站/备忘录/通讯录
+- 日程面板与备忘录完全一致：纯文字记录（textarea）+ 自动保存(500ms防抖) + 跨设备同步
+- localStorage key：office_schedule_content，syncData 字段：schedule，自定义事件：scheduleSynced
+- sync.js 7处同步路径均已支持 schedule 字段
+- 5按钮桌面端间距88px，移动端间距70px，展开状态递增补偿
+
 ## 已完成的微信兼容优化（4-1 + 4-3）
 - wechat-upload.js 成功返回改用 location.replace() 替代 location.href，防止微信返回键死循环
 - wechat-upload.js init 增加 IndexedDB/FileReader 可用性检测，不支持时禁用按钮并提示

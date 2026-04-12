@@ -91,6 +91,12 @@
 - ✅ 净减 49 行代码（130 增 / 179 删）
 - 不在替换范围：ocr.js/kimi.js AI 响应解析、sync.js 文件导入、app.js 深拷贝
 
+### 2026-04-12 日程折叠面板功能
+- ✅ index.html：日程面板 HTML（textarea 模式，与备忘录一致）
+- ✅ css/style.css：日程按钮样式 + 5按钮布局 + 展开补偿 + 7主题 + 移动端适配
+- ✅ js/app.js：initSchedulePanel() 展开收起 + 自动保存(500ms防抖) + 云端同步 + scheduleSynced 事件监听
+- ✅ js/sync.js：7处同步路径添加 schedule 字段（uploadToCloud×2/smartSync/downloadFromCloud/mergeData/silentSyncFromCloud/syncFromCloud）
+
 ### 可选后续优化
 - A1: db.js 事务模式统一（all→readonly/readwrite 按需）
 - A2: sync.js Supabase 查询合并（单次 .select 替代多次 .eq）

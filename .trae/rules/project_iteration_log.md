@@ -676,6 +676,32 @@
 ### 遗留事项
 - 无功能遗留
 
+## 2026-04-12 日程折叠面板功能
+
+### 本次目标
+- 在右侧面板四个折叠按钮上方新增"日程"折叠按钮
+- 与备忘录完全相同的模式：纯文字记录 + 自动保存 + 跨设备同步
+
+### 已完成
+- ✅ index.html：日程面板 HTML（textarea + panel-footer 模式）
+- ✅ css/style.css：日程按钮样式 + 5按钮桌面/移动端布局 + 展开补偿 + 7主题色 + 移动端响应式
+- ✅ js/app.js：initSchedulePanel() 方法 — 展开/收起切换 + 自动保存(500ms防抖) + 云端同步 + scheduleSynced 事件监听
+- ✅ js/sync.js：7处同步路径全部添加 schedule 字段
+  - uploadToCloud syncData 构建（2处）
+  - smartSync "无变化"路径：schedule 比较更新
+  - downloadFromCloud：schedule 下载恢复
+  - mergeData：schedule 云端优先合并
+  - silentSyncFromCloud：schedule 静默同步
+  - syncFromCloud：schedule 完整恢复
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/sync.js` 通过
+- git push 成功（commit 61ba2cb）
+
+### 遗留事项
+- 无功能遗留
+
 ## 2026-04-12 A3 safeJsonParse 工具函数优化
 
 ### 本次目标
