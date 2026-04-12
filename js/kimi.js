@@ -1,4 +1,4 @@
-﻿/**
+﻿﻿/**
  * Kimi API 集成模块
  * 支持 Kimi Code API
  */
@@ -38,7 +38,7 @@ class KimiAPI {
                     messages: [{ role: 'user', content: 'hi' }],
                     max_tokens: 5
                 })
-            });
+            }, 3, 'KimiAPI');
 
             if (response.ok) {
                 return {

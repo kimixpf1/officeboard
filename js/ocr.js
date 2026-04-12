@@ -1,4 +1,4 @@
-﻿/**
+﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -357,7 +357,7 @@ class OCRManager {
                     temperature: 0.1,
                     max_tokens: 2000
                 })
-            });
+            }, 3, 'OCR-DeepSeek');
 
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
@@ -3144,7 +3144,7 @@ class OCRManager {
                     temperature: 0.1,
                     max_tokens: 4000
                 })
-            });
+            }, 3, 'OCR-Kimi');
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
