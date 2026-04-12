@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -375,9 +375,8 @@ class OCRManager {
             // 尝试解析JSON
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                const result = JSON.parse(jsonMatch[0]);
-                if (result.items && Array.isArray(result.items)) {
-                    // 过滤无效项并验证，然后格式化标题
+                const result = safeJsonParse(jsonMatch[0], null);
+                if (result && result.items && Array.isArray(result.items)) {
                     const items = result.items
                         .map(item => this.validateAndCleanItem(item))
                         .filter(item => item !== null);
@@ -3175,8 +3174,8 @@ class OCRManager {
             // 解析JSON
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                const result = JSON.parse(jsonMatch[0]);
-                if (result.items && Array.isArray(result.items)) {
+                const result = safeJsonParse(jsonMatch[0], null);
+                if (result && result.items && Array.isArray(result.items)) {
                     const items = result.items
                         .map(item => this.validateAndCleanItem(item))
                         .filter(item => item !== null);
@@ -3351,8 +3350,8 @@ ${ocrText}
             // 尝试解析JSON
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                const result = JSON.parse(jsonMatch[0]);
-                if (result.items && Array.isArray(result.items)) {
+                const result = safeJsonParse(jsonMatch[0], null);
+                if (result && result.items && Array.isArray(result.items)) {
                     // 验证和清理
                     const items = result.items
                         .map(item => this.validateAndCleanItem(item))

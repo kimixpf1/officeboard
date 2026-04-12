@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿/**
  * Kimi API 集成模块
  * 支持 Kimi Code API
  */
@@ -262,7 +262,8 @@ class KimiAPI {
         const response = await this.request(messages);
 
         try {
-            const result = JSON.parse(response);
+            const result = safeJsonParse(response, null);
+            if (!result) throw new Error('JSON解析失败');
             return this.validateAndNormalizeCommand(result);
         } catch (error) {
             console.error('解析响应失败:', error);
@@ -382,7 +383,8 @@ class KimiAPI {
         const response = await this.request(messages);
 
         try {
-            const result = JSON.parse(response);
+            const result = safeJsonParse(response, null);
+            if (!result) return [];
             return (result.items || []).map(item => this.validateAndNormalize(item));
         } catch (error) {
             console.error('解析文档失败:', error);
@@ -430,10 +432,9 @@ ${JSON.stringify(items, null, 2)}
         const response = await this.request(messages, 0.5);
 
         try {
-            const result = JSON.parse(response);
-            return result.report || result.content || response;
+            const result = safeJsonParse(response, null);
+            return result ? (result.report || result.content || response) : response;
         } catch (error) {
-            // 如果不是JSON格式，直接返回文本
             return response;
         }
     }
@@ -506,7 +507,7 @@ ${JSON.stringify(items.slice(0, 10), null, 2)}
             ];
 
             const response = await this.request(messages);
-            return JSON.parse(response);
+            return safeJsonParse(response, { reminders: [], suggestions: [] });
         } catch (error) {
             console.error('获取推荐失败:', error);
             return { reminders: [], suggestions: [] };
