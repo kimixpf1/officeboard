@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -433,8 +433,7 @@ class OCRManager {
         data.title = data.title
             .replace(/^[和与跟][^\s]*/g, '')
             .replace(/\s+/g, '')
-            .trim()
-            .substring(0, 30);
+            .trim();
 
         // 验证日期格式
         if (data.date && !/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
@@ -1785,11 +1784,6 @@ class OCRManager {
             .replace(/[，,。！？、]/g, '')
             .trim();
 
-        // 限制长度
-        if (title.length > 30) {
-            title = title.substring(0, 30);
-        }
-
         return title || '待办事项';
     }
 
@@ -1820,7 +1814,7 @@ class OCRManager {
         }
 
         // 移除重复字
-        let title = text.replace(/关于关于/g, '关于').replace(/关于于/g, '关于').substring(0, 30);
+        let title = text.replace(/关于关于/g, '关于').replace(/关于于/g, '关于');
         return title;
     }
 
@@ -1890,9 +1884,9 @@ class OCRManager {
                         progressCallback(statusMap[m.status] || `OCR: ${m.status}`);
                     }
                 },
-                // 使用多个镜像源，提高下载成功率
-                langPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0_fast',
-                // 错误处理配置
+                workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/worker.min.js',
+                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4.0.3',
+                langPath: 'https://cdn.jsdelivr.net/npm/tessdata@4.0.0_fast',
                 errorHandler: err => {
                     console.warn('OCR警告:', err);
                 }
@@ -1953,7 +1947,10 @@ class OCRManager {
                         };
                         progressCallback(statusMap[m.status] || `OCR: ${m.status}`);
                     }
-                }
+                },
+                workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/worker.min.js',
+                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4.0.3',
+                langPath: 'https://cdn.jsdelivr.net/npm/tessdata@4.0.0_fast'
             });
 
             return {
@@ -2049,13 +2046,6 @@ class OCRManager {
      */
     isSupportedFile(file) {
         return this.getFileType(file) !== 'unknown';
-    }
-
-    /**
-     * 提取PDF文本（简化实现，实际项目中可使用pdf.js）
-     */
-    async extractPDFText(file) {
-        throw new Error('PDF文件请转换为图片后上传，或使用Kimi API文件上传功能');
     }
 
     /**
