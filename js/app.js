@@ -4730,73 +4730,28 @@ class OfficeDashboard {
         }
     }
 
-    /**
-     * 加载事项列表
-     */
-    async loadItems() {
-        const allItems = await db.getAllItems();
+    async getBoardItemsForSelectedDate() {
+        const items = await db.getItemsByDateRange(this.selectedDate, this.selectedDate);
+        const isSelectedDateWorkday = this.isWorkday(this.selectedDate);
 
-        // 调试：打印所有数据的 order 值
-
-
-        // 日视图：按选中日期筛选
-        let items = allItems;
-        if (this.currentView === 'board') {
-            items = allItems.filter(item => {
-                // 会议：按日期匹配（支持跨天会议）
-                if (item.type === ITEM_TYPES.MEETING && item.date) {
-                    // 跨天会议：检查选中日期是否在日期范围内
-                    if (item.endDate) {
-                        return this.selectedDate >= item.date && this.selectedDate <= item.endDate;
-                    }
-                    // 单天会议
-                    return item.date === this.selectedDate;
-                }
-                // 待办：按截止日期匹配
-                if (item.type === ITEM_TYPES.TODO && item.deadline) {
-                    return item.deadline.startsWith(this.selectedDate);
-                }
-                // 文件：按办文日期范围匹配（支持跨天流转）
-                if (item.type === ITEM_TYPES.DOCUMENT) {
-                    const startDate = item.docStartDate || item.docDate;
-                    const endDate = item.docEndDate;
-                    
-                    // 首先检查当前日期是否在办文日期范围内
-                    let inRange = false;
-                    if (startDate && endDate) {
-                        // 跨天办文：检查选中日期是否在日期范围内
-                        inRange = this.selectedDate >= startDate && this.selectedDate <= endDate;
-                    } else if (startDate) {
-                        // 单天办文
-                        inRange = startDate === this.selectedDate;
-                    } else if (item.createdAt) {
-                        // 兼容旧数据
-                        inRange = item.createdAt.startsWith(this.selectedDate);
-                    }
-                    
-                    // 如果在范围内且启用了跳过周末和节假日
-                    if (inRange && item.skipWeekend) {
-                        return this.isWorkday(this.selectedDate);
-                    }
-                    
-                    return inRange;
-                }
+        return items.filter(item => {
+            if (item.type === ITEM_TYPES.DOCUMENT && item.skipWeekend && !isSelectedDateWorkday) {
                 return false;
-            });
-        }
+            }
+            return true;
+        });
+    }
 
-        // 为跨日期办文应用当天的独立状态，并过滤隐藏的项
-        items = items.map(item => {
-            // 只处理跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (item.type === ITEM_TYPES.DOCUMENT && 
-                item.docStartDate && item.docEndDate && 
-                !item.recurringGroupId) {
+    getVisibleBoardItems(items) {
+        return items.map(item => {
+            if (this.isCrossDateDocument(item)) {
                 return this.getDocumentItemForSelectedDate(item);
             }
             return item;
         }).filter(item => !item._hidden);
+    }
 
-        // 按类型分组
+    groupItemsByType(items) {
         const grouped = {
             [ITEM_TYPES.TODO]: [],
             [ITEM_TYPES.MEETING]: [],
@@ -4808,6 +4763,23 @@ class OfficeDashboard {
                 grouped[item.type].push(item);
             }
         });
+
+        return grouped;
+    }
+
+    /**
+     * 加载事项列表
+     */
+    async loadItems() {
+        const allItems = this.currentView === 'board'
+            ? await this.getBoardItemsForSelectedDate()
+            : await db.getAllItems();
+
+        const items = this.currentView === 'board'
+            ? this.getVisibleBoardItems(allItems)
+            : allItems;
+
+        const grouped = this.groupItemsByType(items);
 
         // 渲染各列（排序在renderColumn中处理）
         this.renderColumn(ITEM_TYPES.TODO, grouped[ITEM_TYPES.TODO]);

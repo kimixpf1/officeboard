@@ -3,6 +3,39 @@
 ## 2026-04-17
 
 ### 本次目标
+- 实施 P2-1 第一轮优化：收敛主面板当前日期加载链路，减少日视图无差别全量读取
+- 保持现有 UI、数据结构、跨日期办文与同步链路不变，确保线上既有功能零回归
+
+### 当前状态
+- ✅ 已重新读取 `.trae/rules/` 目录全部规则文件，确认本轮仍按“验证通过后默认提交、推送、部署”执行
+- ✅ 已定位当前性能热点：`app.js` 中 `loadItems()` 在日视图下每次都先 `db.getAllItems()` 再本地过滤
+- ✅ 已完成 P2-1 第一轮收敛：日视图改为复用 `db.getItemsByDateRange(this.selectedDate, this.selectedDate)` 获取当天相关事项
+- ✅ 已在 `app.js` 抽出 `getBoardItemsForSelectedDate`、`getVisibleBoardItems`、`groupItemsByType`，让加载链路更清晰、可维护
+- ✅ 已保留跨日期办文 `dayStates` 按日覆盖、`skipWeekend` 过滤、原有排序与列渲染逻辑
+- ✅ 已完成本地脚本校验、诊断校验与页面级真人模拟冒烟验证
+- 🔄 待提交、推送、部署本轮改动
+
+### 本轮关键改动
+- app.js：新增 `getBoardItemsForSelectedDate`，主面板日视图优先按选中日期读取当天相关事项，避免每次切日都扫描全部数据后再过滤
+- app.js：新增 `getVisibleBoardItems`，继续统一承接跨日期办文的按日覆盖与 `_hidden` 过滤
+- app.js：新增 `groupItemsByType`，把按类型分桶从 `loadItems()` 主流程中抽离，降低后续维护成本
+- app.js：`loadItems()` 收敛为“按视图取数 → 按需应用按日覆盖 → 分桶 → 渲染”四步主链路
+- index.html：app.js 资源版本号由 `v76` 提升到 `v77`
+
+### 验证结果
+- `node --check js/app.js` 通过
+- app.js 诊断为 0 错误
+- 页面级冒烟验证通过：`window.dashboard` 正常初始化，日期前进/回到今天后标题与计数刷新正常
+- Chrome Console 0 error / 0 warn
+- 未改动数据库结构、未改动同步协议、未改动跨日期办文作用范围逻辑
+
+### 遗留事项
+- 本轮只是 P2-1 第一轮收敛，尚未继续到更深层的 IndexedDB 索引优化
+- 若用户继续推进 P2，可再评估第二轮：为高频日期查询增加更细粒度索引或缓存层
+
+## 2026-04-17
+
+### 本次目标
 - 按跨项目 Rules 优化标准方案，继续收敛整理本项目剩余规则文件
 - 完成跨日期办文 P1 收敛优化：统一读取层、统一作用范围更新层，避免后续新入口再次绕过按日解析
 
