@@ -2852,6 +2852,20 @@ body {
     margin-right: 0;
 }
 
+/* 日历空白态提示 */
+.calendar-empty-hint {
+    color: var(--gray-400);
+    text-align: center;
+    padding-top: 20px;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.week-cell:hover .calendar-empty-hint,
+.month-cell:hover .calendar-empty-hint {
+    color: var(--primary-color);
+}
+
 /* ========== 右侧独立折叠面板样式 ========== */
 /* 通用面板样式 */
 .side-panel {

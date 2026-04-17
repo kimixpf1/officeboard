@@ -1,25 +1,28 @@
 # Todolist
 
 ## 当前轮次目标
-- 实施 P2-1：优化主面板当前日期加载链路，减少日视图无差别全量读取带来的不必要开销
-- 保持现有 UI、数据结构、跨日期办文与同步链路不变，确保线上既有功能零回归
+- 完成 P2 剩余优化，继续收敛主面板/日历视图交互逻辑，同时保持线上既有功能零回归
+- 实现周视图、月视图空白区域直接新增待办/会议/办文事项，并在验证通过后推送部署
 
 ## 当前待办
 - 暂无
 
 ## 已完成
 - ✅ 已重新通读 `.trae/rules/` 五个规则文件并确认本轮仍按“验证通过后默认提交、推送、部署”执行
-- ✅ 已定位主面板当前日期加载链路：`loadItems()` 在日视图下每次都走 `db.getAllItems()` 后再本地过滤
-- ✅ 已完成 P2-1 第一轮收敛：日视图改为复用 `db.getItemsByDateRange(selectedDate, selectedDate)` 获取当天数据
-- ✅ 已在 app.js 抽出 `getBoardItemsForSelectedDate`、`getVisibleBoardItems`、`groupItemsByType`，减少 `loadItems()` 中重复筛选/分组逻辑
-- ✅ 已保留跨日期办文 `dayStates` 按日覆盖、`skipWeekend` 过滤与原有渲染排序逻辑
-- ✅ 已完成 `node --check js/app.js`、app.js 诊断校验与页面级冒烟验证
-- ✅ 已更新 index.html 中 app.js 资源版本号为 `v77`
+- ✅ 已完成 P2-1 第一轮：主面板日视图改为优先按选中日期读取当天相关事项，减少无差别全量读取
+- ✅ 已在 app.js 保留 `getBoardItemsForSelectedDate`、`getVisibleBoardItems`、`groupItemsByType` 收敛后的主加载链路
+- ✅ 已为周/月视图新增 `calendarQuickAdd` 事件链路，空白处点击后可直接选择新增待办、会议或办文
+- ✅ 已扩展 `showAddModal(type, selectedDate)`，支持按用户点击的日历日期预填待办截止时间、会议日期、办文开始日期
+- ✅ 已优化 calendar.js：周/月视图空白单元格显示“+ 点击新增”，点击空白处直接进入快速新增；点击已有事项仍保留跳转到对应日视图
+- ✅ 已补强 `_createChoiceModal`，避免快速连续点击时叠加多个选择弹窗
+- ✅ 已完成 `node --check js/app.js`、`node --check js/calendar.js`、诊断校验与页面级真人模拟测试
+- ✅ 已更新资源版本号：calendar.js `v15`、app.js `v78`
 
 ## 已跳过
 - 暂无
 
 ## 下一步
-- 提交、推送、部署本轮 P2-1 第一轮优化
-- 用户线上强制刷新后，重点复测日期切换、今日按钮、跨日期办文显示与周/月视图切换
+- 提交、推送、部署本轮 P2 与周/月视图空白新增能力
+- 用户线上强制刷新后，重点复测：周视图空白点击新增、月视图空白点击新增、已有事项点击跳日视图、日视图原有新增/编辑链路
+
 

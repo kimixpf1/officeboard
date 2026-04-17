@@ -416,6 +416,11 @@ class OfficeDashboard {
             this.goToDateView(e.detail.date);
         });
 
+        // 监听日历空白处快速新增事件
+        document.addEventListener('calendarQuickAdd', (e) => {
+            this.handleCalendarQuickAdd(e.detail?.date);
+        });
+
         // 初始化右侧折叠面板
         this.initSidePanels();
     }
@@ -5647,7 +5652,7 @@ class OfficeDashboard {
     /**
      * 显示添加弹窗
      */
-    showAddModal(type) {
+    showAddModal(type, selectedDate = this.selectedDate) {
         const modal = document.getElementById('itemModal');
         const form = document.getElementById('itemForm');
         const titleEl = document.getElementById('modalTitle');
@@ -5672,8 +5677,7 @@ class OfficeDashboard {
         document.getElementById(type + 'Fields')?.classList.add('active');
 
         // 使用用户选择的日期作为默认日期
-
-        const dateStr = this.selectedDate;
+        const dateStr = selectedDate || this.selectedDate;
         const now = new Date();
         const timeStr = now.toTimeString().slice(0, 5);
 
@@ -5707,6 +5711,29 @@ class OfficeDashboard {
 
         this.showModal('itemModal');
         this.initRecurringEvents();
+    }
+
+    async handleCalendarQuickAdd(dateStr) {
+        const targetDate = dateStr || this.selectedDate;
+        const type = await this.showCalendarQuickAddTypeChoice(targetDate);
+        if (type === 'cancel') {
+            return;
+        }
+        this.showAddModal(type, targetDate);
+    }
+
+    showCalendarQuickAddTypeChoice(dateStr) {
+        return this._createChoiceModal({
+            title: '快速新增事项',
+            description: `${dateStr} 要新增什么类型的事项？`,
+            maxWidth: '420px',
+            buttons: [
+                { label: '待办事项', subLabel: '默认带入该日期和当前时间', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: ITEM_TYPES.TODO },
+                { label: '会议活动', subLabel: '默认带入该日期和当前时间', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: ITEM_TYPES.MEETING },
+                { label: '办文情况', subLabel: '默认带入该日期作为开始日期', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: ITEM_TYPES.DOCUMENT },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
+        });
     }
 
     /**
@@ -6144,8 +6171,14 @@ class OfficeDashboard {
 
     _createChoiceModal({ title, description, maxWidth, buttons }) {
         return new Promise((resolve) => {
+            if (this._activeChoiceModal) {
+                this._activeChoiceModal.remove();
+                this._activeChoiceModal = null;
+            }
+
             const modal = document.createElement('div');
             modal.className = 'modal active';
+            this._activeChoiceModal = modal;
             const content = document.createElement('div');
             content.className = 'modal-content';
             content.style.maxWidth = maxWidth || '400px';
@@ -6162,6 +6195,13 @@ class OfficeDashboard {
             p.textContent = description;
             const btnContainer = document.createElement('div');
             btnContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+            const closeModal = (value) => {
+                if (this._activeChoiceModal === modal) {
+                    this._activeChoiceModal = null;
+                }
+                modal.remove();
+                resolve(value);
+            };
             for (const cfg of buttons) {
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -6174,9 +6214,14 @@ class OfficeDashboard {
                     sub.textContent = cfg.subLabel;
                     btn.appendChild(sub);
                 }
-                btn.addEventListener('click', () => { modal.remove(); resolve(cfg.value); });
+                btn.addEventListener('click', () => closeModal(cfg.value));
                 btnContainer.appendChild(btn);
             }
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal('cancel');
+                }
+            });
             body.append(p, btnContainer);
             content.append(header, body);
             modal.appendChild(content);

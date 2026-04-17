@@ -242,6 +242,14 @@ class CalendarView {
     }
 
     /**
+     * 触发日历空白处快速新增
+     */
+    quickAddForDate(dateStr) {
+        const event = new CustomEvent('calendarQuickAdd', { detail: { date: dateStr } });
+        document.dispatchEvent(event);
+    }
+
+    /**
      * 渲染周视图
      */
     renderWeekView(items) {
@@ -307,14 +315,19 @@ class CalendarView {
             const cellDiv = document.createElement('div');
             cellDiv.className = `week-cell${isToday ? ' today' : ''}`;
             cellDiv.dataset.date = dateStr;
-            cellDiv.addEventListener('click', () => this.goToDate(dateStr));
+            cellDiv.addEventListener('click', (e) => {
+                if (e.target.closest('.calendar-item')) {
+                    return;
+                }
+                this.quickAddForDate(dateStr);
+            });
 
             if (sortedItems.length > 0) {
                 sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
             } else {
                 const emptyDiv = document.createElement('div');
-                emptyDiv.style.cssText = 'color:#ccc;text-align:center;padding-top:20px;';
-                emptyDiv.textContent = '-';
+                emptyDiv.className = 'calendar-empty-hint';
+                emptyDiv.textContent = '+ 点击新增';
                 cellDiv.appendChild(emptyDiv);
             }
             container.appendChild(cellDiv);
@@ -428,12 +441,24 @@ class CalendarView {
             cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}`;
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
             cellDiv.dataset.date = fullDateLabel;
-            cellDiv.addEventListener('click', () => this.goToDate(dateStr));
+            cellDiv.addEventListener('click', (e) => {
+                if (e.target.closest('.calendar-item')) {
+                    return;
+                }
+                this.quickAddForDate(dateStr);
+            });
 
             const dateLabelDiv = document.createElement('div');
             dateLabelDiv.className = 'month-cell-date';
             dateLabelDiv.textContent = day;
             cellDiv.appendChild(dateLabelDiv);
+
+            if (sortedItems.length === 0) {
+                const emptyHint = document.createElement('div');
+                emptyHint.className = 'calendar-empty-hint';
+                emptyHint.textContent = '+ 点击新增';
+                cellDiv.appendChild(emptyHint);
+            }
 
             sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
             container.appendChild(cellDiv);
@@ -479,6 +504,14 @@ class CalendarView {
         el.title = displayTitle;
         el.style.cursor = 'pointer';
         el.style.whiteSpace = 'normal';
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.goToDate(item.type === 'todo'
+                ? item.deadline?.split('T')[0]
+                : item.type === 'meeting'
+                    ? item.date
+                    : (item.docStartDate || item.docDate || item.createdAt?.split('T')[0]));
+        });
 
         const baseColor = this.getTypeColor(item.type);
         const bgColor = this.getTypeColor(item.type, 0.1);
