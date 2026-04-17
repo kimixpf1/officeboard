@@ -5915,7 +5915,8 @@ class OfficeDashboard {
                 item.skipWeekend = document.getElementById('docSkipWeekend').checked;
                 // 流转历史
                 const existingItem = document.getElementById('itemId').value ? await db.getItem(parseInt(document.getElementById('itemId').value)) : null;
-                item.transferHistory = existingItem?.transferHistory || [];
+                const effectiveExistingItem = existingItem ? this.getDocumentItemForSelectedDate(existingItem) : null;
+                item.transferHistory = effectiveExistingItem?.transferHistory || [];
                 
                 // 办文周期性任务设置
                 const docIsRecurring = document.getElementById('docIsRecurring')?.checked;
@@ -6386,6 +6387,7 @@ class OfficeDashboard {
             title: dayState.title !== undefined ? dayState.title : item.title,
             content: dayState.content !== undefined ? dayState.content : item.content,
             handler: dayState.handler !== undefined ? dayState.handler : item.handler,
+            transferHistory: dayState.transferHistory !== undefined ? dayState.transferHistory : item.transferHistory,
             _hidden: dayState.hidden || false
         };
     }
@@ -7677,31 +7679,67 @@ class OfficeDashboard {
         }
 
         try {
-            const item = await db.getItem(parseInt(itemId));
-            if (!item) return;
+            const originalItem = await db.getItem(parseInt(itemId));
+            if (!originalItem) return;
 
-            // 记录流转历史
-            if (!item.transferHistory) {
-                item.transferHistory = [];
-            }
-
-            item.transferHistory.push({
-                from: item.handler || '待分配',
+            const selectedItem = this.getDocumentItemForSelectedDate(originalItem);
+            const transferRecord = {
+                from: selectedItem.handler || '待分配',
                 to: transferTo,
                 time: new Date().toLocaleString('zh-CN'),
-                note: note
-            });
+                note
+            };
 
-            // 更新当前处理人
-            item.handler = transferTo;
-            item.progress = DOCUMENT_PROGRESS.PROCESSING;
+            if (originalItem.docStartDate && originalItem.docEndDate && !originalItem.recurringGroupId) {
+                const choice = await this.showCrossDateDocChoice('流转', '流转');
+                if (choice === 'cancel') return;
 
-            await db.updateItem(parseInt(itemId), item);
+                if (choice === 'this') {
+                    const dayStates = { ...(originalItem.dayStates || {}) };
+                    dayStates[this.selectedDate] = {
+                        ...(dayStates[this.selectedDate] || {}),
+                        handler: transferTo,
+                        progress: DOCUMENT_PROGRESS.PROCESSING,
+                        transferHistory: [...(selectedItem.transferHistory || []), transferRecord]
+                    };
 
-            // 更新表单显示
+                    this.saveUndoHistory('update', { item: originalItem });
+                    await db.updateItem(parseInt(itemId), { dayStates });
+                } else if (choice === 'future') {
+                    this.saveUndoHistory('update', { item: originalItem });
+                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['handler', 'progress', 'transferHistory'], [originalItem.handler, originalItem.progress, originalItem.transferHistory]);
+                    await db.updateItem(parseInt(itemId), {
+                        handler: transferTo,
+                        progress: DOCUMENT_PROGRESS.PROCESSING,
+                        transferHistory: [...(selectedItem.transferHistory || []), transferRecord],
+                        dayStates
+                    });
+                } else {
+                    const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['handler', 'progress', 'transferHistory']);
+                    this.saveUndoHistory('update', { item: originalItem });
+                    await db.updateItem(parseInt(itemId), {
+                        handler: transferTo,
+                        progress: DOCUMENT_PROGRESS.PROCESSING,
+                        transferHistory: [...(selectedItem.transferHistory || []), transferRecord],
+                        dayStates: clearedDayStates
+                    });
+                }
+            } else {
+                const item = { ...originalItem };
+                item.transferHistory = [...(item.transferHistory || []), transferRecord];
+                item.handler = transferTo;
+                item.progress = DOCUMENT_PROGRESS.PROCESSING;
+
+                this.saveUndoHistory('update', { item: originalItem });
+                await db.updateItem(parseInt(itemId), item);
+            }
+
             document.getElementById('docHandler').value = transferTo;
-
             this.hideModal('transferModal');
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) {
+                await syncManager.immediateSyncToCloud();
+            }
             this.showSuccess('流转成功');
         } catch (error) {
             console.error('流转失败:', error);
