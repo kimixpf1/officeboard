@@ -2610,8 +2610,9 @@ class OfficeDashboard {
 
                 if (e.target.closest('.edit-btn') || e.target.closest('.card-title')) {
                     e.stopPropagation();
-                    const item = await db.getItem(itemId);
-                    if (item) {
+                    const rawItem = await db.getItem(itemId);
+                    if (rawItem) {
+                        const item = this.getDocumentItemForSelectedDate(rawItem);
                         await this.editItem(item);
                     }
                 }
@@ -4791,26 +4792,7 @@ class OfficeDashboard {
             if (item.type === ITEM_TYPES.DOCUMENT && 
                 item.docStartDate && item.docEndDate && 
                 !item.recurringGroupId) {
-                const dayState = item.dayStates?.[this.selectedDate] || null;
-                if (!dayState) {
-                    return item;
-                }
-                return {
-                    ...item,
-                    // 完成状态
-                    completed: dayState.completed !== undefined ? dayState.completed : item.completed,
-                    completedAt: dayState.completedAt !== undefined ? dayState.completedAt : item.completedAt,
-                    progress: dayState.progress !== undefined ? dayState.progress : item.progress,
-                    // 置顶沉底
-                    pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
-                    sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk,
-                    // 编辑字段
-                    title: dayState.title !== undefined ? dayState.title : item.title,
-                    content: dayState.content !== undefined ? dayState.content : item.content,
-                    handler: dayState.handler !== undefined ? dayState.handler : item.handler,
-                    // 隐藏标记
-                    _hidden: dayState.hidden || false
-                };
+                return this.getDocumentItemForSelectedDate(item);
             }
             return item;
         }).filter(item => !item._hidden);
@@ -6382,6 +6364,30 @@ class OfficeDashboard {
             }
         }
         return cleared;
+    }
+
+    getDocumentItemForSelectedDate(item, selectedDate = this.selectedDate) {
+        if (!item || item.type !== ITEM_TYPES.DOCUMENT || !item.docStartDate || !item.docEndDate || item.recurringGroupId) {
+            return item;
+        }
+
+        const dayState = item.dayStates?.[selectedDate];
+        if (!dayState) {
+            return item;
+        }
+
+        return {
+            ...item,
+            completed: dayState.completed !== undefined ? dayState.completed : item.completed,
+            completedAt: dayState.completedAt !== undefined ? dayState.completedAt : item.completedAt,
+            progress: dayState.progress !== undefined ? dayState.progress : item.progress,
+            pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
+            sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk,
+            title: dayState.title !== undefined ? dayState.title : item.title,
+            content: dayState.content !== undefined ? dayState.content : item.content,
+            handler: dayState.handler !== undefined ? dayState.handler : item.handler,
+            _hidden: dayState.hidden || false
+        };
     }
 
     _freezeBeforeAndClearFrom(originalItem, fromDate, fields, fieldValues) {

@@ -1,140 +1,59 @@
 # 项目框架
 
-## 根目录
-- index.html：主页面入口，加载工作面板主体
-- wechat-upload.html：微信专用上传识别入口
-- css/style.css：全局样式
-- supabase_setup.sql：Supabase 初始化脚本
-- supabase_setup_safe.sql：更安全的 Supabase 初始化脚本
+## 技术栈
+- 前端：原生 HTML + CSS + JavaScript（无构建流程）
+- 本地存储：IndexedDB + localStorage（通过 SafeStorage 做安全封装）
+- 云端同步：Supabase
+- AI / OCR：Kimi、DeepSeek，统一经 js/ocr.js / js/kimi.js 封装
+- 部署方式：静态站点部署
 
-## js 模块
-- js/utils.js：全局共享工具（SafeStorage 安全存储、fetchWithRetry 网络重试、HolidayData 假期数据、safeJsonParse 安全 JSON 解析）
-- js/app.js：主界面交互、视图切换、上传入口、识别预览确认
-- js/ocr.js：OCR/AI 识别、会议去重、识别动作计划、确认写入
-- js/upload-flow.js：共享的识别预览与确认逻辑（主页面与微信页共用）
-- js/wechat-upload.js：微信上传页交互、预览确认、保存执行
-- js/db.js：本地数据存储与事项增删改查
-- js/sync.js：云端同步逻辑
-- js/report.js：报告生成与导出（当前仅保留高清长图导出）
-- js/calendar.js：日历相关逻辑
+## 根目录稳定结构
+- index.html：桌面完整工作台入口，加载主面板、右侧折叠面板、报告与设置等能力
+- wechat-upload.html：微信轻量上传入口，只保留上传识别与确认链路
+- css/style.css：全局样式与响应式布局
+- js/：核心业务脚本目录
+- vendor/：本地优先静态依赖资源
+- .trae/rules/：项目规则、框架、待办与迭代记录
+
+## js 模块职责
+- js/utils.js：通用工具（SafeStorage、fetchWithRetry、HolidayData、safeJsonParse）
+- js/app.js：主界面控制器，负责视图切换、事项增删改查入口、排序、批量操作、弹窗、跨日期/周期性逻辑
+- js/db.js：IndexedDB 数据读写、规范化与基础数据模型持久化
+- js/sync.js：云端登录、上传、下载、合并、静默同步与回滚保护
+- js/ocr.js：OCR / AI 识别、会议去重、动作计划、确认写入
+- js/upload-flow.js：主页面与微信页共用的识别预览、摘要与确认流程
+- js/wechat-upload.js：微信轻量页交互、能力检测、上传保存与自动返回
+- js/report.js：报告生成与高清长图导出
+- js/calendar.js：日历周/月视图渲染
 - js/templates.js：模板与渲染辅助
-- js/crypto.js：加密相关工具（AES-GCM 256位加密，CryptoManager）
-- js/kimi.js：Kimi 相关能力封装
+- js/crypto.js：加密能力与密钥管理
+- js/kimi.js：Kimi 请求封装与 AI 能力适配
 
-## 核心流程
-- 主页面上传：选择文件 → OCR 识别 → 预览确认 → 确认后写入面板
-- 微信上传：进入轻量页 → 选择文件 → OCR 识别 → 预览确认 → 确认后写入面板
-- 会议识别：标题清洗 → 时间地点归一化 → 已有会议比对 → 新增 / 合并 / 跳过
-- 取消兜底：预览前先抓取事项快照，若点击取消则恢复快照，确保不发生误写入
-- 会议排序：置顶/正常/沉底/已完成分桶 → 新增会议按领导优先+时间插入 → 手动排序仅约束拖动时的旧会议
-- 领导优先顺序：钱局 → 吴局 → 盛局 → 陈局/陈主任 → 房局 → 处室
+## 核心稳定链路
 
-## 双入口架构
-- 保留双入口：index.html 负责桌面完整工作台；wechat-upload.html 负责微信轻量上传
-- 共用逻辑收敛到 js/upload-flow.js
-- 微信上传成功后约1秒自动返回主页面
+### 1. 主页面上传识别链路
+选择文件 → OCR / AI 识别 → 预览确认 → 用户确认后写入本地面板 → 视情况同步到云端
 
-## 已完成的安全优化（第1批）
-- 计算器：eval() → safeMathEval()，正则白名单过滤
-- 密码存储：btoa() → cryptoManager AES-GCM 256位加密，带v2版本标记向后兼容
-- API Key：Supabase anon key 添加安全性注释
+### 2. 微信上传链路
+进入 wechat-upload.html → 选择文件 → OCR / AI 识别 → 预览确认 → 保存 → 约 1 秒后自动返回主页面
 
-## 已完成的导出优化
-- Word/PDF 导出已移除，仅保留高清长图导出
-- 导出模块脚本动态加载支持复用、超时清理、已加载标记
-- 本地优先加载 vendor/ 资源，失败后回退 CDN
+### 3. 会议识别链路
+标题清洗 → 时间地点归一化 → 与已有会议比对 → 生成新增 / 合并 / 跳过动作计划 → 预览确认 → 写入
 
-## 已完成的同步优化
-- 同步模块日志从明细输出改为摘要输出，减少敏感信息暴露
+### 4. 跨日期办文链路
+创建办文时可记录开始/结束日期与跳过周末规则 → 渲染时按 selectedDate 解析 dayStates 覆盖 → 编辑/完成/置顶/沉底/删除支持“仅当天 / 今天及之后 / 全部日期”三类作用范围
 
-## 已完成的 console 清理（2-2）
-- 全项目 console.log 已清零（共约200处移除）
-- 保留所有 console.error / console.warn 用于错误追踪
-- 涉及文件：sync.js(79)、app.js(104)、db.js(10)、ocr.js(5)、templates.js(1)、upload-flow.js(1)
+### 5. 同步保护链路
+本地与云端比较 → 需要时上传、下载或合并 → 清空前先备份 → 异常时回滚恢复 → 成功后广播同步事件
 
-## 已完成的错误边界增强（2-3）
-- 全项目123处 catch 块审查分类（app.js 58、sync.js 25、ocr.js 18、crypto.js 9、kimi.js 8、db.js 2、calendar.js 1、wechat-upload.js 2）
-- app.js 10处静默吞错/空 catch 添加 console.warn（JSON.parse回退×7 + 空catch×3）
-- 空 catch 块全项目清零
+## 当前稳定业务规则
+- 双入口架构保留：index.html 负责完整工作台，wechat-upload.html 负责微信兼容上传
+- 会议默认排序：置顶 / 正常 / 沉底 / 已完成分桶后，按领导优先级与时间排序；已拖动旧会议保留手动顺序
+- 领导优先级：钱局 → 吴局 → 盛局 → 陈局 / 陈主任 → 房局 → 其他领导 → 处室 → 其他
+- OCR 预览必须支持新增 / 合并 / 跳过依据说明与已有会议摘要展示
+- 跨日期办文必须支持 dayStates 按日期覆盖，且历史日期与“今天及之后”范围修改互不串扰
 
-## 已完成的定时器清理（2-4）
-- 全项目29处 setTimeout/setInterval 审查
-- 1处 setInterval 未保存 ID 已修复（会议自动完成检查，保存到 this._meetingAutoCompleteTimer）
-- 其余均为一次性定时器或已有清理机制，无泄漏风险
-
-## 已完成的预览优化
-- 主页面与微信页预览弹窗增加一次性关闭保护，防重复触发
-- 预览中展示新增/合并/跳过判断依据和匹配到的已有会议摘要
-
-## 已完成的排序优化
-- 未拖动且未完成会议默认按领导优先级+时间排序
-- 拖动排序仅影响当时已存在的会议，后续新增会议重新走默认规则
-- OCR 二次校正层统一领导别名纠偏规则
-
-## 已完成的 innerHTML 安全化（2-1）
-- 全部高风险 innerHTML 已改为 DOM API（createElement/textContent/appendChild/replaceChildren）
-- 仅保留 3 处安全/必要的 innerHTML：2 处 escapeHtml 工具函数 + 1 处类型兼容处理
-- 涉及文件：app.js、upload-flow.js、wechat-upload.js、calendar.js
-- calendar.js 新增 createCalendarItem 辅助函数（返回 DOM 元素），renderWeekView/renderMonthView 改为纯 DOM 构建
-- wechat-upload.js setSummary 改为 replaceChildren() + 类型判断，全部 innerHTML 消除
-- 所有内联 onclick 改为 addEventListener
-
-## 已完成的 .onerror 统一处理（2-6）
-- db.js 新增 _rejectWithLog 辅助方法（console.error + reject 一步完成）
-- 22 处裸 reject(request.error) 统一替换为 _rejectWithLog，每处附带语义化上下文（如"addItem写入失败"、"getAllItems读取失败"）
-- 3 处已有 console.error 的 .onerror 保持不变（数据库打开失败、sortItems 获取失败、排序事务失败）
-- 1 处 transaction.onabort 添加语义化错误消息
-
-## 已完成的事件监听优化（2-5）
-- 全项目 147 处 addEventListener 审查完毕，0 处 removeEventListener
-- createCard() 中 7 处直接按钮监听移除（expand/complete/pin/sink/delete/edit/title），统一到 bindBoardCardEvents() 容器级事件委托
-- bindBoardCardEvents 覆盖范围从 TODO+MEETING 扩展为 TODO+MEETING+DOCUMENT
-- 仅保留 dragstart/dragend 为直接绑定（拖拽事件不适合委托）
-
-## 已完成的跨设备同步数据丢失修复
-- sync.js smartSync：首次同步（lastSyncTime为null）走合并逻辑，防止新设备空数据覆盖云端
-- sync.js uploadToCloud：空数据保护，本地为空时先检查云端是否有数据，有则改为下载而非上传空数据
-- sync.js uploadToCloud：upsert后用 .select('updated_at').maybeSingle() 读取云端实际 updated_at，解决 Supabase BEFORE UPDATE 触发器用 NOW() 覆盖代码传入值导致的时间戳漂移
-- sync.js downloadFromCloud / mergeData / silentSyncFromCloud / syncFromCloud：全部 clearAllItems 调用前加备份（getAllItems），失败时回滚
-- sync.js clearAllItems：全部加 try-catch，清空失败时中止操作而非继续导入
-
-## 已完成的日程折叠面板
-- 右侧面板5个折叠按钮（从上到下）：日程/工具/网站/备忘录/通讯录
-- 日程面板与备忘录完全一致：纯文字记录（textarea）+ 自动保存(500ms防抖) + 跨设备同步
-- localStorage key：office_schedule_content，syncData 字段：schedule，自定义事件：scheduleSynced
-- sync.js 7处同步路径均已支持 schedule 字段
-- 5按钮桌面端间距88px，移动端间距70px，展开状态递增补偿
-
-## 已完成的微信兼容优化（4-1 + 4-3）
-- wechat-upload.js 成功返回改用 location.replace() 替代 location.href，防止微信返回键死循环
-- wechat-upload.js init 增加 IndexedDB/FileReader 可用性检测，不支持时禁用按钮并提示
-- app.js 新增 checkWeChatCapabilities() 方法：检测 IndexedDB、FileReader、camera、微信版本号
-- 4-2 分享卡片跳过（需微信JS-SDK+后端签名，纯静态站无法实现）
-
-## 已完成的代码重构优化（第5批）
-- 5-1 公共工具提取：新增 js/utils.js，SafeStorage（安全 localStorage 封装）+ fetchWithRetry（网络重试）消除 4 文件重复代码
-- 5-2 假期数据外置：HolidayData 对象集中管理 2024-2026 年假期与补班日，isWorkday/isHoliday 统一委托，getNthWorkDayOfMonth 获得补班日支持
-- 5-3 加密密钥迁移：crypto.js 主密钥从 localStorage 迁移到 IndexedDB（db.getSetting/setSetting），自动迁移旧数据
-- 涉及文件：utils.js（新建）、app.js、ocr.js、sync.js、crypto.js、kimi.js、index.html、wechat-upload.html
-
-## 已完成的可观测性增强
-- fetchWithRetry 全部 5 处调用已补齐显式 logPrefix 参数
-  - ocr.js 3处：OCR-DeepSeek(L345)、OCR-Kimi(L3104)、OCR-DeepSeek(L3326)
-  - kimi.js 2处：KimiAPI(L30)、KimiAPI(L91)
-
-## 已完成的 A 类代码质量优化
-- A1: db.js 事务模式审查 — 全部18+方法已正确使用 readonly/readwrite，无需修改
-- A2: sync.js uploadToCloud 接受已有云端数据参数，消除 smartSync→uploadToCloud 冗余查询（1-2次/次）
-- A3: safeJsonParse 工具函数 — 全项目 JSON.parse + try/catch 统一替换
-  - utils.js：全局 safeJsonParse(str, defaultValue) 函数
-  - app.js：5处替换，删除 SecurityUtils.safeJsonParse 内部方法
-  - sync.js：9处替换
-  - ocr.js：3处 AI 响应 JSON 解析替换
-  - kimi.js：4处 AI 响应 JSON 解析替换
-
-## 已完成的 B 类低风险优化
-- B1: 错误分类细化 — 评估跳过，现有 showMessage error/success/info 三级已够用
-- B2: Supabase 错误码映射 — 评估跳过，无实际需求场景
-- B3: 离线检测 — sync.js 新增 isOnline() 方法，8处网络请求入口加离线拦截（smartSync/immediateSyncToCloud/silentSyncFromCloud/syncToCloud/syncFromCloud/login/register/changePassword）；app.js 新增 online/offline 事件监听，离线提示+恢复自动同步
-- B4: 缓存过期 — 评估跳过，查询频率低收益有限
-- B5: 事件节流 — 评估跳过，已有 500ms debounce
+## 当前规则维护约束
+- project_framework.md 只记录稳定结构、稳定职责和稳定链路
+- 单次修复过程、临时问题分析、提交明细放到 project_iteration_log.md
+- 当前轮次的执行项和跳过项放到 todolist.md
