@@ -6071,7 +6071,7 @@ class OfficeDashboard {
                     
                     if (choice === 'future') {
                         this.saveUndoHistory('update', { item: originalItem });
-                        const dayStates = this._clearDayStatesFieldsFrom(originalItem.dayStates, this.selectedDate, ['title', 'content', 'handler', 'progress']);
+                        const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['title', 'content', 'handler', 'progress'], [originalItem.title, originalItem.content, originalItem.handler, originalItem.progress]);
                         item.dayStates = dayStates;
                         await db.updateItem(parseInt(id), item);
                         this.hideModal('itemModal');
@@ -6365,26 +6365,46 @@ class OfficeDashboard {
         return cleared;
     }
 
-    _clearDayStatesFieldsFrom(dayStates, fromDate, fields) {
-        if (!dayStates || typeof dayStates !== 'object') {
-            return {};
-        }
+    _freezeBeforeAndClearFrom(originalItem, fromDate, fields, fieldValues) {
+        const dayStates = { ...(originalItem.dayStates || {}) };
+        const startDate = originalItem.docStartDate;
+        const endDate = originalItem.docEndDate;
+        if (!startDate || !endDate) return dayStates;
         
-        const cleared = {};
-        for (const date of Object.keys(dayStates)) {
-            if (date < fromDate) {
-                cleared[date] = { ...dayStates[date] };
-                continue;
+        let cur = new Date(startDate + 'T12:00:00');
+        const end = new Date(endDate + 'T12:00:00');
+        const from = fromDate;
+        
+        while (cur <= end) {
+            const dateStr = this.formatDateForInput(cur).split('T')[0];
+            if (dateStr < from) {
+                const existing = dayStates[dateStr] || {};
+                const frozen = { ...existing };
+                let changed = false;
+                for (let i = 0; i < fields.length; i++) {
+                    if (frozen[fields[i]] === undefined) {
+                        frozen[fields[i]] = fieldValues[i];
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    dayStates[dateStr] = frozen;
+                }
+            } else {
+                const existing = dayStates[dateStr] || {};
+                const cleaned = { ...existing };
+                for (const field of fields) {
+                    delete cleaned[field];
+                }
+                if (Object.keys(cleaned).length > 0) {
+                    dayStates[dateStr] = cleaned;
+                } else {
+                    delete dayStates[dateStr];
+                }
             }
-            const dayState = { ...dayStates[date] };
-            for (const field of fields) {
-                delete dayState[field];
-            }
-            if (Object.keys(dayState).length > 0) {
-                cleared[date] = dayState;
-            }
+            cur.setDate(cur.getDate() + 1);
         }
-        return cleared;
+        return dayStates;
     }
 
     /**
@@ -6520,7 +6540,7 @@ class OfficeDashboard {
                 
                 if (choice === 'future') {
                     this.saveUndoHistory('update', { item: originalItem });
-                    const dayStates = this._clearDayStatesFieldsFrom(originalItem.dayStates, this.selectedDate, ['completed', 'completedAt', 'progress']);
+                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['completed', 'completedAt', 'progress'], [originalItem.completed, originalItem.completedAt, originalItem.progress]);
                     await db.updateItem(id, {
                         completed,
                         completedAt: completed ? new Date().toISOString() : null,
@@ -6622,7 +6642,7 @@ class OfficeDashboard {
                 
                 if (choice === 'future') {
                     this.saveUndoHistory('update', { item: originalItem });
-                    const dayStates = this._clearDayStatesFieldsFrom(originalItem.dayStates, this.selectedDate, ['pinned', 'sunk']);
+                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['pinned', 'sunk'], [originalItem.pinned, originalItem.sunk]);
                     await db.updateItem(id, {
                         pinned,
                         sunk: pinned ? false : originalItem.sunk,
@@ -6724,7 +6744,7 @@ class OfficeDashboard {
                 
                 if (choice === 'future') {
                     this.saveUndoHistory('update', { item: originalItem });
-                    const dayStates = this._clearDayStatesFieldsFrom(originalItem.dayStates, this.selectedDate, ['pinned', 'sunk']);
+                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['pinned', 'sunk'], [originalItem.pinned, originalItem.sunk]);
                     await db.updateItem(id, {
                         sunk,
                         pinned: sunk ? false : originalItem.pinned,
