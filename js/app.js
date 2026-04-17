@@ -4790,10 +4790,11 @@ class OfficeDashboard {
             // 只处理跨日期办文（有开始和结束日期，但不是周期性任务）
             if (item.type === ITEM_TYPES.DOCUMENT && 
                 item.docStartDate && item.docEndDate && 
-                !item.recurringGroupId && 
-                item.dayStates && item.dayStates[this.selectedDate]) {
-                // 应用当天的状态
-                const dayState = item.dayStates[this.selectedDate];
+                !item.recurringGroupId) {
+                const dayState = item.dayStates?.[this.selectedDate] || null;
+                if (!dayState) {
+                    return item;
+                }
                 return {
                     ...item,
                     // 完成状态
@@ -6072,8 +6073,17 @@ class OfficeDashboard {
                     if (choice === 'future') {
                         this.saveUndoHistory('update', { item: originalItem });
                         const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['title', 'content', 'handler', 'progress'], [originalItem.title, originalItem.content, originalItem.handler, originalItem.progress]);
-                        item.dayStates = dayStates;
-                        await db.updateItem(parseInt(id), item);
+                        await db.updateItem(parseInt(id), {
+                            title: item.title,
+                            content: item.content,
+                            handler: item.handler,
+                            progress: item.progress,
+                            docType: item.docType,
+                            docNumber: item.docNumber,
+                            source: item.source,
+                            skipWeekend: item.skipWeekend,
+                            dayStates
+                        });
                         this.hideModal('itemModal');
                         await this.loadItems();
                         if (syncManager.isLoggedIn()) {
@@ -6086,8 +6096,17 @@ class OfficeDashboard {
                     // choice === 'all'
                     this.saveUndoHistory('update', { item: originalItem });
                     const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['title', 'content', 'handler', 'progress']);
-                    item.dayStates = clearedDayStates;
-                    await db.updateItem(parseInt(id), item);
+                    await db.updateItem(parseInt(id), {
+                        title: item.title,
+                        content: item.content,
+                        handler: item.handler,
+                        progress: item.progress,
+                        docType: item.docType,
+                        docNumber: item.docNumber,
+                        source: item.source,
+                        skipWeekend: item.skipWeekend,
+                        dayStates: clearedDayStates
+                    });
                     this.hideModal('itemModal');
                     await this.loadItems();
                     if (syncManager.isLoggedIn()) {
