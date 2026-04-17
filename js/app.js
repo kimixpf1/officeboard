@@ -6297,9 +6297,10 @@ class OfficeDashboard {
         return this._createChoiceModal({
             title: '周期性任务 - ' + actionType,
             description: '这是周期性任务，您想如何操作？',
+            maxWidth: '450px',
             buttons: [
-                { label: '仅本项' + actionName, className: 'btn-secondary', value: 'this' },
-                { label: '所有后续周期都' + actionName, className: 'btn-primary', value: 'all' },
+                { label: '仅本项' + actionName, subLabel: '独立记录当天的状态，不影响其他周期任务', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: 'this' },
+                { label: '本项及之后所有周期都' + actionName, subLabel: '同步更新当前及后续所有周期的状态（日期保持不变）', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: 'all' },
                 { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
             ]
         });
@@ -6441,22 +6442,17 @@ class OfficeDashboard {
             // 检查是否为周期性任务
             const originalItem = await db.getItem(id);
             if (originalItem && originalItem.recurringGroupId) {
-                // 办文类型默认独立操作，不弹出选择框
-                if (type !== ITEM_TYPES.DOCUMENT) {
-                    const choice = await this.showRecurringChoice('完成状态', completed ? '标记完成' : '取消完成');
-                    if (choice === 'cancel') return;
-                    
-                    if (choice === 'all') {
-                        // 更新所有后续周期
-                        await this.updateRecurringGroupStatus(originalItem, { 
-                            completed, 
-                            completedAt: completed ? new Date().toISOString() : null,
-                            ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING })
-                        });
-                        return;
-                    }
+                const choice = await this.showRecurringChoice('完成状态', completed ? '标记完成' : '取消完成');
+                if (choice === 'cancel') return;
+                
+                if (choice === 'all') {
+                    await this.updateRecurringGroupStatus(originalItem, { 
+                        completed, 
+                        completedAt: completed ? new Date().toISOString() : null,
+                        ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING })
+                    });
+                    return;
                 }
-                // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
             // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
@@ -6533,21 +6529,17 @@ class OfficeDashboard {
             const originalItem = await db.getItem(id);
             
             if (originalItem && originalItem.recurringGroupId) {
-                // 办文类型默认独立操作，不弹出选择框
-                if (originalItem.type !== ITEM_TYPES.DOCUMENT) {
-                    const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
-                    if (choice === 'cancel') return;
-                    
-                    if (choice === 'all') {
-                        await this.updateRecurringGroupStatus(originalItem, { 
-                            pinned, 
-                            sunk: pinned ? false : undefined // 置顶时取消沉底
-                        });
-                        this.showSuccess(pinned ? '已置顶所有后续周期' : '已取消所有后续周期置顶');
-                        return;
-                    }
+                const choice = await this.showRecurringChoice('置顶状态', pinned ? '置顶' : '取消置顶');
+                if (choice === 'cancel') return;
+                
+                if (choice === 'all') {
+                    await this.updateRecurringGroupStatus(originalItem, { 
+                        pinned, 
+                        sunk: pinned ? false : undefined
+                    });
+                    this.showSuccess(pinned ? '已置顶所有后续周期' : '已取消所有后续周期置顶');
+                    return;
                 }
-                // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
             // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
@@ -6624,21 +6616,17 @@ class OfficeDashboard {
             const originalItem = await db.getItem(id);
             
             if (originalItem && originalItem.recurringGroupId) {
-                // 办文类型默认独立操作，不弹出选择框
-                if (originalItem.type !== ITEM_TYPES.DOCUMENT) {
-                    const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
-                    if (choice === 'cancel') return;
-                    
-                    if (choice === 'all') {
-                        await this.updateRecurringGroupStatus(originalItem, { 
-                            sunk, 
-                            pinned: sunk ? false : undefined // 沉底时取消置顶
-                        });
-                        this.showSuccess(sunk ? '已沉底所有后续周期' : '已取消所有后续周期沉底');
-                        return;
-                    }
+                const choice = await this.showRecurringChoice('沉底状态', sunk ? '沉底' : '取消沉底');
+                if (choice === 'cancel') return;
+                
+                if (choice === 'all') {
+                    await this.updateRecurringGroupStatus(originalItem, { 
+                        sunk, 
+                        pinned: sunk ? false : undefined
+                    });
+                    this.showSuccess(sunk ? '已沉底所有后续周期' : '已取消所有后续周期沉底');
+                    return;
                 }
-                // 办文类型或用户选择"仅本项"：直接执行独立更新
             }
             
             // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
@@ -7376,16 +7364,6 @@ class OfficeDashboard {
         }
         
         if (item && item.isRecurring && item.recurringGroupId) {
-            // 办文类型默认独立删除，不弹出选择框
-            if (item.type === ITEM_TYPES.DOCUMENT) {
-                this.deleteItemId = id;
-                this.deleteItem = item;
-                // 直接删除本项
-                await this.confirmDelete();
-                return;
-            }
-            
-            // 其他类型周期性任务：显示选择框
             this.deleteItemId = id;
             this.deleteItem = item;
             const choice = await this.showRecurringDeleteChoice();

@@ -1,5 +1,47 @@
 # 项目迭代记录
 
+## 2026-04-17
+
+### 本次目标
+- 优化办文情况(DOCUMENT)周期性事项的操作弹窗，使其与待办/会议一致，支持"仅本项"和"本项及之后所有周期都"两个选项
+
+### 问题根因
+- 办文类型的周期性事项在完成/置顶/沉底/删除操作中，被 `type !== ITEM_TYPES.DOCUMENT` 条件跳过弹窗选择
+- 导致办文周期性事项只能直接操作本项（无弹窗），没有"本项及之后所有周期都"的选项
+- 涉及4处代码：toggleItemComplete、toggleItemPin、toggleItemSink、deleteItem
+
+### 已完成
+- ✅ 移除 toggleItemComplete 中 `type !== ITEM_TYPES.DOCUMENT` 判断，办文也弹出 showRecurringChoice
+- ✅ 移除 toggleItemPin 中 `originalItem.type !== ITEM_TYPES.DOCUMENT` 判断
+- ✅ 移除 toggleItemSink 中 `originalItem.type !== ITEM_TYPES.DOCUMENT` 判断
+- ✅ 移除 deleteItem 中 `item.type === ITEM_TYPES.DOCUMENT` 的独立删除分支，统一走 showRecurringDeleteChoice
+- ✅ showRecurringChoice 弹窗文案优化：从"所有后续周期都"改为"本项及之后所有周期都"，增加子标签说明
+- ✅ showRecurringDeleteChoice 弹窗保持不变（已有"删除本项及后续所有周期"选项）
+- ✅ 版本号更新：app.js v67→v68
+
+### 修改明细
+- app.js toggleItemComplete：移除 DOCUMENT 类型跳过逻辑，统一弹窗
+- app.js toggleItemPin：同上
+- app.js toggleItemSink：同上
+- app.js deleteItem：移除 DOCUMENT 类型独立删除分支，统一走弹窗选择
+- app.js showRecurringChoice：按钮增加 subLabel 说明 + maxWidth 450px
+- index.html：app.js 版本号 v67→v68
+
+### 验证结果
+- node --check js/app.js 通过
+- GetDiagnostics 零错误
+
+### 测试步骤
+1. 新建一个周期性办文事项（如"每日收文登记"，生成多个周期）
+2. 点击某个周期的"完成"按钮 → 应弹出弹窗，显示"仅本项标记完成"和"本项及之后所有周期都标记完成"两个选项
+3. 选择"仅本项标记完成" → 只有当前项被标记完成，其他周期不变
+4. 再点击另一个周期的"完成"按钮 → 选择"本项及之后所有周期都标记完成" → 当前项及后续所有周期都被标记完成
+5. 同样测试"置顶"和"沉底"按钮，确认弹窗选项一致
+6. 测试删除：点击某个周期的删除按钮 → 应弹出弹窗，显示"仅删除本项"和"删除本项及后续所有周期"两个选项
+
+### 遗留事项
+- 无
+
 ## 2026-04-12
 
 ### 本次目标
