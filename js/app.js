@@ -2610,9 +2610,8 @@ class OfficeDashboard {
 
                 if (e.target.closest('.edit-btn') || e.target.closest('.card-title')) {
                     e.stopPropagation();
-                    const rawItem = await db.getItem(itemId);
-                    if (rawItem) {
-                        const item = this.getDocumentItemForSelectedDate(rawItem);
+                    const item = await this.getEffectiveDocumentItemById(itemId);
+                    if (item) {
                         await this.editItem(item);
                     }
                 }
@@ -5914,8 +5913,8 @@ class OfficeDashboard {
                 // 跳过周末和节假日
                 item.skipWeekend = document.getElementById('docSkipWeekend').checked;
                 // 流转历史
-                const existingItem = document.getElementById('itemId').value ? await db.getItem(parseInt(document.getElementById('itemId').value)) : null;
-                const effectiveExistingItem = existingItem ? this.getDocumentItemForSelectedDate(existingItem) : null;
+                const existingItemId = document.getElementById('itemId').value;
+                const effectiveExistingItem = existingItemId ? await this.getEffectiveDocumentItemById(existingItemId) : null;
                 item.transferHistory = effectiveExistingItem?.transferHistory || [];
                 
                 // 办文周期性任务设置
@@ -6026,60 +6025,11 @@ class OfficeDashboard {
                         await db.updateItem(parseInt(id), item);
                         this.showSuccess('事项已更新（保留周期性）');
                     }
-                } else if (originalItem && originalItem.type === ITEM_TYPES.DOCUMENT && 
-                    originalItem.docStartDate && originalItem.docEndDate && 
-                    !originalItem.recurringGroupId) {
+                } else if (originalItem && this.isCrossDateDocument(originalItem)) {
                     const choice = await this.showCrossDateDocChoice('编辑', '修改');
                     if (choice === 'cancel') return;
                     
-                    if (choice === 'this') {
-                        const dayStates = originalItem.dayStates || {};
-                        dayStates[this.selectedDate] = {
-                            ...(dayStates[this.selectedDate] || {}),
-                            title: item.title,
-                            content: item.content,
-                            handler: item.handler,
-                            progress: item.progress
-                        };
-                        
-                        this.saveUndoHistory('update', { item: originalItem });
-                        await db.updateItem(parseInt(id), { dayStates });
-                        this.hideModal('itemModal');
-                        await this.loadItems();
-                        if (syncManager.isLoggedIn()) {
-                            await syncManager.immediateSyncToCloud();
-                        }
-                        this.showSuccess('已修改当天内容');
-                        return;
-                    }
-                    
-                    if (choice === 'future') {
-                        this.saveUndoHistory('update', { item: originalItem });
-                        const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['title', 'content', 'handler', 'progress'], [originalItem.title, originalItem.content, originalItem.handler, originalItem.progress]);
-                        await db.updateItem(parseInt(id), {
-                            title: item.title,
-                            content: item.content,
-                            handler: item.handler,
-                            progress: item.progress,
-                            docType: item.docType,
-                            docNumber: item.docNumber,
-                            source: item.source,
-                            skipWeekend: item.skipWeekend,
-                            dayStates
-                        });
-                        this.hideModal('itemModal');
-                        await this.loadItems();
-                        if (syncManager.isLoggedIn()) {
-                            await syncManager.immediateSyncToCloud();
-                        }
-                        this.showSuccess('已修改今天及之后所有日期的内容');
-                        return;
-                    }
-                    
-                    // choice === 'all'
-                    this.saveUndoHistory('update', { item: originalItem });
-                    const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['title', 'content', 'handler', 'progress']);
-                    await db.updateItem(parseInt(id), {
+                    const titleUpdates = {
                         title: item.title,
                         content: item.content,
                         handler: item.handler,
@@ -6087,14 +6037,41 @@ class OfficeDashboard {
                         docType: item.docType,
                         docNumber: item.docNumber,
                         source: item.source,
-                        skipWeekend: item.skipWeekend,
-                        dayStates: clearedDayStates
+                        skipWeekend: item.skipWeekend
+                    };
+                    const contentFields = ['title', 'content', 'handler', 'progress'];
+                    const contentDayStateUpdates = {
+                        title: item.title,
+                        content: item.content,
+                        handler: item.handler,
+                        progress: item.progress
+                    };
+
+                    if (choice === 'this') {
+                        await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                            fields: contentFields,
+                            dayStateUpdates: contentDayStateUpdates
+                        });
+                        this.hideModal('itemModal');
+                        this.showSuccess('已修改当天内容');
+                        return;
+                    }
+                    
+                    if (choice === 'future') {
+                        await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                            fields: contentFields,
+                            globalUpdates: titleUpdates
+                        });
+                        this.hideModal('itemModal');
+                        this.showSuccess('已修改今天及之后所有日期的内容');
+                        return;
+                    }
+                    
+                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                        fields: contentFields,
+                        globalUpdates: titleUpdates
                     });
                     this.hideModal('itemModal');
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
-                    }
                     this.showSuccess('已修改全部日期内容');
                     return;
                 } else if (item.isRecurring && item.recurringRule) {
@@ -6367,6 +6344,102 @@ class OfficeDashboard {
         return cleared;
     }
 
+    isCrossDateDocument(item) {
+        return !!(item && item.type === ITEM_TYPES.DOCUMENT && item.docStartDate && item.docEndDate && !item.recurringGroupId);
+    }
+
+    async getEffectiveDocumentItemById(id, selectedDate = this.selectedDate) {
+        const rawItem = await db.getItem(parseInt(id));
+        if (!rawItem) {
+            return null;
+        }
+        return this.getDocumentItemForSelectedDate(rawItem, selectedDate);
+    }
+
+    getCrossDateDocumentUpdatePayload(originalItem, choice, fields, globalUpdates = {}, dayStateUpdates = {}, selectedDate = this.selectedDate) {
+        if (choice === 'this') {
+            const dayStates = { ...(originalItem.dayStates || {}) };
+            dayStates[selectedDate] = {
+                ...(dayStates[selectedDate] || {}),
+                ...dayStateUpdates
+            };
+            return { dayStates };
+        }
+
+        if (choice === 'future') {
+            const dayStates = this._freezeBeforeAndClearFrom(originalItem, selectedDate, fields, fields.map(field => originalItem[field]));
+            return {
+                ...globalUpdates,
+                dayStates
+            };
+        }
+
+        return {
+            ...globalUpdates,
+            dayStates: this.clearDayStatesFields(originalItem.dayStates, fields)
+        };
+    }
+
+    async applyCrossDateDocumentScopedUpdate(id, originalItem, choice, { fields, globalUpdates = {}, dayStateUpdates = {} }) {
+        this.saveUndoHistory('update', { item: originalItem });
+        const payload = this.getCrossDateDocumentUpdatePayload(originalItem, choice, fields, globalUpdates, dayStateUpdates);
+        await db.updateItem(parseInt(id), payload);
+        await this.loadItems();
+        if (syncManager.isLoggedIn()) {
+            await syncManager.immediateSyncToCloud();
+        }
+        return payload;
+    }
+
+    getCrossDateDocumentDeletePayload(originalItem, choice, selectedDate = this.selectedDate) {
+        if (choice === 'this') {
+            return this.getCrossDateDocumentUpdatePayload(
+                originalItem,
+                choice,
+                ['hidden'],
+                {},
+                { hidden: true },
+                selectedDate
+            );
+        }
+
+        if (choice === 'future') {
+            const dayStates = { ...(originalItem.dayStates || {}) };
+            let currentDate = new Date(originalItem.docStartDate + 'T12:00:00');
+            const endDate = new Date(originalItem.docEndDate + 'T12:00:00');
+            while (currentDate <= endDate) {
+                const dateStr = this.formatDateLocal(currentDate);
+                if (dateStr >= selectedDate) {
+                    dayStates[dateStr] = {
+                        ...(dayStates[dateStr] || {}),
+                        hidden: true
+                    };
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return { dayStates };
+        }
+
+        return null;
+    }
+
+    async applyCrossDateDocumentDelete(id, originalItem, choice) {
+        if (choice === 'all') {
+            this.deleteItemId = id;
+            this.deleteItem = originalItem;
+            await this.confirmDelete();
+            return;
+        }
+
+        this.saveUndoHistory('update', { item: originalItem });
+        const payload = this.getCrossDateDocumentDeletePayload(originalItem, choice);
+        await db.updateItem(parseInt(id), payload);
+        await this.loadItems();
+        if (syncManager.isLoggedIn()) {
+            await syncManager.immediateSyncToCloud();
+        }
+    }
+
     getDocumentItemForSelectedDate(item, selectedDate = this.selectedDate) {
         if (!item || item.type !== ITEM_TYPES.DOCUMENT || !item.docStartDate || !item.docEndDate || item.recurringGroupId) {
             return item;
@@ -6547,63 +6620,40 @@ class OfficeDashboard {
                 }
             }
             
-            // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (type === ITEM_TYPES.DOCUMENT && originalItem && 
-                originalItem.docStartDate && originalItem.docEndDate && 
-                !originalItem.recurringGroupId) {
+            if (type === ITEM_TYPES.DOCUMENT && this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('完成状态', completed ? '标记完成' : '取消完成');
                 if (choice === 'cancel') return;
-                
+
+                const completedAt = completed ? new Date().toISOString() : null;
+                const progress = completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING;
+                const statusFields = ['completed', 'completedAt', 'progress'];
+
                 if (choice === 'this') {
-                    const dayStates = originalItem.dayStates || {};
-                    dayStates[this.selectedDate] = {
-                        ...(dayStates[this.selectedDate] || {}),
-                        completed,
-                        completedAt: completed ? new Date().toISOString() : null,
-                        progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING
-                    };
-                    
-                    this.saveUndoHistory('update', { item: originalItem });
-                    await db.updateItem(id, { dayStates });
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
-                    }
+                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                        fields: statusFields,
+                        dayStateUpdates: {
+                            completed,
+                            completedAt,
+                            progress
+                        }
+                    });
                     this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
                     return;
                 }
-                
-                if (choice === 'future') {
-                    this.saveUndoHistory('update', { item: originalItem });
-                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['completed', 'completedAt', 'progress'], [originalItem.completed, originalItem.completedAt, originalItem.progress]);
-                    await db.updateItem(id, {
+
+                await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                    fields: statusFields,
+                    globalUpdates: {
                         completed,
-                        completedAt: completed ? new Date().toISOString() : null,
-                        progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING,
-                        dayStates
-                    });
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
+                        completedAt,
+                        progress
                     }
-                    this.showSuccess(completed ? '已标记今天及之后完成' : '已取消今天及之后完成');
-                    return;
-                }
-                
-                // choice === 'all'
-                this.saveUndoHistory('update', { item: originalItem });
-                const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['completed', 'completedAt', 'progress']);
-                await db.updateItem(id, {
-                    completed,
-                    completedAt: completed ? new Date().toISOString() : null,
-                    progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING,
-                    dayStates: clearedDayStates
                 });
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
-                }
-                this.showSuccess(completed ? '已标记全部日期完成' : '已取消全部日期完成');
+                this.showSuccess(
+                    choice === 'future'
+                        ? (completed ? '已标记今天及之后完成' : '已取消今天及之后完成')
+                        : (completed ? '已标记全部日期完成' : '已取消全部日期完成')
+                );
                 return;
             }
             
@@ -6650,60 +6700,37 @@ class OfficeDashboard {
                 }
             }
             
-            // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (originalItem && originalItem.type === ITEM_TYPES.DOCUMENT && 
-                originalItem.docStartDate && originalItem.docEndDate && 
-                !originalItem.recurringGroupId) {
+            if (this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('置顶状态', pinned ? '置顶' : '取消置顶');
                 if (choice === 'cancel') return;
-                
+
+                const pinFields = ['pinned', 'sunk'];
+                const nextSunk = pinned ? false : originalItem.sunk;
+
                 if (choice === 'this') {
-                    const dayStates = originalItem.dayStates || {};
-                    dayStates[this.selectedDate] = {
-                        ...(dayStates[this.selectedDate] || {}),
-                        pinned,
-                        sunk: pinned ? false : (dayStates[this.selectedDate]?.sunk || false)
-                    };
-                    
-                    this.saveUndoHistory('update', { item: originalItem });
-                    await db.updateItem(id, { dayStates });
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
-                    }
+                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                        fields: pinFields,
+                        dayStateUpdates: {
+                            pinned,
+                            sunk: pinned ? false : (originalItem.dayStates?.[this.selectedDate]?.sunk ?? originalItem.sunk ?? false)
+                        }
+                    });
                     this.showSuccess(pinned ? '已置顶当天' : '已取消当天置顶');
                     return;
                 }
-                
-                if (choice === 'future') {
-                    this.saveUndoHistory('update', { item: originalItem });
-                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['pinned', 'sunk'], [originalItem.pinned, originalItem.sunk]);
-                    await db.updateItem(id, {
+
+                await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                    fields: pinFields,
+                    globalUpdates: {
                         pinned,
-                        sunk: pinned ? false : originalItem.sunk,
-                        dayStates
-                    });
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
+                        sunk: nextSunk
                     }
-                    this.showSuccess(pinned ? '已置顶今天及之后' : '已取消今天及之后置顶');
-                    return;
-                }
-                
-                // choice === 'all'
-                this.saveUndoHistory('update', { item: originalItem });
-                const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['pinned', 'sunk']);
-                await db.updateItem(id, {
-                    pinned,
-                    sunk: pinned ? false : originalItem.sunk,
-                    dayStates: clearedDayStates
                 });
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
-                }
-                this.showSuccess(pinned ? '已置顶全部日期' : '已取消全部日期置顶');
+                this.showSuccess(
+                    choice === 'future'
+                        ? (pinned ? '已置顶今天及之后' : '已取消今天及之后置顶')
+                        : (pinned ? '已置顶全部日期' : '已取消全部日期置顶')
+                );
                 return;
             }
             
@@ -6752,60 +6779,37 @@ class OfficeDashboard {
                 }
             }
             
-            // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-            if (originalItem && originalItem.type === ITEM_TYPES.DOCUMENT && 
-                originalItem.docStartDate && originalItem.docEndDate && 
-                !originalItem.recurringGroupId) {
+            if (this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('沉底状态', sunk ? '沉底' : '取消沉底');
                 if (choice === 'cancel') return;
-                
+
+                const sinkFields = ['pinned', 'sunk'];
+                const nextPinned = sunk ? false : originalItem.pinned;
+
                 if (choice === 'this') {
-                    const dayStates = originalItem.dayStates || {};
-                    dayStates[this.selectedDate] = {
-                        ...(dayStates[this.selectedDate] || {}),
-                        sunk,
-                        pinned: sunk ? false : (dayStates[this.selectedDate]?.pinned || false)
-                    };
-                    
-                    this.saveUndoHistory('update', { item: originalItem });
-                    await db.updateItem(id, { dayStates });
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
-                    }
+                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                        fields: sinkFields,
+                        dayStateUpdates: {
+                            sunk,
+                            pinned: sunk ? false : (originalItem.dayStates?.[this.selectedDate]?.pinned ?? originalItem.pinned ?? false)
+                        }
+                    });
                     this.showSuccess(sunk ? '已沉底当天' : '已取消当天沉底');
                     return;
                 }
-                
-                if (choice === 'future') {
-                    this.saveUndoHistory('update', { item: originalItem });
-                    const dayStates = this._freezeBeforeAndClearFrom(originalItem, this.selectedDate, ['pinned', 'sunk'], [originalItem.pinned, originalItem.sunk]);
-                    await db.updateItem(id, {
+
+                await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                    fields: sinkFields,
+                    globalUpdates: {
                         sunk,
-                        pinned: sunk ? false : originalItem.pinned,
-                        dayStates
-                    });
-                    await this.loadItems();
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
+                        pinned: nextPinned
                     }
-                    this.showSuccess(sunk ? '已沉底今天及之后' : '已取消今天及之后沉底');
-                    return;
-                }
-                
-                // choice === 'all'
-                this.saveUndoHistory('update', { item: originalItem });
-                const clearedDayStates = this.clearDayStatesFields(originalItem.dayStates, ['pinned', 'sunk']);
-                await db.updateItem(id, {
-                    sunk,
-                    pinned: sunk ? false : originalItem.pinned,
-                    dayStates: clearedDayStates
                 });
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
-                }
-                this.showSuccess(sunk ? '已沉底全部日期' : '已取消全部日期沉底');
+                this.showSuccess(
+                    choice === 'future'
+                        ? (sunk ? '已沉底今天及之后' : '已取消今天及之后沉底')
+                        : (sunk ? '已沉底全部日期' : '已取消全部日期沉底')
+                );
                 return;
             }
             
@@ -7472,52 +7476,18 @@ class OfficeDashboard {
         // 先检查是否是周期性任务
         const item = await db.getItem(id);
         
-        // 检查是否是跨日期办文（有开始和结束日期，但不是周期性任务）
-        if (item && item.type === ITEM_TYPES.DOCUMENT && 
-            item.docStartDate && item.docEndDate && 
-            !item.recurringGroupId) {
+        if (this.isCrossDateDocument(item)) {
             const choice = await this.showCrossDateDocDeleteChoice();
             if (choice === 'cancel') {
                 return;
             }
-            
+
+            await this.applyCrossDateDocumentDelete(id, item, choice);
             if (choice === 'this') {
-                const dayStates = item.dayStates || {};
-                dayStates[this.selectedDate] = {
-                    ...(dayStates[this.selectedDate] || {}),
-                    hidden: true
-                };
-                await db.updateItem(id, { dayStates });
-                await this.loadItems();
                 this.showSuccess('已从当天移除');
-                return;
-            }
-            
-            if (choice === 'future') {
-                const dayStates = item.dayStates || {};
-                const startDate = this.selectedDate;
-                let currentDate = new Date(item.docStartDate + 'T12:00:00');
-                const endDate = new Date(item.docEndDate + 'T12:00:00');
-                while (currentDate <= endDate) {
-                    const dateStr = this.formatDateForInput(currentDate).split('T')[0];
-                    if (dateStr >= startDate) {
-                        dayStates[dateStr] = {
-                            ...(dayStates[dateStr] || {}),
-                            hidden: true
-                        };
-                    }
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-                await db.updateItem(id, { dayStates });
-                await this.loadItems();
+            } else if (choice === 'future') {
                 this.showSuccess('已从今天及之后移除');
-                return;
             }
-            
-            // choice === 'all'
-            this.deleteItemId = id;
-            this.deleteItem = item;
-            await this.confirmDelete();
             return;
         }
         
@@ -7690,7 +7660,7 @@ class OfficeDashboard {
                 note
             };
 
-            if (originalItem.docStartDate && originalItem.docEndDate && !originalItem.recurringGroupId) {
+            if (this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('流转', '流转');
                 if (choice === 'cancel') return;
 
