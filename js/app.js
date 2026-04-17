@@ -6372,6 +6372,16 @@ class OfficeDashboard {
         if (!startDate || !endDate) return dayStates;
         
         const defaults = { completed: false, completedAt: null, progress: 'pending', pinned: false, sunk: false };
+        const getEffectiveValue = (dateStr, field) => {
+            const dayState = dayStates[dateStr];
+            if (dayState && dayState[field] !== undefined) {
+                return dayState[field];
+            }
+            if (originalItem[field] !== undefined) {
+                return originalItem[field];
+            }
+            return defaults[field] !== undefined ? defaults[field] : undefined;
+        };
         
         let cur = new Date(startDate + 'T12:00:00');
         const end = new Date(endDate + 'T12:00:00');
@@ -6382,17 +6392,10 @@ class OfficeDashboard {
             if (dateStr < from) {
                 const existing = dayStates[dateStr] || {};
                 const frozen = { ...existing };
-                let changed = false;
-                for (let i = 0; i < fields.length; i++) {
-                    if (frozen[fields[i]] === undefined) {
-                        const val = fieldValues[i];
-                        frozen[fields[i]] = val !== undefined ? val : (defaults[fields[i]] !== undefined ? defaults[fields[i]] : val);
-                        changed = true;
-                    }
+                for (const field of fields) {
+                    frozen[field] = getEffectiveValue(dateStr, field);
                 }
-                if (changed) {
-                    dayStates[dateStr] = frozen;
-                }
+                dayStates[dateStr] = frozen;
             } else {
                 const existing = dayStates[dateStr];
                 if (existing) {
