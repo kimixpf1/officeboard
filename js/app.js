@@ -6371,19 +6371,22 @@ class OfficeDashboard {
         const endDate = originalItem.docEndDate;
         if (!startDate || !endDate) return dayStates;
         
+        const defaults = { completed: false, completedAt: null, progress: 'pending', pinned: false, sunk: false };
+        
         let cur = new Date(startDate + 'T12:00:00');
         const end = new Date(endDate + 'T12:00:00');
         const from = fromDate;
         
         while (cur <= end) {
-            const dateStr = this.formatDateForInput(cur).split('T')[0];
+            const dateStr = this.formatDateLocal(cur);
             if (dateStr < from) {
                 const existing = dayStates[dateStr] || {};
                 const frozen = { ...existing };
                 let changed = false;
                 for (let i = 0; i < fields.length; i++) {
                     if (frozen[fields[i]] === undefined) {
-                        frozen[fields[i]] = fieldValues[i];
+                        const val = fieldValues[i];
+                        frozen[fields[i]] = val !== undefined ? val : (defaults[fields[i]] !== undefined ? defaults[fields[i]] : val);
                         changed = true;
                     }
                 }
@@ -6391,15 +6394,17 @@ class OfficeDashboard {
                     dayStates[dateStr] = frozen;
                 }
             } else {
-                const existing = dayStates[dateStr] || {};
-                const cleaned = { ...existing };
-                for (const field of fields) {
-                    delete cleaned[field];
-                }
-                if (Object.keys(cleaned).length > 0) {
-                    dayStates[dateStr] = cleaned;
-                } else {
-                    delete dayStates[dateStr];
+                const existing = dayStates[dateStr];
+                if (existing) {
+                    const cleaned = { ...existing };
+                    for (const field of fields) {
+                        delete cleaned[field];
+                    }
+                    if (Object.keys(cleaned).length > 0) {
+                        dayStates[dateStr] = cleaned;
+                    } else {
+                        delete dayStates[dateStr];
+                    }
                 }
             }
             cur.setDate(cur.getDate() + 1);
