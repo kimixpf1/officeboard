@@ -17,6 +17,8 @@ class Database {
     constructor() {
         this.db = null;
         this.initPromise = null;
+        this.itemsCache = null;
+        this.itemsCacheUpdatedAt = null;
     }
 
     _rejectWithLog(reject, error, context) {
@@ -36,6 +38,47 @@ class Database {
         }
 
         return normalizedItem;
+    }
+
+    resetItemsCache() {
+        this.itemsCache = null;
+        this.itemsCacheUpdatedAt = null;
+    }
+
+    shouldReuseItemsCache() {
+        if (!this.itemsCache || !this.itemsCacheUpdatedAt) {
+            return false;
+        }
+
+        const cacheAge = Date.now() - this.itemsCacheUpdatedAt;
+        return cacheAge < 5000;
+    }
+
+    matchItemDateRange(item, startDate, endDate) {
+        if (item.type === 'meeting' && item.date) {
+            const meetingStart = item.date;
+            const meetingEnd = item.endDate || item.date;
+            return meetingStart <= endDate && meetingEnd >= startDate;
+        }
+
+        if (item.type === 'todo' && item.deadline) {
+            const deadlineDate = item.deadline.split('T')[0];
+            return deadlineDate >= startDate && deadlineDate <= endDate;
+        }
+
+        if (item.type === 'document') {
+            const docStart = item.docStartDate || item.docDate;
+            const docEnd = item.docEndDate || docStart;
+            if (docStart) {
+                return docStart <= endDate && docEnd >= startDate;
+            }
+            if (item.createdAt) {
+                const createdDate = item.createdAt.split('T')[0];
+                return createdDate >= startDate && createdDate <= endDate;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -61,7 +104,6 @@ class Database {
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
 
-                    // 创建事项表
                     if (!db.objectStoreNames.contains(STORES.ITEMS)) {
                         const itemsStore = db.createObjectStore(STORES.ITEMS, { keyPath: 'id', autoIncrement: true });
                         itemsStore.createIndex('type', 'type', { unique: false });
@@ -70,12 +112,10 @@ class Database {
                         itemsStore.createIndex('createdAt', 'createdAt', { unique: false });
                     }
 
-                    // 创建设置表
                     if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
                         db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
                     }
 
-                    // 创建文档哈希表（用于去重）
                     if (!db.objectStoreNames.contains(STORES.DOCUMENT_HASHES)) {
                         const hashStore = db.createObjectStore(STORES.DOCUMENT_HASHES, { keyPath: 'hash' });
                         hashStore.createIndex('createdAt', 'createdAt', { unique: false });
@@ -116,9 +156,7 @@ class Database {
         const db = await this.init();
         const normalizedItem = this.normalizeItemForStorage(item);
 
-        // 生成唯一标识（用于去重）
         normalizedItem.hash = this.generateHash(normalizedItem);
-        // 保留原有的 createdAt 和 updatedAt（如果存在）
         if (!normalizedItem.createdAt) {
             normalizedItem.createdAt = new Date().toISOString();
         }
@@ -131,32 +169,27 @@ class Database {
             const store = transaction.objectStore(STORES.ITEMS);
             const index = store.index('hash');
 
-            // 先检查是否存在
             const checkRequest = index.get(normalizedItem.hash);
 
             checkRequest.onsuccess = () => {
                 if (checkRequest.result) {
-                    // 已存在相同的hash，但可能是不同的周期性任务
-                    // 检查是否是同一周期的任务
                     const existing = checkRequest.result;
                     if (normalizedItem.recurringGroupId && existing.recurringGroupId === normalizedItem.recurringGroupId) {
                         resolve(existing.id);
                         return;
                     }
-                    // 不同周期的任务，修改hash后重新添加
                     normalizedItem.hash = normalizedItem.hash + '_' + Date.now();
                 }
 
-                // 不存在则添加
                 const addRequest = store.add(normalizedItem);
                 addRequest.onsuccess = () => {
+                    this.resetItemsCache();
                     resolve(addRequest.result);
                 };
                 addRequest.onerror = () => this._rejectWithLog(reject, addRequest.error, 'addItem写入失败');
             };
 
             checkRequest.onerror = () => this._rejectWithLog(reject, checkRequest.error, 'addItem重复检查失败');
-
             transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'addItem事务失败');
         });
     }
@@ -187,7 +220,10 @@ class Database {
                 updatedItem.hash = this.generateHash(updatedItem);
 
                 const putRequest = store.put(updatedItem);
-                putRequest.onsuccess = () => resolve(updatedItem);
+                putRequest.onsuccess = () => {
+                    this.resetItemsCache();
+                    resolve(updatedItem);
+                };
                 putRequest.onerror = () => this._rejectWithLog(reject, putRequest.error, 'updateItem写入失败');
             };
 
@@ -206,7 +242,10 @@ class Database {
             const transaction = db.transaction(STORES.ITEMS, 'readwrite');
             const store = transaction.objectStore(STORES.ITEMS);
             const request = store.delete(id);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.resetItemsCache();
+                resolve();
+            };
             request.onerror = () => this._rejectWithLog(reject, request.error, 'deleteItem删除失败');
             transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'deleteItem事务失败');
         });
@@ -247,13 +286,21 @@ class Database {
      * 获取所有事项
      */
     async getAllItems() {
+        if (this.shouldReuseItemsCache()) {
+            return [...this.itemsCache];
+        }
+
         const db = await this.init();
 
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORES.ITEMS, 'readonly');
             const store = transaction.objectStore(STORES.ITEMS);
             const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                this.itemsCache = request.result || [];
+                this.itemsCacheUpdatedAt = Date.now();
+                resolve([...(this.itemsCache || [])]);
+            };
             request.onerror = () => this._rejectWithLog(reject, request.error, 'getAllItems读取失败');
         });
     }
@@ -262,16 +309,8 @@ class Database {
      * 按类型获取事项
      */
     async getItemsByType(type) {
-        const db = await this.init();
-
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORES.ITEMS, 'readonly');
-            const store = transaction.objectStore(STORES.ITEMS);
-            const index = store.index('type');
-            const request = index.getAll(type);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => this._rejectWithLog(reject, request.error, 'getItemsByType读取失败');
-        });
+        const allItems = await this.getAllItems();
+        return allItems.filter(item => item?.type === type);
     }
 
     /**
@@ -280,36 +319,7 @@ class Database {
      */
     async getItemsByDateRange(startDate, endDate) {
         const allItems = await this.getAllItems();
-
-        return allItems.filter(item => {
-            // 会议：使用 date 字段（支持跨天会议）
-            if (item.type === 'meeting' && item.date) {
-                const meetingStart = item.date;
-                const meetingEnd = item.endDate || item.date;
-                // 检查会议日期范围是否与查询范围有交集
-                return meetingStart <= endDate && meetingEnd >= startDate;
-            }
-            // 待办：使用 deadline 字段
-            if (item.type === 'todo' && item.deadline) {
-                const deadlineDate = item.deadline.split('T')[0];
-                return deadlineDate >= startDate && deadlineDate <= endDate;
-            }
-            // 办文：使用 docStartDate/docEndDate 字段
-            if (item.type === 'document') {
-                const docStart = item.docStartDate || item.docDate;
-                const docEnd = item.docEndDate || docStart;
-                if (docStart) {
-                    // 检查办文日期范围是否与查询范围有交集
-                    return docStart <= endDate && docEnd >= startDate;
-                }
-                // 兼容旧数据：使用 createdAt
-                if (item.createdAt) {
-                    const createdDate = item.createdAt.split('T')[0];
-                    return createdDate >= startDate && createdDate <= endDate;
-                }
-            }
-            return false;
-        });
+        return allItems.filter(item => this.matchItemDateRange(item, startDate, endDate));
     }
 
     /**
@@ -324,9 +334,6 @@ class Database {
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORES.ITEMS, 'readwrite');
             const store = transaction.objectStore(STORES.ITEMS);
-            let updatedCount = 0;
-
-            // 先读取所有需要更新的项目
             const items = [];
             let pendingGets = itemIds.length;
 
@@ -335,7 +342,6 @@ class Database {
                 getRequest.onsuccess = () => {
                     const item = getRequest.result;
                     if (item) {
-                        // 更新 order 值（不检查 type，因为 DOM 中的卡片一定属于该容器）
                         item.order = index;
                         item.manualOrder = true;
                         item.manualOrderUpdatedAt = manualOrderUpdatedAt;
@@ -343,11 +349,9 @@ class Database {
                         items.push(item);
                     }
                     pendingGets--;
-                    // 所有 get 完成后，批量 put
                     if (pendingGets === 0) {
-                        items.forEach(item => {
-                            store.put(item);
-                            updatedCount++;
+                        items.forEach(currentItem => {
+                            store.put(currentItem);
                         });
                     }
                 };
@@ -358,6 +362,7 @@ class Database {
             });
 
             transaction.oncomplete = () => {
+                this.resetItemsCache();
                 resolve();
             };
             transaction.onerror = () => {
@@ -418,7 +423,7 @@ class Database {
      * 检查文档哈希是否存在
      */
     async hasDocumentHash(hash) {
-        if (!hash) return false;  // 安全检查
+        if (!hash) return false;
 
         const store = await this.getStore(STORES.DOCUMENT_HASHES);
 
@@ -438,20 +443,16 @@ class Database {
      * 生成事项哈希（用于去重）
      */
     generateHash(item) {
-        // 根据事项类型选择日期字段
         let dateField = '';
         if (item.type === 'document') {
-            // 办文类型使用 docStartDate 或 docDate
             dateField = item.docStartDate || item.docDate || '';
         } else {
-            // 待办和会议类型使用 date 或 deadline
             dateField = item.date || item.deadline || '';
         }
-        
-        // 周期性任务需要包含周期序号以区分不同周期
-        const recurringKey = item.recurringGroupId ? 
+
+        const recurringKey = item.recurringGroupId ?
             `_${item.recurringGroupId}_${item.occurrenceIndex || 0}` : '';
-        
+
         const data = JSON.stringify({
             title: item.title,
             type: item.type,
@@ -460,7 +461,6 @@ class Database {
             recurring: recurringKey
         });
 
-        // 简单的哈希算法
         let hash = 0;
         for (let i = 0; i < data.length; i++) {
             const char = data.charCodeAt(i);
@@ -495,14 +495,11 @@ class Database {
     async importData(data) {
         const { items, settings } = data;
 
-        // 清空现有数据
         await this.clearAllData();
 
-        // 导入事项
         if (items && items.length > 0) {
             const store = await this.getStore(STORES.ITEMS, 'readwrite');
             for (const item of items) {
-                // 移除自动生成的id，让数据库重新分配
                 delete item.id;
                 await new Promise((resolve, reject) => {
                     const request = store.add(item);
@@ -512,7 +509,6 @@ class Database {
             }
         }
 
-        // 导入设置
         if (settings && settings.length > 0) {
             const store = await this.getStore(STORES.SETTINGS, 'readwrite');
             for (const setting of settings) {
@@ -523,6 +519,8 @@ class Database {
                 });
             }
         }
+
+        this.resetItemsCache();
     }
 
     /**
@@ -539,6 +537,8 @@ class Database {
                 request.onerror = () => this._rejectWithLog(reject, request.error, 'clearAllData清空失败');
             });
         }
+
+        this.resetItemsCache();
     }
 
     /**
@@ -548,7 +548,10 @@ class Database {
         const store = await this.getStore(STORES.ITEMS, 'readwrite');
         return new Promise((resolve, reject) => {
             const request = store.clear();
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.resetItemsCache();
+                resolve();
+            };
             request.onerror = () => this._rejectWithLog(reject, request.error, 'clearAllItems清空失败');
         });
     }
@@ -566,6 +569,5 @@ class Database {
     }
 }
 
-// 创建全局数据库实例
 const db = new Database();
 window.db = db;

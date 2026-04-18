@@ -8,24 +8,23 @@ class CalendarView {
         this.currentDate = new Date();
         this.currentView = 'week';
         this.container = document.getElementById('calendarContainer');
+        this.lastRenderSignature = '';
+        this.lastRenderAt = 0;
     }
 
     /**
      * 排序事项：先按类型（待办→会议→文件），再按时间
      */
     sortItems(items) {
-        // 类型排序权重
         const typeOrder = { todo: 1, meeting: 2, document: 3 };
-        
+
         return items.sort((a, b) => {
-            // 先按类型排序
             const typeA = typeOrder[a.type] || 99;
             const typeB = typeOrder[b.type] || 99;
             if (typeA !== typeB) {
                 return typeA - typeB;
             }
-            
-            // 同类型按时间排序
+
             const timeA = this.getItemTime(a);
             const timeB = this.getItemTime(b);
             return timeA.localeCompare(timeB);
@@ -48,20 +47,37 @@ class CalendarView {
         }
     }
 
+    shouldSkipRender() {
+        const signature = `${this.currentView}:${this.formatLocalDate(this.currentDate)}`;
+        const now = Date.now();
+
+        if (this.lastRenderSignature === signature && now - this.lastRenderAt < 120) {
+            return true;
+        }
+
+        this.lastRenderSignature = signature;
+        this.lastRenderAt = now;
+        return false;
+    }
+
     /**
      * 设置当前日期
      */
-    setDate(date) {
+    setDate(date, shouldRender = true) {
         this.currentDate = new Date(date);
-        this.render();
+        if (shouldRender) {
+            this.render();
+        }
     }
 
     /**
      * 设置视图类型
      */
-    setView(viewType) {
+    setView(viewType, shouldRender = true) {
         this.currentView = viewType;
-        this.render();
+        if (shouldRender) {
+            this.render();
+        }
     }
 
     /**
@@ -138,7 +154,6 @@ class CalendarView {
      * 跳转到指定日期的日视图
      */
     goToDate(dateStr) {
-        // 触发全局事件，让app.js处理视图切换
         const event = new CustomEvent('gotoDate', { detail: { date: dateStr } });
         document.dispatchEvent(event);
     }
@@ -153,15 +168,19 @@ class CalendarView {
                 return;
             }
 
-            // 获取当前视图的数据
+            if (this.shouldSkipRender()) {
+                return;
+            }
+
             const items = await this.getItemsForCurrentView();
+            const itemsByDate = this.buildItemsByDateMap(items);
 
             switch (this.currentView) {
                 case 'week':
-                    this.renderWeekView(items);
+                    this.renderWeekView(itemsByDate);
                     break;
                 case 'month':
-                    this.renderMonthView(items);
+                    this.renderMonthView(itemsByDate);
                     break;
             }
         } catch (error) {
@@ -177,11 +196,9 @@ class CalendarView {
         }
     }
 
-    /**
-     * 获取当前视图的事项
-     */
-    async getItemsForCurrentView() {
-        let startDate, endDate;
+    getCurrentViewDateRange() {
+        let startDate;
+        let endDate;
 
         switch (this.currentView) {
             case 'week': {
@@ -205,6 +222,14 @@ class CalendarView {
                 startDate = endDate = this.formatLocalDate(this.currentDate);
         }
 
+        return { startDate, endDate };
+    }
+
+    /**
+     * 获取当前视图的事项
+     */
+    async getItemsForCurrentView() {
+        const { startDate, endDate } = this.getCurrentViewDateRange();
         return await db.getItemsByDateRange(startDate, endDate);
     }
 
@@ -218,25 +243,106 @@ class CalendarView {
         return `${year}-${month}-${day}`;
     }
 
+    addDays(dateStr, days) {
+        const date = new Date(`${dateStr}T00:00:00`);
+        date.setDate(date.getDate() + days);
+        return this.formatLocalDate(date);
+    }
+
+    getItemDateSpan(item) {
+        if (item.type === 'meeting' && item.date) {
+            return {
+                startDate: item.date,
+                endDate: item.endDate || item.date,
+                skipWeekend: false
+            };
+        }
+
+        if (item.type === 'todo' && item.deadline) {
+            const dateStr = item.deadline.split('T')[0];
+            return {
+                startDate: dateStr,
+                endDate: dateStr,
+                skipWeekend: false
+            };
+        }
+
+        if (item.type === 'document') {
+            const startDate = item.docStartDate || item.docDate || item.createdAt?.split('T')[0] || null;
+            const endDate = item.docEndDate || startDate;
+            if (startDate) {
+                return {
+                    startDate,
+                    endDate,
+                    skipWeekend: Boolean(item.skipWeekend)
+                };
+            }
+        }
+
+        return null;
+    }
+
+    buildItemsByDateMap(items) {
+        const { startDate, endDate } = this.getCurrentViewDateRange();
+        const itemsByDate = new Map();
+
+        items.forEach(item => {
+            const span = this.getItemDateSpan(item);
+            if (!span) {
+                return;
+            }
+
+            let rangeStart = span.startDate;
+            let rangeEnd = span.endDate || span.startDate;
+
+            if (rangeStart > endDate || rangeEnd < startDate) {
+                return;
+            }
+
+            if (rangeStart < startDate) {
+                rangeStart = startDate;
+            }
+            if (rangeEnd > endDate) {
+                rangeEnd = endDate;
+            }
+
+            let currentDate = rangeStart;
+            while (currentDate <= rangeEnd) {
+                if (!span.skipWeekend || this.isWorkday(currentDate)) {
+                    if (!itemsByDate.has(currentDate)) {
+                        itemsByDate.set(currentDate, []);
+                    }
+                    itemsByDate.get(currentDate).push(item);
+                }
+                currentDate = this.addDays(currentDate, 1);
+            }
+        });
+
+        return itemsByDate;
+    }
+
+    getSortedItemsForDate(itemsByDate, dateStr) {
+        const dayItems = itemsByDate.get(dateStr) || [];
+        return this.sortItems([...dayItems]);
+    }
+
     /**
      * 检查日期是否是工作日（不含周末和节假日）
      */
     isWorkday(dateStr) {
         const date = new Date(dateStr);
         const dayOfWeek = date.getDay();
-        
-        // 周六=6, 周日=0
+
         if (dayOfWeek === 0 || dayOfWeek === 6) {
             return false;
         }
-        
-        // 简单节假日检查（可扩展）
+
         const month = date.getMonth() + 1;
         const day = date.getDate();
         const holidays = [
-            '1-1', '1-2', '1-3',  // 元旦
-            '5-1', '5-2', '5-3',  // 劳动节
-            '10-1', '10-2', '10-3', '10-4', '10-5', '10-6', '10-7'  // 国庆
+            '1-1', '1-2', '1-3',
+            '5-1', '5-2', '5-3',
+            '10-1', '10-2', '10-3', '10-4', '10-5', '10-6', '10-7'
         ];
         return !holidays.includes(`${month}-${day}`);
     }
@@ -249,15 +355,54 @@ class CalendarView {
         document.dispatchEvent(event);
     }
 
+    createCellAddButton(dateStr) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'calendar-cell-add-btn';
+        button.textContent = '+ 新增';
+        button.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border:none;border-radius:999px;background:rgba(99,102,241,0.12);color:var(--primary-color);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;';
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.quickAddForDate(dateStr);
+        });
+        return button;
+    }
+
+    createCellTopBar(dateStr, labelText = '') {
+        const topBar = document.createElement('div');
+        topBar.className = 'calendar-cell-topbar';
+        topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;position:sticky;top:0;z-index:1;padding-bottom:4px;background:inherit;';
+
+        const label = document.createElement('div');
+        label.className = 'calendar-cell-topbar-label';
+        label.textContent = labelText;
+        label.style.cssText = 'font-size:12px;font-weight:600;color:var(--gray-600);min-width:0;';
+        topBar.appendChild(label);
+        topBar.appendChild(this.createCellAddButton(dateStr));
+
+        return topBar;
+    }
+
+    createEmptyHint() {
+        const emptyHint = document.createElement('div');
+        emptyHint.className = 'calendar-empty-hint';
+        emptyHint.textContent = '左键查看，右键新增';
+        emptyHint.style.cssText = 'margin-top:8px;color:var(--gray-500);font-size:12px;line-height:1.5;';
+        return emptyHint;
+    }
+
     bindQuickAddEvents(cellDiv, dateStr) {
         cellDiv.addEventListener('click', (e) => {
-            if (e.target.closest('.calendar-item')) {
+            if (e.target.closest('.calendar-item') || e.target.closest('.calendar-cell-add-btn')) {
                 return;
             }
-            this.quickAddForDate(dateStr);
+            this.goToDate(dateStr);
         });
 
         cellDiv.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.calendar-item')) {
+                return;
+            }
             e.preventDefault();
             this.quickAddForDate(dateStr);
         });
@@ -266,7 +411,7 @@ class CalendarView {
     /**
      * 渲染周视图
      */
-    renderWeekView(items) {
+    renderWeekView(itemsByDate) {
         const weekDates = this.getWeekDates(this.currentDate);
         const today = new Date();
         const todayStr = this.formatLocalDate(today);
@@ -302,42 +447,18 @@ class CalendarView {
             const date = weekDates[i];
             const dateStr = this.formatLocalDate(date);
             const isToday = dateStr === todayStr;
-
-            const dayItems = items.filter(item => {
-                if (item.type === 'meeting' && item.date) {
-                    if (item.endDate) return dateStr >= item.date && dateStr <= item.endDate;
-                    return item.date === dateStr;
-                }
-                if (item.type === 'todo' && item.deadline) {
-                    return item.deadline.split('T')[0] === dateStr;
-                }
-                if (item.type === 'document') {
-                    const startDate = item.docStartDate || item.docDate;
-                    const endDate = item.docEndDate;
-                    let inRange = false;
-                    if (startDate && endDate) inRange = dateStr >= startDate && dateStr <= endDate;
-                    else if (startDate) inRange = startDate === dateStr;
-                    else if (item.createdAt) inRange = item.createdAt.split('T')[0] === dateStr;
-                    if (inRange && item.skipWeekend) return this.isWorkday(dateStr);
-                    return inRange;
-                }
-                return false;
-            });
-
-            const sortedItems = this.sortItems(dayItems);
+            const sortedItems = this.getSortedItemsForDate(itemsByDate, dateStr);
 
             const cellDiv = document.createElement('div');
             cellDiv.className = `week-cell${isToday ? ' today' : ''}`;
             cellDiv.dataset.date = dateStr;
             this.bindQuickAddEvents(cellDiv, dateStr);
+            cellDiv.appendChild(this.createCellTopBar(dateStr, '左键进日视图'));
 
             if (sortedItems.length > 0) {
                 sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
             } else {
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'calendar-empty-hint';
-                emptyDiv.textContent = '+ 点击新增';
-                cellDiv.appendChild(emptyDiv);
+                cellDiv.appendChild(this.createEmptyHint());
             }
             container.appendChild(cellDiv);
         }
@@ -371,12 +492,9 @@ class CalendarView {
         const month = date.getMonth();
         const day = date.getDate();
 
-        // 获取该月第一天
         const firstDay = new Date(year, month, 1);
-        const firstDayOfWeek = firstDay.getDay() || 7; // 周一为1，周日为7
+        const firstDayOfWeek = firstDay.getDay() || 7;
 
-        // 计算该日期是该月的第几周
-        // 第一周从1号开始，如果1号不是周一，则第一周包含上个月的天数
         const weekNumber = Math.ceil((day + firstDayOfWeek - 1) / 7);
         return weekNumber;
     }
@@ -384,7 +502,7 @@ class CalendarView {
     /**
      * 渲染月视图
      */
-    renderMonthView(items) {
+    renderMonthView(itemsByDate) {
         const year = this.currentDate.getFullYear();
         const month = this.currentDate.getMonth();
         const firstDay = new Date(year, month, 1);
@@ -422,46 +540,17 @@ class CalendarView {
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
             const isToday = dateStr === todayStr;
-
-            const dayItems = items.filter(item => {
-                if (item.type === 'meeting' && item.date) {
-                    if (item.endDate) return dateStr >= item.date && dateStr <= item.endDate;
-                    return item.date === dateStr;
-                }
-                if (item.type === 'todo' && item.deadline) {
-                    return item.deadline.startsWith(dateStr);
-                }
-                if (item.type === 'document') {
-                    const startDate = item.docStartDate || item.docDate;
-                    const endDate = item.docEndDate;
-                    let inRange = false;
-                    if (startDate && endDate) inRange = dateStr >= startDate && dateStr <= endDate;
-                    else if (startDate) inRange = startDate === dateStr;
-                    else if (item.createdAt) inRange = item.createdAt.startsWith(dateStr);
-                    if (inRange && item.skipWeekend) return this.isWorkday(dateStr);
-                    return inRange;
-                }
-                return false;
-            });
-
-            const sortedItems = this.sortItems(dayItems);
+            const sortedItems = this.getSortedItemsForDate(itemsByDate, dateStr);
 
             const cellDiv = document.createElement('div');
             cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}`;
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
             cellDiv.dataset.date = fullDateLabel;
             this.bindQuickAddEvents(cellDiv, dateStr);
-
-            const dateLabelDiv = document.createElement('div');
-            dateLabelDiv.className = 'month-cell-date';
-            dateLabelDiv.textContent = day;
-            cellDiv.appendChild(dateLabelDiv);
+            cellDiv.appendChild(this.createCellTopBar(dateStr, `${month + 1}月${day}日`));
 
             if (sortedItems.length === 0) {
-                const emptyHint = document.createElement('div');
-                emptyHint.className = 'calendar-empty-hint';
-                emptyHint.textContent = '+ 点击新增';
-                cellDiv.appendChild(emptyHint);
+                cellDiv.appendChild(this.createEmptyHint());
             }
 
             sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
@@ -562,5 +651,4 @@ class CalendarView {
     }
 }
 
-// 创建全局日历视图实例
 window.calendarView = new CalendarView();

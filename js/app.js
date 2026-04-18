@@ -109,6 +109,7 @@ class OfficeDashboard {
         this.selectedDate = this.formatDateLocal(new Date()); // 选中的日期
         this.draggedItem = null;
         this.deleteItemId = null;
+        this.loadItemsRequestSeq = 0;
 
         const urlParams = new URLSearchParams(window.location.search);
         const restoreDate = urlParams.get('restoreDate');
@@ -3190,7 +3191,6 @@ class OfficeDashboard {
             datePicker.value = dateStr;
         }
         this.updateDateDisplay();
-        this.loadItems();
     }
 
     /**
@@ -3775,9 +3775,32 @@ class OfficeDashboard {
      * 日期选择器变化
      */
     onDatePickerChange(e) {
-        this.selectedDate = e.target.value;
+        this.applySelectedDate(e.target.value, true);
+    }
+
+    applySelectedDate(dateStr, shouldLoadItems = true) {
+        if (!dateStr) {
+            return false;
+        }
+
+        if (this.selectedDate === dateStr) {
+            this.updateDateDisplay();
+            return false;
+        }
+
+        this.selectedDate = dateStr;
+        const datePicker = document.getElementById('datePicker');
+        if (datePicker && datePicker.value !== dateStr) {
+            datePicker.value = dateStr;
+        }
+
         this.updateDateDisplay();
-        this.loadItems();
+
+        if (shouldLoadItems) {
+            this.loadItems();
+        }
+
+        return true;
     }
 
     /**
@@ -4626,6 +4649,7 @@ class OfficeDashboard {
      */
     switchView(view) {
         try {
+            const previousView = this.currentView;
             this.currentView = view;
 
             // 更新按钮状态
@@ -4640,13 +4664,20 @@ class OfficeDashboard {
             if (view === 'board') {
                 boardViewEl?.classList.add('active');
                 calendarViewEl?.classList.remove('active');
-                this.loadItems();
+                if (previousView !== 'board') {
+                    this.loadItems();
+                }
             } else {
                 boardViewEl?.classList.remove('active');
                 calendarViewEl?.classList.add('active');
                 // 使用全局的 calendarView 实例（不是 DOM 元素）
-                if (window.calendarView && typeof window.calendarView.setView === 'function') {
-                    window.calendarView.setView(view);
+                if (window.calendarView) {
+                    if (previousView === 'board' && typeof window.calendarView.setDate === 'function') {
+                        window.calendarView.setDate(this.selectedDate, false);
+                    }
+                    if (typeof window.calendarView.setView === 'function') {
+                        window.calendarView.setView(view, previousView !== 'board');
+                    }
                 }
             }
 
@@ -4665,13 +4696,8 @@ class OfficeDashboard {
             // 日视图：按天导航
             const current = new Date(this.selectedDate);
             current.setDate(current.getDate() + direction);
-            this.selectedDate = this.formatDateLocal(current);
-            const datePicker = document.getElementById('datePicker');
-            if (datePicker) {
-                datePicker.value = this.selectedDate;
-            }
-            this.updateDateDisplay();
-            this.loadItems();
+            const nextDate = this.formatDateLocal(current);
+            this.applySelectedDate(nextDate, true);
             return;
         }
 
@@ -4681,6 +4707,7 @@ class OfficeDashboard {
             } else {
                 window.calendarView.next();
             }
+            this.selectedDate = window.calendarView.formatLocalDate(window.calendarView.currentDate);
         }
 
         this.updateDateDisplay();
@@ -4690,22 +4717,21 @@ class OfficeDashboard {
      * 回到今天
      */
     goToToday() {
+        const todayDate = this.formatDateLocal(new Date());
         this.currentDate = new Date();
-        this.selectedDate = this.formatDateLocal(new Date());
 
         if (this.currentView === 'board') {
-            const datePicker = document.getElementById('datePicker');
-            if (datePicker) {
-                datePicker.value = this.selectedDate;
-            }
-            this.updateDateDisplay();
-            this.loadItems();
+            this.applySelectedDate(todayDate, true);
             return;
         }
 
         if (window.calendarView) {
             window.calendarView.today();
+            this.selectedDate = window.calendarView.formatLocalDate(window.calendarView.currentDate);
+        } else {
+            this.selectedDate = todayDate;
         }
+
         this.updateDateDisplay();
     }
 
@@ -4776,9 +4802,15 @@ class OfficeDashboard {
      * 加载事项列表
      */
     async loadItems() {
+        const requestSeq = ++this.loadItemsRequestSeq;
+
         const allItems = this.currentView === 'board'
             ? await this.getBoardItemsForSelectedDate()
             : await db.getAllItems();
+
+        if (requestSeq !== this.loadItemsRequestSeq) {
+            return;
+        }
 
         const items = this.currentView === 'board'
             ? this.getVisibleBoardItems(allItems)
