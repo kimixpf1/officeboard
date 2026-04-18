@@ -4790,6 +4790,10 @@ class OfficeDashboard {
         this.renderColumn(ITEM_TYPES.TODO, grouped[ITEM_TYPES.TODO]);
         this.renderColumn(ITEM_TYPES.MEETING, grouped[ITEM_TYPES.MEETING]);
         this.renderColumn(ITEM_TYPES.DOCUMENT, grouped[ITEM_TYPES.DOCUMENT]);
+
+        if (window.calendarView && this.currentView !== 'board') {
+            await window.calendarView.render();
+        }
     }
 
     /**

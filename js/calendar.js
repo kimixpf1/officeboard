@@ -249,6 +249,20 @@ class CalendarView {
         document.dispatchEvent(event);
     }
 
+    bindQuickAddEvents(cellDiv, dateStr) {
+        cellDiv.addEventListener('click', (e) => {
+            if (e.target.closest('.calendar-item')) {
+                return;
+            }
+            this.quickAddForDate(dateStr);
+        });
+
+        cellDiv.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.quickAddForDate(dateStr);
+        });
+    }
+
     /**
      * 渲染周视图
      */
@@ -315,12 +329,7 @@ class CalendarView {
             const cellDiv = document.createElement('div');
             cellDiv.className = `week-cell${isToday ? ' today' : ''}`;
             cellDiv.dataset.date = dateStr;
-            cellDiv.addEventListener('click', (e) => {
-                if (e.target.closest('.calendar-item')) {
-                    return;
-                }
-                this.quickAddForDate(dateStr);
-            });
+            this.bindQuickAddEvents(cellDiv, dateStr);
 
             if (sortedItems.length > 0) {
                 sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
@@ -441,12 +450,7 @@ class CalendarView {
             cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}`;
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
             cellDiv.dataset.date = fullDateLabel;
-            cellDiv.addEventListener('click', (e) => {
-                if (e.target.closest('.calendar-item')) {
-                    return;
-                }
-                this.quickAddForDate(dateStr);
-            });
+            this.bindQuickAddEvents(cellDiv, dateStr);
 
             const dateLabelDiv = document.createElement('div');
             dateLabelDiv.className = 'month-cell-date';
