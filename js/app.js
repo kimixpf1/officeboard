@@ -110,6 +110,7 @@ class OfficeDashboard {
         this.draggedItem = null;
         this.deleteItemId = null;
         this.loadItemsRequestSeq = 0;
+        this.dateViewController = new OfficeDateViewController(this);
 
         const urlParams = new URLSearchParams(window.location.search);
         const restoreDate = urlParams.get('restoreDate');
@@ -337,16 +338,16 @@ class OfficeDashboard {
 
         // 视图切换
         document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchView(e.target.dataset.view));
+            btn.addEventListener('click', (e) => this.dateViewController.switchView(e.target.dataset.view));
         });
 
         // 日期导航
-        document.getElementById('prevDate')?.addEventListener('click', () => this.navigateDate(-1));
-        document.getElementById('nextDate')?.addEventListener('click', () => this.navigateDate(1));
-        document.getElementById('todayBtn')?.addEventListener('click', () => this.goToToday());
+        document.getElementById('prevDate')?.addEventListener('click', () => this.dateViewController.navigateDate(-1));
+        document.getElementById('nextDate')?.addEventListener('click', () => this.dateViewController.navigateDate(1));
+        document.getElementById('todayBtn')?.addEventListener('click', () => this.dateViewController.goToToday());
 
         // 日期选择器
-        document.getElementById('datePicker')?.addEventListener('change', (e) => this.onDatePickerChange(e));
+        document.getElementById('datePicker')?.addEventListener('change', (e) => this.dateViewController.onDatePickerChange(e));
 
         // 添加按钮
         document.querySelectorAll('.btn-add').forEach(btn => {
@@ -3184,13 +3185,7 @@ class OfficeDashboard {
      * 跳转到指定日期的日视图
      */
     goToDateView(dateStr) {
-        this.selectedDate = dateStr;
-        this.switchView('board');
-        const datePicker = document.getElementById('datePicker');
-        if (datePicker) {
-            datePicker.value = dateStr;
-        }
-        this.updateDateDisplay();
+        return this.dateViewController.goToDateView(dateStr);
     }
 
     /**
@@ -3765,42 +3760,15 @@ class OfficeDashboard {
      * 初始化日期选择器
      */
     initDatePicker() {
-        const datePicker = document.getElementById('datePicker');
-        if (datePicker) {
-            datePicker.value = this.selectedDate;
-        }
+        return this.dateViewController.initDatePicker();
     }
 
-    /**
-     * 日期选择器变化
-     */
     onDatePickerChange(e) {
-        this.applySelectedDate(e.target.value, true);
+        return this.dateViewController.onDatePickerChange(e);
     }
 
     applySelectedDate(dateStr, shouldLoadItems = true) {
-        if (!dateStr) {
-            return false;
-        }
-
-        if (this.selectedDate === dateStr) {
-            this.updateDateDisplay();
-            return false;
-        }
-
-        this.selectedDate = dateStr;
-        const datePicker = document.getElementById('datePicker');
-        if (datePicker && datePicker.value !== dateStr) {
-            datePicker.value = dateStr;
-        }
-
-        this.updateDateDisplay();
-
-        if (shouldLoadItems) {
-            this.loadItems();
-        }
-
-        return true;
+        return this.dateViewController.applySelectedDate(dateStr, shouldLoadItems);
     }
 
     /**
@@ -4648,184 +4616,47 @@ class OfficeDashboard {
      * 切换视图
      */
     switchView(view) {
-        try {
-            const previousView = this.currentView;
-            this.currentView = view;
-
-            // 更新按钮状态
-            document.querySelectorAll('.view-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.view === view);
-            });
-
-            // 切换视图显示
-            const boardViewEl = document.getElementById('boardView');
-            const calendarViewEl = document.getElementById('calendarView');
-
-            if (view === 'board') {
-                boardViewEl?.classList.add('active');
-                calendarViewEl?.classList.remove('active');
-                if (previousView !== 'board') {
-                    this.loadItems();
-                }
-            } else {
-                boardViewEl?.classList.remove('active');
-                calendarViewEl?.classList.add('active');
-                // 使用全局的 calendarView 实例（不是 DOM 元素）
-                if (window.calendarView) {
-                    if (previousView === 'board' && typeof window.calendarView.setDate === 'function') {
-                        window.calendarView.setDate(this.selectedDate, false);
-                    }
-                    if (typeof window.calendarView.setView === 'function') {
-                        window.calendarView.setView(view, previousView !== 'board');
-                    }
-                }
-            }
-
-            this.updateDateDisplay();
-        } catch (error) {
-            console.error('切换视图失败:', error);
-            this.showError('切换视图失败: ' + error.message);
-        }
+        return this.dateViewController.switchView(view);
     }
 
     /**
      * 导航日期
      */
     navigateDate(direction) {
-        if (this.currentView === 'board') {
-            // 日视图：按天导航
-            const current = new Date(this.selectedDate);
-            current.setDate(current.getDate() + direction);
-            const nextDate = this.formatDateLocal(current);
-            this.applySelectedDate(nextDate, true);
-            return;
-        }
-
-        if (window.calendarView) {
-            if (direction < 0) {
-                window.calendarView.prev();
-            } else {
-                window.calendarView.next();
-            }
-            this.selectedDate = window.calendarView.formatLocalDate(window.calendarView.currentDate);
-        }
-
-        this.updateDateDisplay();
+        return this.dateViewController.navigateDate(direction);
     }
 
     /**
      * 回到今天
      */
     goToToday() {
-        const todayDate = this.formatDateLocal(new Date());
-        this.currentDate = new Date();
-
-        if (this.currentView === 'board') {
-            this.applySelectedDate(todayDate, true);
-            return;
-        }
-
-        if (window.calendarView) {
-            window.calendarView.today();
-            this.selectedDate = window.calendarView.formatLocalDate(window.calendarView.currentDate);
-        } else {
-            this.selectedDate = todayDate;
-        }
-
-        this.updateDateDisplay();
+        return this.dateViewController.goToToday();
     }
 
     /**
      * 更新日期显示
      */
     updateDateDisplay() {
-        const datePicker = document.getElementById('datePicker');
-        const boardDateTitle = document.getElementById('boardDateTitle');
-
-        if (this.currentView === 'board') {
-            // 更新日期选择器
-            if (datePicker) {
-                datePicker.value = this.selectedDate;
-            }
-            // 更新日视图标题
-            if (boardDateTitle) {
-                const date = new Date(this.selectedDate);
-                const today = new Date();
-                const isToday = this.formatDateLocal(today) === this.selectedDate;
-                const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekDays[date.getDay()]}`;
-                boardDateTitle.textContent = isToday ? `今日事项 (${dateStr})` : `${dateStr}事项`;
-            }
-        } else if (window.calendarView) {
-            // 周视图和月视图使用日历组件的日期范围
-        }
+        return this.dateViewController.updateDateDisplay();
     }
 
     async getBoardItemsForSelectedDate() {
-        const items = await db.getItemsByDateRange(this.selectedDate, this.selectedDate);
-        const isSelectedDateWorkday = this.isWorkday(this.selectedDate);
-
-        return items.filter(item => {
-            if (item.type === ITEM_TYPES.DOCUMENT && item.skipWeekend && !isSelectedDateWorkday) {
-                return false;
-            }
-            return true;
-        });
+        return this.dateViewController.getBoardItemsForSelectedDate();
     }
 
     getVisibleBoardItems(items) {
-        return items.map(item => {
-            if (this.isCrossDateDocument(item)) {
-                return this.getDocumentItemForSelectedDate(item);
-            }
-            return item;
-        }).filter(item => !item._hidden);
+        return this.dateViewController.getVisibleBoardItems(items);
     }
 
     groupItemsByType(items) {
-        const grouped = {
-            [ITEM_TYPES.TODO]: [],
-            [ITEM_TYPES.MEETING]: [],
-            [ITEM_TYPES.DOCUMENT]: []
-        };
-
-        items.forEach(item => {
-            if (item && item.type && grouped[item.type]) {
-                grouped[item.type].push(item);
-            }
-        });
-
-        return grouped;
+        return this.dateViewController.groupItemsByType(items);
     }
 
     /**
      * 加载事项列表
      */
     async loadItems() {
-        const requestSeq = ++this.loadItemsRequestSeq;
-
-        const allItems = this.currentView === 'board'
-            ? await this.getBoardItemsForSelectedDate()
-            : await db.getAllItems();
-
-        if (requestSeq !== this.loadItemsRequestSeq) {
-            return;
-        }
-
-        const items = this.currentView === 'board'
-            ? this.getVisibleBoardItems(allItems)
-            : allItems;
-
-        const grouped = this.groupItemsByType(items);
-
-        // 渲染各列（排序在renderColumn中处理）
-        this.renderColumn(ITEM_TYPES.TODO, grouped[ITEM_TYPES.TODO]);
-        this.renderColumn(ITEM_TYPES.MEETING, grouped[ITEM_TYPES.MEETING]);
-        this.renderColumn(ITEM_TYPES.DOCUMENT, grouped[ITEM_TYPES.DOCUMENT]);
-
-        if (window.calendarView && this.currentView !== 'board') {
-            await window.calendarView.render();
-        }
+        return this.dateViewController.loadItems();
     }
 
     /**
