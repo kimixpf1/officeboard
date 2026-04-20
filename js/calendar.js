@@ -666,13 +666,24 @@ class CalendarView {
         const bgColor = this.getTypeColor(item.type, 0.1);
 
         if (compact) {
-            el.style.cssText = `padding:6px 8px;margin:4px 0;border-radius:6px;font-size:13px;background:${bgColor};border-left:4px solid ${baseColor};cursor:pointer;white-space:normal;line-height:1.4;box-shadow:0 1px 2px rgba(0,0,0,0.1);`;
+            el.style.padding = '6px 8px';
+            el.style.margin = '4px 0';
+            el.style.borderRadius = '6px';
+            el.style.fontSize = '13px';
+            el.style.background = bgColor;
+            el.style.borderLeft = `4px solid ${baseColor}`;
+            el.style.lineHeight = '1.4';
+            el.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
             const strong = document.createElement('strong');
             strong.textContent = `[${typeLabel}]`;
             el.appendChild(strong);
             el.appendChild(document.createTextNode(` ${displayTitle}`));
         } else {
-            el.style.cssText = `padding:8px 12px;margin:4px 0;border-radius:6px;background:${bgColor};border-left:4px solid ${baseColor};cursor:pointer;`;
+            el.style.padding = '8px 12px';
+            el.style.margin = '4px 0';
+            el.style.borderRadius = '6px';
+            el.style.background = bgColor;
+            el.style.borderLeft = `4px solid ${baseColor}`;
             const titleDiv = document.createElement('div');
             titleDiv.style.cssText = 'font-weight:600;font-size:13px;';
             titleDiv.textContent = displayTitle;

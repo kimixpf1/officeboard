@@ -5295,10 +5295,10 @@ class OfficeDashboard {
      * 拖拽开始
      */
     handleDragStart(e, item) {
-
+        const dragSource = e.currentTarget;
         this.draggedItem = item;
-        this.draggedElement = e.target;
-        e.target.classList.add('dragging');
+        this.draggedElement = dragSource;
+        dragSource.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', item.id.toString());
     }
