@@ -163,6 +163,9 @@ class OfficeDateViewController {
             if (this.app.isCrossDateDocument(item)) {
                 return this.app.getDocumentItemForSelectedDate(item);
             }
+            if (this.app.isCrossDateMeeting(item)) {
+                return this.app.getMeetingItemForSelectedDate(item);
+            }
             return item;
         }).filter(item => !item._hidden);
     }

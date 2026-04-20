@@ -300,6 +300,50 @@ class CalendarView {
         return null;
     }
 
+    getItemForDate(item, dateStr) {
+        if (!item || !dateStr) {
+            return item;
+        }
+
+        if (item.type !== 'meeting' && item.type !== 'document') {
+            return item;
+        }
+
+        const dayState = item.dayStates?.[dateStr];
+        const isCrossDateMeeting = item.type === 'meeting' && item.date && item.endDate && item.endDate > item.date && !item.recurringGroupId;
+        const isNoTimeMeeting = item.type === 'meeting' && !item.time;
+        const fallbackMeetingCompleted = (isCrossDateMeeting && isNoTimeMeeting) ? false : item.completed;
+        const fallbackMeetingCompletedAt = (isCrossDateMeeting && isNoTimeMeeting) ? null : item.completedAt;
+
+        if (!dayState) {
+            if (item.type === 'meeting') {
+                return {
+                    ...item,
+                    completed: fallbackMeetingCompleted,
+                    completedAt: fallbackMeetingCompletedAt
+                };
+            }
+            return item;
+        }
+
+        return {
+            ...item,
+            completed: dayState.completed !== undefined
+                ? dayState.completed
+                : (item.type === 'meeting' ? fallbackMeetingCompleted : item.completed),
+            completedAt: dayState.completedAt !== undefined
+                ? dayState.completedAt
+                : (item.type === 'meeting' ? fallbackMeetingCompletedAt : item.completedAt),
+            progress: dayState.progress !== undefined ? dayState.progress : item.progress,
+            pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
+            sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk,
+            title: dayState.title !== undefined ? dayState.title : item.title,
+            content: dayState.content !== undefined ? dayState.content : item.content,
+            location: dayState.location !== undefined ? dayState.location : item.location,
+            _hidden: dayState.hidden || false
+        };
+    }
+
     buildItemsByDateMap(items) {
         const { startDate, endDate } = this.getCurrentViewDateRange();
         const itemsByDate = new Map();
@@ -327,10 +371,13 @@ class CalendarView {
             let currentDate = rangeStart;
             while (currentDate <= rangeEnd) {
                 if (!span.skipWeekend || this.isWorkday(currentDate)) {
-                    if (!itemsByDate.has(currentDate)) {
-                        itemsByDate.set(currentDate, []);
+                    const dateItem = this.getItemForDate(item, currentDate);
+                    if (!dateItem?._hidden) {
+                        if (!itemsByDate.has(currentDate)) {
+                            itemsByDate.set(currentDate, []);
+                        }
+                        itemsByDate.get(currentDate).push(dateItem);
                     }
-                    itemsByDate.get(currentDate).push(item);
                 }
                 currentDate = this.addDays(currentDate, 1);
             }

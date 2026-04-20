@@ -5587,8 +5587,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-20 P3-3';
-        const scriptVersions = ['calendar.js?v=22', 'app-date-view.js?v=3', 'app.js?v=84'];
+        const version = '2026-04-20 P3-4';
+        const scriptVersions = ['calendar.js?v=23', 'app-date-view.js?v=4', 'app.js?v=85'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -6320,6 +6320,41 @@ class OfficeDashboard {
         return !!(item && item.type === ITEM_TYPES.DOCUMENT && item.docStartDate && item.docEndDate && !item.recurringGroupId);
     }
 
+    isCrossDateMeeting(item) {
+        return !!(item && item.type === ITEM_TYPES.MEETING && item.date && item.endDate && item.endDate > item.date && !item.recurringGroupId);
+    }
+
+    getMeetingItemForSelectedDate(item, selectedDate = this.selectedDate) {
+        if (!this.isCrossDateMeeting(item)) {
+            return item;
+        }
+
+        const dayState = item.dayStates?.[selectedDate];
+        const isNoTimeMeeting = !item.time;
+        const fallbackCompleted = isNoTimeMeeting ? false : item.completed;
+        const fallbackCompletedAt = isNoTimeMeeting ? null : item.completedAt;
+
+        if (!dayState) {
+            return {
+                ...item,
+                completed: fallbackCompleted,
+                completedAt: fallbackCompletedAt
+            };
+        }
+
+        return {
+            ...item,
+            completed: dayState.completed !== undefined ? dayState.completed : fallbackCompleted,
+            completedAt: dayState.completedAt !== undefined ? dayState.completedAt : fallbackCompletedAt,
+            pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
+            sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk,
+            title: dayState.title !== undefined ? dayState.title : item.title,
+            content: dayState.content !== undefined ? dayState.content : item.content,
+            location: dayState.location !== undefined ? dayState.location : item.location,
+            _hidden: dayState.hidden || false
+        };
+    }
+
     async getEffectiveDocumentItemById(id, selectedDate = this.selectedDate) {
         const rawItem = await db.getItem(parseInt(id));
         if (!rawItem) {
@@ -6952,6 +6987,7 @@ class OfficeDashboard {
             const now = new Date();
             const allItems = await db.getAllItems();
             const todayStr = this.formatDateLocal(now);
+            let hasNewCompleted = false;
 
             const incompleteMeetings = allItems.filter(item =>
                 item.type === ITEM_TYPES.MEETING && !item.completed
@@ -6959,12 +6995,17 @@ class OfficeDashboard {
 
             for (const meeting of incompleteMeetings) {
                 let shouldComplete = false;
+                let updatePayload = null;
 
                 if (meeting.date && meeting.time) {
                     const meetingStart = new Date(`${meeting.date}T${meeting.time}`);
                     const autoCompleteTime = new Date(meetingStart.getTime() + 30 * 60 * 1000);
                     if (now >= autoCompleteTime) {
                         shouldComplete = true;
+                        updatePayload = {
+                            completed: true,
+                            completedAt: now.toISOString()
+                        };
                     }
                 } else if (meeting.date && !meeting.time) {
                     const meetingDate = meeting.date;
@@ -6972,38 +7013,38 @@ class OfficeDashboard {
                     const isMultiDay = endDate > meetingDate;
                     const isToday = meetingDate <= todayStr && endDate >= todayStr;
 
-                    if (isToday) {
+                    if (isToday && now.getHours() >= 16) {
                         if (isMultiDay) {
-                            if (todayStr >= endDate && now.getHours() >= 16) {
+                            const dayStates = { ...(meeting.dayStates || {}) };
+                            const todayState = dayStates[todayStr] || {};
+                            if (!todayState.completed) {
                                 shouldComplete = true;
+                                dayStates[todayStr] = {
+                                    ...todayState,
+                                    completed: true,
+                                    completedAt: now.toISOString()
+                                };
+                                updatePayload = { dayStates };
                             }
                         } else {
-                            if (now.getHours() >= 16) {
-                                shouldComplete = true;
-                            }
+                            shouldComplete = true;
+                            updatePayload = {
+                                completed: true,
+                                completedAt: now.toISOString()
+                            };
                         }
                     }
                 }
 
-                if (shouldComplete) {
-                    await db.updateItem(meeting.id, {
-                        completed: true,
-                        completedAt: now.toISOString()
-                    });
+                if (shouldComplete && updatePayload) {
+                    await db.updateItem(meeting.id, updatePayload);
+                    hasNewCompleted = true;
 
                     if (syncManager.isLoggedIn()) {
                         await syncManager.immediateSyncToCloud();
                     }
                 }
             }
-
-            const updatedItems = await db.getAllItems();
-            const hasNewCompleted = updatedItems.some(item =>
-                item.type === ITEM_TYPES.MEETING &&
-                item.completed &&
-                item.completedAt &&
-                new Date(item.completedAt) > new Date(now.getTime() - 120000)
-            );
 
             if (hasNewCompleted) {
                 await this.loadItems();
