@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 日历视图模块
  * 支持周视图、月视图
  */
@@ -305,8 +305,13 @@ class CalendarView {
             return item;
         }
 
+        const baseItem = {
+            ...item,
+            _viewDate: dateStr
+        };
+
         if (item.type !== 'meeting' && item.type !== 'document') {
-            return item;
+            return baseItem;
         }
 
         const dayState = item.dayStates?.[dateStr];
@@ -318,16 +323,16 @@ class CalendarView {
         if (!dayState) {
             if (item.type === 'meeting') {
                 return {
-                    ...item,
+                    ...baseItem,
                     completed: fallbackMeetingCompleted,
                     completedAt: fallbackMeetingCompletedAt
                 };
             }
-            return item;
+            return baseItem;
         }
 
         return {
-            ...item,
+            ...baseItem,
             completed: dayState.completed !== undefined
                 ? dayState.completed
                 : (item.type === 'meeting' ? fallbackMeetingCompleted : item.completed),
@@ -395,21 +400,19 @@ class CalendarView {
      * 检查日期是否是工作日（不含周末和节假日）
      */
     isWorkday(dateStr) {
-        const date = new Date(dateStr);
+        const date = new Date(`${dateStr}T00:00:00`);
         const dayOfWeek = date.getDay();
 
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            return false;
+        if (typeof HolidayData !== 'undefined') {
+            if (HolidayData.isHoliday(dateStr)) {
+                return false;
+            }
+            if (HolidayData.isMakeupDay(dateStr)) {
+                return true;
+            }
         }
 
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        const holidays = [
-            '1-1', '1-2', '1-3',
-            '5-1', '5-2', '5-3',
-            '10-1', '10-2', '10-3', '10-4', '10-5', '10-6', '10-7'
-        ];
-        return !holidays.includes(`${month}-${day}`);
+        return dayOfWeek !== 0 && dayOfWeek !== 6;
     }
 
     /**
@@ -710,11 +713,12 @@ class CalendarView {
         el.style.whiteSpace = 'normal';
         el.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.goToDate(item.type === 'todo'
+            const targetDate = item._viewDate || (item.type === 'todo'
                 ? item.deadline?.split('T')[0]
                 : item.type === 'meeting'
                     ? item.date
                     : (item.docStartDate || item.docDate || item.createdAt?.split('T')[0]));
+            this.goToDate(targetDate);
         });
         el.addEventListener('dragstart', (e) => {
             e.stopPropagation();
@@ -803,3 +807,4 @@ class CalendarView {
 }
 
 window.calendarView = new CalendarView();
+

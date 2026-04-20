@@ -4879,11 +4879,14 @@ class OfficeDashboard {
     }
 
     createCard(item) {
+        const effectiveCompleted = item.type === ITEM_TYPES.DOCUMENT
+            ? item.progress === DOCUMENT_PROGRESS.COMPLETED
+            : !!item.completed;
         const card = document.createElement('div');
-        card.className = `card ${item.type}-card${item.completed ? ' completed' : ''}${item.pinned ? ' pinned' : ''}${item.sunk ? ' sunk' : ''}`;
+        card.className = `card ${item.type}-card${effectiveCompleted ? ' completed' : ''}${item.pinned ? ' pinned' : ''}${item.sunk ? ' sunk' : ''}`;
         card.dataset.id = item.id;
         card.dataset.type = item.type;
-        card.dataset.completed = String(!!item.completed);
+        card.dataset.completed = String(effectiveCompleted);
         card.dataset.pinned = String(!!item.pinned);
         card.dataset.sunk = String(!!item.sunk);
         card.draggable = true;
@@ -4911,8 +4914,8 @@ class OfficeDashboard {
             this.createSinkIcon(item.sunk)
         );
         const completeBtn = this._createCardActionBtn(
-            `card-action-btn complete-btn${item.completed ? ' completed' : ''}`,
-            item.completed ? '已完成' : '标记完成',
+            `card-action-btn complete-btn${effectiveCompleted ? ' completed' : ''}`,
+            effectiveCompleted ? '已完成' : '标记完成',
             this.createCheckIcon()
         );
         const expandBtn = this._createCardActionBtn('card-action-btn expand-btn', '展开/收起详情', this.createExpandIcon(false));
@@ -4970,7 +4973,7 @@ class OfficeDashboard {
                 cardMain.appendChild(headerRow);
 
                 const titleEl = document.createElement('div');
-                titleEl.className = `card-title meeting-title${item.completed ? ' completed-text' : ''}`;
+                titleEl.className = `card-title meeting-title${effectiveCompleted ? ' completed-text' : ''}`;
                 titleEl.textContent = meetingTitle;
                 cardMain.appendChild(titleEl);
 
@@ -5020,7 +5023,7 @@ class OfficeDashboard {
                 cardMain.appendChild(headerRow);
 
                 const titleEl = document.createElement('div');
-                titleEl.className = `card-title${isCompleted ? ' completed-text' : ''}`;
+                titleEl.className = `card-title${effectiveCompleted ? ' completed-text' : ''}`;
                 titleEl.textContent = item.title;
                 cardMain.appendChild(titleEl);
 
@@ -5587,8 +5590,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-20 P3-4';
-        const scriptVersions = ['calendar.js?v=23', 'app-date-view.js?v=4', 'app.js?v=85'];
+        const version = '2026-04-20 P3-5';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=33', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=86'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -6654,6 +6657,40 @@ class OfficeDashboard {
                         completed,
                         completedAt,
                         progress
+                    }
+                });
+                this.showSuccess(
+                    choice === 'future'
+                        ? (completed ? '已标记今天及之后完成' : '已取消今天及之后完成')
+                        : (completed ? '已标记全部日期完成' : '已取消全部日期完成')
+                );
+                return;
+            }
+
+            if (type === ITEM_TYPES.MEETING && this.isCrossDateMeeting(originalItem)) {
+                const choice = await this.showCrossDateDocChoice('完成状态', completed ? '标记完成' : '取消完成');
+                if (choice === 'cancel') return;
+
+                const completedAt = completed ? new Date().toISOString() : null;
+                const statusFields = ['completed', 'completedAt'];
+
+                if (choice === 'this') {
+                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                        fields: statusFields,
+                        dayStateUpdates: {
+                            completed,
+                            completedAt
+                        }
+                    });
+                    this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
+                    return;
+                }
+
+                await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                    fields: statusFields,
+                    globalUpdates: {
+                        completed,
+                        completedAt
                     }
                 });
                 this.showSuccess(

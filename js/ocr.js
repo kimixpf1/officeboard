@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -2587,6 +2587,8 @@ class OCRManager {
             // 同类型才比较
             if (existing.type !== newItem.type) continue;
 
+            const existTitle = (existing.title || '').trim().toLowerCase();
+
             // 会议：比较标题关键词和日期
             if (newItem.type === 'meeting') {
                 if (this.isSameMeetingForMerge(newItemData, existing)) {
@@ -2596,8 +2598,6 @@ class OCRManager {
                 if (this.hasConflictingMeetingSchedule(newItemData, existing)) {
                     continue;
                 }
-
-                const existTitle = (existing.title || '').trim().toLowerCase();
 
                 // 提取标题关键词（去掉"会议"、"研究"等常见词）
                 const extractKeywords = (title) => {
@@ -2955,7 +2955,6 @@ class OCRManager {
      */
     async extractPDFText(file, progressCallback = null) {
         try {
-            // 动态加载pdf.js
             if (typeof pdfjsLib === 'undefined') {
                 if (progressCallback) progressCallback('正在加载PDF解析库...');
                 await this.loadPdfJs();
@@ -2977,7 +2976,37 @@ class OCRManager {
 
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
+                const sortedItems = [...textContent.items]
+                    .filter(item => item?.str && item.str.trim())
+                    .sort((a, b) => {
+                        const ay = a.transform?.[5] ?? 0;
+                        const by = b.transform?.[5] ?? 0;
+                        if (Math.abs(by - ay) > 2) {
+                            return by - ay;
+                        }
+                        const ax = a.transform?.[4] ?? 0;
+                        const bx = b.transform?.[4] ?? 0;
+                        return ax - bx;
+                    });
+
+                const rows = [];
+                for (const item of sortedItems) {
+                    const y = item.transform?.[5] ?? 0;
+                    const textValue = item.str.trim();
+                    const lastRow = rows[rows.length - 1];
+
+                    if (!lastRow || Math.abs(lastRow.y - y) > 2) {
+                        rows.push({ y, texts: [textValue] });
+                    } else {
+                        lastRow.texts.push(textValue);
+                    }
+                }
+
+                const pageText = rows
+                    .map(row => row.texts.join(' | ').replace(/\s*\|\s*/g, ' | ').trim())
+                    .filter(Boolean)
+                    .join('\n');
+
                 fullText += pageText + '\n\n';
             }
 
@@ -3201,34 +3230,58 @@ class OCRManager {
         });
     }
 
-    /**
-     * OCR+AI联合识别
-     * 先用OCR提取文字，再用DeepSeek AI进行智能解析
-     */
-    async parseWithOCRAndAI(ocrText, source = '', progressCallback = null) {
-        // 如果OCR结果太短，直接返回空
-        if (!ocrText || ocrText.trim().length < 2) {
+    splitTextForAI(ocrText, maxChunkLength = 3200) {
+        const normalizedText = String(ocrText || '').replace(/\r\n/g, '\n').trim();
+        if (!normalizedText) {
             return [];
         }
 
-        // 检查是否有DeepSeek API Key
-        const apiKey = this.getApiKey();
-
-        if (!apiKey) {
-            // 没有API Key，使用本地规则解析
-            if (progressCallback) progressCallback('使用本地规则解析...');
-            return this.parseWithRules(ocrText);
+        if (normalizedText.length <= maxChunkLength) {
+            return [normalizedText];
         }
 
-        // 有API Key，使用DeepSeek AI进行高级识别
-        if (progressCallback) progressCallback('使用DeepSeek AI深度分析...');
+        const lines = normalizedText.split('\n').map(line => line.trim()).filter(Boolean);
+        const chunks = [];
+        let currentChunk = '';
 
-        try {
-            const today = new Date();
-            const todayStr = this.formatDateLocal(today);
-            const weekDay = ['日', '一', '二', '三', '四', '五', '六'][today.getDay()];
+        const pushChunk = () => {
+            if (currentChunk.trim()) {
+                chunks.push(currentChunk.trim());
+                currentChunk = '';
+            }
+        };
 
-            const systemPrompt = `你是专业的办公文档识别助手。请仔细分析内容，精准提取每一个办公事项，确保不重不漏。
+        for (const line of lines) {
+            if (line.length > maxChunkLength) {
+                pushChunk();
+                for (let i = 0; i < line.length; i += maxChunkLength) {
+                    const piece = line.slice(i, i + maxChunkLength).trim();
+                    if (piece) {
+                        chunks.push(piece);
+                    }
+                }
+                continue;
+            }
+
+            const candidate = currentChunk ? `${currentChunk}\n${line}` : line;
+            if (candidate.length > maxChunkLength) {
+                pushChunk();
+                currentChunk = line;
+            } else {
+                currentChunk = candidate;
+            }
+        }
+
+        pushChunk();
+        return chunks;
+    }
+
+    async parseSingleOCRChunkWithAI(ocrText, source = '') {
+        const today = new Date();
+        const todayStr = this.formatDateLocal(today);
+        const weekDay = ['日', '一', '二', '三', '四', '五', '六'][today.getDay()];
+
+        const systemPrompt = `你是专业的办公文档识别助手。请仔细分析内容，精准提取每一个办公事项，确保不重不漏。
 
 【原始内容】
 ${ocrText}
@@ -3251,6 +3304,7 @@ ${ocrText}
 5. **会议合并原则**：如果只是"参加XX会议"与"组织召开XX会议"、"出席XX座谈会"与"召开XX座谈会"这类角色描述不同，但日期时间和会议主题相同，仍按同一个会议主题理解，核心标题要忽略动作前缀
 6. **地点优先来自备注列**：像"市人大机关一楼主任会议室""局1405会议室""南京金奥国际酒店"都应作为location
 7. **数字与专有名词优先逐字保留**：时间、房间号、楼层、酒店厅名、人名、处室名不要擅自改成同音字或常见词
+8. **如果文本被分段，仍要尽量识别该段内所有事项，不能因为内容多就少提取**
 
 【日期格式】
 - "3月24日" → date="${todayStr.substring(0,4)}-03-24"
@@ -3300,7 +3354,7 @@ ${ocrText}
 2. 每行生成一个独立对象
 3. 确保不重不漏`;
 
-            const userPrompt = `请分析以下OCR识别出的文字，提取所有办公事项：
+        const userPrompt = `请分析以下OCR识别出的文字，提取所有办公事项：
 
 """${ocrText}"""
 
@@ -3312,50 +3366,84 @@ ${ocrText}
 5. 如果与原文不完全确定，宁可保守保留原字，不要臆造
 6. 只返回JSON，不要解释`;
 
-            const response = await fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: this.deepseekModel,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    temperature: 0.1,
-                    max_tokens: 2000
-                })
-            }, 3, 'OCR-DeepSeek');
+        const response = await fetchWithRetry(`${this.deepseekBaseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.getApiKey()}`
+            },
+            body: JSON.stringify({
+                model: this.deepseekModel,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.1,
+                max_tokens: 3000
+            })
+        }, 3, 'OCR-DeepSeek');
 
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error?.message || `API请求失败: ${response.status}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error?.message || `API请求失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content || '';
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            return [];
+        }
+
+        const result = safeJsonParse(jsonMatch[0], null);
+        if (!result || !Array.isArray(result.items)) {
+            return [];
+        }
+
+        return result.items
+            .map(item => this.validateAndCleanItem(item))
+            .filter(item => item !== null);
+    }
+
+    /**
+     * OCR+AI联合识别
+     * 先用OCR提取文字，再用DeepSeek AI进行智能解析
+     */
+    async parseWithOCRAndAI(ocrText, source = '', progressCallback = null) {
+        if (!ocrText || ocrText.trim().length < 2) {
+            return [];
+        }
+
+        const apiKey = this.getApiKey();
+        if (!apiKey) {
+            if (progressCallback) progressCallback('使用本地规则解析...');
+            return this.parseWithRules(ocrText);
+        }
+
+        if (progressCallback) progressCallback('使用DeepSeek AI深度分析...');
+
+        try {
+            const chunks = this.splitTextForAI(ocrText);
+            const mergedItems = [];
+
+            for (let i = 0; i < chunks.length; i++) {
+                if (progressCallback) {
+                    progressCallback(chunks.length > 1
+                        ? `正在分析第${i + 1}/${chunks.length}段内容...`
+                        : '正在分析识别内容...');
+                }
+
+                const chunkItems = await this.parseSingleOCRChunkWithAI(chunks[i], source);
+                mergedItems.push(...chunkItems);
             }
 
-            const data = await response.json();
-            const content = data.choices[0]?.message?.content;
-
-            // 尝试解析JSON
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const result = safeJsonParse(jsonMatch[0], null);
-                if (result && result.items && Array.isArray(result.items)) {
-                    // 验证和清理
-                    const items = result.items
-                        .map(item => this.validateAndCleanItem(item))
-                        .filter(item => item !== null);
-
-                    return this.mergeRecognizedItems(items);
-                }
+            if (mergedItems.length > 0) {
+                return this.mergeRecognizedItems(mergedItems);
             }
 
             return this.parseWithRules(ocrText);
-
         } catch (error) {
             console.error('DeepSeek AI解析失败:', error.message);
-            // 降级到本地规则
             return this.parseWithRules(ocrText);
         }
     }

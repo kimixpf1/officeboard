@@ -1,3 +1,52 @@
+## 2026-04-20
+
+### 本次目标
+- 修复跨日期会议手动完成、周/月视图点击跳错日期、节假日跳过判断异常
+- 修复 PDF 识别链路中的真实运行时错误，并基于用户提供的会议安排表 PDF 做样本验证
+- 完成本轮补充修复的静态校验、提交、推送与线上回归准备
+
+### 当前状态
+- ✅ 已重新读取 `.trae/rules/` 目录规则文件，并按本轮要求继续同步更新
+- ✅ 已确认线上页面仍停留在 `2026-04-20 P3-4`，本轮补充修复此前尚未推送部署
+- ✅ 已修复跨日期会议手动标记完成链路，支持仅当天 / 今天及之后 / 全部日期
+- ✅ 已修复周视图 / 月视图点击具体事项跳转到错误日视图的问题，日历项点击优先使用 `_viewDate`
+- ✅ 已修复 `calendar.js` 工作日判断仍走旧硬编码的问题，统一改为复用 `HolidayData`
+- ✅ 已修复办文卡片完成态展示与按钮状态不一致的问题，卡片 `completed` 类、按钮样式与 `dataset.completed` 统一按有效完成态计算
+- ✅ 已修复 `ocr.js` 中 `parseWithOCRAndAI()` 结构损坏问题，并补上 PDF 长文本分段识别链路
+- ✅ 已修复真实 PDF 识别链路运行时错误：`existTitle is not defined`
+- ✅ 已使用用户提供的真实样本 `C:\Users\42151\Desktop\【4.20】近期主要会议活动安排表.pdf` 完成验证，当前可进入识别前预览确认
+- ✅ 真实 PDF 样本验证结果：共识别 28 条记录，其中待新增 21、待合并 1、待跳过 6
+- ✅ 已完成 `node --check js/app.js`、`node --check js/calendar.js`、`node --check js/ocr.js`、`node --check js/utils.js` 与 diagnostics 0 错误
+- 🔄 待完成提交、推送与线上强刷回归复测
+
+### 本轮关键改动
+- app.js：为跨日期会议完成状态切换补齐 scoped update 处理
+- app.js：修复卡片完成态展示、按钮样式与 `dataset.completed` 不一致问题
+- app.js：部署版本徽标提升为 `2026-04-20 P3-5`，并展示 `utils.js v4 / ocr.js v33 / calendar.js v24 / app.js v86`
+- calendar.js：`getItemForDate(item, dateStr)` 为日历项补齐 `_viewDate`
+- calendar.js：日历项点击跳转优先使用 `_viewDate`，修复点击具体事项跳回周期第一天的问题
+- calendar.js：`isWorkday(dateStr)` 统一改为复用 `HolidayData.isHoliday()` / `HolidayData.isMakeupDay()`
+- utils.js：修正 2026 年节假日与补班数据，覆盖 5 月、6 月等此前错判日期
+- ocr.js：`extractPDFText()` 改为按坐标排序并按行聚合文本，增强会议安排表类 PDF 的结构保真度
+- ocr.js：新增长文本分段 AI 识别，降低单次识别漏行漏项风险
+- ocr.js：修复批次去重时 `existTitle` 变量作用域错误
+- index.html：资源版本提升为 `utils.js v4`、`ocr.js v33`、`calendar.js v24`、`app.js v86`
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/calendar.js` 通过
+- `node --check js/ocr.js` 通过
+- `node --check js/utils.js` 通过
+- `app.js` / `calendar.js` / `ocr.js` / `utils.js` diagnostics 0 错误
+- 本地浏览器验证通过：
+  - 页面版本仍为 `P3-4`，确认线上尚未包含本轮修复
+  - 真实 PDF 上传后可进入识别前预览确认，不再报 `existTitle is not defined`
+  - 识别结果已能产出新增 / 合并 / 跳过三类预览
+
+### 遗留事项
+- 仍需提交、推送并等待线上页面更新到 `P3-5` 后做强刷回归
+- 真实 PDF 识别质量虽已明显改善，但标题清洗与表格列归并仍可继续做一轮定向优化
+
 # 项目迭代记录
 
 ## 2026-04-18
@@ -21,12 +70,12 @@
 - ✅ 已在 `calendar.js` 中新增已完成事项判断逻辑，并让周 / 月视图排序改为“未完成优先、已完成沉底”
 - ✅ 已为周 / 月视图日历事项增加完成态样式类 `completed`，并补齐桌面端横线 / 透明度样式
 - ✅ 已让周 / 月视图中的日历事项支持拖拽，并通过 `window.officeDashboard` 接入主面板现有拖拽链路
-- ✅ 已为周 / 月日期格增加 `dragover` / `dragleave` / `drop` 处理与高亮反馈
+- ✅ 已修复周视图 / 月视图办文完成态不生效的问题：日历映射按日期展开时补齐 dayStates 解析，办文可按当日 progress 正确打勾并沉底
 - ✅ 已为周视图单日格内事项增加拖拽排序并落库的能力
 - ✅ 已在 `app.js` 中新增 `moveItemToDateFromCalendar(targetDate)`，统一处理拖拽到日历日期后的日期更新与刷新
 - ✅ 已新增部署版本可视化徽标 `deployVersionBadge`，页面初始化后展示当前部署版本与关键脚本版本
 - ✅ 已新增会议自动完成规则：有具体时间会议按开始后 30 分钟自动完成；无具体时间单日会议在当天 16:00 自动完成；无具体时间跨日期会议在最后一天 16:00 自动完成
-- ✅ 已更新资源版本号：`calendar.js v22`、`app-date-view.js v3`、`app.js v84`
+- ✅ 已更新资源版本号：`calendar.js v23`、`app-date-view.js v4`、`app.js v85`
 - ✅ 已完成 `node --check js/app-date-view.js`、`node --check js/calendar.js`、`node --check js/app.js` 与 diagnostics 0 错误
 - ✅ 已完成本地浏览器真人验证：
   - 周视图已完成待办 / 办文卡片 `opacity=0.65` 且 `text-decoration=line-through`
@@ -53,7 +102,7 @@
 - app.js：初始化完成后调用 `updateDeployVersionBadge()`
 - app.js：启动时补充 `window.officeDashboard = window.dashboard`
 - css/style.css：补齐桌面端日历完成态、拖拽态和日期格拖拽高亮样式
-- index.html：新增 `deployVersionBadge` 节点，资源版本号提升为 `calendar.js v22`、`app-date-view.js v3`、`app.js v84`
+- index.html：新增 `deployVersionBadge` 节点，资源版本号提升为 `calendar.js v23`、`app-date-view.js v4`、`app.js v85`
 
 ### 验证结果
 - `node --check js/app-date-view.js` 通过
