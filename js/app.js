@@ -5455,7 +5455,38 @@ class OfficeDashboard {
             }
 
             if (!isSameColumn) {
-                await db.updateItem(draggedId, { type: newType });
+                const updates = { type: newType };
+                if (originalItem) {
+                    const oldType = originalItem.type;
+                    const selDate = this.selectedDate;
+                    if (oldType === 'todo' && newType === 'meeting') {
+                        updates.date = originalItem.deadline?.split('T')[0] || selDate;
+                        if (originalItem.deadline?.includes('T')) {
+                            updates.time = originalItem.deadline.split('T')[1]?.substring(0, 5) || '';
+                        }
+                    } else if (oldType === 'todo' && newType === 'document') {
+                        const dateStr = originalItem.deadline?.split('T')[0] || selDate;
+                        updates.docDate = dateStr;
+                        updates.docStartDate = dateStr;
+                        updates.docEndDate = dateStr;
+                        updates.progress = 'pending';
+                    } else if (oldType === 'meeting' && newType === 'todo') {
+                        const timeStr = originalItem.time || '09:00';
+                        updates.deadline = `${originalItem.date || selDate}T${timeStr}`;
+                    } else if (oldType === 'meeting' && newType === 'document') {
+                        const dateStr = originalItem.date || selDate;
+                        updates.docDate = dateStr;
+                        updates.docStartDate = dateStr;
+                        updates.docEndDate = dateStr;
+                        updates.progress = 'pending';
+                    } else if (oldType === 'document' && newType === 'todo') {
+                        const dateStr = originalItem.docStartDate || originalItem.docDate || selDate;
+                        updates.deadline = `${dateStr}T09:00`;
+                    } else if (oldType === 'document' && newType === 'meeting') {
+                        updates.date = originalItem.docStartDate || originalItem.docDate || selDate;
+                    }
+                }
+                await db.updateItem(draggedId, updates);
             }
 
             await db.updateItemOrder(newType, orderedIds);
@@ -6920,42 +6951,58 @@ class OfficeDashboard {
         try {
             const now = new Date();
             const allItems = await db.getAllItems();
+            const todayStr = this.formatDateLocal(now);
 
-            // 筛选未完成的会议
             const incompleteMeetings = allItems.filter(item =>
                 item.type === ITEM_TYPES.MEETING && !item.completed
             );
 
             for (const meeting of incompleteMeetings) {
+                let shouldComplete = false;
+
                 if (meeting.date && meeting.time) {
-                    // 构建会议开始时间
                     const meetingStart = new Date(`${meeting.date}T${meeting.time}`);
-
-                    // 计算会议开始后30分钟的时间点
                     const autoCompleteTime = new Date(meetingStart.getTime() + 30 * 60 * 1000);
-
-                    // 如果当前时间已经超过会议开始后30分钟
                     if (now >= autoCompleteTime) {
-                        await db.updateItem(meeting.id, {
-                            completed: true,
-                            completedAt: now.toISOString()
-                        });
+                        shouldComplete = true;
+                    }
+                } else if (meeting.date && !meeting.time) {
+                    const meetingDate = meeting.date;
+                    const endDate = meeting.endDate || meetingDate;
+                    const isMultiDay = endDate > meetingDate;
+                    const isToday = meetingDate <= todayStr && endDate >= todayStr;
 
-                        // 立即同步到云端
-                        if (syncManager.isLoggedIn()) {
-                            await syncManager.immediateSyncToCloud();
+                    if (isToday) {
+                        if (isMultiDay) {
+                            if (todayStr >= endDate && now.getHours() >= 16) {
+                                shouldComplete = true;
+                            }
+                        } else {
+                            if (now.getHours() >= 16) {
+                                shouldComplete = true;
+                            }
                         }
+                    }
+                }
+
+                if (shouldComplete) {
+                    await db.updateItem(meeting.id, {
+                        completed: true,
+                        completedAt: now.toISOString()
+                    });
+
+                    if (syncManager.isLoggedIn()) {
+                        await syncManager.immediateSyncToCloud();
                     }
                 }
             }
 
-            // 如果有会议被标记完成，刷新显示
             const updatedItems = await db.getAllItems();
             const hasNewCompleted = updatedItems.some(item =>
                 item.type === ITEM_TYPES.MEETING &&
                 item.completed &&
                 item.completedAt &&
-                new Date(item.completedAt) > new Date(now.getTime() - 120000) // 2分钟内完成的
+                new Date(item.completedAt) > new Date(now.getTime() - 120000)
             );
 
             if (hasNewCompleted) {

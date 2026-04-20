@@ -7,23 +7,31 @@
 - 保持低风险、可回退，不改数据库结构、不改同步协议
 
 ## 当前待办
-- 已完成本轮代码与静态校验，待提交、推送后做页面级回归复测
+- 已完成本轮代码、静态校验与本地浏览器真人测试，待提交、推送后做线上强刷回归复测
 
 ## 已完成
 - ✅ 已继续沿用可回退策略，在 `app.js` 第一层拆分基础上推进第二层低风险收口
+- ✅ 已完成本地浏览器真人测试，确认此前“横线样式未生效”和“跨栏拖拽仍消失”并非已修复，而是存在真实根因
+- ✅ 已修复周 / 月视图已完成事项横线样式桌面端未生效的问题：将 `.calendar-item.completed` / `.calendar-item.dragging` / 日期格 `drag-over` 全局样式补到桌面样式区，不再只存在于移动端块内
+- ✅ 已修复日视图跨栏拖拽事项后消失的问题：跨类型拖拽时除更新 `type` 外，同步迁移 `deadline / date / docDate / docStartDate / docEndDate / time / progress` 等关键字段，避免事项因缺少目标类型日期字段被过滤掉
 - ✅ 已修复日视图跨栏拖拽时事项直接消失的问题：拖拽开始/结束统一使用 `currentTarget`，避免事件命中子节点导致拖拽源元素记录错误
 - ✅ 已修复日视图切到周视图 / 月视图时未正确定位到包含当前选中日期的问题：切换视图时统一先把 `calendarView` 对齐到 `selectedDate`
 - ✅ 已在周视图 / 月视图中为已完成事项增加区分展示：已完成项自动沉底并显示横线样式
 - ✅ 已为周视图 / 月视图日历事项增加拖拽能力，可直接把待办 / 会议 / 办文拖到目标日期单元格
+- ✅ 已为周视图日格内事项增加拖拽排序能力，可在同一天内直接调整显示顺序并落库
 - ✅ 已在日历日期格增加拖拽高亮反馈，落点更直观
 - ✅ 已新增 `moveItemToDateFromCalendar(targetDate)`，统一承接从周 / 月视图拖拽改日期
 - ✅ 已新增部署版本可视化徽标 `#deployVersionBadge`，页面加载后会显示当前部署版本
 - ✅ 已将版本信息同步到徽标提示中，便于快速核对脚本资源版本是否已更新
-- ✅ 已更新资源版本号：`calendar.js v21`、`app-date-view.js v2`、`app.js v83`
+- ✅ 已新增会议自动完成规则：
+  - 有具体时间的会议，开始后 30 分钟自动完成
+  - 无具体时间的单日会议，在当天 16:00 自动完成
+  - 无具体时间的跨日期会议，在最后一天 16:00 自动完成
+- ✅ 已更新资源版本号：`calendar.js v22`、`app-date-view.js v3`、`app.js v84`
 - ✅ 已完成 `node --check js/app-date-view.js`
 - ✅ 已完成 `node --check js/calendar.js`
 - ✅ 已完成 `node --check js/app.js`
-- ✅ 已完成 `app-date-view.js` / `calendar.js` / `app.js` / `index.html` diagnostics 0 错误
+- ✅ 已完成 `app-date-view.js` / `calendar.js` / `app.js` / `index.html` / `style.css` diagnostics 0 错误
 - ✅ 已确认本轮工作区相关变更为：`css/style.css`、`index.html`、`js/app-date-view.js`、`js/app.js`、`js/calendar.js`
 - ✅ 已确认 `js/ocr.js` 仍为独立未纳入本轮的改动
 

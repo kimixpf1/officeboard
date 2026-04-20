@@ -1005,6 +1005,22 @@ body {
     color: var(--gray-400);
 }
 
+.calendar-item.completed {
+    opacity: 0.65;
+    text-decoration: line-through;
+    color: var(--gray-400);
+}
+
+.calendar-item.dragging {
+    opacity: 0.4;
+}
+
+.week-cell.drag-over,
+.month-cell.drag-over {
+    outline: 2px dashed var(--primary-color);
+    outline-offset: -2px;
+}
+
 /* 日历视图 */
 .calendar-view {
     display: none;
