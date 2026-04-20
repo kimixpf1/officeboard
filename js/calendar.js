@@ -12,13 +12,31 @@ class CalendarView {
         this.lastRenderAt = 0;
     }
 
+    isItemCompleted(item) {
+        if (!item) {
+            return false;
+        }
+
+        if (item.type === 'document') {
+            return item.progress === 'completed';
+        }
+
+        return Boolean(item.completed);
+    }
+
     /**
-     * 排序事项：先按类型（待办→会议→文件），再按时间
+     * 排序事项：未完成优先，再按类型（待办→会议→文件），再按时间
      */
     sortItems(items) {
         const typeOrder = { todo: 1, meeting: 2, document: 3 };
 
         return items.sort((a, b) => {
+            const completedA = this.isItemCompleted(a) ? 1 : 0;
+            const completedB = this.isItemCompleted(b) ? 1 : 0;
+            if (completedA !== completedB) {
+                return completedA - completedB;
+            }
+
             const typeA = typeOrder[a.type] || 99;
             const typeB = typeOrder[b.type] || 99;
             if (typeA !== typeB) {
@@ -406,6 +424,30 @@ class CalendarView {
             e.preventDefault();
             this.quickAddForDate(dateStr);
         });
+
+        cellDiv.addEventListener('dragover', (e) => {
+            if (!window.officeDashboard?.draggedItem) {
+                return;
+            }
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            cellDiv.classList.add('drag-over');
+        });
+
+        cellDiv.addEventListener('dragleave', (e) => {
+            if (!cellDiv.contains(e.relatedTarget)) {
+                cellDiv.classList.remove('drag-over');
+            }
+        });
+
+        cellDiv.addEventListener('drop', async (e) => {
+            if (!window.officeDashboard?.draggedItem || !window.officeDashboard?.moveItemToDateFromCalendar) {
+                return;
+            }
+            e.preventDefault();
+            cellDiv.classList.remove('drag-over');
+            await window.officeDashboard.moveItemToDateFromCalendar(dateStr);
+        });
     }
 
     /**
@@ -578,6 +620,7 @@ class CalendarView {
         const typeClass = `${item.type}-card`;
         const typeLabels = { todo: '待办', meeting: '会议', document: '文件' };
         const typeLabel = typeLabels[item.type] || item.type;
+        const isCompleted = this.isItemCompleted(item);
 
         let displayTitle = item.title;
         if (item.type === 'meeting') {
@@ -592,9 +635,10 @@ class CalendarView {
         }
 
         const el = document.createElement('div');
-        el.className = `calendar-item ${typeClass}`;
+        el.className = `calendar-item ${typeClass}${isCompleted ? ' completed' : ''}`;
         el.dataset.id = item.id;
         el.title = displayTitle;
+        el.draggable = true;
         el.style.cursor = 'pointer';
         el.style.whiteSpace = 'normal';
         el.addEventListener('click', (e) => {
@@ -604,6 +648,18 @@ class CalendarView {
                 : item.type === 'meeting'
                     ? item.date
                     : (item.docStartDate || item.docDate || item.createdAt?.split('T')[0]));
+        });
+        el.addEventListener('dragstart', (e) => {
+            e.stopPropagation();
+            if (window.officeDashboard?.handleDragStart) {
+                window.officeDashboard.handleDragStart(e, item);
+            }
+        });
+        el.addEventListener('dragend', (e) => {
+            e.stopPropagation();
+            if (window.officeDashboard?.handleDragEnd) {
+                window.officeDashboard.handleDragEnd(e);
+            }
         });
 
         const baseColor = this.getTypeColor(item.type);

@@ -1,51 +1,42 @@
 # Todolist
 
 ## 当前轮次目标
-- 完成 `app.js` 第一层小拆分：先抽离“日期 / 视图 / 刷新”主链，降低后续继续拆分的耦合度
-- 保持低风险、可回退，不改数据库结构、不改同步协议、不触碰 OCR / 同步等高风险链路
-- 在功能保持不变前提下，为后续继续拆分 `app.js` 建立稳定边界
+- 完成 `app.js` 第二层低风险优化，围绕日历视图交互与拖拽链路继续收口
+- 为周视图 / 月视图补齐已完成事项区分展示、拖拽改日期与视图定位能力
+- 增加部署版本可视化，解决线上是否已更新难以判断的长期痛点
+- 保持低风险、可回退，不改数据库结构、不改同步协议
 
 ## 当前待办
-- 已完成本轮代码拆分与静态校验，待提交、推送后做页面级回归复测
+- 已完成本轮代码与静态校验，待提交、推送后做页面级回归复测
 
 ## 已完成
-- ✅ 已重新核对 `app.js` 当前实现，确认本轮只处理日期选择、视图切换、日期导航、日历跳转与列表刷新主链
-- ✅ 已创建可回退锚点：`rollback/app-split-p3-l1-pre-20260418-1`
-- ✅ 已新增 `js/app-date-view.js`，抽出 `OfficeDateViewController`
-- ✅ 已将以下逻辑集中到 `OfficeDateViewController`：
-  - `initDatePicker()`
-  - `onDatePickerChange()`
-  - `applySelectedDate()`
-  - `switchView()`
-  - `goToDateView()`
-  - `navigateDate()`
-  - `goToToday()`
-  - `updateDateDisplay()`
-  - `getBoardItemsForSelectedDate()`
-  - `getVisibleBoardItems()`
-  - `groupItemsByType()`
-  - `loadItems()`
-- ✅ 已在 `app.js` 中保留同名薄封装入口，避免现有调用点大面积改动
-- ✅ 已在构造函数中接入 `this.dateViewController = new OfficeDateViewController(this)`
-- ✅ 已将视图按钮、上一页 / 下一页 / 今天、日期选择器等事件改为经由 `dateViewController` 转发
-- ✅ 已让 `index.html` 加载 `js/app-date-view.js?v=1`，并将 `app.js` 资源版本提升到 `v=82`
-- ✅ 已补齐 `goToDateView()` 的委托收口，避免同一职责在 `app.js` 与新模块中重复维护
+- ✅ 已继续沿用可回退策略，在 `app.js` 第一层拆分基础上推进第二层低风险收口
+- ✅ 已修复日视图跨栏拖拽时事项直接消失的问题：拖拽开始/结束统一使用 `currentTarget`，避免事件命中子节点导致拖拽源元素记录错误
+- ✅ 已修复日视图切到周视图 / 月视图时未正确定位到包含当前选中日期的问题：切换视图时统一先把 `calendarView` 对齐到 `selectedDate`
+- ✅ 已在周视图 / 月视图中为已完成事项增加区分展示：已完成项自动沉底并显示横线样式
+- ✅ 已为周视图 / 月视图日历事项增加拖拽能力，可直接把待办 / 会议 / 办文拖到目标日期单元格
+- ✅ 已在日历日期格增加拖拽高亮反馈，落点更直观
+- ✅ 已新增 `moveItemToDateFromCalendar(targetDate)`，统一承接从周 / 月视图拖拽改日期
+- ✅ 已新增部署版本可视化徽标 `#deployVersionBadge`，页面加载后会显示当前部署版本
+- ✅ 已将版本信息同步到徽标提示中，便于快速核对脚本资源版本是否已更新
+- ✅ 已更新资源版本号：`calendar.js v21`、`app-date-view.js v2`、`app.js v83`
 - ✅ 已完成 `node --check js/app-date-view.js`
+- ✅ 已完成 `node --check js/calendar.js`
 - ✅ 已完成 `node --check js/app.js`
-- ✅ 已完成 `app-date-view.js` / `app.js` / `index.html` diagnostics 0 错误
-- ✅ 已确认当前工作区仅保留本轮相关变更：`js/app.js`、`js/app-date-view.js`，以及独立未纳入本轮的 `js/ocr.js`
+- ✅ 已完成 `app-date-view.js` / `calendar.js` / `app.js` / `index.html` diagnostics 0 错误
+- ✅ 已确认本轮工作区相关变更为：`css/style.css`、`index.html`、`js/app-date-view.js`、`js/app.js`、`js/calendar.js`
+- ✅ 已确认 `js/ocr.js` 仍为独立未纳入本轮的改动
 
 ## 已跳过
-- 暂不在本轮继续拆分 OCR、同步、批量操作、表单弹窗等高风险或高耦合链路
-- 暂不在本轮继续做 `app.js` 第二层大拆分，先把第一层可回退版本稳定落地
+- 暂不在本轮继续拆分 OCR、同步、表单弹窗等高耦合链路
+- 暂不在本轮引入数据库 schema 变更或同步协议变更
 
 ## 下一步
-- 提交并推送本轮 `app.js` 第一层拆分
+- 提交并推送本轮第二层优化与日历交互修复
 - 页面级重点回归：
-  - 日视图日期选择器切换是否正常
-  - 今天 / 上一页 / 下一页是否正常
-  - 周 / 月视图切换是否正常
-  - 从日历左键进入日视图是否正常
-  - 日历右键快速新增、顶部“+ 新增”是否仍正常
-  - 新增 / 编辑 / 同步完成后列表与日历刷新是否正常
-- 若本轮稳定，再继续做 `app.js` 第二层拆分（弹窗/表单或批量操作链路）
+  - 日视图切到周视图 / 月视图是否正确定位到包含选中日期的周 / 月
+  - 周视图 / 月视图已完成事项是否显示横线并自动沉底
+  - 周视图 / 月视图中把待办 / 会议 / 办文拖到某一天后日期是否正确更新
+  - 日视图跨栏拖拽事项后是否仍正常显示
+  - 页面底部附近的部署版本徽标是否能直观看到新版本号
+- 若本轮稳定，再继续考虑第二层后续拆分（弹窗 / 表单链路或批量操作链路）

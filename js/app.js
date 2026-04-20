@@ -243,6 +243,7 @@ class OfficeDashboard {
             this.initDatePicker();
 
             this.updateDateDisplay();
+            this.updateDeployVersionBadge();
 
             setTimeout(() => {
                 this.checkApiKey().catch(err => {
@@ -5308,25 +5309,20 @@ class OfficeDashboard {
      * 这里只需清理handleDrop未涉及的样式（如拖拽取消的情况）
      */
     handleDragEnd(e) {
-
-        e.target.classList.remove('dragging');
+        const dragSource = e.currentTarget;
+        dragSource.classList.remove('dragging');
         document.querySelectorAll('.column-content').forEach(col => {
             col.classList.remove('drag-over');
         });
         document.querySelectorAll('.card').forEach(card => {
             card.classList.remove('drag-above', 'drag-below');
         });
-        // 取消未执行的 rAF
         if (this._dragOverRAF) {
             cancelAnimationFrame(this._dragOverRAF);
             this._dragOverRAF = null;
         }
-        // 使用 setTimeout 确保 handleDrop 有机会先执行
-        // 如果 handleDrop 已经清空了这些变量，这里就不会有问题
         setTimeout(() => {
-            // 只有在 handleDrop 还没清空时才清空（拖放取消的情况）
             if (this.draggedItem) {
-
                 this.draggedItem = null;
                 this.draggedElement = null;
             }
@@ -5415,24 +5411,19 @@ class OfficeDashboard {
         }
 
 
-        // 取消未执行的 rAF，确保用最终位置
         if (this._dragOverRAF) {
             cancelAnimationFrame(this._dragOverRAF);
             this._dragOverRAF = null;
         }
 
-        // ====== 同步阶段：在任何await之前捕获所有必要数据 ======
         const container = e.currentTarget;
         const newType = container.id.replace('List', '');
         const isSameColumn = newType === this.draggedItem.type;
         const draggedId = this.draggedItem.id;
         const draggedCard = this.draggedElement;
-        const originalType = this.draggedItem.type;  // 必须在 await 之前获取！
 
-        // 保存原始数据用于撤回（在async操作之前同步获取）
         const originalItem = await db.getItem(draggedId);
 
-        // 确保拖拽卡片在当前容器中（handleDragOver的rAF可能还没执行最后一帧）
         if (draggedCard && draggedCard.parentElement !== container) {
             const afterElement = this.getDragAfterElement(container, e.clientY);
             if (afterElement) {
@@ -5442,11 +5433,9 @@ class OfficeDashboard {
             }
         }
 
-        // 读取当前 DOM 顺序 - 这就是用户看到的最终位置
         const allCards = [...container.querySelectorAll('.card')];
         let orderedIds = allCards.map(card => parseInt(card.dataset.id));
 
-        // 确保 draggedId 在列表中（防御性检查）
         if (!orderedIds.includes(draggedId)) {
             const afterElement = this.getDragAfterElement(container, e.clientY);
             const afterId = afterElement ? parseInt(afterElement.dataset.id) : null;
@@ -5458,38 +5447,27 @@ class OfficeDashboard {
             orderedIds.splice(insertIndex, 0, draggedId);
         }
 
-        // 去重确保无重复ID
         orderedIds = [...new Set(orderedIds)];
 
-        // ====== 异步阶段 ======
         try {
-            // 保存原始数据用于撤回
             if (originalItem) {
                 this.saveUndoHistory('update', { item: originalItem });
             }
 
-            // 跨列移动：先更新类型
             if (!isSameColumn) {
                 await db.updateItem(draggedId, { type: newType });
             }
 
-            // 批量更新排序
-
             await db.updateItemOrder(newType, orderedIds);
 
-
             if (isSameColumn) {
-                // 同列拖动：DOM已经正确，不需要重新渲染
-                // 只需移除 dragging 样式
                 if (draggedCard) {
                     draggedCard.classList.remove('dragging');
                 }
             } else {
-                // 跨列拖动：需要重新渲染（类型变更，卡片需重建）
                 await this.loadItems();
             }
 
-            // 同步到云端（不阻塞UI）
             if (syncManager.isLoggedIn()) {
                 syncManager.immediateSyncToCloud().catch(err => {
                     console.error('云端同步失败:', err);
@@ -5504,6 +5482,65 @@ class OfficeDashboard {
 
         this.draggedItem = null;
         this.draggedElement = null;
+    }
+
+    async moveItemToDateFromCalendar(targetDate) {
+        if (!this.draggedItem || !targetDate) {
+            return;
+        }
+
+        const draggedId = this.draggedItem.id;
+        const originalItem = await db.getItem(draggedId);
+        if (!originalItem) {
+            return;
+        }
+
+        const updates = {};
+        if (originalItem.type === ITEM_TYPES.TODO) {
+            const currentTime = originalItem.deadline?.split('T')[1] || '09:00';
+            updates.deadline = `${targetDate}T${currentTime}`;
+        } else if (originalItem.type === ITEM_TYPES.MEETING) {
+            updates.date = targetDate;
+        } else if (originalItem.type === ITEM_TYPES.DOCUMENT) {
+            updates.docDate = targetDate;
+            if (originalItem.docStartDate && originalItem.docEndDate) {
+                updates.docStartDate = targetDate;
+                updates.docEndDate = targetDate;
+            } else if (originalItem.docStartDate) {
+                updates.docStartDate = targetDate;
+            }
+        }
+
+        try {
+            this.saveUndoHistory('update', { item: originalItem });
+            await db.updateItem(draggedId, updates);
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) {
+                syncManager.immediateSyncToCloud().catch(err => {
+                    console.error('云端同步失败:', err);
+                });
+            }
+        } catch (error) {
+            console.error('拖拽调整日期失败:', error);
+            this.showError('拖拽调整日期失败，请重试');
+            try { await this.loadItems(); } catch (refreshError) { console.warn('拖拽后刷新失败:', refreshError.message); }
+        } finally {
+            this.draggedItem = null;
+            this.draggedElement = null;
+        }
+    }
+
+    updateDeployVersionBadge() {
+        const badge = document.getElementById('deployVersionBadge');
+        if (!badge) {
+            return;
+        }
+
+        const version = '2026-04-18 P3-2';
+        const scriptVersions = ['calendar.js?v=21', 'app-date-view.js?v=2', 'app.js?v=83'];
+        badge.textContent = `部署版本：${version}`;
+        badge.dataset.version = version;
+        badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
     }
 
     /**
@@ -7836,4 +7873,5 @@ class OfficeDashboard {
 // 启动应用
 document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new OfficeDashboard();
+    window.officeDashboard = window.dashboard;
 });

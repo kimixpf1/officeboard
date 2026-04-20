@@ -61,11 +61,11 @@ class OfficeDateViewController {
                 boardViewEl?.classList.remove('active');
                 calendarViewEl?.classList.add('active');
                 if (window.calendarView) {
-                    if (previousView === 'board' && typeof window.calendarView.setDate === 'function') {
+                    if (typeof window.calendarView.setDate === 'function') {
                         window.calendarView.setDate(this.app.selectedDate, false);
                     }
                     if (typeof window.calendarView.setView === 'function') {
-                        window.calendarView.setView(view, previousView !== 'board');
+                        window.calendarView.setView(view, true);
                     }
                 }
             }

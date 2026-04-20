@@ -2270,6 +2270,23 @@ body {
         line-height: 1.4;
     }
 
+    .week-cell .calendar-item.completed,
+    .month-cell .calendar-item.completed {
+        opacity: 0.65;
+        text-decoration: line-through;
+    }
+
+    .week-cell.drag-over,
+    .month-cell.drag-over {
+        outline: 2px dashed var(--primary-color);
+        outline-offset: -2px;
+    }
+
+    .week-cell .calendar-item.dragging,
+    .month-cell .calendar-item.dragging {
+        opacity: 0.4;
+    }
+
     /* 月视图手机端 - 改为垂直列表 */
     .month-view {
         display: flex;

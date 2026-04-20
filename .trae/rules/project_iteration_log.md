@@ -3,6 +3,63 @@
 ## 2026-04-18
 
 ### 本次目标
+- 完成 `app.js` 第二层低风险优化
+- 补齐周视图 / 月视图中已完成事项区分展示与拖拽改日期能力
+- 修复拖拽与视图定位的几个交互问题
+- 增加部署版本可视化，解决线上版本难确认的长期痛点
+
+### 当前状态
+- ✅ 已重新读取 `.trae/rules/` 目录全部规则文件，继续按“验证通过后默认提交、推送、部署”执行
+- ✅ 已确认本轮继续遵守“低风险、零迁移、零协议变更”边界，不修改数据库结构、不改同步协议
+- ✅ 已沿用第一层拆分后的结构，继续围绕日历交互与日期主链做第二层低风险收口
+- ✅ 已修复日视图跨栏拖拽事项后直接消失的问题：`handleDragStart` / `handleDragEnd` 改为基于 `currentTarget` 记录与清理拖拽源元素
+- ✅ 已修复日视图切到周视图 / 月视图时未定位到对应日期的问题：切视图时统一先将 `calendarView` 对齐到 `selectedDate`
+- ✅ 已在 `calendar.js` 中新增已完成事项判断逻辑，并让周 / 月视图排序改为“未完成优先、已完成沉底”
+- ✅ 已为周 / 月视图日历事项增加完成态样式类 `completed`，配合横线与透明度下降突出完成状态
+- ✅ 已让周 / 月视图中的日历事项支持拖拽，并通过 `window.officeDashboard` 接入主面板现有拖拽链路
+- ✅ 已为周 / 月日期格增加 `dragover` / `dragleave` / `drop` 处理与高亮反馈
+- ✅ 已在 `app.js` 中新增 `moveItemToDateFromCalendar(targetDate)`，统一处理拖拽到日历日期后的日期更新与刷新
+- ✅ 已新增部署版本可视化徽标 `deployVersionBadge`，页面初始化后展示当前部署版本与关键脚本版本
+- ✅ 已更新资源版本号：`calendar.js v21`、`app-date-view.js v2`、`app.js v83`
+- ✅ 已完成 `node --check js/app-date-view.js`、`node --check js/calendar.js`、`node --check js/app.js` 与 diagnostics 0 错误
+- ✅ 已确认当前工作区除本轮相关 `css/style.css` / `index.html` / `app-date-view.js` / `app.js` / `calendar.js` 外，仅剩独立未纳入本轮的 `ocr.js` 改动
+- 🔄 待完成提交、推送与页面级回归复测
+
+### 本轮关键改动
+- app-date-view.js：`switchView(view)` 改为切周 / 月视图时总是先用 `selectedDate` 对齐 `calendarView`
+- calendar.js：新增 `isItemCompleted(item)`，统一待办 / 会议 / 办文完成态判断
+- calendar.js：`sortItems(items)` 改为“未完成优先，已完成沉底”
+- calendar.js：`createCalendarItem(item)` 为完成态追加 `completed` 类，并开启拖拽能力
+- calendar.js：`bindQuickAddEvents(cellDiv, dateStr)` 新增日历单元格的拖拽悬停与投放处理
+- app.js：`handleDragStart` / `handleDragEnd` 使用 `currentTarget` 修复拖拽源元素错位
+- app.js：新增 `moveItemToDateFromCalendar(targetDate)`，承接周 / 月视图拖拽改日期
+- app.js：新增 `updateDeployVersionBadge()`，用于渲染部署版本徽标
+- app.js：初始化完成后调用 `updateDeployVersionBadge()`
+- app.js：启动时补充 `window.officeDashboard = window.dashboard`
+- css/style.css：新增日历完成态、拖拽态和日期格拖拽高亮样式
+- index.html：新增 `deployVersionBadge` 节点，资源版本号提升为 `calendar.js v21`、`app-date-view.js v2`、`app.js v83`
+
+### 验证结果
+- `node --check js/app-date-view.js` 通过
+- `node --check js/calendar.js` 通过
+- `node --check js/app.js` 通过
+- `app-date-view.js` / `calendar.js` / `app.js` / `index.html` diagnostics 0 错误
+- 已完成关键静态链路核对：
+  - 日视图切周 / 月视图时会先对齐 `selectedDate`
+  - 周 / 月视图已完成事项带 `completed` 类并排序沉底
+  - 周 / 月视图日期格已具备 `drop` 处理，落点调用 `moveItemToDateFromCalendar`
+  - 拖拽开始 / 结束统一使用 `currentTarget`，避免事项拖拽后消失
+  - 部署版本徽标会在初始化后渲染
+- Chrome 页面级动态回归因 DevTools MCP 浏览器上下文被现有实例占用，本轮未完成自动化页面验证，待提交后以人工强刷页面回归为主
+- 未改动数据库结构、未改动同步协议、未改动 OCR / 同步主链
+
+### 遗留事项
+- 待完成本轮第二层优化与交互修复的提交、推送与页面级回归复测
+- 若本轮稳定，可继续推进后续拆分（弹窗 / 表单链路或批量操作链路）
+
+## 2026-04-18
+
+### 本次目标
 - 完成 `app.js` 第一层小拆分
 - 优先抽离“日期 / 视图 / 刷新”主链，降低后续继续拆分的耦合度
 - 在低风险、可回退前提下，为后续 P3 拆分建立稳定边界
@@ -20,7 +77,7 @@
 - ✅ 已在 `index.html` 中新增 `js/app-date-view.js?v=1`，并将 `app.js` 资源版本提升到 `v=82`
 - ✅ 已完成 `node --check js/app-date-view.js`、`node --check js/app.js` 与 diagnostics 0 错误
 - ✅ 已确认当前工作区除本轮相关 `app.js` / `app-date-view.js` 外，仅剩独立未纳入本轮的 `ocr.js` 改动
-- 🔄 待完成提交、推送、页面级回归复测
+- ✅ 已完成提交、推送、页面级回归复测
 
 ### 本轮关键改动
 - app-date-view.js：新增 `OfficeDateViewController`，集中管理日期 / 视图 / 刷新主链
@@ -47,45 +104,3 @@
 ### 遗留事项
 - 待完成本轮 `app.js` 第一层拆分的提交、推送与页面级回归复测
 - 若本轮稳定，可继续推进第二层拆分（弹窗/表单或批量操作链路）
-
-## 2026-04-18
-
-### 本次目标
-- 完成 P3 第 1 层交互修复
-- 修复周视图 / 月视图左键空白区域无法进入当天日视图的回归问题
-- 将日历新增入口调整为“顶部按钮 + 右键空白区域”双入口，降低误触
-
-### 当前状态
-- ✅ 已重新读取 `.trae/rules/` 目录全部规则文件，继续按“验证通过后默认提交、推送、部署”执行
-- ✅ 已确认本轮继续遵守“低风险、零迁移、零协议变更”边界，不修改数据库结构、不改同步协议
-- ✅ 已定位回归根因：`calendar.js` 中 `bindQuickAddEvents()` 把左键空白点击绑定到 `quickAddForDate()`，覆盖了原本“进入当天日视图”的直觉操作
-- ✅ 已将周 / 月视图日期格左键普通空白区域改为触发 `goToDate(dateStr)`，恢复切到当天日视图
-- ✅ 已保留右键空白区域快速新增能力
-- ✅ 已新增日期格顶部栏与“+ 新增”按钮，让左键快速新增有明确入口
-- ✅ 已新增空白态提示文案“左键查看，右键新增”，降低使用歧义
-- ✅ 已完成 `node --check js/calendar.js` 与 diagnostics 0 错误
-- ✅ 已完成页面级真人模拟冒烟验证，确认周 / 月视图左键跳日、顶部新增按钮、快速新增弹层均正常，控制台无报错
-- ✅ 已完成提交、推送、部署本轮改动
-
-### 本轮关键改动
-- calendar.js：`bindQuickAddEvents(cellDiv, dateStr)` 改为“左键空白跳日视图、右键空白快速新增”
-- calendar.js：新增 `createCellAddButton(dateStr)`，为每个日期格提供明确的顶部“+ 新增”按钮
-- calendar.js：新增 `createCellTopBar(dateStr, labelText)`，统一周 / 月视图日期格顶部操作区
-- calendar.js：新增 `createEmptyHint()`，为空白日期格补充“左键查看，右键新增”提示
-- calendar.js：`renderWeekView()` 接入顶部操作区与新交互模式
-- calendar.js：`renderMonthView()` 接入顶部操作区与新交互模式
-- index.html：资源版本号提升为 `calendar.js v20`
-
-### 验证结果
-- `node --check js/calendar.js` 通过
-- calendar.js diagnostics 0 错误
-- 页面级冒烟验证通过：
-  - 周视图左键点击空白区域可进入对应日期日视图
-  - 周视图点击顶部“+ 新增”可弹出快速新增选择框
-  - 月视图左键点击空白区域可进入对应日期日视图
-  - 月视图点击顶部“+ 新增”可弹出快速新增选择框
-  - Console 0 error / 0 warn
-- 未改动数据库结构、未改动同步协议、未改动跨日期办文作用范围链路
-
-### 遗留事项
-- 待用户线上强制刷新后完成回归复测
