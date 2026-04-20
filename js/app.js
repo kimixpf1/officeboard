@@ -5530,14 +5530,34 @@ class OfficeDashboard {
         }
     }
 
+    async saveCalendarItemOrder(orderedIds) {
+        if (!orderedIds || orderedIds.length === 0) return;
+        try {
+            const itemsByType = {};
+            for (const id of orderedIds) {
+                const item = await db.getItem(id);
+                if (!item) continue;
+                if (!itemsByType[item.type]) itemsByType[item.type] = [];
+                itemsByType[item.type].push(id);
+            }
+            for (const [type, typeIds] of Object.entries(itemsByType)) {
+                if (typeIds.length > 0) {
+                    await db.updateItemOrder(type, typeIds);
+                }
+            }
+        } catch (error) {
+            console.error('日历排序保存失败:', error);
+        }
+    }
+
     updateDeployVersionBadge() {
         const badge = document.getElementById('deployVersionBadge');
         if (!badge) {
             return;
         }
 
-        const version = '2026-04-18 P3-2';
-        const scriptVersions = ['calendar.js?v=21', 'app-date-view.js?v=2', 'app.js?v=83'];
+        const version = '2026-04-20 P3-3';
+        const scriptVersions = ['calendar.js?v=22', 'app-date-view.js?v=3', 'app.js?v=84'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

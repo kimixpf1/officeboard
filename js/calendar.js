@@ -430,6 +430,7 @@ class CalendarView {
                 return;
             }
             e.preventDefault();
+            e.stopPropagation();
             e.dataTransfer.dropEffect = 'move';
             cellDiv.classList.add('drag-over');
         });
@@ -441,12 +442,31 @@ class CalendarView {
         });
 
         cellDiv.addEventListener('drop', async (e) => {
-            if (!window.officeDashboard?.draggedItem || !window.officeDashboard?.moveItemToDateFromCalendar) {
+            if (!window.officeDashboard?.draggedItem) {
                 return;
             }
             e.preventDefault();
+            e.stopPropagation();
             cellDiv.classList.remove('drag-over');
-            await window.officeDashboard.moveItemToDateFromCalendar(dateStr);
+
+            const draggedItem = window.officeDashboard.draggedItem;
+            const sameCell = draggedItem.type === 'todo'
+                ? draggedItem.deadline?.split('T')[0] === dateStr
+                : draggedItem.type === 'meeting'
+                    ? draggedItem.date === dateStr
+                    : (draggedItem.docStartDate || draggedItem.docDate) === dateStr;
+
+            if (sameCell) {
+                const calendarItems = cellDiv.querySelectorAll('.calendar-item');
+                const orderedIds = [...calendarItems].map(el => parseInt(el.dataset.id)).filter(id => !isNaN(id));
+                if (orderedIds.length > 0 && window.officeDashboard?.saveCalendarItemOrder) {
+                    await window.officeDashboard.saveCalendarItemOrder(orderedIds);
+                }
+            } else {
+                if (window.officeDashboard?.moveItemToDateFromCalendar) {
+                    await window.officeDashboard.moveItemToDateFromCalendar(dateStr);
+                }
+            }
         });
     }
 
@@ -659,6 +679,23 @@ class CalendarView {
             e.stopPropagation();
             if (window.officeDashboard?.handleDragEnd) {
                 window.officeDashboard.handleDragEnd(e);
+            }
+        });
+        el.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!window.officeDashboard?.draggedItem) {
+                return;
+            }
+            if (window.officeDashboard.draggedItem.id === item.id) {
+                return;
+            }
+            const rect = el.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                el.parentNode.insertBefore(window.officeDashboard.draggedElement, el);
+            } else {
+                el.parentNode.insertBefore(window.officeDashboard.draggedElement, el.nextSibling);
             }
         });
 
