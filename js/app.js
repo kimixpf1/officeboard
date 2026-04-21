@@ -563,6 +563,8 @@ class OfficeDashboard {
         const toggle = document.getElementById('countdownToggle');
         const close = document.getElementById('countdownClose');
         const addBtn = document.getElementById('addCountdownBtn');
+        const nameInput = document.getElementById('countdownName');
+        const dateInput = document.getElementById('countdownDate');
 
         if (!panel || !toggle) {
             return;
@@ -570,10 +572,27 @@ class OfficeDashboard {
 
         const openPanel = () => panel.classList.add('expanded');
         const closePanel = () => panel.classList.remove('expanded');
+        const handleAdd = () => this.handleAddCountdownEvent();
 
         toggle.addEventListener('click', openPanel);
         close?.addEventListener('click', closePanel);
-        addBtn?.addEventListener('click', () => this.handleAddCountdownEvent());
+        addBtn?.addEventListener('click', handleAdd);
+        nameInput?.addEventListener('keypress', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (!dateInput?.value) {
+                    dateInput?.focus();
+                    return;
+                }
+                handleAdd();
+            }
+        });
+        dateInput?.addEventListener('keypress', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                handleAdd();
+            }
+        });
 
         panel.addEventListener('click', (event) => {
             const deleteBtn = event.target.closest('.countdown-item-delete');
@@ -587,17 +606,27 @@ class OfficeDashboard {
     getBuiltinHolidayCountdowns() {
         const year = this.countdownBuiltinYear || new Date().getFullYear();
         const holidayMap = HolidayData?.holidays?.[year] || {};
-        const todayStr = this.formatDateLocal(new Date());
+        const holidayGroups = new Map();
 
-        return Object.entries(holidayMap)
-            .filter(([dateStr]) => dateStr >= todayStr)
-            .map(([dateStr, info]) => ({
-                id: `holiday-${dateStr}`,
-                name: info?.name || '节假日',
-                date: dateStr,
-                type: 'holiday'
-            }))
-            .sort((a, b) => a.date.localeCompare(b.date));
+        Object.entries(holidayMap).forEach(([dateStr, info]) => {
+            if (!dateStr || !info?.name) {
+                return;
+            }
+            const existing = holidayGroups.get(info.name);
+            if (!existing || dateStr < existing.date) {
+                holidayGroups.set(info.name, {
+                    id: `holiday-${dateStr}`,
+                    name: info.name,
+                    date: dateStr,
+                    type: 'holiday'
+                });
+            }
+        });
+
+        return Array.from(holidayGroups.values())
+            .map(item => this.normalizeCountdownEvent(item))
+            .filter(item => item.daysLeft >= 0)
+            .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date));
     }
 
     getCustomCountdownEvents() {
@@ -615,14 +644,55 @@ class OfficeDashboard {
         localStorage.setItem(this.countdownStorageKey || 'office_countdown_events', JSON.stringify(events));
     }
 
+    normalizeCountdownEvent(item) {
+        if (!item?.name || !item?.date) {
+            return null;
+        }
+
+        const sourceDate = new Date(`${item.date}T00:00:00`);
+        if (Number.isNaN(sourceDate.getTime())) {
+            return null;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let targetDate = new Date(sourceDate);
+        const isHoliday = item.type === 'holiday';
+        const originalYear = sourceDate.getFullYear();
+        const currentYear = today.getFullYear();
+        const isRecurringCustom = item.type === 'custom' && originalYear !== currentYear;
+
+        if (isRecurringCustom) {
+            targetDate = new Date(today.getFullYear(), sourceDate.getMonth(), sourceDate.getDate());
+            if (targetDate < today) {
+                targetDate = new Date(today.getFullYear() + 1, sourceDate.getMonth(), sourceDate.getDate());
+            }
+        }
+
+        const normalizedDate = this.formatDateLocal(targetDate);
+        const daysLeft = this.getDaysLeft(normalizedDate);
+        const monthDay = normalizedDate.slice(5);
+        const metaLabel = isHoliday
+            ? '节假日首日'
+            : isRecurringCustom
+                ? `每年 ${monthDay}`
+                : '自定义';
+
+        return {
+            ...item,
+            originalDate: item.date,
+            date: normalizedDate,
+            daysLeft,
+            metaLabel,
+            isRecurring: isRecurringCustom
+        };
+    }
+
     getAllCountdownEvents() {
         return [...this.getBuiltinHolidayCountdowns(), ...this.getCustomCountdownEvents()]
-            .filter(item => item?.name && item?.date)
-            .map(item => ({
-                ...item,
-                daysLeft: this.getDaysLeft(item.date)
-            }))
-            .filter(item => item.daysLeft >= 0)
+            .map(item => this.normalizeCountdownEvent(item))
+            .filter(item => item?.name && item?.date && item.daysLeft >= 0)
             .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date));
     }
 
@@ -643,9 +713,9 @@ class OfficeDashboard {
         const events = this.getAllCountdownEvents();
         const nextEvent = events[0] || null;
 
-        summaryEl.textContent = nextEvent
-            ? `最近的是 ${nextEvent.name}，还有 ${nextEvent.daysLeft} 天（${nextEvent.date}）`
-            : '今年剩余节假日和你添加的重要日子会集中展示在这里。';
+        summaryEl.innerHTML = nextEvent
+            ? `<strong>${this.escapeHtml(nextEvent.name)}</strong><span>${nextEvent.daysLeft === 0 ? '今天就是' : `还有 ${nextEvent.daysLeft} 天`} · ${this.escapeHtml(nextEvent.date)}</span>`
+            : '这里会自动展示今年剩余节假日首日，以及你新增的生日和纪念日。';
 
         if (!events.length) {
             listEl.innerHTML = '<div class="countdown-empty">暂时还没有需要倒数的重要日子</div>';
@@ -658,13 +728,15 @@ class OfficeDashboard {
                 ? `<button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
                 : '';
             return `
-                <div class="countdown-item">
+                <div class="countdown-item${isSoon ? ' soon' : ''}">
                     <div class="countdown-item-info">
                         <div class="countdown-item-title">${this.escapeHtml(item.name)}</div>
-                        <div class="countdown-item-meta">${item.date}${item.type === 'holiday' ? ' · 节假日' : ' · 自定义'}</div>
+                        <div class="countdown-item-meta">${this.escapeHtml(item.date)} · ${this.escapeHtml(item.metaLabel || (item.type === 'holiday' ? '节假日' : '自定义'))}</div>
                     </div>
-                    <div class="countdown-item-days ${isSoon ? 'soon' : ''}">${item.daysLeft === 0 ? '今天' : `还有${item.daysLeft}天`}</div>
-                    ${deleteBtn}
+                    <div class="countdown-item-side">
+                        <div class="countdown-item-days ${isSoon ? 'soon' : ''}">${item.daysLeft === 0 ? '今天' : `${item.daysLeft} 天`}</div>
+                        ${deleteBtn}
+                    </div>
                 </div>`;
         }).join('');
     }
@@ -689,7 +761,7 @@ class OfficeDashboard {
             titleEl.textContent = `${nextItem.name}${nextItem.daysLeft === 0 ? '就在今天' : `还有 ${nextItem.daysLeft} 天`}`;
         }
         if (descEl) {
-            descEl.textContent = `${nextItem.date} · ${nextItem.type === 'holiday' ? '节假日提醒' : '纪念日提醒'}`;
+            descEl.textContent = `${nextItem.date} · ${nextItem.metaLabel || (nextItem.type === 'holiday' ? '节假日提醒' : '纪念日提醒')}`;
         }
         noticeEl.hidden = false;
     }
@@ -5876,8 +5948,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-21 P3-6';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=34', 'upload-flow.js?v=5', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=87'];
+        const version = '2026-04-21 P3-7';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=34', 'upload-flow.js?v=5', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=88', 'style.css?v=25'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

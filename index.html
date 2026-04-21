@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=24">
+    <link rel="stylesheet" href="css/style.css?v=25">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -727,7 +727,34 @@
         <span class="loading-text">处理中...</span>
     </div>
 
-    <!-- 右侧日程折叠框（最上） -->
+    <!-- 右侧倒数日折叠框（最上） -->
+    <div id="countdownPanel" class="side-panel countdown-panel">
+        <div class="panel-toggle countdown-toggle" id="countdownToggle" title="倒数日">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 3"></path>
+            </svg>
+            <span class="panel-toggle-text">倒数日</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>倒数日</h3>
+                <button type="button" class="panel-close" id="countdownClose" title="收起">×</button>
+            </div>
+            <div class="panel-body countdown-body">
+                <div class="countdown-summary" id="countdownSummary"></div>
+                <div class="countdown-add-form">
+                    <input type="text" id="countdownName" placeholder="纪念日名称，如妈妈生日" maxlength="30">
+                    <input type="date" id="countdownDate">
+                    <button type="button" id="addCountdownBtn" class="btn-add-link">+ 添加</button>
+                </div>
+                <div class="countdown-section-title">今年剩余节假日与纪念日</div>
+                <div class="countdown-list" id="countdownList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧日程折叠框 -->
     <div id="schedulePanel" class="side-panel schedule-panel">
         <div class="panel-toggle schedule-toggle" id="scheduleToggle" title="日程记录">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -756,7 +783,7 @@
         </div>
     </div>
 
-    <!-- 右侧工具折叠框（上） -->
+    <!-- 右侧工具折叠框 -->
     <div id="toolsPanel" class="side-panel tools-panel">
         <div class="panel-toggle tools-toggle" id="toolsToggle" title="常用工具">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -778,34 +805,7 @@
         </div>
     </div>
 
-    <!-- 右侧倒数日折叠框 -->
-    <div id="countdownPanel" class="side-panel countdown-panel">
-        <div class="panel-toggle countdown-toggle" id="countdownToggle" title="倒数日">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 7v5l3 3"></path>
-            </svg>
-            <span class="panel-toggle-text">倒数日</span>
-        </div>
-        <div class="panel-content">
-            <div class="panel-header">
-                <h3>倒数日</h3>
-                <button type="button" class="panel-close" id="countdownClose" title="收起">×</button>
-            </div>
-            <div class="panel-body countdown-body">
-                <div class="countdown-summary" id="countdownSummary"></div>
-                <div class="countdown-add-form">
-                    <input type="text" id="countdownName" placeholder="纪念日名称，如妈妈生日" maxlength="30">
-                    <input type="date" id="countdownDate">
-                    <button type="button" id="addCountdownBtn" class="btn-add-link">+ 添加</button>
-                </div>
-                <div class="countdown-section-title">今年剩余节假日与纪念日</div>
-                <div class="countdown-list" id="countdownList"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 右侧网站折叠框（中） -->
+    <!-- 右侧网站折叠框 -->
     <div id="linksPanel" class="side-panel links-panel">
         <div class="panel-toggle links-toggle" id="linksToggle" title="常用网站">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1082,7 +1082,7 @@
     <script src="js/sync.js?v=18"></script>
     <script src="js/upload-flow.js?v=5"></script>
     <script src="js/app-date-view.js?v=4"></script>
-    <script src="js/app.js?v=87"></script>
+    <script src="js/app.js?v=88"></script>
     
     <div id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></div>
 

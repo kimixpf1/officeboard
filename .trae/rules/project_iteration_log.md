@@ -12,8 +12,11 @@
 - ✅ 已在 `app.js` 主入口接入新的预览返回结构：确认后使用编辑后的 `actionPlan` 写入，取消后恢复识别前快照
 - ✅ 已在 `wechat-upload.js` 微信入口同步接入新的预览返回结构，保证双入口行为一致
 - ✅ 已在 `ocr.js` 中将 PDF 提取增强为“原始行文本 + 结构化表格提取”双输出，新增按坐标归一、行分组、列切分、跨行继承与标题 / 地点清洗能力
-- ✅ 已完成 `node --check js/app.js`、`node --check js/wechat-upload.js`、`node --check js/upload-flow.js`、`node --check js/ocr.js` 与 diagnostics 0 错误
-- ✅ 已将部署版本提升为 `2026-04-21 P3-6`，并同步提升 `ocr.js v34 / upload-flow.js v5 / wechat-upload.js v9 / app.js v87`
+- ✅ 已完成顶部品牌区与倒数日折叠框本轮 UI 收口：时间 / 天气靠右展示、倒数日上移到日程之上、暖橙色视觉与折叠交互统一
+- ✅ 已修复倒数日数据逻辑：默认按节假日名称只保留今年剩余各节假日首日，自定义生日 / 纪念日按月日递推到下一次日期后参与展示
+- ✅ 已完成 `node --check js/app.js`、`node --check js/app-date-view.js` 与 `app.js` / `index.html` / `style.css` diagnostics 0 错误
+- ✅ 已将部署版本提升为 `2026-04-21 P3-7`，并同步提升 `style.css v25 / app.js v88`
+- ✅ 已确认仓库当前没有 `.github/workflows`、没有 `gh-pages` 分支发布脚本、没有 `docs/` 目录发布源配置，Pages 只能直接吃 `main` 根目录
 - 🔄 待完成提交、推送与线上强刷回归复测
 
 ### 本轮关键改动
@@ -23,24 +26,29 @@
 - ocr.js：`extractPDFText()` 改为调用 `buildStructuredPDFPageText()` 输出结构化表格文本
 - ocr.js：新增 `normalizePDFTextItems()`、`groupPDFItemsIntoRows()`、`splitPDFRowIntoCells()`、`extractPDFTableRows()` 等辅助方法
 - ocr.js：新增 PDF 表格标题识别、会议标题清洗、地点清洗与分组 / 参会人员跨行继承逻辑
-- app.js：部署版本徽标提升为 `2026-04-21 P3-6`，并展示 `utils.js v4 / ocr.js v34 / upload-flow.js v5 / calendar.js v24 / app-date-view.js v4 / app.js v87`
-- index.html：资源版本提升为 `ocr.js v34`、`upload-flow.js v5`、`app.js v87`
-- wechat-upload.html：资源版本提升为 `ocr.js v34`、`upload-flow.js v5`、`wechat-upload.js v9`
+- index.html：将倒数日折叠框上移到日程上方，并把 `style.css` / `app.js` 资源版本提升到 `v25 / v88`
+- style.css：重构顶部品牌区布局，保证桌面端时间 / 天气紧贴标题右侧，移动端再按窄屏换行
+- style.css：重构倒数日折叠框视觉，补齐暖橙色摘要卡、列表间距、删除按钮与临近日高亮
+- app.js：倒数日内置节假日改为按节假日名称去重后只展示首日；自定义生日 / 纪念日改为按月日自动递推到下一次日期
+- app.js：部署版本徽标提升为 `2026-04-21 P3-7`，并展示 `utils.js v4 / ocr.js v34 / upload-flow.js v5 / calendar.js v24 / app-date-view.js v4 / app.js v88 / style.css v25`
 
 ### 验证结果
 - `node --check js/app.js` 通过
-- `node --check js/wechat-upload.js` 通过
-- `node --check js/upload-flow.js` 通过
-- `node --check js/ocr.js` 通过
-- `app.js` / `wechat-upload.js` / `upload-flow.js` / `ocr.js` diagnostics 0 错误
+- `node --check js/app-date-view.js` 通过
+- `app.js` / `index.html` / `style.css` diagnostics 0 错误
+- Pages 配置侧排查结果：
+  - 本地 `main` 与 `origin/main` 已对齐，推送目标正确
+  - 仓库根目录不存在 `.github/workflows`，说明不是 Actions 自定义部署链路
+  - 仓库没有 `docs/` 目录，也没有 `gh-pages` 分支发布脚本，说明 Pages 只能从 `main` 根目录发布
+  - 远端 `main` 的 `index.html` 仍引用 `style.css?v=24`，而线上此前已出现 HTML 与静态资源体感不同步，根因更接近“主分支 HTML 已发布，但浏览器 / CDN 对旧版 CSS/JS 仍有缓存命中”，而不是 git 没推上去
 - 关键静态链路已核对：
-  - 主上传入口会使用识别预览编辑后的 `actionPlan` 保存结果
-  - 微信上传入口会使用识别预览编辑后的 `actionPlan` 保存结果
-  - PDF 提取阶段已增加结构化表格文本输出，可为后续 AI 识别补充更稳定的上下文
-  - 页面版本与脚本版本已同步提升到 `P3-6`
+  - 顶部时间 / 天气布局已调整为桌面端靠右紧贴标题
+  - 倒数日折叠框已位于日程上方
+  - 倒数日列表会自动展示今年剩余节假日首日与用户新增生日 / 纪念日
 
 ### 遗留事项
-- 待提交、推送并完成线上强刷回归，重点核对版本徽标是否为 `P3-6`
+- 待提交、推送并完成线上强刷回归，重点核对版本徽标是否为 `P3-7`
+- 待继续观察 GitHub Pages 是否仍会出现“HTML 先更新、CSS / JS 仍命中旧缓存”的情况；若仍复现，需要去仓库 Pages 设置页核对发布源与最近部署记录
 - 待继续用真实 PDF 样本回归识别质量，重点观察合并单元格、跨行参会人员与地点列识别稳定性
 - 用户此前反馈的“跨日期会议点击完成后未打勾划线沉底”仍需在本轮部署稳定后继续排查
 
