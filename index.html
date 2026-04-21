@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=25">
+    <link rel="stylesheet" href="css/style.css?v=26">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -100,6 +100,13 @@
                             <span class="header-weather-text">苏州天气加载中</span>
                         </button>
                     </div>
+                    <div id="countdownNotice" class="countdown-notice" hidden>
+                        <span class="countdown-notice-badge">提醒</span>
+                        <div class="countdown-notice-content">
+                            <div class="countdown-notice-title">暂无临近倒数日</div>
+                            <div class="countdown-notice-desc">距离三天内的重要节日和纪念日会显示在这里</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="header-center">
@@ -128,13 +135,6 @@
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </button>
                     <button type="button" id="todayBtn" class="btn-text btn-sm">今天</button>
-                </div>
-                <div id="countdownNotice" class="countdown-notice" hidden>
-                    <span class="countdown-notice-badge">提醒</span>
-                    <div class="countdown-notice-content">
-                        <div class="countdown-notice-title">暂无临近倒数日</div>
-                        <div class="countdown-notice-desc">距离三天内的重要节日和纪念日会显示在这里</div>
-                    </div>
                 </div>
             </div>
             <div class="header-right">
@@ -1076,13 +1076,13 @@
     <script src="js/crypto.js?v=15"></script>
     <script src="js/kimi.js?v=15"></script>
     <script src="js/templates.js?v=14"></script>
-    <script src="js/ocr.js?v=34"></script>
+    <script src="js/ocr.js?v=35"></script>
     <script src="js/report.js?v=15"></script>
     <script src="js/calendar.js?v=24"></script>
     <script src="js/sync.js?v=18"></script>
-    <script src="js/upload-flow.js?v=5"></script>
+    <script src="js/upload-flow.js?v=6"></script>
     <script src="js/app-date-view.js?v=4"></script>
-    <script src="js/app.js?v=88"></script>
+    <script src="js/app.js?v=89"></script>
     
     <div id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></div>
 

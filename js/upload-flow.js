@@ -347,29 +347,29 @@
         body.innerHTML = '';
 
         const container = document.createElement('div');
-        container.style.cssText = 'display:flex;flex-direction:column;gap:12px;color:inherit;';
+        container.style.cssText = 'display:flex;flex-direction:column;gap:12px;color:var(--gray-800);';
 
         const title = document.createElement('h4');
-        title.style.cssText = 'margin:0;padding-bottom:8px;border-bottom:1px solid var(--border-color,#eee);';
+        title.style.cssText = 'margin:0;padding-bottom:8px;border-bottom:1px solid var(--border-color,#eee);color:var(--gray-800);';
         title.textContent = '📄 文件：' + fileName;
         container.appendChild(title);
 
         const summary = document.createElement('div');
-        summary.style.cssText = 'padding:10px 12px;border-radius:8px;background:var(--card-bg,#f8fafc);font-size:13px;';
+        summary.style.cssText = 'padding:10px 12px;border-radius:8px;background:var(--bg-tertiary,#f8fafc);color:var(--gray-700);font-size:13px;border:1px solid var(--border-color,#e5e7eb);';
         summary.textContent = `可逐条修改新增项，也可删除不需要的新增/合并/跳过记录。当前：新增 ${workingResult.items.length}｜合并 ${workingResult.mergedItems.length}｜跳过 ${workingResult.skippedItems.length}`;
         container.appendChild(summary);
 
         const createInput = (labelText, value, onChange, placeholder = '') => {
             const wrap = document.createElement('label');
-            wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;min-width:0;';
+            wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;min-width:0;color:var(--gray-700);';
             const label = document.createElement('span');
-            label.style.cssText = 'font-size:12px;color:#64748b;';
+            label.style.cssText = 'font-size:12px;color:var(--gray-600);';
             label.textContent = labelText;
             const input = document.createElement('input');
             input.type = 'text';
             input.value = value || '';
             input.placeholder = placeholder;
-            input.style.cssText = 'padding:8px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;background:var(--input-bg,#fff);color:inherit;';
+            input.style.cssText = 'padding:8px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;background:var(--bg-primary,#fff);color:var(--gray-800);caret-color:var(--gray-800);';
             input.addEventListener('input', () => onChange(input.value));
             wrap.append(label, input);
             return wrap;
@@ -377,7 +377,7 @@
 
         const createSectionTitle = (text, color, bg) => {
             const sectionTitle = document.createElement('h5');
-            sectionTitle.style.cssText = `margin:0;padding:8px 10px;border-radius:6px;color:${color};background:${bg};`;
+            sectionTitle.style.cssText = `margin:0;padding:8px 10px;border-radius:6px;color:${color};background:${bg};border:1px solid var(--border-color,#e5e7eb);`;
             sectionTitle.textContent = text;
             return sectionTitle;
         };
@@ -388,12 +388,12 @@
             section.appendChild(createSectionTitle('✅ 待新增事项（可编辑）', '#10b981', 'rgba(16,185,129,0.1)'));
             workingResult.items.forEach((item, index) => {
                 const card = document.createElement('div');
-                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--card-bg,#fff);';
+                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg-primary,#fff);color:var(--gray-800);';
 
                 const top = document.createElement('div');
                 top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;';
                 const head = document.createElement('div');
-                head.style.cssText = 'font-weight:600;';
+                head.style.cssText = 'font-weight:600;color:var(--gray-800);';
                 head.textContent = `${index + 1}. ${item.type === 'meeting' ? '会议' : item.type === 'document' ? '办文' : '待办'}`;
                 const del = document.createElement('button');
                 del.type = 'button';
@@ -449,7 +449,7 @@
 
                 if (item.previewReason || item.matchedExistingSummary) {
                     const note = document.createElement('div');
-                    note.style.cssText = 'font-size:12px;color:#64748b;';
+                    note.style.cssText = 'font-size:12px;color:var(--gray-600);';
                     if (item.previewReason) note.textContent = '依据：' + item.previewReason;
                     if (item.matchedExistingSummary?.title) {
                         const match = document.createElement('div');
@@ -471,9 +471,9 @@
             section.appendChild(createSectionTitle('🔄 待合并事项（可删除）', '#f59e0b', 'rgba(245,158,11,0.1)'));
             workingResult.mergedItems.forEach((item, index) => {
                 const card = document.createElement('div');
-                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--card-bg,#fff);';
+                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--bg-primary,#fff);color:var(--gray-800);';
                 const text = document.createElement('div');
-                text.style.cssText = 'font-size:13px;line-height:1.6;';
+                text.style.cssText = 'font-size:13px;line-height:1.6;color:var(--gray-800);';
                 text.innerHTML = `<div><b>${index + 1}. ${item.title || '未知事项'}</b></div><div>归并到：${item.targetTitle || item.title || '未知事项'}</div><div>新增参会：${item.addedAttendees?.length ? item.addedAttendees.join('、') : '-'}</div>`;
                 appendReason(text, item.reason, '#b45309');
                 appendMatchedExisting(text, item, '#92400e');
@@ -497,9 +497,9 @@
             section.appendChild(createSectionTitle('⏭️ 待跳过事项（可移除）', '#6b7280', 'rgba(107,114,128,0.1)'));
             workingResult.skippedItems.forEach((item, index) => {
                 const card = document.createElement('div');
-                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--card-bg,#fff);';
+                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--bg-primary,#fff);color:var(--gray-800);';
                 const text = document.createElement('div');
-                text.style.cssText = 'font-size:13px;line-height:1.6;';
+                text.style.cssText = 'font-size:13px;line-height:1.6;color:var(--gray-800);';
                 const titleText = getSkippedTitle(item);
                 text.innerHTML = `<div><b>${index + 1}. ${titleText}</b></div>`;
                 appendReason(text, getSkippedReason(item), '#6b7280');
@@ -520,13 +520,13 @@
 
         if (!workingResult.items.length && !workingResult.mergedItems.length && !workingResult.skippedItems.length) {
             const empty = document.createElement('div');
-            empty.style.cssText = 'padding:16px;border:1px dashed var(--border-color,#d1d5db);border-radius:8px;text-align:center;color:#64748b;';
+            empty.style.cssText = 'padding:16px;border:1px dashed var(--border-color,#d1d5db);border-radius:8px;text-align:center;color:var(--gray-600);background:var(--bg-tertiary,#f8fafc);';
             empty.textContent = '当前预览结果已清空。';
             container.appendChild(empty);
         }
 
         const tip = document.createElement('div');
-        tip.style.cssText = 'padding:10px 12px;border-radius:6px;background:rgba(37,99,235,0.08);color:var(--text-color,#334155);font-size:13px;';
+        tip.style.cssText = 'padding:10px 12px;border-radius:6px;background:rgba(37,99,235,0.08);color:var(--gray-700);font-size:13px;border:1px solid var(--border-color,#e5e7eb);';
         tip.textContent = '确认后按当前预览结果写入面板；删除的条目不会保存。';
         container.appendChild(tip);
 

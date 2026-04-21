@@ -570,12 +570,23 @@ class OfficeDashboard {
             return;
         }
 
+        const isExpanded = () => panel.classList.contains('expanded');
         const openPanel = () => panel.classList.add('expanded');
         const closePanel = () => panel.classList.remove('expanded');
+        const togglePanel = () => {
+            if (isExpanded()) {
+                closePanel();
+            } else {
+                openPanel();
+            }
+        };
         const handleAdd = () => this.handleAddCountdownEvent();
 
-        toggle.addEventListener('click', openPanel);
-        close?.addEventListener('click', closePanel);
+        toggle.addEventListener('click', togglePanel);
+        close?.addEventListener('click', event => {
+            event.stopPropagation();
+            closePanel();
+        });
         addBtn?.addEventListener('click', handleAdd);
         nameInput?.addEventListener('keypress', event => {
             if (event.key === 'Enter') {
@@ -605,18 +616,24 @@ class OfficeDashboard {
 
     getBuiltinHolidayCountdowns() {
         const year = this.countdownBuiltinYear || new Date().getFullYear();
-        const holidayMap = HolidayData?.holidays?.[year] || {};
+        const holidayDates = HolidayData?.holidays?.[year] || [];
         const holidayGroups = new Map();
 
-        Object.entries(holidayMap).forEach(([dateStr, info]) => {
-            if (!dateStr || !info?.name) {
+        holidayDates.forEach(dateStr => {
+            if (!dateStr) {
                 return;
             }
-            const existing = holidayGroups.get(info.name);
+
+            const holidayName = this.getHolidayDisplayName(dateStr);
+            if (!holidayName) {
+                return;
+            }
+
+            const existing = holidayGroups.get(holidayName);
             if (!existing || dateStr < existing.date) {
-                holidayGroups.set(info.name, {
+                holidayGroups.set(holidayName, {
                     id: `holiday-${dateStr}`,
-                    name: info.name,
+                    name: holidayName,
                     date: dateStr,
                     type: 'holiday'
                 });
@@ -627,6 +644,37 @@ class OfficeDashboard {
             .map(item => this.normalizeCountdownEvent(item))
             .filter(item => item.daysLeft >= 0)
             .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date));
+    }
+
+    getHolidayDisplayName(dateStr) {
+        const year = Number.parseInt(String(dateStr || '').slice(0, 4), 10);
+        const holidayList = HolidayData?.holidays?.[year] || [];
+        if (!holidayList.includes(dateStr)) {
+            return '';
+        }
+
+        const monthDay = String(dateStr).slice(5);
+        const holidayNameMap = {
+            '01-01': '元旦',
+            '04-04': '清明节',
+            '04-05': '清明节',
+            '05-01': '劳动节',
+            '05-31': '端午节',
+            '06-19': '端午节',
+            '09-15': '中秋节',
+            '09-25': '中秋节',
+            '10-01': '国庆节'
+        };
+
+        if (holidayNameMap[monthDay]) {
+            return holidayNameMap[monthDay];
+        }
+
+        if (dateStr >= `${year}-02-01` && dateStr <= `${year}-03-01`) {
+            return '春节';
+        }
+
+        return '法定节假日';
     }
 
     getCustomCountdownEvents() {
@@ -5948,8 +5996,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-21 P3-7';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=34', 'upload-flow.js?v=5', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=88', 'style.css?v=25'];
+        const version = '2026-04-21 P3-8';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=89', 'style.css?v=26'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
