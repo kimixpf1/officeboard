@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 日历视图模块
  * 支持周视图、月视图
  */
@@ -315,30 +315,15 @@ class CalendarView {
         }
 
         const dayState = item.dayStates?.[dateStr];
-        const isCrossDateMeeting = item.type === 'meeting' && item.date && item.endDate && item.endDate > item.date && !item.recurringGroupId;
-        const isNoTimeMeeting = item.type === 'meeting' && !item.time;
-        const fallbackMeetingCompleted = (isCrossDateMeeting && isNoTimeMeeting) ? false : item.completed;
-        const fallbackMeetingCompletedAt = (isCrossDateMeeting && isNoTimeMeeting) ? null : item.completedAt;
 
         if (!dayState) {
-            if (item.type === 'meeting') {
-                return {
-                    ...baseItem,
-                    completed: fallbackMeetingCompleted,
-                    completedAt: fallbackMeetingCompletedAt
-                };
-            }
             return baseItem;
         }
 
         return {
             ...baseItem,
-            completed: dayState.completed !== undefined
-                ? dayState.completed
-                : (item.type === 'meeting' ? fallbackMeetingCompleted : item.completed),
-            completedAt: dayState.completedAt !== undefined
-                ? dayState.completedAt
-                : (item.type === 'meeting' ? fallbackMeetingCompletedAt : item.completedAt),
+            completed: dayState.completed !== undefined ? dayState.completed : item.completed,
+            completedAt: dayState.completedAt !== undefined ? dayState.completedAt : item.completedAt,
             progress: dayState.progress !== undefined ? dayState.progress : item.progress,
             pinned: dayState.pinned !== undefined ? dayState.pinned : item.pinned,
             sunk: dayState.sunk !== undefined ? dayState.sunk : item.sunk,

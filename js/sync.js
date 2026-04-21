@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -310,6 +310,7 @@ class SyncManager {
                 contacts: SafeStorage.get('office_contacts') || '',
                 countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
                 countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
+                countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
                 device_info: navigator.userAgent
             };
 
@@ -408,10 +409,15 @@ class SyncManager {
                 SafeStorage.set('office_countdown_type_colors', cloudData.data.countdownTypeColors || '{}');
             }
 
+            if (cloudData.data.countdownSortOrder !== undefined) {
+                SafeStorage.set('office_countdown_sort_order', cloudData.data.countdownSortOrder || '[]');
+            }
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
-                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {})
+                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
                 }
             }));
 
@@ -622,10 +628,19 @@ class SyncManager {
                 }
             }
 
+            if (cloudData.data.countdownSortOrder !== undefined) {
+                const cloudCountdownSortOrder = cloudData.data.countdownSortOrder || '[]';
+                const localCountdownSortOrder = SafeStorage.get('office_countdown_sort_order') || '[]';
+                if (cloudCountdownSortOrder !== localCountdownSortOrder) {
+                    SafeStorage.set('office_countdown_sort_order', cloudCountdownSortOrder);
+                }
+            }
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
-                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {})
+                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
                 }
             }));
 
@@ -1174,6 +1189,10 @@ class SyncManager {
                 memo: SafeStorage.get('office_memo_content') || '',
                 schedule: SafeStorage.get('office_schedule_content') || '',
                 links: SafeStorage.get('office_links') || '',
+                contacts: SafeStorage.get('office_contacts') || '',
+                countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
+                countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
+                countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
@@ -1302,13 +1321,20 @@ class SyncManager {
             if (data.data.countdownEvents !== undefined) {
                 SafeStorage.set('office_countdown_events', data.data.countdownEvents || '[]');
             }
+
             if (data.data.countdownTypeColors !== undefined) {
                 SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
             }
+
+            if (data.data.countdownSortOrder !== undefined) {
+                SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
+            }
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(data.data.countdownEvents || '[]', []),
-                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {})
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(data.data.countdownSortOrder || '[]', [])
                 }
             }));
 

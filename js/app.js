@@ -786,8 +786,14 @@ class OfficeDashboard {
         };
     }
 
-    saveCountdownTypeColors(colors) {
+    saveCountdownTypeColors(colors, options = {}) {
         SafeStorage.set(this.countdownTypeColorsKey || 'office_countdown_type_colors', JSON.stringify(colors || {}));
+
+        if (!options.skipSync && window.syncManager?.isLoggedIn?.()) {
+            window.syncManager.immediateSyncToCloud().catch(error => {
+                console.warn('倒数日颜色同步失败:', error?.message || error);
+            });
+        }
     }
 
     getCustomCountdownEvents() {
@@ -935,6 +941,7 @@ class OfficeDashboard {
         const listEl = document.getElementById('countdownList');
         const summaryEl = document.getElementById('countdownSummary');
         const addBtn = document.getElementById('addCountdownBtn');
+        const calendarTypeSelect = document.getElementById('countdownCalendarType');
         if (!listEl || !summaryEl) {
             return;
         }
@@ -945,6 +952,12 @@ class OfficeDashboard {
         summaryEl.innerHTML = nextEvent
             ? `<strong>${this.escapeHtml(nextEvent.name)}</strong><span>${nextEvent.daysLeft === 0 ? '今天就是' : `还有 ${nextEvent.daysLeft} 天`} · ${this.escapeHtml(nextEvent.date)}</span>`
             : '这里会自动展示今年剩余节假日首日，以及你新增的生日、节日和纪念日。';
+
+        if (calendarTypeSelect) {
+            calendarTypeSelect.title = calendarTypeSelect.value === 'lunar'
+                ? '已切换为农历。日期框里请选择一个对应农历月日的公历日期，系统会按农历自动换算下一次日期。'
+                : '这里可以切换公历或农历。';
+        }
 
         if (addBtn) {
             addBtn.textContent = addBtn.dataset.editingId ? '保存' : '+ 添加';
@@ -6327,8 +6340,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-21 P3-11';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=20', 'app-date-view.js?v=4', 'app.js?v=92', 'style.css?v=28'];
+        const version = '2026-04-21 P3-12';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=21', 'app-date-view.js?v=4', 'app.js?v=93', 'style.css?v=29'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
