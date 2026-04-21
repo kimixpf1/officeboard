@@ -94,17 +94,14 @@ body {
 .header-left {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
 }
 
 .brand-block {
-    display: grid;
-    grid-template-columns: auto minmax(0, auto) minmax(220px, 320px);
+    display: flex;
     align-items: center;
     gap: var(--spacing-3);
-    width: 100%;
     min-width: 0;
 }
 
@@ -231,6 +228,13 @@ body {
     flex: 1;
     justify-content: center;
     flex-wrap: wrap;
+}
+
+.header-notice {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    min-width: 0;
 }
 
 .header-right {
@@ -2216,6 +2220,11 @@ body {
     .header-clock,
     .header-weather {
         max-width: 100%;
+    }
+
+    .header-notice {
+        width: 100%;
+        justify-content: center;
     }
 
     .countdown-notice {
@@ -4420,6 +4429,7 @@ mark.highlight {
     .header-left,
     .brand-block,
     .header-meta,
+    .header-notice,
     .header-center,
     .header-right {
         width: 100%;
