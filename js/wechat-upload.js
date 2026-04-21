@@ -86,19 +86,21 @@
             const progressCallback = (message) => setStatus(message);
             const itemsSnapshot = await ocrManager.captureItemsSnapshot();
             const previewResult = await ocrManager.analyzeDocument(processedFile, progressCallback, { previewOnly: true });
-            const confirmed = await showPreviewDialog(file.name, previewResult);
+            const previewDecision = await showPreviewDialog(file.name, previewResult);
 
-            if (!confirmed) {
+            if (!previewDecision?.confirmed) {
                 await ocrManager.restoreItemsSnapshot(itemsSnapshot);
                 setStatus('已取消保存识别结果');
                 setSummary('本次识别结果未写入主面板。');
                 return;
             }
 
+            const finalPreviewResult = previewDecision.result || previewResult;
+
             setStatus('正在保存识别结果...');
-            const result = await ocrManager.applyRecognitionActionPlan(previewResult.actionPlan, {
-                text: previewResult.text,
-                metadata: previewResult.metadata
+            const result = await ocrManager.applyRecognitionActionPlan(finalPreviewResult.actionPlan, {
+                text: finalPreviewResult.text || previewResult.text,
+                metadata: finalPreviewResult.metadata || previewResult.metadata
             });
 
             setStatus('识别完成，结果已保存到本地，正在返回主页面...');

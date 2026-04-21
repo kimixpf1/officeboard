@@ -26,6 +26,56 @@
         parent.appendChild(div);
     }
 
+    function cloneJson(value) {
+        return JSON.parse(JSON.stringify(value || null));
+    }
+
+    function ensurePreviewIds(result) {
+        const cloned = cloneJson(result) || {};
+        cloned.actionPlan = cloned.actionPlan || {};
+
+        cloned.items = (cloned.items || []).map((item, index) => ({
+            ...item,
+            __previewId: item.__previewId || `create-${index}`
+        }));
+        cloned.actionPlan.createItems = cloned.items.map(item => ({ ...item }));
+
+        cloned.mergedItems = (cloned.mergedItems || []).map((item, index) => ({
+            ...item,
+            __previewId: item.__previewId || `merge-${index}`
+        }));
+        const mergeUpdateMap = new Map(
+            (cloned.actionPlan.mergeUpdates || []).map((item, index) => [item.__previewId || `merge-${index}`, { ...item, __previewId: item.__previewId || `merge-${index}` }])
+        );
+        cloned.actionPlan.mergeUpdates = cloned.mergedItems.map((item, index) => {
+            const previewId = item.__previewId || `merge-${index}`;
+            return mergeUpdateMap.get(previewId) || { ...item, __previewId: previewId };
+        });
+        cloned.actionPlan.mergeSummaries = cloned.mergedItems.map(item => ({ ...item }));
+
+        cloned.skippedItems = (cloned.skippedItems || []).map((item, index) => ({
+            ...(typeof item === 'string' ? { title: item } : item),
+            __previewId: item?.__previewId || `skip-${index}`
+        }));
+        cloned.actionPlan.skippedItems = cloned.skippedItems.map(item => ({ ...item }));
+
+        return cloned;
+    }
+
+    function cleanPreviewMeta(item) {
+        if (!item || typeof item !== 'object') return item;
+        const cleaned = { ...item };
+        delete cleaned.__previewId;
+        return cleaned;
+    }
+
+    function buildRecognitionSummaryHtml(fileName, result, isPreview, layout = 'detailed') {
+        if (layout === 'compact') {
+            return buildCompactSummaryHtml(fileName, result, isPreview);
+        }
+        return buildDetailedSummaryHtml(fileName, result, isPreview);
+    }
+
     function buildDetailedSummaryHtml(fileName, result, isPreview) {
         const sectionPrefix = isPreview ? '待' : '';
         const container = document.createElement('div');
@@ -293,17 +343,224 @@
         return container;
     }
 
-    function buildRecognitionSummaryHtml(fileName, result, isPreview, layout = 'detailed') {
-        if (layout === 'compact') {
-            return buildCompactSummaryHtml(fileName, result, isPreview);
+    function renderEditablePreview(body, fileName, workingResult) {
+        body.innerHTML = '';
+
+        const container = document.createElement('div');
+        container.style.cssText = 'display:flex;flex-direction:column;gap:12px;color:inherit;';
+
+        const title = document.createElement('h4');
+        title.style.cssText = 'margin:0;padding-bottom:8px;border-bottom:1px solid var(--border-color,#eee);';
+        title.textContent = '📄 文件：' + fileName;
+        container.appendChild(title);
+
+        const summary = document.createElement('div');
+        summary.style.cssText = 'padding:10px 12px;border-radius:8px;background:var(--card-bg,#f8fafc);font-size:13px;';
+        summary.textContent = `可逐条修改新增项，也可删除不需要的新增/合并/跳过记录。当前：新增 ${workingResult.items.length}｜合并 ${workingResult.mergedItems.length}｜跳过 ${workingResult.skippedItems.length}`;
+        container.appendChild(summary);
+
+        const createInput = (labelText, value, onChange, placeholder = '') => {
+            const wrap = document.createElement('label');
+            wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;min-width:0;';
+            const label = document.createElement('span');
+            label.style.cssText = 'font-size:12px;color:#64748b;';
+            label.textContent = labelText;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = value || '';
+            input.placeholder = placeholder;
+            input.style.cssText = 'padding:8px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;background:var(--input-bg,#fff);color:inherit;';
+            input.addEventListener('input', () => onChange(input.value));
+            wrap.append(label, input);
+            return wrap;
+        };
+
+        const createSectionTitle = (text, color, bg) => {
+            const sectionTitle = document.createElement('h5');
+            sectionTitle.style.cssText = `margin:0;padding:8px 10px;border-radius:6px;color:${color};background:${bg};`;
+            sectionTitle.textContent = text;
+            return sectionTitle;
+        };
+
+        if (workingResult.items.length) {
+            const section = document.createElement('div');
+            section.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+            section.appendChild(createSectionTitle('✅ 待新增事项（可编辑）', '#10b981', 'rgba(16,185,129,0.1)'));
+            workingResult.items.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--card-bg,#fff);';
+
+                const top = document.createElement('div');
+                top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;';
+                const head = document.createElement('div');
+                head.style.cssText = 'font-weight:600;';
+                head.textContent = `${index + 1}. ${item.type === 'meeting' ? '会议' : item.type === 'document' ? '办文' : '待办'}`;
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'btn-secondary';
+                del.textContent = '删除此条';
+                del.addEventListener('click', () => {
+                    workingResult.items = workingResult.items.filter(current => current.__previewId !== item.__previewId);
+                    renderEditablePreview(body, fileName, workingResult);
+                });
+                top.append(head, del);
+                card.appendChild(top);
+
+                card.appendChild(createInput('标题', item.title || '', value => {
+                    item.title = value.trim();
+                    item.displayTitle = value.trim();
+                }, '请输入事项标题'));
+
+                const row1 = document.createElement('div');
+                row1.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;';
+                row1.appendChild(createInput('开始日期', item.date || item.deadline?.slice?.(0, 10) || item.docDate || item.docStartDate || '', value => {
+                    const trimmed = value.trim();
+                    if (item.type === 'meeting') item.date = trimmed;
+                    if (item.type === 'todo') item.deadline = trimmed ? `${trimmed}${item.time ? 'T' + item.time : ''}` : '';
+                    if (item.type === 'document') {
+                        item.docDate = trimmed;
+                        item.docStartDate = trimmed;
+                    }
+                }, 'YYYY-MM-DD'));
+                row1.appendChild(createInput('结束日期', item.endDate || item.docEndDate || '', value => {
+                    const trimmed = value.trim();
+                    if (item.type === 'meeting') item.endDate = trimmed;
+                    if (item.type === 'document') item.docEndDate = trimmed;
+                }, '跨日期时填写'));
+                row1.appendChild(createInput('时间', item.time || '', value => {
+                    const trimmed = value.trim();
+                    item.time = trimmed;
+                    if (item.type === 'todo') {
+                        const datePart = item.deadline?.slice?.(0, 10) || '';
+                        item.deadline = datePart ? `${datePart}${trimmed ? 'T' + trimmed : ''}` : item.deadline;
+                    }
+                }, 'HH:MM'));
+                card.appendChild(row1);
+
+                const row2 = document.createElement('div');
+                row2.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;';
+                row2.appendChild(createInput('地点', item.location || '', value => {
+                    item.location = value.trim();
+                }, '会议地点/备注地点'));
+                row2.appendChild(createInput('参会人员', Array.isArray(item.attendees) ? item.attendees.join('、') : '', value => {
+                    item.attendees = value.split(/[、，,\s]+/).map(part => part.trim()).filter(Boolean);
+                }, '多个用顿号或逗号分隔'));
+                card.appendChild(row2);
+
+                if (item.previewReason || item.matchedExistingSummary) {
+                    const note = document.createElement('div');
+                    note.style.cssText = 'font-size:12px;color:#64748b;';
+                    if (item.previewReason) note.textContent = '依据：' + item.previewReason;
+                    if (item.matchedExistingSummary?.title) {
+                        const match = document.createElement('div');
+                        match.style.marginTop = '4px';
+                        match.textContent = '匹配到：' + item.matchedExistingSummary.title + (item.matchedExistingSummary.summaryText ? '｜' + item.matchedExistingSummary.summaryText : '');
+                        note.appendChild(match);
+                    }
+                    card.appendChild(note);
+                }
+
+                section.appendChild(card);
+            });
+            container.appendChild(section);
         }
-        return buildDetailedSummaryHtml(fileName, result, isPreview);
+
+        if (workingResult.mergedItems.length) {
+            const section = document.createElement('div');
+            section.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+            section.appendChild(createSectionTitle('🔄 待合并事项（可删除）', '#f59e0b', 'rgba(245,158,11,0.1)'));
+            workingResult.mergedItems.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--card-bg,#fff);';
+                const text = document.createElement('div');
+                text.style.cssText = 'font-size:13px;line-height:1.6;';
+                text.innerHTML = `<div><b>${index + 1}. ${item.title || '未知事项'}</b></div><div>归并到：${item.targetTitle || item.title || '未知事项'}</div><div>新增参会：${item.addedAttendees?.length ? item.addedAttendees.join('、') : '-'}</div>`;
+                appendReason(text, item.reason, '#b45309');
+                appendMatchedExisting(text, item, '#92400e');
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'btn-secondary';
+                del.textContent = '删除此条';
+                del.addEventListener('click', () => {
+                    workingResult.mergedItems = workingResult.mergedItems.filter(current => current.__previewId !== item.__previewId);
+                    renderEditablePreview(body, fileName, workingResult);
+                });
+                card.append(text, del);
+                section.appendChild(card);
+            });
+            container.appendChild(section);
+        }
+
+        if (workingResult.skippedItems.length) {
+            const section = document.createElement('div');
+            section.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+            section.appendChild(createSectionTitle('⏭️ 待跳过事项（可移除）', '#6b7280', 'rgba(107,114,128,0.1)'));
+            workingResult.skippedItems.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--card-bg,#fff);';
+                const text = document.createElement('div');
+                text.style.cssText = 'font-size:13px;line-height:1.6;';
+                const titleText = getSkippedTitle(item);
+                text.innerHTML = `<div><b>${index + 1}. ${titleText}</b></div>`;
+                appendReason(text, getSkippedReason(item), '#6b7280');
+                appendMatchedExisting(text, item, '#6b7280');
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'btn-secondary';
+                del.textContent = '移除此条';
+                del.addEventListener('click', () => {
+                    workingResult.skippedItems = workingResult.skippedItems.filter(current => current.__previewId !== item.__previewId);
+                    renderEditablePreview(body, fileName, workingResult);
+                });
+                card.append(text, del);
+                section.appendChild(card);
+            });
+            container.appendChild(section);
+        }
+
+        if (!workingResult.items.length && !workingResult.mergedItems.length && !workingResult.skippedItems.length) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'padding:16px;border:1px dashed var(--border-color,#d1d5db);border-radius:8px;text-align:center;color:#64748b;';
+            empty.textContent = '当前预览结果已清空。';
+            container.appendChild(empty);
+        }
+
+        const tip = document.createElement('div');
+        tip.style.cssText = 'padding:10px 12px;border-radius:6px;background:rgba(37,99,235,0.08);color:var(--text-color,#334155);font-size:13px;';
+        tip.textContent = '确认后按当前预览结果写入面板；删除的条目不会保存。';
+        container.appendChild(tip);
+
+        body.appendChild(container);
+    }
+
+    function buildFinalPreviewResult(workingResult) {
+        const keptCreates = (workingResult.items || []).map(item => cleanPreviewMeta(item));
+        const keptMergeIds = new Set((workingResult.mergedItems || []).map(item => item.__previewId));
+        const keptSkipIds = new Set((workingResult.skippedItems || []).map(item => item.__previewId));
+        const finalMergeSummaries = (workingResult.mergedItems || []).map(item => cleanPreviewMeta(item));
+        const finalSkippedItems = (workingResult.skippedItems || []).map(item => cleanPreviewMeta(item));
+        const finalMergeUpdates = (workingResult.actionPlan?.mergeUpdates || [])
+            .filter(item => keptMergeIds.has(item.__previewId))
+            .map(item => cleanPreviewMeta(item));
+
+        return {
+            ...workingResult,
+            items: keptCreates,
+            mergedItems: finalMergeSummaries,
+            skippedItems: finalSkippedItems,
+            actionPlan: {
+                ...(workingResult.actionPlan || {}),
+                createItems: keptCreates,
+                mergeUpdates: finalMergeUpdates,
+                mergeSummaries: finalMergeSummaries,
+                skippedItems: finalSkippedItems
+            }
+        };
     }
 
     function showRecognitionPreviewModal(fileName, result, options = {}) {
-        const hasActions = (result.items?.length || 0) > 0 || (result.mergedItems?.length || 0) > 0;
-        const layout = options.layout || 'detailed';
-        const contentEl = buildRecognitionSummaryHtml(fileName, result, true, layout);
+        const preparedResult = ensurePreviewIds(result);
+        const hasActions = (preparedResult.items?.length || 0) > 0 || (preparedResult.mergedItems?.length || 0) > 0 || (preparedResult.skippedItems?.length || 0) > 0;
 
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
@@ -314,31 +571,27 @@
 
             const dialog = document.createElement('div');
             dialog.className = options.dialogClassName || 'modal-content';
-            dialog.style.cssText = options.dialogStyle || 'max-width: 680px;';
+            dialog.style.cssText = options.dialogStyle || 'max-width: 880px;';
 
             const header = document.createElement('div');
             header.className = options.headerClassName || 'modal-header';
-            if (options.headerContent) {
-                header.appendChild(options.headerContent);
-            } else {
-                const h3 = document.createElement('h3');
-                h3.textContent = '识别前预览确认';
-                header.appendChild(h3);
-            }
+            const h3 = document.createElement('h3');
+            h3.textContent = '识别前预览确认';
+            header.appendChild(h3);
             if (options.showCloseButton !== false) {
                 const closeBtn = document.createElement('button');
                 closeBtn.type = 'button';
                 closeBtn.className = options.closeButtonClass || 'btn-close';
                 closeBtn.textContent = options.closeButtonText || '×';
-                closeBtn.addEventListener('click', () => finish(false));
+                closeBtn.addEventListener('click', () => finish(false, null));
                 header.appendChild(closeBtn);
             }
             dialog.appendChild(header);
 
             const body = document.createElement('div');
             body.className = options.bodyClassName || 'modal-body';
-            body.style.cssText = options.bodyStyle || 'padding: 16px;';
-            body.appendChild(contentEl);
+            body.style.cssText = options.bodyStyle || 'padding: 16px; max-height: 70vh; overflow-y: auto;';
+            renderEditablePreview(body, fileName, preparedResult);
             dialog.appendChild(body);
 
             const footer = document.createElement('div');
@@ -361,20 +614,20 @@
             overlay.appendChild(dialog);
 
             let settled = false;
-            const finish = (confirmed) => {
+            const finish = (confirmed, payload) => {
                 if (settled) {
                     return;
                 }
                 settled = true;
                 overlay.remove();
-                resolve(confirmed);
+                resolve({ confirmed, result: payload });
             };
 
-            cancelBtn.addEventListener('click', () => finish(false));
-            overlay.querySelector('.preview-confirm')?.addEventListener('click', () => finish(true));
+            cancelBtn.addEventListener('click', () => finish(false, null));
+            overlay.querySelector('.preview-confirm')?.addEventListener('click', () => finish(true, buildFinalPreviewResult(preparedResult)));
             overlay.addEventListener('click', (event) => {
                 if (event.target === overlay) {
-                    finish(false);
+                    finish(false, null);
                 }
             });
 

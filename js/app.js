@@ -244,6 +244,9 @@ class OfficeDashboard {
 
             this.updateDateDisplay();
             this.updateDeployVersionBadge();
+            this.initHeaderClock();
+            this.initHeaderWeather();
+            this.initCountdownSystem();
 
             setTimeout(() => {
                 this.checkApiKey().catch(err => {
@@ -479,12 +482,269 @@ class OfficeDashboard {
      * 初始化所有右侧折叠面板
      */
     initSidePanels() {
+        this.initCountdownPanel();
         this.initSchedulePanel();
         this.initToolsPanel();
         this.initLinksPanel();
         this.initContactsPanel();
         this.initMemoPanel();
         this.initToolModals();
+    }
+
+    initHeaderClock() {
+        const clockEl = document.getElementById('headerClock');
+        if (!clockEl) {
+            return;
+        }
+
+        const renderClock = () => {
+            const now = new Date();
+            const datePart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const timePart = now.toLocaleTimeString('zh-CN', { hour12: false });
+            clockEl.textContent = `${datePart} ${timePart}`;
+            clockEl.title = `当前时间：${datePart} ${timePart}`;
+        };
+
+        renderClock();
+        if (this.headerClockTimer) {
+            clearInterval(this.headerClockTimer);
+        }
+        this.headerClockTimer = setInterval(renderClock, 1000);
+    }
+
+    initHeaderWeather() {
+        const weatherBtn = document.getElementById('headerWeather');
+        if (!weatherBtn) {
+            return;
+        }
+
+        weatherBtn.addEventListener('click', () => {
+            this.openTool('weather');
+        });
+        this.updateHeaderWeatherDisplay();
+        this.loadWeather().catch(error => {
+            console.warn('顶部天气初始化失败:', error?.message || error);
+        });
+    }
+
+    updateHeaderWeatherDisplay() {
+        const weatherBtn = document.getElementById('headerWeather');
+        if (!weatherBtn) {
+            return;
+        }
+
+        const city = localStorage.getItem('office_weather_city') || '苏州';
+        const weatherText = weatherBtn.querySelector('.header-weather-text');
+        const weatherIcon = weatherBtn.querySelector('.header-weather-icon');
+        const current = this.currentWeatherData || null;
+
+        if (weatherText) {
+            weatherText.textContent = current?.description
+                ? `${city} ${current.description} ${current.temperature ?? '--'}°C`
+                : `${city} 天气点击查看`;
+        }
+
+        if (weatherIcon) {
+            weatherIcon.textContent = current?.icon || '🌤️';
+        }
+
+        weatherBtn.title = `当前天气城市：${city}，点击切换`;
+    }
+
+    initCountdownSystem() {
+        this.countdownStorageKey = 'office_countdown_events';
+        this.countdownBuiltinYear = new Date().getFullYear();
+        this.renderCountdownPanel();
+        this.updateCountdownNotice();
+    }
+
+    initCountdownPanel() {
+        const panel = document.getElementById('countdownPanel');
+        const toggle = document.getElementById('countdownToggle');
+        const close = document.getElementById('countdownClose');
+        const addBtn = document.getElementById('addCountdownBtn');
+
+        if (!panel || !toggle) {
+            return;
+        }
+
+        const openPanel = () => panel.classList.add('expanded');
+        const closePanel = () => panel.classList.remove('expanded');
+
+        toggle.addEventListener('click', openPanel);
+        close?.addEventListener('click', closePanel);
+        addBtn?.addEventListener('click', () => this.handleAddCountdownEvent());
+
+        panel.addEventListener('click', (event) => {
+            const deleteBtn = event.target.closest('.countdown-item-delete');
+            if (!deleteBtn) {
+                return;
+            }
+            this.handleDeleteCountdownEvent(deleteBtn.dataset.id);
+        });
+    }
+
+    getBuiltinHolidayCountdowns() {
+        const year = this.countdownBuiltinYear || new Date().getFullYear();
+        const holidayMap = HolidayData?.holidays?.[year] || {};
+        const todayStr = this.formatDateLocal(new Date());
+
+        return Object.entries(holidayMap)
+            .filter(([dateStr]) => dateStr >= todayStr)
+            .map(([dateStr, info]) => ({
+                id: `holiday-${dateStr}`,
+                name: info?.name || '节假日',
+                date: dateStr,
+                type: 'holiday'
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    getCustomCountdownEvents() {
+        try {
+            const raw = localStorage.getItem(this.countdownStorageKey || 'office_countdown_events');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            console.warn('读取倒数日失败:', error);
+            return [];
+        }
+    }
+
+    saveCustomCountdownEvents(events) {
+        localStorage.setItem(this.countdownStorageKey || 'office_countdown_events', JSON.stringify(events));
+    }
+
+    getAllCountdownEvents() {
+        return [...this.getBuiltinHolidayCountdowns(), ...this.getCustomCountdownEvents()]
+            .filter(item => item?.name && item?.date)
+            .map(item => ({
+                ...item,
+                daysLeft: this.getDaysLeft(item.date)
+            }))
+            .filter(item => item.daysLeft >= 0)
+            .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date));
+    }
+
+    getDaysLeft(dateStr) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const target = new Date(`${dateStr}T00:00:00`);
+        return Math.round((target.getTime() - today.getTime()) / 86400000);
+    }
+
+    renderCountdownPanel() {
+        const listEl = document.getElementById('countdownList');
+        const summaryEl = document.getElementById('countdownSummary');
+        if (!listEl || !summaryEl) {
+            return;
+        }
+
+        const events = this.getAllCountdownEvents();
+        const nextEvent = events[0] || null;
+
+        summaryEl.textContent = nextEvent
+            ? `最近的是 ${nextEvent.name}，还有 ${nextEvent.daysLeft} 天（${nextEvent.date}）`
+            : '今年剩余节假日和你添加的重要日子会集中展示在这里。';
+
+        if (!events.length) {
+            listEl.innerHTML = '<div class="countdown-empty">暂时还没有需要倒数的重要日子</div>';
+            return;
+        }
+
+        listEl.innerHTML = events.map(item => {
+            const isSoon = item.daysLeft <= 3;
+            const deleteBtn = item.type === 'custom'
+                ? `<button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
+                : '';
+            return `
+                <div class="countdown-item">
+                    <div class="countdown-item-info">
+                        <div class="countdown-item-title">${this.escapeHtml(item.name)}</div>
+                        <div class="countdown-item-meta">${item.date}${item.type === 'holiday' ? ' · 节假日' : ' · 自定义'}</div>
+                    </div>
+                    <div class="countdown-item-days ${isSoon ? 'soon' : ''}">${item.daysLeft === 0 ? '今天' : `还有${item.daysLeft}天`}</div>
+                    ${deleteBtn}
+                </div>`;
+        }).join('');
+    }
+
+    updateCountdownNotice() {
+        const noticeEl = document.getElementById('countdownNotice');
+        if (!noticeEl) {
+            return;
+        }
+
+        const upcoming = this.getAllCountdownEvents().filter(item => item.daysLeft <= 3);
+        if (!upcoming.length) {
+            noticeEl.hidden = true;
+            return;
+        }
+
+        const nextItem = upcoming[0];
+        const titleEl = noticeEl.querySelector('.countdown-notice-title');
+        const descEl = noticeEl.querySelector('.countdown-notice-desc');
+
+        if (titleEl) {
+            titleEl.textContent = `${nextItem.name}${nextItem.daysLeft === 0 ? '就在今天' : `还有 ${nextItem.daysLeft} 天`}`;
+        }
+        if (descEl) {
+            descEl.textContent = `${nextItem.date} · ${nextItem.type === 'holiday' ? '节假日提醒' : '纪念日提醒'}`;
+        }
+        noticeEl.hidden = false;
+    }
+
+    handleAddCountdownEvent() {
+        const nameInput = document.getElementById('countdownName');
+        const dateInput = document.getElementById('countdownDate');
+        const name = nameInput?.value?.trim();
+        const date = dateInput?.value;
+
+        if (!name || !date) {
+            this.showError('请先填写倒数日名称和日期');
+            return;
+        }
+
+        const events = this.getCustomCountdownEvents();
+        events.push({
+            id: `custom-${Date.now()}`,
+            name,
+            date,
+            type: 'custom'
+        });
+        this.saveCustomCountdownEvents(events);
+
+        if (nameInput) {
+            nameInput.value = '';
+        }
+        if (dateInput) {
+            dateInput.value = '';
+        }
+
+        this.renderCountdownPanel();
+        this.updateCountdownNotice();
+        this.showSuccess('倒数日已添加');
+    }
+
+    handleDeleteCountdownEvent(id) {
+        if (!id) {
+            return;
+        }
+
+        const events = this.getCustomCountdownEvents().filter(item => item.id !== id);
+        this.saveCustomCountdownEvents(events);
+        this.renderCountdownPanel();
+        this.updateCountdownNotice();
+        this.showSuccess('已删除倒数日');
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -1253,22 +1513,26 @@ class OfficeDashboard {
      */
     async loadWeather() {
         const weatherBody = document.getElementById('weatherBody');
-        if (!weatherBody) return;
 
-        this.renderWeatherStatus('正在获取天气...', 'weather-loading');
+        if (weatherBody) {
+            this.renderWeatherStatus('正在获取天气...', 'weather-loading');
+        }
 
         try {
-            // 读取用户保存的城市设置，默认苏州
             const savedCity = SecurityUtils.safeGetStorage('office_weather_city');
             let cityConfig = savedCity ? safeJsonParse(savedCity, null) : null;
             if (!cityConfig) {
                 cityConfig = { name: '苏州', lat: 31.2989, lon: 120.5853 };
             }
 
+            localStorage.setItem('office_weather_city', cityConfig.name || '苏州');
             await this.fetchWeather(cityConfig.lat, cityConfig.lon, cityConfig.name);
         } catch (e) {
             console.error('天气加载失败:', e);
-            this.renderWeatherStatus('获取天气失败', 'weather-loading');
+            if (weatherBody) {
+                this.renderWeatherStatus('获取天气失败', 'weather-loading');
+            }
+            throw e;
         }
     }
 
@@ -1288,10 +1552,11 @@ class OfficeDashboard {
      */
     async fetchWeather(lat, lon, cityName) {
         const weatherBody = document.getElementById('weatherBody');
-        if (!weatherBody) return;
         
         try {
-            this.renderWeatherStatus('正在加载天气...', 'weather-loading');
+            if (weatherBody) {
+                this.renderWeatherStatus('正在加载天气...', 'weather-loading');
+            }
             
             // 使用 open-meteo 免费天气API（无需key，国内可访问）
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FShanghai&forecast_days=3`;
@@ -1322,6 +1587,17 @@ class OfficeDashboard {
             const code = data.current.weather_code;
             const desc = this.getWeatherDesc(code);
             const icon = this.getWeatherIcon(code);
+
+            this.currentWeatherData = {
+                cityName,
+                temperature: temp,
+                humidity,
+                windSpeed,
+                description: desc,
+                icon,
+                code
+            };
+            this.updateHeaderWeatherDisplay();
 
             const weatherInfo = document.createElement('div');
             weatherInfo.className = 'weather-info';
@@ -1395,9 +1671,13 @@ class OfficeDashboard {
                 weatherInfo.appendChild(forecastEl);
             }
             
-            weatherBody.replaceChildren(weatherInfo);
+            if (weatherBody) {
+                weatherBody.replaceChildren(weatherInfo);
+            }
         } catch (e) {
             console.error('天气获取失败:', e);
+            this.currentWeatherData = null;
+            this.updateHeaderWeatherDisplay();
 
             const errorEl = document.createElement('div');
             errorEl.className = 'weather-error';
@@ -1425,7 +1705,9 @@ class OfficeDashboard {
             });
 
             errorEl.append(iconEl, titleEl, detailEl, retryBtn);
-            weatherBody.replaceChildren(errorEl);
+            if (weatherBody) {
+                weatherBody.replaceChildren(errorEl);
+            }
         }
     }
 
@@ -1468,6 +1750,7 @@ class OfficeDashboard {
             cityBtn.textContent = city.name;
             cityBtn.addEventListener('click', () => {
                 SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(city));
+                localStorage.setItem('office_weather_city', city.name);
                 this.fetchWeather(city.lat, city.lon, city.name);
             });
             gridEl.appendChild(cityBtn);
@@ -1517,6 +1800,7 @@ class OfficeDashboard {
             }
             const city = { name, lat: parts[0], lon: parts[1] };
             SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(city));
+            localStorage.setItem('office_weather_city', city.name);
             this.fetchWeather(city.lat, city.lon, city.name);
         });
 
@@ -4530,17 +4814,19 @@ class OfficeDashboard {
                     return false;
                 }
 
-                const confirmed = await this.showRecognitionPreview(file.name, previewResult);
-                if (!confirmed) {
+                const previewDecision = await this.showRecognitionPreview(file.name, previewResult);
+                if (!previewDecision?.confirmed) {
                     await ocrManager.restoreItemsSnapshot(itemsSnapshot);
                     showStatus('已取消保存，本次识别结果未写入面板');
                     return false;
                 }
 
+                const finalPreviewResult = previewDecision.result || previewResult;
+
                 showStatus('正在保存识别结果...');
-                const result = await ocrManager.applyRecognitionActionPlan(previewResult.actionPlan, {
-                    text: previewResult.text,
-                    metadata: previewResult.metadata
+                const result = await ocrManager.applyRecognitionActionPlan(finalPreviewResult.actionPlan, {
+                    text: finalPreviewResult.text || previewResult.text,
+                    metadata: finalPreviewResult.metadata || previewResult.metadata
                 });
 
                 this.showRecognitionLog('识别结果', this.buildRecognitionSummaryHtml(file.name, result, false));
@@ -5590,8 +5876,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-20 P3-5';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=33', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=86'];
+        const version = '2026-04-21 P3-6';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=34', 'upload-flow.js?v=5', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=87'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -5932,45 +6218,50 @@ class OfficeDashboard {
                     }
 
                     if (choice === 'future') {
-                        // 修改本项及未来所有周期性任务
                         await this.updateRecurringGroup(originalItem, item, recurringGroupId, occurrenceIndex);
+                        this.hideModal('itemModal');
                         this.showSuccess('已更新本项及未来所有周期性任务');
+                        requestAnimationFrame(() => {
+                            this.runPostSaveRefresh().catch(error => {
+                                console.error('刷新或同步失败:', error);
+                            });
+                        });
+                        return;
                     } else if (choice === 'this_detach') {
-                        // 仅修改本项并脱离周期组
                         if (originalItem) {
                             this.saveUndoHistory('update', { item: originalItem });
                         }
-                        // 清除周期性标识，变成普通任务
                         item.isRecurring = false;
                         item.recurringGroupId = null;
                         item.occurrenceIndex = null;
                         item.recurringRule = null;
                         await db.updateItem(parseInt(id), item);
+                        this.hideModal('itemModal');
                         this.showSuccess('事项已更新并脱离周期组');
+                        requestAnimationFrame(() => {
+                            this.runPostSaveRefresh().catch(error => {
+                                console.error('刷新或同步失败:', error);
+                            });
+                        });
+                        return;
                     } else {
-                        // 仅修改本项（保留周期性标识和日期）
                         if (originalItem) {
                             this.saveUndoHistory('update', { item: originalItem });
                         }
-                        // 保留周期性标识
                         item.isRecurring = true;
                         item.recurringGroupId = originalItem.recurringGroupId;
                         item.occurrenceIndex = originalItem.occurrenceIndex;
                         item.recurringRule = originalItem.recurringRule;
                         
-                        // 保留原事项的日期字段（只修改内容，不修改日期）
-                        // 待办类型
                         if (originalItem.deadline) {
                             item.deadline = originalItem.deadline;
                         }
-                        // 会议类型
                         if (originalItem.date) {
                             item.date = originalItem.date;
                         }
                         if (originalItem.endDate) {
                             item.endDate = originalItem.endDate;
                         }
-                        // 办文类型 - 保留周期日期
                         if (originalItem.docStartDate) {
                             item.docStartDate = originalItem.docStartDate;
                             item.docDate = originalItem.docStartDate;
@@ -5980,7 +6271,14 @@ class OfficeDashboard {
                         }
                         
                         await db.updateItem(parseInt(id), item);
+                        this.hideModal('itemModal');
                         this.showSuccess('事项已更新（保留周期性）');
+                        requestAnimationFrame(() => {
+                            this.runPostSaveRefresh().catch(error => {
+                                console.error('刷新或同步失败:', error);
+                            });
+                        });
+                        return;
                     }
                 } else if (originalItem && this.isCrossDateDocument(originalItem)) {
                     const choice = await this.showCrossDateDocChoice('编辑', '修改');
@@ -6011,6 +6309,11 @@ class OfficeDashboard {
                         });
                         this.hideModal('itemModal');
                         this.showSuccess('已修改当天内容');
+                        requestAnimationFrame(() => {
+                            this.runPostSaveRefresh().catch(error => {
+                                console.error('刷新或同步失败:', error);
+                            });
+                        });
                         return;
                     }
                     
@@ -6021,6 +6324,11 @@ class OfficeDashboard {
                         });
                         this.hideModal('itemModal');
                         this.showSuccess('已修改今天及之后所有日期的内容');
+                        requestAnimationFrame(() => {
+                            this.runPostSaveRefresh().catch(error => {
+                                console.error('刷新或同步失败:', error);
+                            });
+                        });
                         return;
                     }
                     
@@ -6030,6 +6338,11 @@ class OfficeDashboard {
                     });
                     this.hideModal('itemModal');
                     this.showSuccess('已修改全部日期内容');
+                    requestAnimationFrame(() => {
+                        this.runPostSaveRefresh().catch(error => {
+                            console.error('刷新或同步失败:', error);
+                        });
+                    });
                     return;
                 } else if (item.isRecurring && item.recurringRule) {
                     // 编辑时转为周期性任务，询问用户
@@ -6127,6 +6440,16 @@ class OfficeDashboard {
         }
     }
 
+    async runPostSaveRefresh() {
+        await this.loadItems();
+        if (syncManager.isLoggedIn()) {
+            const result = await syncManager.immediateSyncToCloud();
+            if (!result.success) {
+                console.error('同步失败:', result.error);
+            }
+        }
+    }
+
     _createChoiceModal({ title, description, maxWidth, buttons }) {
         return new Promise((resolve) => {
             if (this._activeChoiceModal) {
@@ -6209,50 +6532,36 @@ class OfficeDashboard {
      * @param {number} fromIndex - 从第几个开始更新
      */
     async updateRecurringGroup(originalItem, updates, groupId, fromIndex) {
-        // 保存原始数据用于撤回
         const allItems = await db.getAllItems();
-        // 使用 String 转换确保类型一致
         const targetGroupId = String(groupId);
         const groupItems = allItems.filter(item => 
             String(item.recurringGroupId) === targetGroupId && 
             parseInt(item.occurrenceIndex) >= parseInt(fromIndex)
         );
 
-        // 保存所有原始数据
         this.saveUndoHistory('update', { items: groupItems.map(i => ({ ...i })) });
 
-        // 提取需要同步更新的字段（排除周期性相关字段和各类型的日期字段）
         const fieldsToUpdate = { ...updates };
-        // 周期性相关字段
         delete fieldsToUpdate.isRecurring;
         delete fieldsToUpdate.recurringRule;
         delete fieldsToUpdate.recurringCount;
         delete fieldsToUpdate.recurringGroupId;
         delete fieldsToUpdate.occurrenceIndex;
-        // 待办事项日期
         delete fieldsToUpdate.deadline;
-        // 办文日期（每个周期有自己的日期）
         delete fieldsToUpdate.docStartDate;
         delete fieldsToUpdate.docEndDate;
         delete fieldsToUpdate.docDate;
-        // 会议日期
         delete fieldsToUpdate.date;
         delete fieldsToUpdate.endDate;
-        // 其他不应同步的字段
         delete fieldsToUpdate.id;
         delete fieldsToUpdate.createdAt;
         delete fieldsToUpdate.completed;
         delete fieldsToUpdate.completedAt;
         delete fieldsToUpdate.hash;
 
-
-
-        // 批量更新
         for (const groupItem of groupItems) {
             await db.updateItem(groupItem.id, fieldsToUpdate);
         }
-
-        await this.loadItems();
     }
 
     /**
@@ -6333,9 +6642,8 @@ class OfficeDashboard {
         }
 
         const dayState = item.dayStates?.[selectedDate];
-        const isNoTimeMeeting = !item.time;
-        const fallbackCompleted = isNoTimeMeeting ? false : item.completed;
-        const fallbackCompletedAt = isNoTimeMeeting ? null : item.completedAt;
+        const fallbackCompleted = !!item.completed;
+        const fallbackCompletedAt = item.completedAt ?? null;
 
         if (!dayState) {
             return {
@@ -6394,10 +6702,6 @@ class OfficeDashboard {
         this.saveUndoHistory('update', { item: originalItem });
         const payload = this.getCrossDateDocumentUpdatePayload(originalItem, choice, fields, globalUpdates, dayStateUpdates);
         await db.updateItem(parseInt(id), payload);
-        await this.loadItems();
-        if (syncManager.isLoggedIn()) {
-            await syncManager.immediateSyncToCloud();
-        }
         return payload;
     }
 
@@ -6647,6 +6951,7 @@ class OfficeDashboard {
                             progress
                         }
                     });
+                    await this.runPostSaveRefresh();
                     this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
                     return;
                 }
@@ -6659,6 +6964,7 @@ class OfficeDashboard {
                         progress
                     }
                 });
+                await this.runPostSaveRefresh();
                 this.showSuccess(
                     choice === 'future'
                         ? (completed ? '已标记今天及之后完成' : '已取消今天及之后完成')

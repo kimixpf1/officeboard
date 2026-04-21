@@ -1,3 +1,49 @@
+## 2026-04-21
+
+### 本次目标
+- 打通识别前预览逐条编辑 / 删除后的正式保存链路
+- 增强 PDF 结构化提取，改善会议安排表类 PDF 的表格识别质量
+- 完成本轮静态校验、版本提升、提交推送与线上回归准备
+
+### 当前状态
+- ✅ 已重新读取 `.trae/rules/` 目录规则文件，并按本轮要求继续同步更新
+- ✅ 已确认上一轮线上页面仍停留在 `2026-04-20 P3-5`，需要本轮提升版本后重新部署验证
+- ✅ 已在 `upload-flow.js` 中实现识别前预览逐条编辑 / 删除：待新增事项支持编辑标题、开始日期、结束日期、时间、地点、参会人员，并支持删除新增 / 合并 / 跳过项
+- ✅ 已在 `app.js` 主入口接入新的预览返回结构：确认后使用编辑后的 `actionPlan` 写入，取消后恢复识别前快照
+- ✅ 已在 `wechat-upload.js` 微信入口同步接入新的预览返回结构，保证双入口行为一致
+- ✅ 已在 `ocr.js` 中将 PDF 提取增强为“原始行文本 + 结构化表格提取”双输出，新增按坐标归一、行分组、列切分、跨行继承与标题 / 地点清洗能力
+- ✅ 已完成 `node --check js/app.js`、`node --check js/wechat-upload.js`、`node --check js/upload-flow.js`、`node --check js/ocr.js` 与 diagnostics 0 错误
+- ✅ 已将部署版本提升为 `2026-04-21 P3-6`，并同步提升 `ocr.js v34 / upload-flow.js v5 / wechat-upload.js v9 / app.js v87`
+- 🔄 待完成提交、推送与线上强刷回归复测
+
+### 本轮关键改动
+- upload-flow.js：新增识别前预览逐条编辑 / 删除能力，并在确认时重建编辑后的 `actionPlan`
+- app.js：上传识别链路改为接收 `{ confirmed, result }`，正式保存时使用编辑后的 `result.actionPlan`
+- wechat-upload.js：微信轻量上传链路同步改为使用编辑后的 `actionPlan`
+- ocr.js：`extractPDFText()` 改为调用 `buildStructuredPDFPageText()` 输出结构化表格文本
+- ocr.js：新增 `normalizePDFTextItems()`、`groupPDFItemsIntoRows()`、`splitPDFRowIntoCells()`、`extractPDFTableRows()` 等辅助方法
+- ocr.js：新增 PDF 表格标题识别、会议标题清洗、地点清洗与分组 / 参会人员跨行继承逻辑
+- app.js：部署版本徽标提升为 `2026-04-21 P3-6`，并展示 `utils.js v4 / ocr.js v34 / upload-flow.js v5 / calendar.js v24 / app-date-view.js v4 / app.js v87`
+- index.html：资源版本提升为 `ocr.js v34`、`upload-flow.js v5`、`app.js v87`
+- wechat-upload.html：资源版本提升为 `ocr.js v34`、`upload-flow.js v5`、`wechat-upload.js v9`
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/wechat-upload.js` 通过
+- `node --check js/upload-flow.js` 通过
+- `node --check js/ocr.js` 通过
+- `app.js` / `wechat-upload.js` / `upload-flow.js` / `ocr.js` diagnostics 0 错误
+- 关键静态链路已核对：
+  - 主上传入口会使用识别预览编辑后的 `actionPlan` 保存结果
+  - 微信上传入口会使用识别预览编辑后的 `actionPlan` 保存结果
+  - PDF 提取阶段已增加结构化表格文本输出，可为后续 AI 识别补充更稳定的上下文
+  - 页面版本与脚本版本已同步提升到 `P3-6`
+
+### 遗留事项
+- 待提交、推送并完成线上强刷回归，重点核对版本徽标是否为 `P3-6`
+- 待继续用真实 PDF 样本回归识别质量，重点观察合并单元格、跨行参会人员与地点列识别稳定性
+- 用户此前反馈的“跨日期会议点击完成后未打勾划线沉底”仍需在本轮部署稳定后继续排查
+
 ## 2026-04-20
 
 ### 本次目标
@@ -44,7 +90,7 @@
   - 识别结果已能产出新增 / 合并 / 跳过三类预览
 
 ### 遗留事项
-- 仍需提交、推送并等待线上页面更新到 `P3-5` 后做强刷回归
+- 待用户在线上页面强刷后完成最终回归，重点核对版本徽标是否为 `P3-5`
 - 真实 PDF 识别质量虽已明显改善，但标题清洗与表格列归并仍可继续做一轮定向优化
 
 # 项目迭代记录

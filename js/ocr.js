@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -2976,37 +2976,7 @@ class OCRManager {
 
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const sortedItems = [...textContent.items]
-                    .filter(item => item?.str && item.str.trim())
-                    .sort((a, b) => {
-                        const ay = a.transform?.[5] ?? 0;
-                        const by = b.transform?.[5] ?? 0;
-                        if (Math.abs(by - ay) > 2) {
-                            return by - ay;
-                        }
-                        const ax = a.transform?.[4] ?? 0;
-                        const bx = b.transform?.[4] ?? 0;
-                        return ax - bx;
-                    });
-
-                const rows = [];
-                for (const item of sortedItems) {
-                    const y = item.transform?.[5] ?? 0;
-                    const textValue = item.str.trim();
-                    const lastRow = rows[rows.length - 1];
-
-                    if (!lastRow || Math.abs(lastRow.y - y) > 2) {
-                        rows.push({ y, texts: [textValue] });
-                    } else {
-                        lastRow.texts.push(textValue);
-                    }
-                }
-
-                const pageText = rows
-                    .map(row => row.texts.join(' | ').replace(/\s*\|\s*/g, ' | ').trim())
-                    .filter(Boolean)
-                    .join('\n');
-
+                const pageText = this.buildStructuredPDFPageText(textContent.items || []);
                 fullText += pageText + '\n\n';
             }
 
@@ -3022,6 +2992,186 @@ class OCRManager {
             }
             throw new Error('PDF解析失败: ' + error.message + '。请确保PDF文件未损坏。');
         }
+    }
+
+    buildStructuredPDFPageText(items) {
+        const normalizedItems = this.normalizePDFTextItems(items);
+        const rows = this.groupPDFItemsIntoRows(normalizedItems);
+        const rawText = rows
+            .map(row => row.map(item => item.text).join(' | ').replace(/\s*\|\s*/g, ' | ').trim())
+            .filter(Boolean)
+            .join('\n');
+
+        const tableLines = this.extractPDFTableRows(rows);
+        if (!tableLines.length) {
+            return rawText;
+        }
+
+        return `${rawText}\n\n【结构化表格提取】\n${tableLines.join('\n')}`.trim();
+    }
+
+    normalizePDFTextItems(items) {
+        return [...(Array.isArray(items) ? items : [])]
+            .filter(item => item?.str && item.str.trim())
+            .map(item => ({
+                text: item.str.trim(),
+                x: item.transform?.[4] ?? 0,
+                y: item.transform?.[5] ?? 0,
+                width: Number(item.width) || 0,
+                height: Math.abs(Number(item.height) || 0)
+            }))
+            .sort((a, b) => {
+                if (Math.abs(b.y - a.y) > 2) {
+                    return b.y - a.y;
+                }
+                return a.x - b.x;
+            });
+    }
+
+    groupPDFItemsIntoRows(items) {
+        const rows = [];
+
+        for (const item of Array.isArray(items) ? items : []) {
+            const lastRow = rows[rows.length - 1];
+            const tolerance = Math.max(2, (item.height || 0) * 0.45);
+
+            if (!lastRow || Math.abs(lastRow.y - item.y) > tolerance) {
+                rows.push({ y: item.y, items: [item] });
+            } else {
+                lastRow.items.push(item);
+            }
+        }
+
+        return rows.map(row => row.items.sort((a, b) => a.x - b.x));
+    }
+
+    splitPDFRowIntoCells(items) {
+        const cells = [];
+        let currentCell = [];
+
+        for (const item of Array.isArray(items) ? items : []) {
+            const prevItem = currentCell[currentCell.length - 1];
+            const gap = prevItem ? item.x - (prevItem.x + prevItem.width) : 0;
+            const splitThreshold = prevItem
+                ? Math.max(18, Math.min(60, (prevItem.width || 0) * 1.4))
+                : Number.MAX_SAFE_INTEGER;
+
+            if (prevItem && gap > splitThreshold) {
+                cells.push(currentCell);
+                currentCell = [item];
+            } else {
+                currentCell.push(item);
+            }
+        }
+
+        if (currentCell.length) {
+            cells.push(currentCell);
+        }
+
+        return cells
+            .map(cell => this.cleanPDFCellText(cell.map(item => item.text).join(' ')))
+            .filter(Boolean);
+    }
+
+    cleanPDFCellText(value) {
+        return (value || '')
+            .replace(/[|｜]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    cleanPDFMeetingTitle(value) {
+        return this.correctMeetingTitleText(
+            this.cleanPDFCellText(value)
+                .replace(/^事项[:：]?/, '')
+                .replace(/^会议活动名称[:：]?/, '')
+        );
+    }
+
+    isLikelyPDFTableHeader(value) {
+        const text = this.cleanPDFCellText(value);
+        if (!text) {
+            return false;
+        }
+
+        return /近期主要会议活动安排|会议活动名称|事项|备注|地点|姓名|处室|参会人员|日期|时间/.test(text);
+    }
+
+    extractPDFTableRows(rows) {
+        const result = [];
+        let inheritedGroup = '';
+        let inheritedAttendee = '';
+
+        for (const row of Array.isArray(rows) ? rows : []) {
+            const cells = this.splitPDFRowIntoCells(row);
+            if (!cells.length) {
+                continue;
+            }
+
+            const joined = cells.join('｜');
+            if (!joined || this.isLikelyPDFTableHeader(joined)) {
+                continue;
+            }
+
+            const hasDateOrTime = /\d{1,2}[.:：]\d{2}|\d{1,2}月\d{1,2}日|星期[一二三四五六日天]|周[一二三四五六日天]|\d{4}-\d{2}-\d{2}/.test(joined);
+            if (!hasDateOrTime && cells.length < 4) {
+                continue;
+            }
+
+            let group = '';
+            let attendee = '';
+            let title = '';
+            let location = '';
+
+            if (cells.length >= 4) {
+                group = cells[0];
+                attendee = cells[1];
+                title = cells.slice(2, -1).join(' ');
+                location = cells[cells.length - 1];
+            } else if (cells.length === 3) {
+                attendee = cells[0];
+                title = cells[1];
+                location = cells[2];
+            } else if (cells.length === 2) {
+                title = cells[0];
+                location = cells[1];
+            } else {
+                title = cells[0];
+            }
+
+            if (group && !/局领导|处室|科室|其他/.test(group) && !this.isLikelyPDFTableHeader(group)) {
+                title = [group, title].filter(Boolean).join(' ');
+                group = '';
+            }
+
+            group = this.cleanPDFCellText(group) || inheritedGroup;
+            attendee = this.cleanPDFCellText(attendee) || inheritedAttendee;
+            title = this.cleanPDFMeetingTitle(title);
+            location = this.correctMeetingLocationText(this.cleanPDFCellText(location));
+
+            if (!title) {
+                continue;
+            }
+
+            if (group) {
+                inheritedGroup = group;
+            }
+            if (attendee) {
+                inheritedAttendee = attendee;
+            }
+
+            const correctedAttendee = attendee
+                ? (this.sortMeetingAttendees([attendee])[0] || attendee)
+                : '';
+            result.push([
+                group ? `分组：${group}` : '',
+                correctedAttendee ? `参会：${correctedAttendee}` : '',
+                `事项：${title}`,
+                location ? `地点：${location}` : ''
+            ].filter(Boolean).join('｜'));
+        }
+
+        return result;
     }
 
     /**
