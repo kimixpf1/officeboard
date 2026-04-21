@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -1297,6 +1297,20 @@ class SyncManager {
                 }));
 
             }
+
+            // 同步倒数日
+            if (data.data.countdownEvents !== undefined) {
+                SafeStorage.set('office_countdown_events', data.data.countdownEvents || '[]');
+            }
+            if (data.data.countdownTypeColors !== undefined) {
+                SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
+            }
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(data.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {})
+                }
+            }));
 
             // 同步事项数据
             const cloudItems = data.data.items || [];

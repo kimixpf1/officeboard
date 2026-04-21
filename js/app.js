@@ -655,7 +655,7 @@ class OfficeDashboard {
 
         panel.addEventListener('dragstart', event => {
             const item = event.target.closest('.countdown-item[data-id]');
-            if (!item || item.dataset.builtin === 'true') {
+            if (!item) {
                 return;
             }
             this.countdownDragId = item.dataset.id;
@@ -675,7 +675,7 @@ class OfficeDashboard {
 
         panel.addEventListener('dragover', event => {
             const item = event.target.closest('.countdown-item[data-id]');
-            if (!item || item.dataset.builtin === 'true') {
+            if (!item) {
                 return;
             }
             event.preventDefault();
@@ -689,7 +689,7 @@ class OfficeDashboard {
 
         panel.addEventListener('drop', event => {
             const target = event.target.closest('.countdown-item[data-id]');
-            if (!target || target.dataset.builtin === 'true' || !this.countdownDragId) {
+            if (!target || !this.countdownDragId) {
                 return;
             }
             event.preventDefault();
@@ -902,7 +902,26 @@ class OfficeDashboard {
             .filter(item => item?.name && item?.date && item.daysLeft >= 0)
             .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.daysLeft - b.daysLeft);
 
-        return [...builtinEvents, ...normalizedCustomEvents].filter(Boolean);
+        const allEvents = [...builtinEvents, ...normalizedCustomEvents].filter(Boolean);
+
+        try {
+            const sortOrderRaw = SafeStorage.get('office_countdown_sort_order');
+            if (sortOrderRaw) {
+                const sortOrder = JSON.parse(sortOrderRaw);
+                if (Array.isArray(sortOrder) && sortOrder.length > 0) {
+                    const orderMap = new Map(sortOrder.map((id, index) => [id, index]));
+                    const sorted = allEvents.slice().sort((a, b) => {
+                        const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 99999;
+                        const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 99999;
+                        if (aIdx !== bIdx) return aIdx - bIdx;
+                        return a.daysLeft - b.daysLeft;
+                    });
+                    return sorted;
+                }
+            }
+        } catch (_) { /* ignore */ }
+
+        return allEvents;
     }
 
     getDaysLeft(dateStr) {
@@ -947,7 +966,7 @@ class OfficeDashboard {
                    <button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
                 : '';
             return `
-                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${item.id}" data-builtin="${item.type === 'holiday'}" draggable="${isCustom}"${style}>
+                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${item.id}" draggable="true"${style}>
                     <div class="countdown-item-info">
                         <div class="countdown-item-title-row">
                             <span class="countdown-item-type-dot"></span>
@@ -994,6 +1013,11 @@ class OfficeDashboard {
             return;
         }
 
+        const panel = document.getElementById('countdownPanel');
+        if (panel && !panel.classList.contains('expanded')) {
+            panel.classList.add('expanded');
+        }
+
         const nameInput = document.getElementById('countdownName');
         const dateInput = document.getElementById('countdownDate');
         const calendarTypeSelect = document.getElementById('countdownCalendarType');
@@ -1020,6 +1044,7 @@ class OfficeDashboard {
             addBtn.dataset.editingId = id;
             addBtn.textContent = '保存';
         }
+        nameInput?.focus();
     }
 
     resetCountdownForm() {
@@ -1135,16 +1160,19 @@ class OfficeDashboard {
             return;
         }
 
-        const events = this.getCustomCountdownEvents().slice().sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
-        const sourceIndex = events.findIndex(item => item.id === sourceId);
-        const targetIndex = events.findIndex(item => item.id === targetId);
+        const allEvents = this.getAllCountdownEvents();
+        const sourceIndex = allEvents.findIndex(item => item.id === sourceId);
+        const targetIndex = allEvents.findIndex(item => item.id === targetId);
         if (sourceIndex < 0 || targetIndex < 0) {
             return;
         }
 
-        const [moved] = events.splice(sourceIndex, 1);
-        events.splice(targetIndex, 0, moved);
-        this.saveCustomCountdownEvents(events.map((item, order) => ({ ...item, order })));
+        const [moved] = allEvents.splice(sourceIndex, 1);
+        allEvents.splice(targetIndex, 0, moved);
+
+        const sortOrder = allEvents.map(item => item.id);
+        SafeStorage.set('office_countdown_sort_order', JSON.stringify(sortOrder));
+
         this.renderCountdownPanel();
         this.updateCountdownNotice();
     }
@@ -6299,8 +6327,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-21 P3-10';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=19', 'app-date-view.js?v=4', 'app.js?v=91', 'style.css?v=28'];
+        const version = '2026-04-21 P3-11';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=20', 'app-date-view.js?v=4', 'app.js?v=92', 'style.css?v=28'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
