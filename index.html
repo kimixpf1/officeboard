@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=26">
+    <link rel="stylesheet" href="css/style.css?v=27">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -746,6 +746,16 @@
                 <div class="countdown-add-form">
                     <input type="text" id="countdownName" placeholder="纪念日名称，如妈妈生日" maxlength="30">
                     <input type="date" id="countdownDate">
+                    <select id="countdownCalendarType">
+                        <option value="solar">公历</option>
+                        <option value="lunar">农历</option>
+                    </select>
+                    <select id="countdownEventType">
+                        <option value="birthday">生日</option>
+                        <option value="anniversary">纪念日</option>
+                        <option value="festival">节日</option>
+                    </select>
+                    <input type="color" id="countdownColor" value="#ec4899" title="类型底色">
                     <button type="button" id="addCountdownBtn" class="btn-add-link">+ 添加</button>
                 </div>
                 <div class="countdown-section-title">今年剩余节假日与纪念日</div>
@@ -1079,10 +1089,10 @@
     <script src="js/ocr.js?v=35"></script>
     <script src="js/report.js?v=15"></script>
     <script src="js/calendar.js?v=24"></script>
-    <script src="js/sync.js?v=18"></script>
+    <script src="js/sync.js?v=19"></script>
     <script src="js/upload-flow.js?v=6"></script>
     <script src="js/app-date-view.js?v=4"></script>
-    <script src="js/app.js?v=89"></script>
+    <script src="js/app.js?v=90"></script>
     
     <div id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></div>
 

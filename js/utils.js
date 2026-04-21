@@ -25,6 +25,101 @@ const SafeStorage = {
     }
 };
 
+const LunarCalendarUtils = {
+    lunarNumberMap: {
+        '正': 1,
+        '元': 1,
+        '一': 1,
+        '二': 2,
+        '三': 3,
+        '四': 4,
+        '五': 5,
+        '六': 6,
+        '七': 7,
+        '八': 8,
+        '九': 9,
+        '十': 10,
+        '冬': 11,
+        '十一': 11,
+        '腊': 12,
+        '十二': 12
+    },
+    parseChineseNumber(value) {
+        const str = String(value || '').replace(/初|闰|月|日/g, '').trim();
+        if (!str) {
+            return NaN;
+        }
+        if (/^\d+$/.test(str)) {
+            return Number(str);
+        }
+        if (this.lunarNumberMap[str]) {
+            return this.lunarNumberMap[str];
+        }
+        if (str === '二十') {
+            return 20;
+        }
+        if (str === '三十') {
+            return 30;
+        }
+        if (str.startsWith('十')) {
+            return 10 + (this.lunarNumberMap[str.slice(1)] || 0);
+        }
+        if (str.startsWith('廿')) {
+            return 20 + (this.lunarNumberMap[str.slice(1)] || 0);
+        }
+        if (str.startsWith('三十')) {
+            return 30;
+        }
+        return NaN;
+    },
+    getLunarMonthDay(dateStr) {
+        if (!dateStr) {
+            return null;
+        }
+        const date = new Date(`${dateStr}T00:00:00`);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+
+        const formatter = new Intl.DateTimeFormat('zh-Hans-CN-u-ca-chinese', {
+            month: 'long',
+            day: 'numeric'
+        });
+        const parts = formatter.formatToParts(date);
+        const monthPart = parts.find(part => part.type === 'month')?.value || '';
+        const dayPart = parts.find(part => part.type === 'day')?.value || '';
+        const month = this.parseChineseNumber(monthPart);
+        const day = this.parseChineseNumber(dayPart);
+
+        if (!Number.isFinite(month) || !Number.isFinite(day)) {
+            return null;
+        }
+
+        return { month, day, label: `${monthPart}${dayPart}` };
+    },
+    getNextSolarDateForLunar(lunarMonth, lunarDay, fromDate = new Date()) {
+        const start = new Date(fromDate);
+        start.setHours(0, 0, 0, 0);
+
+        for (let offset = 0; offset < 420; offset += 1) {
+            const candidate = new Date(start);
+            candidate.setDate(start.getDate() + offset);
+            const lunar = this.getLunarMonthDay(candidate.toISOString().slice(0, 10));
+            if (lunar?.month === Number(lunarMonth) && lunar?.day === Number(lunarDay)) {
+                const year = candidate.getFullYear();
+                const month = String(candidate.getMonth() + 1).padStart(2, '0');
+                const day = String(candidate.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+        }
+
+        return '';
+    }
+};
+
+window.LunarCalendarUtils = LunarCalendarUtils;
+
+
 async function fetchWithRetry(url, options, maxRetries = 3, logPrefix = 'API') {
     for (let i = 0; i < maxRetries; i++) {
         try {

@@ -553,9 +553,20 @@ class OfficeDashboard {
 
     initCountdownSystem() {
         this.countdownStorageKey = 'office_countdown_events';
+        this.countdownTypeColorsKey = 'office_countdown_type_colors';
         this.countdownBuiltinYear = new Date().getFullYear();
+        this.countdownDragId = null;
         this.renderCountdownPanel();
         this.updateCountdownNotice();
+
+        document.addEventListener('countdownSynced', () => {
+            this.renderCountdownPanel();
+            this.updateCountdownNotice();
+        });
+        document.addEventListener('syncDataLoaded', () => {
+            this.renderCountdownPanel();
+            this.updateCountdownNotice();
+        });
     }
 
     initCountdownPanel() {
@@ -565,6 +576,16 @@ class OfficeDashboard {
         const addBtn = document.getElementById('addCountdownBtn');
         const nameInput = document.getElementById('countdownName');
         const dateInput = document.getElementById('countdownDate');
+        const calendarTypeSelect = document.getElementById('countdownCalendarType');
+        const typeSelect = document.getElementById('countdownEventType');
+        const colorInput = document.getElementById('countdownColor');
+        const syncColor = () => {
+            if (!colorInput || !typeSelect) {
+                return;
+            }
+            const colors = this.getCountdownTypeColors();
+            colorInput.value = colors[typeSelect.value] || '#f97316';
+        };
 
         if (!panel || !toggle) {
             return;
@@ -588,6 +609,14 @@ class OfficeDashboard {
             closePanel();
         });
         addBtn?.addEventListener('click', handleAdd);
+        typeSelect?.addEventListener('change', syncColor);
+        calendarTypeSelect?.addEventListener('change', () => {
+            if (dateInput) {
+                dateInput.title = calendarTypeSelect.value === 'lunar'
+                    ? '请选择一个对应农历日期的公历日期，系统会自动按农历每年换算'
+                    : '';
+            }
+        });
         nameInput?.addEventListener('keypress', event => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -607,11 +636,68 @@ class OfficeDashboard {
 
         panel.addEventListener('click', (event) => {
             const deleteBtn = event.target.closest('.countdown-item-delete');
-            if (!deleteBtn) {
+            if (deleteBtn) {
+                this.handleDeleteCountdownEvent(deleteBtn.dataset.id);
                 return;
             }
-            this.handleDeleteCountdownEvent(deleteBtn.dataset.id);
+
+            const editBtn = event.target.closest('.countdown-item-edit');
+            if (editBtn) {
+                this.startEditCountdownEvent(editBtn.dataset.id);
+                return;
+            }
+
+            const moveBtn = event.target.closest('.countdown-item-move');
+            if (moveBtn) {
+                this.moveCountdownEvent(moveBtn.dataset.id, moveBtn.dataset.direction);
+            }
         });
+
+        panel.addEventListener('dragstart', event => {
+            const item = event.target.closest('.countdown-item[data-id]');
+            if (!item || item.dataset.builtin === 'true') {
+                return;
+            }
+            this.countdownDragId = item.dataset.id;
+            item.classList.add('dragging');
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', item.dataset.id || '');
+            }
+        });
+
+        panel.addEventListener('dragend', event => {
+            const item = event.target.closest('.countdown-item[data-id]');
+            item?.classList.remove('dragging');
+            panel.querySelectorAll('.countdown-item.drag-over').forEach(node => node.classList.remove('drag-over'));
+            this.countdownDragId = null;
+        });
+
+        panel.addEventListener('dragover', event => {
+            const item = event.target.closest('.countdown-item[data-id]');
+            if (!item || item.dataset.builtin === 'true') {
+                return;
+            }
+            event.preventDefault();
+            panel.querySelectorAll('.countdown-item.drag-over').forEach(node => {
+                if (node !== item) {
+                    node.classList.remove('drag-over');
+                }
+            });
+            item.classList.add('drag-over');
+        });
+
+        panel.addEventListener('drop', event => {
+            const target = event.target.closest('.countdown-item[data-id]');
+            if (!target || target.dataset.builtin === 'true' || !this.countdownDragId) {
+                return;
+            }
+            event.preventDefault();
+            target.classList.remove('drag-over');
+            this.reorderCountdownEvents(this.countdownDragId, target.dataset.id);
+        });
+
+        syncColor();
     }
 
     getBuiltinHolidayCountdowns() {
@@ -632,17 +718,19 @@ class OfficeDashboard {
             const existing = holidayGroups.get(holidayName);
             if (!existing || dateStr < existing.date) {
                 holidayGroups.set(holidayName, {
-                    id: `holiday-${dateStr}`,
+                    id: `holiday-${holidayName}`,
                     name: holidayName,
                     date: dateStr,
-                    type: 'holiday'
+                    type: 'holiday',
+                    builtin: true,
+                    eventType: 'festival'
                 });
             }
         });
 
         return Array.from(holidayGroups.values())
             .map(item => this.normalizeCountdownEvent(item))
-            .filter(item => item.daysLeft >= 0)
+            .filter(item => item?.daysLeft >= 0)
             .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date));
     }
 
@@ -654,32 +742,57 @@ class OfficeDashboard {
         }
 
         const monthDay = String(dateStr).slice(5);
-        const holidayNameMap = {
-            '01-01': '元旦',
-            '04-04': '清明节',
-            '04-05': '清明节',
-            '05-01': '劳动节',
-            '05-31': '端午节',
-            '06-19': '端午节',
-            '09-15': '中秋节',
-            '09-25': '中秋节',
-            '10-01': '国庆节'
-        };
-
-        if (holidayNameMap[monthDay]) {
-            return holidayNameMap[monthDay];
+        if (monthDay === '01-01') {
+            return '元旦';
+        }
+        if (monthDay >= '04-04' && monthDay <= '04-06') {
+            return '清明节';
+        }
+        if (monthDay >= '05-01' && monthDay <= '05-05') {
+            return '劳动节';
+        }
+        if (monthDay >= '10-01' && monthDay <= '10-07') {
+            return '国庆节';
         }
 
-        if (dateStr >= `${year}-02-01` && dateStr <= `${year}-03-01`) {
+        const lunarInfo = window.LunarCalendarUtils?.getLunarMonthDay(dateStr);
+        if (lunarInfo?.month === 1 && lunarInfo?.day === 1) {
+            return '春节';
+        }
+        if (lunarInfo?.month === 5 && lunarInfo?.day === 5) {
+            return '端午节';
+        }
+        if (lunarInfo?.month === 8 && lunarInfo?.day === 15) {
+            return '中秋节';
+        }
+
+        if (dateStr >= `${year}-01-20` && dateStr <= `${year}-02-28`) {
             return '春节';
         }
 
         return '法定节假日';
     }
 
+    getCountdownTypeColors() {
+        const defaults = {
+            birthday: '#ec4899',
+            anniversary: '#8b5cf6',
+            festival: '#f97316'
+        };
+        const saved = safeJsonParse(SafeStorage.get(this.countdownTypeColorsKey || 'office_countdown_type_colors'), null);
+        return {
+            ...defaults,
+            ...(saved && typeof saved === 'object' ? saved : {})
+        };
+    }
+
+    saveCountdownTypeColors(colors) {
+        SafeStorage.set(this.countdownTypeColorsKey || 'office_countdown_type_colors', JSON.stringify(colors || {}));
+    }
+
     getCustomCountdownEvents() {
         try {
-            const raw = localStorage.getItem(this.countdownStorageKey || 'office_countdown_events');
+            const raw = SafeStorage.get(this.countdownStorageKey || 'office_countdown_events');
             const parsed = raw ? JSON.parse(raw) : [];
             return Array.isArray(parsed) ? parsed : [];
         } catch (error) {
@@ -688,60 +801,108 @@ class OfficeDashboard {
         }
     }
 
-    saveCustomCountdownEvents(events) {
-        localStorage.setItem(this.countdownStorageKey || 'office_countdown_events', JSON.stringify(events));
+    saveCustomCountdownEvents(events, options = {}) {
+        const normalized = Array.isArray(events)
+            ? events.map((item, index) => ({
+                ...item,
+                order: Number.isFinite(item?.order) ? item.order : index
+            }))
+            : [];
+
+        SafeStorage.set(this.countdownStorageKey || 'office_countdown_events', JSON.stringify(normalized));
+
+        if (!options.skipSync && window.syncManager?.isLoggedIn?.()) {
+            window.syncManager.immediateSyncToCloud().catch(error => {
+                console.warn('倒数日同步失败:', error?.message || error);
+            });
+        }
+    }
+
+    getNextLunarOccurrence(item) {
+        if (!item?.lunarMonth || !item?.lunarDay || !window.LunarCalendarUtils?.getNextSolarDateForLunar) {
+            return item?.date || '';
+        }
+        return window.LunarCalendarUtils.getNextSolarDateForLunar(item.lunarMonth, item.lunarDay, new Date()) || item.date;
+    }
+
+    getCountdownEventLabel(item) {
+        const typeMap = {
+            birthday: '生日',
+            anniversary: '纪念日',
+            festival: '节日'
+        };
+        const base = typeMap[item.eventType] || (item.type === 'holiday' ? '节日' : '纪念日');
+        if (item.type === 'holiday') {
+            return '节假日首日';
+        }
+        if (item.calendarType === 'lunar') {
+            return `农历 ${item.lunarMonth || '--'}月${item.lunarDay || '--'}日 · ${base}`;
+        }
+        return `公历 ${String(item.date || '').slice(5)} · ${base}`;
     }
 
     normalizeCountdownEvent(item) {
-        if (!item?.name || !item?.date) {
-            return null;
-        }
-
-        const sourceDate = new Date(`${item.date}T00:00:00`);
-        if (Number.isNaN(sourceDate.getTime())) {
+        if (!item?.name) {
             return null;
         }
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        let normalizedDate = item.date;
+        let metaLabel = this.getCountdownEventLabel(item);
+        if (item.calendarType === 'lunar') {
+            normalizedDate = this.getNextLunarOccurrence(item);
+        }
+
+        const sourceDate = new Date(`${normalizedDate}T00:00:00`);
+        if (!normalizedDate || Number.isNaN(sourceDate.getTime())) {
+            return null;
+        }
+
         let targetDate = new Date(sourceDate);
         const isHoliday = item.type === 'holiday';
         const originalYear = sourceDate.getFullYear();
         const currentYear = today.getFullYear();
-        const isRecurringCustom = item.type === 'custom' && originalYear !== currentYear;
+        const isRecurringSolar = item.calendarType !== 'lunar' && !isHoliday && originalYear !== currentYear;
 
-        if (isRecurringCustom) {
+        if (isRecurringSolar) {
             targetDate = new Date(today.getFullYear(), sourceDate.getMonth(), sourceDate.getDate());
             if (targetDate < today) {
                 targetDate = new Date(today.getFullYear() + 1, sourceDate.getMonth(), sourceDate.getDate());
             }
+            metaLabel = this.getCountdownEventLabel({ ...item, date: this.formatDateLocal(targetDate) });
         }
 
-        const normalizedDate = this.formatDateLocal(targetDate);
-        const daysLeft = this.getDaysLeft(normalizedDate);
-        const monthDay = normalizedDate.slice(5);
-        const metaLabel = isHoliday
-            ? '节假日首日'
-            : isRecurringCustom
-                ? `每年 ${monthDay}`
-                : '自定义';
+        const finalDate = this.formatDateLocal(targetDate);
+        const daysLeft = this.getDaysLeft(finalDate);
+        const colors = this.getCountdownTypeColors();
+        const color = item.color || colors[item.eventType] || colors.anniversary;
 
         return {
             ...item,
             originalDate: item.date,
-            date: normalizedDate,
+            date: finalDate,
             daysLeft,
             metaLabel,
-            isRecurring: isRecurringCustom
+            isRecurring: item.calendarType === 'lunar' || isRecurringSolar,
+            color,
+            order: Number.isFinite(item.order) ? item.order : 9999
         };
     }
 
     getAllCountdownEvents() {
-        return [...this.getBuiltinHolidayCountdowns(), ...this.getCustomCountdownEvents()]
+        const builtinEvents = this.getBuiltinHolidayCountdowns();
+        const customEvents = this.getCustomCountdownEvents()
+            .slice()
+            .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+
+        const normalizedCustomEvents = customEvents
             .map(item => this.normalizeCountdownEvent(item))
             .filter(item => item?.name && item?.date && item.daysLeft >= 0)
-            .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date));
+            .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.daysLeft - b.daysLeft);
+
+        return [...builtinEvents, ...normalizedCustomEvents].filter(Boolean);
     }
 
     getDaysLeft(dateStr) {
@@ -754,6 +915,7 @@ class OfficeDashboard {
     renderCountdownPanel() {
         const listEl = document.getElementById('countdownList');
         const summaryEl = document.getElementById('countdownSummary');
+        const addBtn = document.getElementById('addCountdownBtn');
         if (!listEl || !summaryEl) {
             return;
         }
@@ -763,7 +925,11 @@ class OfficeDashboard {
 
         summaryEl.innerHTML = nextEvent
             ? `<strong>${this.escapeHtml(nextEvent.name)}</strong><span>${nextEvent.daysLeft === 0 ? '今天就是' : `还有 ${nextEvent.daysLeft} 天`} · ${this.escapeHtml(nextEvent.date)}</span>`
-            : '这里会自动展示今年剩余节假日首日，以及你新增的生日和纪念日。';
+            : '这里会自动展示今年剩余节假日首日，以及你新增的生日、节日和纪念日。';
+
+        if (addBtn) {
+            addBtn.textContent = addBtn.dataset.editingId ? '保存' : '+ 添加';
+        }
 
         if (!events.length) {
             listEl.innerHTML = '<div class="countdown-empty">暂时还没有需要倒数的重要日子</div>';
@@ -772,18 +938,26 @@ class OfficeDashboard {
 
         listEl.innerHTML = events.map(item => {
             const isSoon = item.daysLeft <= 3;
-            const deleteBtn = item.type === 'custom'
-                ? `<button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
+            const isCustom = item.type !== 'holiday';
+            const style = item.color ? ` style="--countdown-accent:${this.escapeHtml(item.color)}"` : '';
+            const actionButtons = isCustom
+                ? `<button type="button" class="countdown-item-move" data-id="${item.id}" data-direction="up" title="上移">↑</button>
+                   <button type="button" class="countdown-item-move" data-id="${item.id}" data-direction="down" title="下移">↓</button>
+                   <button type="button" class="countdown-item-edit" data-id="${item.id}" title="编辑">编辑</button>
+                   <button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
                 : '';
             return `
-                <div class="countdown-item${isSoon ? ' soon' : ''}">
+                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${item.id}" data-builtin="${item.type === 'holiday'}" draggable="${isCustom}"${style}>
                     <div class="countdown-item-info">
-                        <div class="countdown-item-title">${this.escapeHtml(item.name)}</div>
+                        <div class="countdown-item-title-row">
+                            <span class="countdown-item-type-dot"></span>
+                            <div class="countdown-item-title">${this.escapeHtml(item.name)}</div>
+                        </div>
                         <div class="countdown-item-meta">${this.escapeHtml(item.date)} · ${this.escapeHtml(item.metaLabel || (item.type === 'holiday' ? '节假日' : '自定义'))}</div>
                     </div>
                     <div class="countdown-item-side">
                         <div class="countdown-item-days ${isSoon ? 'soon' : ''}">${item.daysLeft === 0 ? '今天' : `${item.daysLeft} 天`}</div>
-                        ${deleteBtn}
+                        <div class="countdown-item-actions">${actionButtons}</div>
                     </div>
                 </div>`;
         }).join('');
@@ -814,25 +988,48 @@ class OfficeDashboard {
         noticeEl.hidden = false;
     }
 
-    handleAddCountdownEvent() {
-        const nameInput = document.getElementById('countdownName');
-        const dateInput = document.getElementById('countdownDate');
-        const name = nameInput?.value?.trim();
-        const date = dateInput?.value;
-
-        if (!name || !date) {
-            this.showError('请先填写倒数日名称和日期');
+    startEditCountdownEvent(id) {
+        const target = this.getCustomCountdownEvents().find(item => item.id === id);
+        if (!target) {
             return;
         }
 
-        const events = this.getCustomCountdownEvents();
-        events.push({
-            id: `custom-${Date.now()}`,
-            name,
-            date,
-            type: 'custom'
-        });
-        this.saveCustomCountdownEvents(events);
+        const nameInput = document.getElementById('countdownName');
+        const dateInput = document.getElementById('countdownDate');
+        const calendarTypeSelect = document.getElementById('countdownCalendarType');
+        const typeSelect = document.getElementById('countdownEventType');
+        const colorInput = document.getElementById('countdownColor');
+        const addBtn = document.getElementById('addCountdownBtn');
+
+        if (nameInput) {
+            nameInput.value = target.name || '';
+        }
+        if (dateInput) {
+            dateInput.value = target.originalDate || target.date || '';
+        }
+        if (calendarTypeSelect) {
+            calendarTypeSelect.value = target.calendarType || 'solar';
+        }
+        if (typeSelect) {
+            typeSelect.value = target.eventType || 'anniversary';
+        }
+        if (colorInput) {
+            colorInput.value = target.color || this.getCountdownTypeColors()[target.eventType || 'anniversary'] || '#f97316';
+        }
+        if (addBtn) {
+            addBtn.dataset.editingId = id;
+            addBtn.textContent = '保存';
+        }
+    }
+
+    resetCountdownForm() {
+        const nameInput = document.getElementById('countdownName');
+        const dateInput = document.getElementById('countdownDate');
+        const calendarTypeSelect = document.getElementById('countdownCalendarType');
+        const typeSelect = document.getElementById('countdownEventType');
+        const colorInput = document.getElementById('countdownColor');
+        const addBtn = document.getElementById('addCountdownBtn');
+        const colors = this.getCountdownTypeColors();
 
         if (nameInput) {
             nameInput.value = '';
@@ -840,10 +1037,116 @@ class OfficeDashboard {
         if (dateInput) {
             dateInput.value = '';
         }
+        if (calendarTypeSelect) {
+            calendarTypeSelect.value = 'solar';
+        }
+        if (typeSelect) {
+            typeSelect.value = 'birthday';
+        }
+        if (colorInput) {
+            colorInput.value = colors.birthday || '#ec4899';
+        }
+        if (addBtn) {
+            delete addBtn.dataset.editingId;
+            addBtn.textContent = '+ 添加';
+        }
+    }
 
+    handleAddCountdownEvent() {
+        const nameInput = document.getElementById('countdownName');
+        const dateInput = document.getElementById('countdownDate');
+        const calendarTypeSelect = document.getElementById('countdownCalendarType');
+        const typeSelect = document.getElementById('countdownEventType');
+        const colorInput = document.getElementById('countdownColor');
+        const addBtn = document.getElementById('addCountdownBtn');
+        const name = nameInput?.value?.trim();
+        const date = dateInput?.value;
+        const calendarType = calendarTypeSelect?.value || 'solar';
+        const eventType = typeSelect?.value || 'anniversary';
+        const color = colorInput?.value || this.getCountdownTypeColors()[eventType] || '#f97316';
+        const editingId = addBtn?.dataset.editingId;
+
+        if (!name || !date) {
+            this.showError('请先填写倒数日名称和日期');
+            return;
+        }
+
+        const events = this.getCustomCountdownEvents();
+        const colors = this.getCountdownTypeColors();
+        colors[eventType] = color;
+        this.saveCountdownTypeColors(colors);
+
+        const lunarInfo = calendarType === 'lunar'
+            ? window.LunarCalendarUtils?.getLunarMonthDay(date)
+            : null;
+
+        if (calendarType === 'lunar' && (!lunarInfo?.month || !lunarInfo?.day)) {
+            this.showError('当前浏览器无法换算农历日期，请改用公历或更换浏览器后重试');
+            return;
+        }
+
+        const nextOrder = events.length ? Math.max(...events.map(item => item.order ?? 0)) + 1 : 0;
+        const payload = {
+            id: editingId || `custom-${Date.now()}`,
+            name,
+            date,
+            originalDate: date,
+            type: 'custom',
+            calendarType,
+            eventType,
+            color,
+            lunarMonth: lunarInfo?.month || null,
+            lunarDay: lunarInfo?.day || null,
+            order: editingId ? (events.find(item => item.id === editingId)?.order ?? nextOrder) : nextOrder
+        };
+
+        const nextEvents = editingId
+            ? events.map(item => item.id === editingId ? { ...item, ...payload } : item)
+            : [...events, payload];
+
+        this.saveCustomCountdownEvents(nextEvents);
+        this.resetCountdownForm();
         this.renderCountdownPanel();
         this.updateCountdownNotice();
-        this.showSuccess('倒数日已添加');
+        this.showSuccess(editingId ? '倒数日已更新' : '倒数日已添加');
+    }
+
+    moveCountdownEvent(id, direction) {
+        const events = this.getCustomCountdownEvents().slice().sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+        const index = events.findIndex(item => item.id === id);
+        if (index < 0) {
+            return;
+        }
+
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= events.length) {
+            return;
+        }
+
+        const [moved] = events.splice(index, 1);
+        events.splice(targetIndex, 0, moved);
+        this.saveCustomCountdownEvents(events.map((item, order) => ({ ...item, order })));
+        this.renderCountdownPanel();
+        this.updateCountdownNotice();
+    }
+
+    reorderCountdownEvents(sourceId, targetId) {
+        if (!sourceId || !targetId || sourceId === targetId) {
+            return;
+        }
+
+        const events = this.getCustomCountdownEvents().slice().sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+        const sourceIndex = events.findIndex(item => item.id === sourceId);
+        const targetIndex = events.findIndex(item => item.id === targetId);
+        if (sourceIndex < 0 || targetIndex < 0) {
+            return;
+        }
+
+        const [moved] = events.splice(sourceIndex, 1);
+        events.splice(targetIndex, 0, moved);
+        this.saveCustomCountdownEvents(events.map((item, order) => ({ ...item, order })));
+        this.renderCountdownPanel();
+        this.updateCountdownNotice();
     }
 
     handleDeleteCountdownEvent(id) {
@@ -852,7 +1155,7 @@ class OfficeDashboard {
         }
 
         const events = this.getCustomCountdownEvents().filter(item => item.id !== id);
-        this.saveCustomCountdownEvents(events);
+        this.saveCustomCountdownEvents(events.map((item, order) => ({ ...item, order })));
         this.renderCountdownPanel();
         this.updateCountdownNotice();
         this.showSuccess('已删除倒数日');
@@ -5996,8 +6299,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-21 P3-8';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'app-date-view.js?v=4', 'app.js?v=89', 'style.css?v=26'];
+        const version = '2026-04-21 P3-9';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=19', 'app-date-view.js?v=4', 'app.js?v=90', 'style.css?v=27'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

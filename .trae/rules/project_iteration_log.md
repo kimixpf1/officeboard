@@ -1,4 +1,106 @@
-## 2026-04-21
+## 2026-04-21 P3-9
+
+### 本次目标
+- 修复顶部菜单栏宽度与顺序，恢复为“品牌 / 时间天气 / 中间工具 / 通知栏 / 右侧工具”稳定布局
+- 修复倒数日跨设备同步问题
+- 为倒数日补齐农历生日 / 农历纪念日、编辑、删除、排序与类型底色能力
+- 完成本轮静态校验、提交推送与线上回归准备
+
+### 当前状态
+- ✅ 已重新读取 `.trae/rules/` 目录规则文件，并按“本地校验通过后默认提交推送部署”继续执行
+- ✅ 已修复顶部 header 宽度异常问题，品牌区恢复紧凑布局，不再把通知栏塞进品牌区或中间工具区
+- ✅ 已恢复顶部顺序为：大飞智能工作面板 / 时间 / 天气 / 原中间工具区 / 通知栏 / 原右侧工具区
+- ✅ 已为倒数日补齐跨设备同步，云端上传与下载均纳入 `countdownEvents`、`countdownTypeColors`
+- ✅ 已为倒数日新增农历生日 / 农历纪念日支持，提供农历月日识别与下一次公历日期换算
+- ✅ 已为倒数日新增编辑、删除、上下移动、拖拽排序能力
+- ✅ 已为生日 / 纪念日 / 节日补齐类型底色配置与颜色记忆能力
+- ✅ 已增强默认节假日名称识别，补齐春节 / 端午 / 中秋等按农历识别的展示逻辑
+- ✅ 已将部署版本提升为 `2026-04-21 P3-9`，并同步提升 `style.css v27 / sync.js v19 / app.js v90`
+- ✅ 已完成 `node --check js/app.js`、`node --check js/sync.js`、`node --check js/utils.js` 与 diagnostics 0 错误
+- 🔄 待完成提交、推送与线上强刷回归复测
+
+### 本轮关键改动
+- index.html：重排顶部 header 结构，将 `countdownNotice` 从品牌区移出并放入独立 `header-notice`
+- index.html：保留原中间工具区与原右侧工具区位置，仅恢复正确横向顺序
+- index.html：倒数日新增表单补充公历 / 农历、事件类型、颜色输入
+- index.html：资源版本提升为 `style.css v27 / sync.js v19 / app.js v90`
+- style.css：顶部 header 改为四列 grid，恢复品牌区紧凑宽度，避免中间工具区被挤偏
+- style.css：新增 `header-notice` 区域，保证通知栏位于中间工具右侧且不侵占 center 区
+- style.css：扩展倒数日新增表单样式，适配类型、颜色、农历选择
+- style.css：补齐倒数日条目类型色条、按钮区、拖拽态与移动端兼容样式
+- app.js：`initCountdownSystem()` 新增同步事件监听，云端同步后自动刷新倒数日面板与通知栏
+- app.js：`getCustomCountdownEvents()` / `saveCustomCountdownEvents()` 改为走 `SafeStorage`，并在登录状态下触发云同步
+- app.js：新增 `getCountdownTypeColors()` / `saveCountdownTypeColors()` 管理类型颜色
+- app.js：新增 `getNextLunarOccurrence()`，支持农历事件计算下一次日期
+- app.js：新增 `startEditCountdownEvent()`、`resetCountdownForm()`、`moveCountdownEvent()`、`reorderCountdownEvents()`
+- app.js：`handleAddCountdownEvent()` 扩展为支持编辑态、公历 / 农历、类型与颜色
+- app.js：`renderCountdownPanel()` 扩展为支持编辑、删除、上下移动、拖拽排序与类型底色展示
+- app.js：`getHolidayDisplayName()` 增强节假日名称判断，支持按农历识别春节 / 端午 / 中秋
+- app.js：部署版本徽标提升为 `2026-04-21 P3-9`
+- sync.js：上传云端时补充 `countdownEvents`、`countdownTypeColors`
+- sync.js：下载云端数据时回写倒数日相关存储，并派发 `countdownSynced`
+- utils.js：新增 `LunarCalendarUtils`，提供农历月日解析与农历转下一次公历日期能力
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/sync.js` 通过
+- `node --check js/utils.js` 通过
+- `app.js` / `sync.js` / `utils.js` / `index.html` / `style.css` diagnostics 0 错误
+- 关键静态链路已核对：
+  - 顶部顺序已恢复为品牌 / 时间天气 / 中间工具 / 通知栏 / 右侧工具
+  - 通知栏已脱离品牌区，不再挤占中间工具布局
+  - 倒数日已具备同步、农历、编辑、删除、排序、类型颜色能力
+  - 版本徽标与静态资源 query 已提升到 `P3-9 / v27 / v19 / v90`
+
+### 遗留事项
+- 待提交、推送并完成线上强刷回归，重点核对版本徽标是否为 `P3-9`
+- 待在线上验证顶部栏宽度、倒数日跨设备同步、农历日期、拖拽排序与类型颜色是否全部稳定
+- 待继续观察 GitHub Pages 是否仍出现 HTML 已更新但 CSS / JS 命中旧缓存的情况
+- 待继续排查“跨日期会议点击完成后未打勾划线沉底”的剩余问题
+
+## 2026-04-21 P3-8
+
+### 本次目标
+- 修复倒数日折叠开关只能打开不能收起
+- 修复倒数事项配色不适配深浅色主题
+- 修复今年剩余节假日没有默认嵌入倒数日
+- 恢复顶部既有模块位置，时间天气放"面板"右边，中间区域不动，右侧放倒数日通知框
+- 修复 AI/PDF 识别预览编辑区白底白字问题
+
+### 当前状态
+- ✅ 已修复倒数日折叠按钮的 toggle 逻辑，改为 `isExpanded()` 判断后切换 `expanded` 类
+- ✅ 已修复倒数事项配色，全部改为 `var(--gray-*)`、`var(--warning-color)`、`var(--bg-primary)` 等主题变量联动
+- ✅ 已修复默认节假日嵌入逻辑，`getBuiltinHolidayCountdowns()` 改为按 `HolidayData.holidays[year]` 数组读取并映射名称
+- ✅ 已恢复顶部布局：时间天气放左侧品牌区"面板"右边，中间区域保持原位不动
+- ✅ 已将三天内倒数日通知框移到品牌区右侧（grid 第三列）
+- ✅ 已修复 upload-flow.js 中识别预览编辑区的白底白字：输入框、卡片、文字全部改为明确主题变量
+- ✅ 版本提升为 `2026-04-21 P3-8`，资源版本 `style.css v26 / ocr.js v35 / upload-flow.js v6 / app.js v89`
+- ✅ 已完成 `node --check js/app.js`、`node --check js/upload-flow.js` 与 diagnostics 0 错误
+- ✅ 已提交并推送到远端 `main` 分支
+
+### 本轮关键改动
+- app.js：`initCountdownPanel()` 改为 toggle 逻辑，支持点击同一按钮打开/收起
+- app.js：`getBuiltinHolidayCountdowns()` 改为按数组读取并新增 `getHolidayDisplayName()` 映射节假日名称
+- app.js：部署版本徽标提升为 `P3-8`
+- style.css：倒数日全部配色改为 `color-mix()` 和主题变量联动
+- style.css：顶部品牌区改为 grid 三列布局（logo / meta / notice）
+- style.css：移动端倒数日和品牌区改为单列堆叠
+- index.html：时间天气移入品牌区，通知框移入品牌区右侧
+- index.html：资源版本提升为 `style.css v26 / ocr.js v35 / upload-flow.js v6 / app.js v89`
+- upload-flow.js：所有 `color: inherit`、`var(--card-bg)`、`var(--input-bg)` 改为明确主题变量
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/upload-flow.js` 通过
+- `app.js` / `upload-flow.js` / `index.html` / `style.css` diagnostics 0 错误
+- 已推送到 `origin/main`
+
+### 遗留事项
+- 待线上强刷验证 P3-8 全部修复点
+- 待继续观察 GitHub Pages 资源缓存是否仍出现旧 CSS / JS 混用
+- 待继续排查"跨日期会议点击完成后未打勾划线沉底"的剩余问题
+
+## 2026-04-21 P3-7
 
 ### 本次目标
 - 打通识别前预览逐条编辑 / 删除后的正式保存链路

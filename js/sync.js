@@ -308,6 +308,8 @@ class SyncManager {
                 schedule: SafeStorage.get('office_schedule_content') || '',
                 links: SafeStorage.get('office_links') || '',
                 contacts: SafeStorage.get('office_contacts') || '',
+                countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
+                countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
                 device_info: navigator.userAgent
             };
 
@@ -397,6 +399,21 @@ class SyncManager {
                     detail: { contacts: safeJsonParse(cloudData.data.contacts, []) }
                 }));
             }
+
+            if (cloudData.data.countdownEvents !== undefined) {
+                SafeStorage.set('office_countdown_events', cloudData.data.countdownEvents || '[]');
+            }
+
+            if (cloudData.data.countdownTypeColors !== undefined) {
+                SafeStorage.set('office_countdown_type_colors', cloudData.data.countdownTypeColors || '{}');
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {})
+                }
+            }));
 
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
@@ -588,6 +605,29 @@ class SyncManager {
                     }));
                 }
             }
+
+            if (cloudData.data.countdownEvents !== undefined) {
+                const cloudCountdownEvents = cloudData.data.countdownEvents || '[]';
+                const localCountdownEvents = SafeStorage.get('office_countdown_events') || '[]';
+                if (cloudCountdownEvents !== localCountdownEvents) {
+                    SafeStorage.set('office_countdown_events', cloudCountdownEvents);
+                }
+            }
+
+            if (cloudData.data.countdownTypeColors !== undefined) {
+                const cloudCountdownTypeColors = cloudData.data.countdownTypeColors || '{}';
+                const localCountdownTypeColors = SafeStorage.get('office_countdown_type_colors') || '{}';
+                if (cloudCountdownTypeColors !== localCountdownTypeColors) {
+                    SafeStorage.set('office_countdown_type_colors', cloudCountdownTypeColors);
+                }
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {})
+                }
+            }));
 
             // 上传合并后的数据到云端
             await this.uploadToCloud(cloudData);
@@ -820,6 +860,21 @@ class SyncManager {
                     detail: { contacts: safeJsonParse(data.data.contacts, []) }
                 }));
             }
+
+            if (data.data.countdownEvents !== undefined) {
+                SafeStorage.set('office_countdown_events', data.data.countdownEvents || '[]');
+            }
+
+            if (data.data.countdownTypeColors !== undefined) {
+                SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(data.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {})
+                }
+            }));
 
             // 同步事项 - 带去重逻辑（安全替换：失败回滚）
             const cloudItems = data.data.items || [];

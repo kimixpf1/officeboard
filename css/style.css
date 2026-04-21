@@ -182,7 +182,6 @@ body {
     gap: 12px;
     min-width: 220px;
     max-width: 320px;
-    justify-self: end;
     padding: 10px 14px;
     border: 1px solid color-mix(in srgb, var(--warning-color) 24%, var(--border-color));
     border-radius: 14px;
@@ -2186,7 +2185,7 @@ body {
 @media (max-width: 640px) {
     /* 手机端头部优化 */
     .header {
-        flex-direction: column;
+        grid-template-columns: 1fr;
         gap: var(--spacing-2);
         text-align: center;
         padding: var(--spacing-2);
@@ -2198,8 +2197,8 @@ body {
     }
 
     .brand-block {
-        grid-template-columns: 1fr;
-        justify-items: center;
+        flex-direction: column;
+        justify-content: center;
         gap: var(--spacing-2);
         width: 100%;
     }
@@ -3602,6 +3601,17 @@ mark.highlight {
     border-radius: 12px;
     background: linear-gradient(135deg, color-mix(in srgb, var(--warning-color) 5%, var(--bg-primary)), color-mix(in srgb, var(--bg-primary) 92%, var(--primary-light) 8%));
     box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+    border-left: 4px solid var(--countdown-accent, color-mix(in srgb, var(--warning-color) 42%, var(--border-color)));
+}
+
+.countdown-item.drag-over {
+    transform: translateY(-2px);
+    border-color: var(--countdown-accent, var(--warning-color));
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+}
+
+.countdown-item.dragging {
+    opacity: 0.72;
 }
 
 .countdown-item.soon {
@@ -3612,6 +3622,20 @@ mark.highlight {
 .countdown-item-info {
     min-width: 0;
     flex: 1;
+}
+
+.countdown-item-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.countdown-item-type-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--countdown-accent, var(--warning-color));
+    flex-shrink: 0;
 }
 
 .countdown-item-title {
@@ -3636,6 +3660,39 @@ mark.highlight {
     flex-shrink: 0;
 }
 
+.countdown-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.countdown-item-move,
+.countdown-item-edit,
+.countdown-item-delete {
+    flex-shrink: 0;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border: none;
+    background: rgba(148, 163, 184, 0.12);
+    color: var(--gray-500);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    border-radius: 999px;
+}
+
+.countdown-item-delete {
+    font-size: 18px;
+}
+
+.countdown-item-move:hover,
+.countdown-item-edit:hover,
+.countdown-item-delete:hover {
+    color: #ffffff;
+    background: var(--countdown-accent, var(--danger-color));
+}
+
 .countdown-item-days {
     flex-shrink: 0;
     min-width: 68px;
@@ -3654,21 +3711,7 @@ mark.highlight {
 }
 
 .countdown-item-delete {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: rgba(148, 163, 184, 0.12);
-    color: var(--gray-500);
-    cursor: pointer;
     font-size: 18px;
-    line-height: 1;
-    border-radius: 999px;
-}
-
-.countdown-item-delete:hover {
-    color: #ffffff;
-    background: var(--danger-color);
 }
 
 .countdown-empty {
