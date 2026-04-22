@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -187,10 +187,17 @@ class SyncManager {
                 return;
             }
 
-            // 情况2: 本地无数据
+            // 情况2: 本地无事项数据
             if (localItems.length === 0) {
+                const hasLocalCountdownData = (SafeStorage.get('office_countdown_events') || '[]') !== '[]'
+                    || (SafeStorage.get('office_countdown_type_colors') || '{}') !== '{}'
+                    || (SafeStorage.get('office_countdown_sort_order') || '[]') !== '[]';
 
-                await this.downloadFromCloud(cloudData);
+                if (hasLocalCountdownData) {
+                    await this.mergeData(localItems, cloudData);
+                } else {
+                    await this.downloadFromCloud(cloudData);
+                }
                 this.isSyncing = false;
                 return;
             }
@@ -217,7 +224,7 @@ class SyncManager {
                 } else if (localHasModify) {
                     await this.uploadToCloud(cloudData);
                 } else {
-                    // 两边都没变化 - 但仍需同步备忘录
+                    // 两边都没变化 - 仍需把轻量模块从云端对齐到本地，避免倒数日等内容漏同步
                     if (cloudData?.data?.memo !== undefined) {
                         const localMemo = SafeStorage.get('office_memo_content') || '';
                         const cloudMemo = cloudData.data.memo;
@@ -228,7 +235,6 @@ class SyncManager {
                             }));
                         }
                     }
-                    // 同步网站
                     if (cloudData?.data?.links !== undefined) {
                         const localLinks = SafeStorage.get('office_links') || '';
                         const cloudLinks = cloudData.data.links;
@@ -239,7 +245,6 @@ class SyncManager {
                             }));
                         }
                     }
-                    // 同步日程
                     if (cloudData?.data?.schedule !== undefined) {
                         const localSchedule = SafeStorage.get('office_schedule_content') || '';
                         const cloudSchedule = cloudData.data.schedule;
@@ -249,6 +254,38 @@ class SyncManager {
                                 detail: { content: cloudSchedule } 
                             }));
                         }
+                    }
+                    if (cloudData?.data?.contacts !== undefined) {
+                        const localContacts = SafeStorage.get('office_contacts') || '';
+                        const cloudContacts = cloudData.data.contacts;
+                        if (cloudContacts !== localContacts) {
+                            SafeStorage.set('office_contacts', cloudContacts);
+                            document.dispatchEvent(new CustomEvent('contactsSynced', {
+                                detail: { contacts: safeJsonParse(cloudContacts, []) }
+                            }));
+                        }
+                    }
+                    const localCountdownEvents = SafeStorage.get('office_countdown_events') || '[]';
+                    const localCountdownTypeColors = SafeStorage.get('office_countdown_type_colors') || '{}';
+                    const localCountdownSortOrder = SafeStorage.get('office_countdown_sort_order') || '[]';
+                    const cloudCountdownEvents = cloudData?.data?.countdownEvents ?? '[]';
+                    const cloudCountdownTypeColors = cloudData?.data?.countdownTypeColors ?? '{}';
+                    const cloudCountdownSortOrder = cloudData?.data?.countdownSortOrder ?? '[]';
+                    const countdownChanged = cloudCountdownEvents !== localCountdownEvents
+                        || cloudCountdownTypeColors !== localCountdownTypeColors
+                        || cloudCountdownSortOrder !== localCountdownSortOrder;
+
+                    if (countdownChanged) {
+                        SafeStorage.set('office_countdown_events', cloudCountdownEvents || '[]');
+                        SafeStorage.set('office_countdown_type_colors', cloudCountdownTypeColors || '{}');
+                        SafeStorage.set('office_countdown_sort_order', cloudCountdownSortOrder || '[]');
+                        document.dispatchEvent(new CustomEvent('countdownSynced', {
+                            detail: {
+                                events: safeJsonParse(cloudCountdownEvents || '[]', []),
+                                colors: safeJsonParse(cloudCountdownTypeColors || '{}', {}),
+                                sortOrder: safeJsonParse(cloudCountdownSortOrder || '[]', [])
+                            }
+                        }));
                     }
                 }
             }
@@ -405,15 +442,27 @@ class SyncManager {
             }
 
             if (cloudData.data.countdownEvents !== undefined) {
-                SafeStorage.set('office_countdown_events', cloudData.data.countdownEvents || '[]');
+                const localCountdownEvents = SafeStorage.get('office_countdown_events') || '[]';
+                const cloudCountdownEvents = cloudData.data.countdownEvents || '[]';
+                if (cloudCountdownEvents !== localCountdownEvents) {
+                    SafeStorage.set('office_countdown_events', cloudCountdownEvents);
+                }
             }
 
             if (cloudData.data.countdownTypeColors !== undefined) {
-                SafeStorage.set('office_countdown_type_colors', cloudData.data.countdownTypeColors || '{}');
+                const localCountdownTypeColors = SafeStorage.get('office_countdown_type_colors') || '{}';
+                const cloudCountdownTypeColors = cloudData.data.countdownTypeColors || '{}';
+                if (cloudCountdownTypeColors !== localCountdownTypeColors) {
+                    SafeStorage.set('office_countdown_type_colors', cloudCountdownTypeColors);
+                }
             }
 
             if (cloudData.data.countdownSortOrder !== undefined) {
-                SafeStorage.set('office_countdown_sort_order', cloudData.data.countdownSortOrder || '[]');
+                const localCountdownSortOrder = SafeStorage.get('office_countdown_sort_order') || '[]';
+                const cloudCountdownSortOrder = cloudData.data.countdownSortOrder || '[]';
+                if (cloudCountdownSortOrder !== localCountdownSortOrder) {
+                    SafeStorage.set('office_countdown_sort_order', cloudCountdownSortOrder);
+                }
             }
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
@@ -887,10 +936,15 @@ class SyncManager {
                 SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
             }
 
+            if (data.data.countdownSortOrder !== undefined) {
+                SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
+            }
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(data.data.countdownEvents || '[]', []),
-                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {})
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(data.data.countdownSortOrder || '[]', [])
                 }
             }));
 

@@ -330,6 +330,8 @@ class CalendarView {
             title: dayState.title !== undefined ? dayState.title : item.title,
             content: dayState.content !== undefined ? dayState.content : item.content,
             location: dayState.location !== undefined ? dayState.location : item.location,
+            handler: dayState.handler !== undefined ? dayState.handler : item.handler,
+            transferHistory: dayState.transferHistory !== undefined ? dayState.transferHistory : item.transferHistory,
             _hidden: dayState.hidden || false
         };
     }
