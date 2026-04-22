@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=29">
+    <link rel="stylesheet" href="css/style.css?v=30">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -186,9 +186,6 @@
 
         <!-- 日视图 -->
         <section id="boardView" class="board-view active">
-            <div class="board-header">
-                <h2 id="boardDateTitle">今日事项</h2>
-            </div>
             <div class="board-container">
                 <!-- 待办事项栏 -->
                 <div class="board-column" data-type="todo">
@@ -760,7 +757,7 @@
                     <input type="color" id="countdownColor" value="#ec4899" title="类型底色">
                     <button type="button" id="addCountdownBtn" class="btn-add-link">+ 添加</button>
                 </div>
-                <div class="countdown-form-tip">日期类型这里可切换“公历 / 农历”。选农历后，日期框里选一个对应农历月日的公历日期即可。</div>
+                <div class="countdown-form-tip">日期类型这里可切换“公历 / 农历”。选农历时只要挑一个对应的公历日期，系统会自动记住农历并换算成之后每年的公历日期。</div>
                 <div class="countdown-section-title">今年剩余节假日与纪念日</div>
                 <div class="countdown-list" id="countdownList"></div>
             </div>
@@ -1092,10 +1089,10 @@
     <script src="js/ocr.js?v=35"></script>
     <script src="js/report.js?v=15"></script>
     <script src="js/calendar.js?v=24"></script>
-    <script src="js/sync.js?v=21"></script>
+    <script src="js/sync.js?v=22"></script>
     <script src="js/upload-flow.js?v=6"></script>
     <script src="js/app-date-view.js?v=4"></script>
-    <script src="js/app.js?v=93"></script>
+    <script src="js/app.js?v=94"></script>
     
     <div id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></div>
 
