@@ -618,9 +618,13 @@ class OfficeDashboard {
                     ? '请选择一个对应农历日期的公历日期，系统会自动按农历每年换算'
                     : '';
             }
-            this.updateCountdownDateTip();
+            const dateTip = document.querySelector('.countdown-form-tip');
+            if (dateTip) {
+                dateTip.textContent = calendarTypeSelect.value === 'lunar'
+                    ? '已切换为农历。你只需要选一次对应的公历日期，系统会自动记住农历月日，后续每年自动换算成新的公历日期。'
+                    : '日期类型这里可切换“公历 / 农历”。选农历后，日期框里选一个对应农历月日的公历日期即可。';
+            }
         });
-        dateInput?.addEventListener('change', () => this.updateCountdownDateTip());
         nameInput?.addEventListener('keypress', event => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -885,7 +889,7 @@ class OfficeDashboard {
 
         return {
             ...item,
-            originalDate: item.originalDate || item.date,
+            originalDate: item.date,
             date: finalDate,
             daysLeft,
             metaLabel,
@@ -1040,9 +1044,6 @@ class OfficeDashboard {
         }
         if (dateInput) {
             dateInput.value = target.originalDate || target.date || '';
-            dateInput.title = target.calendarType === 'lunar'
-                ? '请选择一个对应农历日期的公历日期，系统会自动按农历每年换算'
-                : '';
         }
         if (calendarTypeSelect) {
             calendarTypeSelect.value = target.calendarType || 'solar';
@@ -1060,38 +1061,9 @@ class OfficeDashboard {
         if (dateTip) {
             dateTip.textContent = (target.calendarType === 'lunar' && target.lunarMonth && target.lunarDay)
                 ? `当前是农历 ${target.lunarMonth} 月 ${target.lunarDay} 日，日期框里保留的是用于换算的公历日期，保存时会自动继续按农历换算。`
-                : '日期类型这里可切换“公历 / 农历”。选农历后，日期框里选一个对应农历月日的公历日期即可。';
+                : '日期类型这里可切换“公历 / 农历”。选农历时只要挑一个对应的公历日期，系统会自动记住农历并换算成之后每年的公历日期。';
         }
-        this.updateCountdownDateTip();
         nameInput?.focus();
-    }
-
-    updateCountdownDateTip() {
-        const calendarTypeSelect = document.getElementById('countdownCalendarType');
-        const dateInput = document.getElementById('countdownDate');
-        const dateTip = document.querySelector('.countdown-form-tip');
-        if (!calendarTypeSelect || !dateTip) {
-            return;
-        }
-
-        if (calendarTypeSelect.value !== 'lunar') {
-            dateTip.textContent = '日期类型这里可切换“公历 / 农历”。选农历后，日期框里选一个对应农历月日的公历日期即可。';
-            return;
-        }
-
-        const selectedDate = dateInput?.value;
-        const lunarInfo = selectedDate ? window.LunarCalendarUtils?.getLunarMonthDay(selectedDate) : null;
-        const baseDate = selectedDate ? new Date(`${selectedDate}T00:00:00`) : new Date();
-        const nextSolarDate = lunarInfo?.month && lunarInfo?.day
-            ? window.LunarCalendarUtils?.getNextSolarDateForLunar(lunarInfo.month, lunarInfo.day, baseDate)
-            : '';
-
-        if (selectedDate && lunarInfo?.month && lunarInfo?.day && nextSolarDate) {
-            dateTip.textContent = `当前选择的是公历 ${selectedDate}，对应农历 ${lunarInfo.month} 月 ${lunarInfo.day} 日；保存后会自动换算到下一次公历 ${nextSolarDate}。`;
-            return;
-        }
-
-        dateTip.textContent = '已切换为农历。请先选择一个与目标农历月日对应的公历日期，系统会自动记住农历月日并换算之后每年的公历日期。';
     }
 
     resetCountdownForm() {
@@ -1163,9 +1135,8 @@ class OfficeDashboard {
         colors[eventType] = color;
         this.saveCountdownTypeColors(colors, { skipSync: true });
 
-        const baseDate = date ? new Date(`${date}T00:00:00`) : new Date();
         const normalizedDate = calendarType === 'lunar'
-            ? (window.LunarCalendarUtils?.getNextSolarDateForLunar(lunarInfo.month, lunarInfo.day, baseDate) || date)
+            ? (window.LunarCalendarUtils?.getNextSolarDateForLunar(lunarInfo.month, lunarInfo.day, new Date()) || date)
             : date;
 
         const nextOrder = events.length ? Math.max(...events.map(item => item.order ?? 0)) + 1 : 0;
@@ -1230,12 +1201,6 @@ class OfficeDashboard {
 
         const sortOrder = allEvents.map(item => item.id);
         SafeStorage.set('office_countdown_sort_order', JSON.stringify(sortOrder));
-
-        if (window.syncManager?.isLoggedIn?.()) {
-            window.syncManager.immediateSyncToCloud().catch(error => {
-                console.warn('?????????:', error?.message || error);
-            });
-        }
 
         this.renderCountdownPanel();
         this.updateCountdownNotice();
@@ -6070,31 +6035,6 @@ class OfficeDashboard {
             const item = await db.getItem(id);
             if (!item) return;
 
-            if (item.type === ITEM_TYPES.DOCUMENT && item.docStartDate && item.docEndDate && item.docEndDate > item.docStartDate && !item.recurringGroupId) {
-                const choice = await this.showCrossDateDocChoice('complete');
-                if (!choice) return;
-
-                const progress = completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING;
-                await this.applyCrossDateDocumentScopedUpdate(id, item, choice, {
-                    fields: ['completed', 'completedAt', 'progress'],
-                    globalUpdates: {
-                        progress,
-                        completed,
-                        completedAt: completed ? new Date().toISOString() : null
-                    },
-                    dayStateUpdates: {
-                        progress,
-                        completed,
-                        completedAt: completed ? new Date().toISOString() : null
-                    }
-                });
-                await this.loadItems();
-                if (syncManager.isLoggedIn()) {
-                    await syncManager.immediateSyncToCloud();
-                }
-                return;
-            }
-
             item.progress = completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING;
             item.completed = completed;
             item.completedAt = completed ? new Date().toISOString() : null;
@@ -6416,8 +6356,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-22 P3-14';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=23', 'app-date-view.js?v=4', 'app.js?v=95', 'style.css?v=31'];
+        const version = '2026-04-21 P3-13';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=22', 'app-date-view.js?v=4', 'app.js?v=94', 'style.css?v=30'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -7521,26 +7461,24 @@ class OfficeDashboard {
                 const statusFields = ['completed', 'completedAt'];
 
                 if (choice === 'this') {
-                    await this.applyCrossDateMeetingScopedUpdate(id, originalItem, choice, {
+                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
                         fields: statusFields,
                         dayStateUpdates: {
                             completed,
                             completedAt
                         }
                     });
-                    await this.runPostSaveRefresh();
                     this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
                     return;
                 }
 
-                await this.applyCrossDateMeetingScopedUpdate(id, originalItem, choice, {
+                await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
                     fields: statusFields,
                     globalUpdates: {
                         completed,
                         completedAt
                     }
                 });
-                await this.runPostSaveRefresh();
                 this.showSuccess(
                     choice === 'future'
                         ? (completed ? '已标记今天及之后完成' : '已取消今天及之后完成')
