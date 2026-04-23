@@ -151,7 +151,7 @@ body {
 }
 
 .header-weather {
-    max-width: 200px;
+    max-width: 360px;
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -660,9 +660,11 @@ body {
 /* 日视图 */
 .board-view {
     display: none;
-    padding: var(--spacing-5) var(--spacing-6);
-    height: calc(100vh - 200px);
+    padding: var(--spacing-5) var(--spacing-6) calc(var(--spacing-5) + 6px);
+    min-height: calc(100vh - 200px);
+    height: calc(100vh - 184px);
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .board-view.active {
@@ -682,16 +684,20 @@ body {
 
 .board-container {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--spacing-5);
-    height: calc(100% - 50px);
+    min-height: calc(100% - 50px);
+    height: calc(100% - 18px);
     max-width: 1600px;
     margin: 0 auto;
+    align-items: stretch;
 }
 
 .board-column {
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    height: 100%;
     background: var(--gray-100);
     border-radius: var(--border-radius-lg);
     overflow: hidden;
@@ -2285,6 +2291,13 @@ body {
 
     .countdown-add-form {
         grid-template-columns: 1fr;
+        grid-template-areas:
+            'name'
+            'date'
+            'calendar'
+            'type'
+            'color'
+            'submit';
     }
 
     /* 日视图优化 */
@@ -3573,7 +3586,12 @@ mark.highlight {
 
 .countdown-add-form {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(170px, 1fr) minmax(96px, 110px) minmax(110px, 128px) 54px auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+        'name name'
+        'date date'
+        'calendar type'
+        'color submit';
     gap: 10px;
     margin-bottom: 10px;
     align-items: center;
@@ -3596,9 +3614,33 @@ mark.highlight {
     box-sizing: border-box;
 }
 
+#countdownName {
+    grid-area: name;
+}
+
+#countdownDate {
+    grid-area: date;
+}
+
 #countdownCalendarType {
+    grid-area: calendar;
     min-width: 96px;
     font-weight: 700;
+}
+
+#countdownEventType {
+    grid-area: type;
+}
+
+#countdownColor {
+    grid-area: color;
+    min-width: 0;
+}
+
+#addCountdownBtn {
+    grid-area: submit;
+    width: 100%;
+    justify-content: center;
 }
 
 .countdown-form-tip {

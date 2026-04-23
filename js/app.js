@@ -539,10 +539,12 @@ class OfficeDashboard {
         const weatherText = weatherBtn.querySelector('.header-weather-text');
         const weatherIcon = weatherBtn.querySelector('.header-weather-icon');
         const current = this.currentWeatherData || null;
+        const forecast = Array.isArray(this.weatherForecastSummary) ? this.weatherForecastSummary : [];
+        const extraDays = forecast.slice(1, 3).map(item => `${item.label}${item.max}°/${item.min}°`).join(' · ');
 
         if (weatherText) {
             weatherText.textContent = current?.description
-                ? `${city} ${current.description} ${current.temperature ?? '--'}°C`
+                ? `${city} ${current.description} ${current.temperature ?? '--'}°C${extraDays ? ` · ${extraDays}` : ''}`
                 : `${city} 天气点击查看`;
         }
 
@@ -550,7 +552,9 @@ class OfficeDashboard {
             weatherIcon.textContent = current?.icon || '🌤️';
         }
 
-        weatherBtn.title = `当前天气城市：${city}，点击切换`;
+        weatherBtn.title = extraDays
+            ? `当前天气城市：${city}，点击切换\n${extraDays}`
+            : `当前天气城市：${city}，点击切换`;
     }
 
     initCountdownSystem() {
@@ -1001,7 +1005,7 @@ class OfficeDashboard {
             return;
         }
 
-        const upcoming = this.getAllCountdownEvents().filter(item => item.daysLeft <= 3);
+        const upcoming = this.getAllCountdownEvents().filter(item => item.daysLeft >= 0 && item.daysLeft <= 10);
         if (!upcoming.length) {
             noticeEl.hidden = true;
             return;
@@ -2077,6 +2081,17 @@ class OfficeDashboard {
                 icon,
                 code
             };
+            this.weatherForecastSummary = Array.isArray(data.daily?.time)
+                ? data.daily.time.slice(0, 3).map((dateStr, index) => {
+                    const date = new Date(dateStr);
+                    return {
+                        label: index === 0 ? '今天' : index === 1 ? '明天' : index === 2 ? '后天' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()],
+                        max: Math.round(data.daily.temperature_2m_max[index]),
+                        min: Math.round(data.daily.temperature_2m_min[index]),
+                        code: data.daily.weather_code[index]
+                    };
+                })
+                : [];
             this.updateHeaderWeatherDisplay();
 
             const weatherInfo = document.createElement('div');
@@ -6356,8 +6371,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-21 P3-13';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=22', 'app-date-view.js?v=4', 'app.js?v=94', 'style.css?v=30'];
+        const version = '2026-04-23 P3-16';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=23', 'app-date-view.js?v=4', 'app.js?v=96', 'style.css?v=31'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

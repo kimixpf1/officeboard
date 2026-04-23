@@ -187,10 +187,14 @@ class SyncManager {
                 return;
             }
 
-            // 情况2: 本地无数据
+            // 情况2: 本地无事项数据
             if (localItems.length === 0) {
-
-                await this.downloadFromCloud(cloudData);
+                const hasLocalSideData = this.hasLocalNonItemData();
+                if (hasLocalSideData) {
+                    await this.mergeData(localItems, cloudData);
+                } else {
+                    await this.downloadFromCloud(cloudData);
+                }
                 this.isSyncing = false;
                 return;
             }
@@ -405,15 +409,27 @@ class SyncManager {
             }
 
             if (cloudData.data.countdownEvents !== undefined) {
-                SafeStorage.set('office_countdown_events', cloudData.data.countdownEvents || '[]');
+                const nextValue = cloudData.data.countdownEvents || '[]';
+                const currentValue = SafeStorage.get('office_countdown_events') || '[]';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_countdown_events', nextValue);
+                }
             }
 
             if (cloudData.data.countdownTypeColors !== undefined) {
-                SafeStorage.set('office_countdown_type_colors', cloudData.data.countdownTypeColors || '{}');
+                const nextValue = cloudData.data.countdownTypeColors || '{}';
+                const currentValue = SafeStorage.get('office_countdown_type_colors') || '{}';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_countdown_type_colors', nextValue);
+                }
             }
 
             if (cloudData.data.countdownSortOrder !== undefined) {
-                SafeStorage.set('office_countdown_sort_order', cloudData.data.countdownSortOrder || '[]');
+                const nextValue = cloudData.data.countdownSortOrder || '[]';
+                const currentValue = SafeStorage.get('office_countdown_sort_order') || '[]';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_countdown_sort_order', nextValue);
+                }
             }
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
