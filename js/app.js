@@ -537,19 +537,25 @@ class OfficeDashboard {
 
         const city = localStorage.getItem('office_weather_city') || '苏州';
         const weatherText = weatherBtn.querySelector('.header-weather-text');
+        const weatherMainLine = weatherBtn.querySelector('.header-weather-line-main');
+        const weatherSubLine = weatherBtn.querySelector('.header-weather-line-sub');
         const weatherIcon = weatherBtn.querySelector('.header-weather-icon');
         const current = this.currentWeatherData || null;
         const forecast = Array.isArray(this.weatherForecastSummary) ? this.weatherForecastSummary : [];
-        const extraDays = forecast.slice(1, 3).map(item => `${item.label}${item.max}°/${item.min}°`).join(' · ');
+        const extraDays = forecast.slice(1, 3).map(item => `${item.label[0]}${item.max}/${item.min}°`).join(' ');
 
         if (weatherText) {
-            weatherText.textContent = current?.description
-                ? `${city} ${current.description} ${current.temperature ?? '--'}°C${extraDays ? ` · ${extraDays}` : ''}`
+            const mainText = current?.description
+                ? `${city} ${current.description} ${current.temperature ?? '--'}°`
                 : `${city} 天气点击查看`;
-        }
+            const subText = extraDays || '明/后天气加载中';
 
-        if (weatherIcon) {
-            weatherIcon.textContent = current?.icon || '🌤️';
+            if (weatherMainLine && weatherSubLine) {
+                weatherMainLine.textContent = mainText;
+                weatherSubLine.textContent = subText;
+            } else {
+                weatherText.textContent = `${mainText}${extraDays ? ` ${extraDays}` : ''}`;
+            }
         }
 
         weatherBtn.title = extraDays
