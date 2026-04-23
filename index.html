@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=35">
+    <link rel="stylesheet" href="css/style.css?v=38">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -95,16 +95,28 @@
                     <h1 class="logo">大飞智能工作面板</h1>
                     <div class="header-meta">
                         <div id="headerClock" class="header-clock" title="当前时间">
-                            <span class="clock-date">----/--/--</span>
                             <span class="clock-time">--:--:--</span>
                         </div>
                         <button type="button" id="headerWeather" class="header-weather" title="点击切换天气城市">
-                            <span class="header-weather-top">
-                                <span class="header-weather-icon header-weather-icon-today">🌤️</span>
-                                <span class="header-weather-text">
-                                    <span class="header-weather-line header-weather-line-main">苏州 · 今日 18~26°</span>
-                                    <span class="header-weather-line header-weather-line-sub">明 🌦️ 17~24° · 后 ☁️ 16~22°</span>
-                                </span>
+                            <span class="weather-current">
+                                <span class="weather-current-city">苏州</span>
+                                <span class="weather-current-icon">🌤️</span>
+                                <span class="weather-current-temp">22°</span>
+                            </span>
+                            <span class="weather-today">
+                                <span class="weather-today-label">今天</span>
+                                <span class="weather-today-icon">🌤️</span>
+                                <span class="weather-temp-range">18~26°</span>
+                            </span>
+                            <span class="weather-tomorrow">
+                                <span class="weather-day-label">周五</span>
+                                <span class="weather-day-icon">🌦️</span>
+                                <span class="weather-day-temp">17~24°</span>
+                            </span>
+                            <span class="weather-dayafter">
+                                <span class="weather-day-label">周六</span>
+                                <span class="weather-day-icon">☁️</span>
+                                <span class="weather-day-temp">16~22°</span>
                             </span>
                         </button>
                     </div>
@@ -195,7 +207,12 @@
 
         <!-- 日视图 -->
         <section id="boardView" class="board-view active">
-            <div class="board-container">
+            <div class="board-wrapper">
+                <div id="boardDateLabel" class="board-date-label">
+                    <span class="board-date-label-date">----/--/--</span>
+                    <span class="board-date-label-week">---</span>
+                </div>
+                <div class="board-container">
                 <!-- 待办事项栏 -->
                 <div class="board-column" data-type="todo">
                     <div class="column-header">
@@ -304,10 +321,9 @@
                         <!-- 文件卡片将动态插入 -->
                     </div>
                 </div>
+                </div>
             </div>
         </section>
-
-        <!-- 日历视图（日/周/月） -->
         <section id="calendarView" class="calendar-view">
             <div id="calendarContainer"></div>
         </section>
@@ -1100,8 +1116,8 @@
     <script src="js/calendar.js?v=25"></script>
     <script src="js/sync.js?v=25"></script>
     <script src="js/upload-flow.js?v=6"></script>
-    <script src="js/app-date-view.js?v=5"></script>
-    <script src="js/app.js?v=101"></script>
+    <script src="js/app-date-view.js?v=6"></script>
+    <script src="js/app.js?v=105"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">

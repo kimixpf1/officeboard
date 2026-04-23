@@ -499,15 +499,13 @@ class OfficeDashboard {
 
         const renderClock = () => {
             const now = new Date();
-            const weekday = now.toLocaleDateString('zh-CN', { weekday: 'short' });
+            const timePart = now.toLocaleTimeString('zh-CN', { hour12: false });
+            const timeEl = clockEl.querySelector('.clock-time');
+            if (timeEl) timeEl.textContent = timePart;
             const y = now.getFullYear();
             const m = String(now.getMonth() + 1).padStart(2, '0');
             const d = String(now.getDate()).padStart(2, '0');
-            const timePart = now.toLocaleTimeString('zh-CN', { hour12: false });
-            const dateEl = clockEl.querySelector('.clock-date');
-            const timeEl = clockEl.querySelector('.clock-time');
-            if (dateEl) dateEl.textContent = `${y}/${m}/${d} ${weekday}`;
-            if (timeEl) timeEl.textContent = timePart;
+            const weekday = now.toLocaleDateString('zh-CN', { weekday: 'short' });
             clockEl.title = `当前时间：${y}-${m}-${d} ${weekday} ${timePart}`;
         };
 
@@ -539,46 +537,81 @@ class OfficeDashboard {
             return;
         }
 
-        const city = localStorage.getItem('office_weather_city') || '苏州';
-        const weatherMainLine = weatherBtn.querySelector('.header-weather-line-main');
-        const weatherSubLine = weatherBtn.querySelector('.header-weather-line-sub');
-        const weatherTodayIcon = weatherBtn.querySelector('.header-weather-icon-today');
         const current = this.currentWeatherData || null;
         const forecast = Array.isArray(this.weatherForecastSummary) ? this.weatherForecastSummary : [];
-
         const today = forecast[0] || null;
         const tomorrow = forecast[1] || null;
         const dayAfterTomorrow = forecast[2] || null;
 
-        if (weatherTodayIcon) {
-            weatherTodayIcon.textContent = current?.icon || (today ? this.getWeatherIcon(today.code) : '🌤️');
+        const currentCity = weatherBtn.querySelector('.weather-current-city');
+        const currentIcon = weatherBtn.querySelector('.weather-current-icon');
+        const currentTemp = weatherBtn.querySelector('.weather-current-temp');
+        const todayIcon = weatherBtn.querySelector('.weather-today-icon');
+        const todayRange = weatherBtn.querySelector('.weather-today .weather-temp-range');
+        const tomorrowLabel = weatherBtn.querySelector('.weather-tomorrow .weather-day-label');
+        const tomorrowIcon = weatherBtn.querySelector('.weather-tomorrow .weather-day-icon');
+        const tomorrowTemp = weatherBtn.querySelector('.weather-tomorrow .weather-day-temp');
+        const dayafterLabel = weatherBtn.querySelector('.weather-dayafter .weather-day-label');
+        const dayafterIcon = weatherBtn.querySelector('.weather-dayafter .weather-day-icon');
+        const dayafterTemp = weatherBtn.querySelector('.weather-dayafter .weather-day-temp');
+
+        const city = localStorage.getItem('office_weather_city') || '苏州';
+        if (currentCity) {
+            currentCity.textContent = city;
         }
 
-        if (weatherMainLine) {
-            if (today) {
-                const curTemp = current?.temperature ? ` · ${current.temperature}°` : '';
-                weatherMainLine.textContent = `${city} · ${today.min}~${today.max}°${curTemp}`;
-            } else if (current?.description) {
-                weatherMainLine.textContent = `${city} · ${current.temperature ?? '--'}°`;
-            } else {
-                weatherMainLine.textContent = `${city} 天气加载中`;
-            }
+        if (currentIcon) {
+            currentIcon.textContent = current?.icon || '🌤️';
         }
 
-        if (weatherSubLine) {
-            const parts = [tomorrow, dayAfterTomorrow]
-                .filter(Boolean)
-                .map(item => {
-                    const shortLabel = item.label === '明天' ? '明' : item.label === '后天' ? '后' : item.label;
-                    const icon = this.getWeatherIcon(item.code);
-                    return `${shortLabel}${icon}${item.min}~${item.max}°`;
-                });
-            weatherSubLine.textContent = parts.length ? parts.join(' · ') : '明后天天气加载中';
+        if (currentTemp) {
+            currentTemp.textContent = current?.temperature ? `${current.temperature}°` : '--°';
         }
 
-        const mainText = weatherMainLine?.textContent || '';
-        const subText = weatherSubLine?.textContent || '';
-        weatherBtn.title = `当前天气城市：${city}，点击切换\n${mainText}\n${subText}`;
+        if (todayIcon) {
+            todayIcon.textContent = today ? this.getWeatherIcon(today.code) : '🌤️';
+        }
+
+        if (todayRange) {
+            todayRange.textContent = today ? `${today.min}~${today.max}°` : '--~--°';
+        }
+
+        const getWeekday = (offset) => {
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            return d.toLocaleDateString('zh-CN', { weekday: 'short' }).replace('星期', '周');
+        };
+
+        if (tomorrowLabel) {
+            tomorrowLabel.textContent = getWeekday(1);
+        }
+
+        if (tomorrowIcon) {
+            tomorrowIcon.textContent = tomorrow ? this.getWeatherIcon(tomorrow.code) : '🌦️';
+        }
+
+        if (tomorrowTemp) {
+            tomorrowTemp.textContent = tomorrow ? `${tomorrow.min}~${tomorrow.max}°` : '--~--°';
+        }
+
+        if (dayafterLabel) {
+            dayafterLabel.textContent = getWeekday(2);
+        }
+
+        if (dayafterIcon) {
+            dayafterIcon.textContent = dayAfterTomorrow ? this.getWeatherIcon(dayAfterTomorrow.code) : '☁️';
+        }
+
+        if (dayafterTemp) {
+            dayafterTemp.textContent = dayAfterTomorrow ? `${dayAfterTomorrow.min}~${dayAfterTomorrow.max}°` : '--~--°';
+        }
+
+        const parts = [];
+        if (current?.temperature) parts.push(`当前 ${current.temperature}°`);
+        if (today) parts.push(`今天 ${today.min}~${today.max}°`);
+        if (tomorrow) parts.push(`${getWeekday(1)} ${this.getWeatherIcon(tomorrow.code)} ${tomorrow.min}~${tomorrow.max}°`);
+        if (dayAfterTomorrow) parts.push(`${getWeekday(2)} ${this.getWeatherIcon(dayAfterTomorrow.code)} ${dayAfterTomorrow.min}~${dayAfterTomorrow.max}°`);
+        weatherBtn.title = `天气城市：${city}，点击切换\n${parts.join('\n') || '天气加载中'}`;
     }
 
     initCountdownSystem() {
@@ -6424,8 +6457,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-23 P3-20';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=5', 'app.js?v=101', 'style.css?v=35'];
+        const version = '2026-04-23 P3-24';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=6', 'app.js?v=105', 'style.css?v=39'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

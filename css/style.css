@@ -129,12 +129,10 @@ body {
 
 .header-clock {
     display: inline-flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1px;
     min-height: 38px;
-    padding: 5px 10px;
+    padding: 6px 14px;
     border: 1px solid rgba(79, 70, 229, 0.14);
     border-radius: 999px;
     background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(14, 165, 233, 0.12));
@@ -144,41 +142,33 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
-.clock-date {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--gray-700);
-    white-space: nowrap;
-    line-height: 1.2;
-}
-
 .clock-time {
-    font-size: 12px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--gray-800);
     white-space: nowrap;
     line-height: 1.2;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
 }
 
 .header-weather {
     display: inline-flex;
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
     justify-content: flex-start;
-    gap: 5px;
+    gap: 0;
     min-height: 38px;
-    width: 180px;
-    max-width: 180px;
-    padding: 5px 9px;
+    width: 260px;
+    max-width: 260px;
+    padding: 3px 0;
     border: 1px solid rgba(79, 70, 229, 0.14);
     border-radius: 999px;
     background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(14, 165, 233, 0.12));
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-    font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
     flex: 0 0 auto;
+    overflow: hidden;
 }
 
 .header-weather:hover {
@@ -186,50 +176,107 @@ body {
     transform: translateY(-1px);
 }
 
-.header-weather-top {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
-}
-
-.header-weather-icon {
-    font-size: 14px;
-    flex-shrink: 0;
-    line-height: 1;
-}
-
-.header-weather-icon-today {
-    font-size: 14px;
-}
-
-.header-weather-text {
-    min-width: 0;
+.weather-current {
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: center;
-    gap: 1px;
-    overflow: hidden;
+    gap: 0;
+    flex: 0 0 25%;
+    min-width: 0;
+    padding: 2px 4px;
+    border-right: 1px solid rgba(79, 70, 229, 0.12);
 }
 
-.header-weather-line {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.weather-current-city {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--gray-800);
     white-space: nowrap;
     line-height: 1.2;
 }
 
-.header-weather-line-main {
-    font-weight: 700;
-    font-size: 10px;
-    color: var(--gray-800);
+.weather-current-icon {
+    font-size: 14px;
+    line-height: 1;
 }
 
-.header-weather-line-sub {
+.weather-current-temp {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--primary-color);
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.weather-today {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex: 0 0 25%;
+    min-width: 0;
+    padding: 2px 4px;
+    border-right: 1px solid rgba(79, 70, 229, 0.08);
+}
+
+.weather-today-label {
     font-size: 9px;
-    color: var(--gray-600);
-    letter-spacing: -0.1px;
+    font-weight: 700;
+    color: var(--gray-800);
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.weather-today-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.weather-today .weather-temp-range {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--gray-700);
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.weather-tomorrow,
+.weather-dayafter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex: 0 0 25%;
+    min-width: 0;
+    padding: 2px 4px;
+}
+
+.weather-tomorrow {
+    border-right: 1px solid rgba(79, 70, 229, 0.08);
+}
+
+.weather-day-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--gray-800);
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.weather-day-icon {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.weather-day-temp {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--gray-700);
+    white-space: nowrap;
+    line-height: 1.2;
 }
 
 .countdown-notice {
@@ -421,10 +468,10 @@ body {
 /* 主视图区域优化 */
 .board-view {
     flex: 1;
-    padding: var(--spacing-5) var(--spacing-6) calc(var(--spacing-6) + 4px);
+    padding: var(--spacing-3) var(--spacing-6) var(--spacing-2);
     overflow: hidden;
-    min-height: calc(100vh - 188px);
-    height: calc(100vh - 172px);
+    min-height: calc(100vh - 148px);
+    height: calc(100vh - 130px);
     box-sizing: border-box;
 }
 
@@ -739,9 +786,9 @@ body {
 /* 日视图 */
 .board-view {
     display: none;
-    padding: var(--spacing-5) var(--spacing-6) calc(var(--spacing-6) + 4px);
-    min-height: calc(100vh - 188px);
-    height: calc(100vh - 172px);
+    padding: var(--spacing-3) var(--spacing-6) var(--spacing-2);
+    min-height: calc(100vh - 148px);
+    height: calc(100vh - 130px);
     overflow: hidden;
     box-sizing: border-box;
 }
@@ -761,14 +808,50 @@ body {
     margin: 0;
 }
 
-.board-container {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--spacing-5);
-    min-height: calc(100% - 42px);
+.board-wrapper {
+    display: flex;
+    gap: var(--spacing-3);
+    min-height: calc(100% - 6px);
     height: calc(100% - 6px);
     max-width: 1600px;
     margin: 0 auto;
+    align-items: stretch;
+}
+
+.board-date-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 2px;
+    width: 72px;
+    min-width: 72px;
+    flex-shrink: 0;
+    padding-top: var(--spacing-3);
+}
+
+.board-date-label-date {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-800);
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.board-date-label-week {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-600);
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.board-container {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--spacing-4);
+    flex: 1;
+    min-width: 0;
     align-items: stretch;
 }
 
@@ -2264,8 +2347,8 @@ body {
     }
 
     .header-weather {
-        width: 170px;
-        max-width: 170px;
+        width: 200px;
+        max-width: 200px;
     }
 
     .board-container {
