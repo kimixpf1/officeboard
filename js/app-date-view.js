@@ -151,6 +151,18 @@ class OfficeDateViewController {
             const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayText}`;
             boardDateTitle.textContent = isToday ? `今日事项 (${dateStr})` : `${dateStr}事项`;
         }
+
+        const boardDateLabel = document.getElementById('boardDateLabel');
+        if (boardDateLabel) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const shortWeek = weekdayText.replace('星期', '周');
+            const dateLabel = boardDateLabel.querySelector('.board-date-label-date');
+            const weekLabel = boardDateLabel.querySelector('.board-date-label-week');
+            if (dateLabel) dateLabel.textContent = `${y}/${m}/${d}`;
+            if (weekLabel) weekLabel.textContent = shortWeek;
+        }
     }
 
     async getBoardItemsForSelectedDate() {
