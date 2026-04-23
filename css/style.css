@@ -194,13 +194,13 @@ body {
 }
 
 .header-weather-icon {
-    font-size: 16px;
+    font-size: 14px;
     flex-shrink: 0;
     line-height: 1;
 }
 
 .header-weather-icon-today {
-    font-size: 18px;
+    font-size: 14px;
 }
 
 .header-weather-text {
@@ -309,13 +309,15 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
-    flex: 0 1 320px;
-    max-width: 320px;
-    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 400px;
+    min-width: 120px;
+    overflow: hidden;
 }
 
 .ai-input {
     flex: 1;
+    min-width: 0;
     padding: var(--spacing-2) var(--spacing-3);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
@@ -2257,8 +2259,8 @@ body {
     }
 
     .toolbar-ai {
-        flex: 1 1 270px;
-        max-width: 270px;
+        flex: 1 1 240px;
+        max-width: 300px;
     }
 
     .header-weather {
