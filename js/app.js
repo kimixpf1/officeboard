@@ -575,6 +575,8 @@ class OfficeDashboard {
         this.countdownTypeColorsKey = 'office_countdown_type_colors';
         this.countdownBuiltinYear = new Date().getFullYear();
         this.countdownDragId = null;
+        this.countdownNoticeTimer = null;
+        this.countdownNoticeIndex = 0;
         this.renderCountdownPanel();
         this.updateCountdownNotice();
 
@@ -1019,22 +1021,43 @@ class OfficeDashboard {
         }
 
         const upcoming = this.getAllCountdownEvents().filter(item => item.daysLeft >= 0 && item.daysLeft <= 10);
+        if (this.countdownNoticeTimer) {
+            clearInterval(this.countdownNoticeTimer);
+            this.countdownNoticeTimer = null;
+        }
+
         if (!upcoming.length) {
             noticeEl.hidden = true;
+            this.countdownNoticeIndex = 0;
             return;
         }
 
-        const nextItem = upcoming[0];
         const titleEl = noticeEl.querySelector('.countdown-notice-title');
         const descEl = noticeEl.querySelector('.countdown-notice-desc');
+        const renderNoticeItem = (item) => {
+            if (titleEl) {
+                titleEl.textContent = `${item.name}${item.daysLeft === 0 ? '就在今天' : `还有 ${item.daysLeft} 天`}`;
+            }
+            if (descEl) {
+                descEl.textContent = `${item.date} · ${item.metaLabel || (item.type === 'holiday' ? '节假日提醒' : '纪念日提醒')}`;
+            }
+        };
 
-        if (titleEl) {
-            titleEl.textContent = `${nextItem.name}${nextItem.daysLeft === 0 ? '就在今天' : `还有 ${nextItem.daysLeft} 天`}`;
-        }
-        if (descEl) {
-            descEl.textContent = `${nextItem.date} · ${nextItem.metaLabel || (nextItem.type === 'holiday' ? '节假日提醒' : '纪念日提醒')}`;
-        }
+        const currentIndex = upcoming.length > 1
+            ? this.countdownNoticeIndex % upcoming.length
+            : 0;
+        renderNoticeItem(upcoming[currentIndex]);
         noticeEl.hidden = false;
+
+        if (upcoming.length > 1) {
+            this.countdownNoticeIndex = currentIndex;
+            this.countdownNoticeTimer = window.setInterval(() => {
+                this.countdownNoticeIndex = (this.countdownNoticeIndex + 1) % upcoming.length;
+                renderNoticeItem(upcoming[this.countdownNoticeIndex]);
+            }, 3000);
+        } else {
+            this.countdownNoticeIndex = 0;
+        }
     }
 
     startEditCountdownEvent(id) {
@@ -1218,6 +1241,12 @@ class OfficeDashboard {
 
         const sortOrder = allEvents.map(item => item.id);
         SafeStorage.set('office_countdown_sort_order', JSON.stringify(sortOrder));
+
+        if (window.syncManager?.isLoggedIn?.()) {
+            window.syncManager.immediateSyncToCloud().catch(error => {
+                console.warn('倒数日排序同步失败:', error?.message || error);
+            });
+        }
 
         this.renderCountdownPanel();
         this.updateCountdownNotice();
@@ -6384,8 +6413,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-23 P3-17';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=24', 'app-date-view.js?v=5', 'app.js?v=97', 'style.css?v=32'];
+        const version = '2026-04-23 P3-18';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=5', 'app.js?v=98', 'style.css?v=32'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

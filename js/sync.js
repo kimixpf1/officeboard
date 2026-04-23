@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -54,6 +54,63 @@ class SyncManager {
         this.lastLocalModifyTime = new Date().toISOString();
         SafeStorage.set('lastLocalModifyTime', this.lastLocalModifyTime);
 
+    }
+
+    hasLocalNonItemData() {
+        const hasNonEmptyString = (key) => {
+            const value = SafeStorage.get(key);
+            return typeof value === 'string' && value.trim() !== '';
+        };
+
+        const hasNonEmptyJson = (key, fallback) => {
+            const raw = SafeStorage.get(key);
+            if (!raw) {
+                return false;
+            }
+            const parsed = safeJsonParse(raw, fallback);
+            if (Array.isArray(parsed)) {
+                return parsed.length > 0;
+            }
+            if (parsed && typeof parsed === 'object') {
+                return Object.keys(parsed).length > 0;
+            }
+            return false;
+        };
+
+        return hasNonEmptyString('office_memo_content')
+            || hasNonEmptyString('office_schedule_content')
+            || hasNonEmptyString('office_links')
+            || hasNonEmptyString('office_contacts')
+            || hasNonEmptyJson('office_countdown_events', [])
+            || hasNonEmptyJson('office_countdown_type_colors', {})
+            || hasNonEmptyJson('office_countdown_sort_order', []);
+    }
+
+    async buildSyncData(items) {
+        const settings = {};
+        const kimiKey = await db.getSetting('kimi_api_key');
+        const kimiKeySet = await db.getSetting('kimi_api_key_set');
+        const deepseekKey = await db.getSetting('deepseek_api_key');
+        const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
+
+        if (kimiKey) settings.kimi_api_key = kimiKey;
+        if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
+        if (deepseekKey) settings.deepseek_api_key = deepseekKey;
+        if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+
+        return {
+            sync_time: new Date().toISOString(),
+            items: Array.isArray(items) ? items : [],
+            settings,
+            memo: SafeStorage.get('office_memo_content') || '',
+            schedule: SafeStorage.get('office_schedule_content') || '',
+            links: SafeStorage.get('office_links') || '',
+            contacts: SafeStorage.get('office_contacts') || '',
+            countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
+            countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
+            countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
+            device_info: navigator.userAgent
+        };
     }
 
     /**
@@ -164,7 +221,7 @@ class SyncManager {
             if (error) {
                 console.error('获取云端数据失败:', error);
                 // 云端获取失败，但本地有数据，尝试上传
-                if (localItems.length > 0) {
+                if (localItems.length > 0 || this.hasLocalNonItemData()) {
                     await this.uploadToCloud();
                 }
                 this.isSyncing = false;
@@ -179,9 +236,11 @@ class SyncManager {
 
             // 情况1: 云端无数据
             if (!cloudData || !cloudData.data) {
+                const localSyncData = await this.buildSyncData(localItems);
+                const hasLocalSideData = this.hasLocalNonItemData();
 
-                if (localItems.length > 0) {
-                    await this.uploadToCloud(cloudData);
+                if (localItems.length > 0 || hasLocalSideData) {
+                    await this.uploadToCloud(cloudData, localSyncData);
                 }
                 this.isSyncing = false;
                 return;
@@ -270,14 +329,16 @@ class SyncManager {
     /**
      * 上传本地数据到云端
      */
-    async uploadToCloud(existingCloudData = null) {
+    async uploadToCloud(existingCloudData = null, preparedSyncData = null) {
 
 
         try {
             const allItems = await db.getAllItems();
+            const syncData = preparedSyncData || await this.buildSyncData(allItems);
+            const hasLocalSideData = this.hasLocalNonItemData();
             
             // 空数据保护：如果本地事项为空但云端可能有数据，先检查云端
-            if (allItems.length === 0) {
+            if (allItems.length === 0 && !hasLocalSideData) {
                 let cloudRow = existingCloudData;
                 if (!cloudRow) {
                     const { data } = await this.supabase
@@ -295,31 +356,8 @@ class SyncManager {
                 }
             }
             
-            const settings = {};
-            const kimiKey = await db.getSetting('kimi_api_key');
-            const kimiKeySet = await db.getSetting('kimi_api_key_set');
-            const deepseekKey = await db.getSetting('deepseek_api_key');
-            const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
-
-            if (kimiKey) settings.kimi_api_key = kimiKey;
-            if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
-            if (deepseekKey) settings.deepseek_api_key = deepseekKey;
-            if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
-
             const syncTime = new Date().toISOString();
-            const syncData = {
-                sync_time: syncTime,
-                items: allItems,
-                settings: settings,
-                memo: SafeStorage.get('office_memo_content') || '',
-                schedule: SafeStorage.get('office_schedule_content') || '',
-                links: SafeStorage.get('office_links') || '',
-                contacts: SafeStorage.get('office_contacts') || '',
-                countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
-                countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
-                countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
-                device_info: navigator.userAgent
-            };
+            syncData.sync_time = syncTime;
 
             const { data: upsertResult, error } = await this.supabase
                 .from('user_data')
