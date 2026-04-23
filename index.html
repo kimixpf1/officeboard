@@ -94,19 +94,17 @@
                 <div class="brand-block">
                     <h1 class="logo">大飞智能工作面板</h1>
                     <div class="header-meta">
-                        <button type="button" id="headerClock" class="header-clock" title="当前时间">--:--:--</button>
+                        <div id="headerClock" class="header-clock" title="当前时间">
+                            <span class="clock-date">----/--/--</span>
+                            <span class="clock-time">--:--:--</span>
+                        </div>
                         <button type="button" id="headerWeather" class="header-weather" title="点击切换天气城市">
                             <span class="header-weather-top">
-                                <span class="header-weather-city">苏州</span>
-                                <span class="header-weather-icons">
-                                    <span class="header-weather-icon header-weather-icon-today">🌤️</span>
-                                    <span class="header-weather-icon header-weather-icon-next">🌦️</span>
-                                    <span class="header-weather-icon header-weather-icon-next">☁️</span>
+                                <span class="header-weather-icon header-weather-icon-today">🌤️</span>
+                                <span class="header-weather-text">
+                                    <span class="header-weather-line header-weather-line-main">苏州 · 今日 18~26°</span>
+                                    <span class="header-weather-line header-weather-line-sub">明 🌦️ 17~24° · 后 ☁️ 16~22°</span>
                                 </span>
-                            </span>
-                            <span class="header-weather-text">
-                                <span class="header-weather-line header-weather-line-main">今日 18~26° · 当前 22°</span>
-                                <span class="header-weather-line header-weather-line-sub">明 17~24° · 后 16~22°</span>
                             </span>
                         </button>
                     </div>
@@ -1103,7 +1101,7 @@
     <script src="js/sync.js?v=25"></script>
     <script src="js/upload-flow.js?v=6"></script>
     <script src="js/app-date-view.js?v=5"></script>
-    <script src="js/app.js?v=99"></script>
+    <script src="js/app.js?v=100"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">

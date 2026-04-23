@@ -8,34 +8,33 @@
 
 ### 当前状态
 - ✅ 已完成上一批改动推送到 `origin/main`
-- ✅ 已将 `toolbar-ai` 收敛为约三分之二宽度（`max-width: 270px`），并保留解析/上传按钮
+- ✅ 已将 `toolbar-ai` 收敛为约三分之二宽度后，再根据实际占位回调为桌面端 `max-width: 320px`，避免与视图切换区重叠
 - ✅ 已将 `header-center` 调整为桌面端默认 `nowrap`，降低 AI / 视图切换 / 日期区折行
 - ✅ 已重做天气组件为两层结构：第一层城市 + 今明后图标，第二层今日与明后天温度区间
-- ✅ 已将天气组件宽度适度扩展为 `240px`，保持原菜单栏位置不变
+- ✅ 已将天气组件从 `240px` 收紧为桌面端 `196px`、中等屏宽 `188px`，避免挤占中间区
 - ✅ 已继续拉伸 `board-view` / `board-container` 可用高度，减小底部空白
 - ✅ 已完成 `node --check js/app.js` 与 diagnostics 0 错误
-- 🔄 待提交并推送 `P3-18`，并进行线上强刷验证
+- 🔄 待线上强刷验证 `P3-18`，重点观察顶部组件是否仍发生互相挤压
 
 ### 本轮关键改动
 - index.html：`headerWeather` 改为两层结构，新增 `header-weather-top`、`header-weather-icons`、`header-weather-icon-today`、`header-weather-icon-next`
 - index.html：资源版本提升为 `style.css?v=33`、`app.js?v=99`
 - app.js：`updateHeaderWeatherDisplay()` 改为分别驱动“今日图标 + 明/后图标”，并输出“今日温度区间+当前温度 / 明后天温度区间”
 - app.js：部署徽标资源描述同步提升到 `app.js?v=99`、`style.css?v=33`
-- style.css：`toolbar-ai` 收敛到 `max-width: 270px`，`header-center` 默认不换行
-- style.css：天气组件改为两层排版并扩展至 `240px`，增强信息可读性
+- style.css：`toolbar-ai` 现为桌面端 `max-width: 320px`，`header-center` 默认不换行
+- style.css：天气组件改为两层排版后再压缩至 `196px` / `188px`，增强信息可读性同时回避重叠
 - style.css：`board-view` 与 `board-container` 高度参数继续上调，减少主视图下方留白
 
 ### 验证结果
 - `node --check js/app.js` 通过
 - `index.html` / `app.js` / `style.css` diagnostics 0 错误
 - 静态核对通过：
-  - 顶部 AI 输入区较之前明显缩短
-  - 天气组件已为两层布局，含今明后图标与今日/未来温度区间
+  - 顶部 AI 输入区相对前一版重新释放了可用宽度
+  - 天气组件仍为两层布局，但桌面端已明显收窄
   - 主视图区高度较上轮进一步拉伸
   - 资源 query 已更新为 `style.css?v=33`、`app.js?v=99`
 
 ### 遗留事项
-- 待提交并推送到 `origin/main`
 - 待线上强刷验证 `P3-18` 是否生效
 - 待在真实双端登录环境继续观察倒数日自动同步与顶部布局稳定性
 
