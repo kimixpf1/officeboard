@@ -127,8 +127,8 @@ class OfficeDashboard {
             ['钱局'],
             ['吴局'],
             ['盛局'],
-            ['陈局', '陈主任'],
-            ['房局']
+            ['房局'],
+            ['陈局', '陈主任']
         ];
 
         // 多选功能状态
@@ -542,12 +542,19 @@ class OfficeDashboard {
         const weatherIcon = weatherBtn.querySelector('.header-weather-icon');
         const current = this.currentWeatherData || null;
         const forecast = Array.isArray(this.weatherForecastSummary) ? this.weatherForecastSummary : [];
-        const extraDays = forecast.slice(1, 3).map(item => `${item.label[0]}${item.max}/${item.min}°`).join(' ');
+        const extraDays = forecast.slice(1, 3).map(item => {
+            const icon = this.getWeatherIcon(item.code);
+            return `${item.label[0]}${icon}${item.min}~${item.max}°`;
+        }).join(' ');
+
+        if (weatherIcon) {
+            weatherIcon.textContent = current?.icon || '🌤️';
+        }
 
         if (weatherText) {
             const mainText = current?.description
-                ? `${city} ${current.description} ${current.temperature ?? '--'}°`
-                : `${city} 天气点击查看`;
+                ? `${city} ${current.temperature ?? '--'}°`
+                : `${city} 天气`;
             const subText = extraDays || '明/后天气加载中';
 
             if (weatherMainLine && weatherSubLine) {
@@ -558,8 +565,8 @@ class OfficeDashboard {
             }
         }
 
-        weatherBtn.title = extraDays
-            ? `当前天气城市：${city}，点击切换\n${extraDays}`
+        weatherBtn.title = current?.description
+            ? `当前天气城市：${city}，${current.description} ${current.temperature ?? '--'}°，点击切换\n${extraDays || '明后天天气加载中'}`
             : `当前天气城市：${city}，点击切换`;
     }
 
@@ -6377,8 +6384,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-23 P3-16';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=24', 'sync.js?v=23', 'app-date-view.js?v=4', 'app.js?v=96', 'style.css?v=31'];
+        const version = '2026-04-23 P3-17';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=24', 'app-date-view.js?v=5', 'app.js?v=97', 'style.css?v=32'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -7482,24 +7489,26 @@ class OfficeDashboard {
                 const statusFields = ['completed', 'completedAt'];
 
                 if (choice === 'this') {
-                    await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                    await this.applyCrossDateMeetingScopedUpdate(id, originalItem, choice, {
                         fields: statusFields,
                         dayStateUpdates: {
                             completed,
                             completedAt
                         }
                     });
+                    await this.loadItems();
                     this.showSuccess(completed ? '已标记当天完成' : '已取消当天完成');
                     return;
                 }
 
-                await this.applyCrossDateDocumentScopedUpdate(id, originalItem, choice, {
+                await this.applyCrossDateMeetingScopedUpdate(id, originalItem, choice, {
                     fields: statusFields,
                     globalUpdates: {
                         completed,
                         completedAt
                     }
                 });
+                await this.loadItems();
                 this.showSuccess(
                     choice === 'future'
                         ? (completed ? '已标记今天及之后完成' : '已取消今天及之后完成')

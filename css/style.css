@@ -157,6 +157,8 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     align-items: flex-start;
+    padding: 6px 10px;
+    gap: 5px;
 }
 
 .header-weather:hover {
@@ -165,9 +167,9 @@ body {
 }
 
 .header-weather-icon {
-    font-size: 16px;
+    font-size: 15px;
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .header-weather-text {
@@ -189,11 +191,13 @@ body {
 
 .header-weather-line-main {
     font-weight: 600;
+    font-size: 11px;
 }
 
 .header-weather-line-sub {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--gray-600);
+    letter-spacing: -0.1px;
 }
 
 .countdown-notice {
@@ -362,6 +366,14 @@ body {
     background: var(--bg-primary);
     cursor: pointer;
     max-width: 130px;
+}
+
+.date-weekday-label {
+    min-width: 48px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--gray-700);
+    text-align: center;
 }
 
 /* 主视图区域优化 */
@@ -2106,6 +2118,7 @@ body {
 /* 深色主题特殊样式 */
 [data-theme="dark"] .ai-input,
 [data-theme="dark"] .date-picker-sm,
+[data-theme="dark"] .date-weekday-label,
 [data-theme="dark"] input[type="date"] {
     background: var(--bg-tertiary);
     color: var(--gray-700);
@@ -4654,6 +4667,15 @@ mark.highlight {
 
 .copyright-footer p {
     margin: 2px 0;
+}
+
+.deploy-version-badge {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 10px;
+    color: var(--gray-400);
+    line-height: 1.3;
+    pointer-events: auto;
 }
 
 .copyright-note {

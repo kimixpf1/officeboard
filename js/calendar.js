@@ -12,6 +12,39 @@ class CalendarView {
         this.lastRenderAt = 0;
     }
 
+    getDashboardApp() {
+        return window.officeDashboard || null;
+    }
+
+    getComparableTimestamp(value) {
+        const timestamp = new Date(value || 0).getTime();
+        return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    getMeetingLeaderRank(item) {
+        const app = this.getDashboardApp();
+        if (!app?.getMeetingLevel || !item || item.type !== 'meeting') {
+            return Number.MAX_SAFE_INTEGER;
+        }
+        return app.getMeetingLevel(item);
+    }
+
+    compareMeetingsByBoardOrder(a, b) {
+        const rankA = this.getMeetingLeaderRank(a);
+        const rankB = this.getMeetingLeaderRank(b);
+        if (rankA !== rankB) {
+            return rankA - rankB;
+        }
+
+        const timeA = a.time || '99:99';
+        const timeB = b.time || '99:99';
+        if (timeA !== timeB) {
+            return timeA.localeCompare(timeB);
+        }
+
+        return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
+    }
+
     isItemCompleted(item) {
         if (!item) {
             return false;
@@ -41,6 +74,10 @@ class CalendarView {
             const typeB = typeOrder[b.type] || 99;
             if (typeA !== typeB) {
                 return typeA - typeB;
+            }
+
+            if (a.type === 'meeting' && b.type === 'meeting') {
+                return this.compareMeetingsByBoardOrder(a, b);
             }
 
             const timeA = this.getItemTime(a);
@@ -330,6 +367,11 @@ class CalendarView {
             title: dayState.title !== undefined ? dayState.title : item.title,
             content: dayState.content !== undefined ? dayState.content : item.content,
             location: dayState.location !== undefined ? dayState.location : item.location,
+            attendees: dayState.attendees !== undefined ? dayState.attendees : item.attendees,
+            time: dayState.time !== undefined ? dayState.time : item.time,
+            endTime: dayState.endTime !== undefined ? dayState.endTime : item.endTime,
+            handler: dayState.handler !== undefined ? dayState.handler : item.handler,
+            transferHistory: dayState.transferHistory !== undefined ? dayState.transferHistory : item.transferHistory,
             _hidden: dayState.hidden || false
         };
     }

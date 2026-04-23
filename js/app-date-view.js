@@ -130,19 +130,26 @@ class OfficeDateViewController {
     updateDateDisplay() {
         const datePicker = document.getElementById('datePicker');
         const boardDateTitle = document.getElementById('boardDateTitle');
+        const dateWeekdayLabel = document.getElementById('dateWeekdayLabel');
+        const date = new Date(this.app.selectedDate);
+        const today = new Date();
+        const isToday = this.app.formatDateLocal(today) === this.app.selectedDate;
+        const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const weekdayText = weekDays[date.getDay()];
 
-        if (this.app.currentView === 'board') {
-            if (datePicker) {
-                datePicker.value = this.app.selectedDate;
-            }
-            if (boardDateTitle) {
-                const date = new Date(this.app.selectedDate);
-                const today = new Date();
-                const isToday = this.app.formatDateLocal(today) === this.app.selectedDate;
-                const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekDays[date.getDay()]}`;
-                boardDateTitle.textContent = isToday ? `今日事项 (${dateStr})` : `${dateStr}事项`;
-            }
+        if (datePicker) {
+            datePicker.value = this.app.selectedDate;
+            datePicker.title = `${this.app.selectedDate} ${weekdayText}`;
+        }
+
+        if (dateWeekdayLabel) {
+            dateWeekdayLabel.textContent = weekdayText;
+            dateWeekdayLabel.title = `${this.app.selectedDate} ${weekdayText}`;
+        }
+
+        if (this.app.currentView === 'board' && boardDateTitle) {
+            const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayText}`;
+            boardDateTitle.textContent = isToday ? `今日事项 (${dateStr})` : `${dateStr}事项`;
         }
     }
 
