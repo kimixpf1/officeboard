@@ -152,13 +152,16 @@ body {
 }
 
 .header-weather {
-    max-width: 200px;
+    width: 240px;
+    max-width: 240px;
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
-    align-items: flex-start;
-    padding: 6px 10px;
-    gap: 5px;
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-direction: column;
+    padding: 7px 11px 8px;
+    gap: 4px;
 }
 
 .header-weather:hover {
@@ -166,10 +169,44 @@ body {
     transform: translateY(-1px);
 }
 
+.header-weather-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+}
+
+.header-weather-city {
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-weather-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
 .header-weather-icon {
     font-size: 15px;
     flex-shrink: 0;
-    margin-top: 1px;
+    line-height: 1;
+}
+
+.header-weather-icon-today {
+    font-size: 16px;
+}
+
+.header-weather-icon-next {
+    font-size: 14px;
+    opacity: 0.92;
 }
 
 .header-weather-text {
@@ -177,7 +214,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 1px;
+    gap: 2px;
     overflow: hidden;
 }
 
@@ -186,12 +223,13 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 1.2;
+    line-height: 1.25;
 }
 
 .header-weather-line-main {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 11px;
+    color: var(--gray-800);
 }
 
 .header-weather-line-sub {
@@ -251,16 +289,17 @@ body {
 .header-center {
     display: flex;
     align-items: center;
-    gap: var(--spacing-4);
-    flex: 1;
+    gap: var(--spacing-3);
+    flex: 1 1 auto;
     justify-content: center;
-    flex-wrap: wrap;
+    min-width: 0;
+    flex-wrap: nowrap;
 }
 
 .header-notice {
     display: flex;
     align-items: center;
-    flex: 0 0 auto;
+    flex: 0 1 320px;
     min-width: 0;
 }
 
@@ -276,8 +315,9 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
-    flex: 1;
-    max-width: 400px;
+    flex: 0 1 270px;
+    max-width: 270px;
+    min-width: 0;
 }
 
 .ai-input {
@@ -330,6 +370,7 @@ body {
     padding: 2px;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
+    flex: 0 0 auto;
 }
 
 .toolbar-views .view-btn {
@@ -341,6 +382,7 @@ body {
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .toolbar-views .view-btn:hover {
@@ -356,6 +398,8 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-1);
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .date-picker-sm {
@@ -366,6 +410,7 @@ body {
     background: var(--bg-primary);
     cursor: pointer;
     max-width: 130px;
+    flex: 0 0 auto;
 }
 
 .date-weekday-label {
@@ -374,14 +419,17 @@ body {
     font-weight: 600;
     color: var(--gray-700);
     text-align: center;
+    white-space: nowrap;
 }
 
 /* 主视图区域优化 */
 .board-view {
     flex: 1;
-    padding: var(--spacing-4);
-    overflow-y: auto;
-    min-height: calc(100vh - 120px);
+    padding: var(--spacing-5) var(--spacing-6) calc(var(--spacing-6) + 4px);
+    overflow: hidden;
+    min-height: calc(100vh - 188px);
+    height: calc(100vh - 172px);
+    box-sizing: border-box;
 }
 
 /* 按钮样式 */
@@ -695,9 +743,9 @@ body {
 /* 日视图 */
 .board-view {
     display: none;
-    padding: var(--spacing-5) var(--spacing-6) calc(var(--spacing-5) + 6px);
-    min-height: calc(100vh - 200px);
-    height: calc(100vh - 184px);
+    padding: var(--spacing-5) var(--spacing-6) calc(var(--spacing-6) + 4px);
+    min-height: calc(100vh - 188px);
+    height: calc(100vh - 172px);
     overflow: hidden;
     box-sizing: border-box;
 }
@@ -721,8 +769,8 @@ body {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--spacing-5);
-    min-height: calc(100% - 50px);
-    height: calc(100% - 18px);
+    min-height: calc(100% - 42px);
+    height: calc(100% - 6px);
     max-width: 1600px;
     margin: 0 auto;
     align-items: stretch;
@@ -2197,6 +2245,33 @@ body {
         overflow: visible;
     }
 
+    .header {
+        flex-wrap: wrap;
+        gap: var(--spacing-3);
+    }
+
+    .header-left,
+    .header-center,
+    .header-notice,
+    .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .header-center {
+        flex-wrap: wrap;
+    }
+
+    .toolbar-ai {
+        flex: 1 1 250px;
+        max-width: 300px;
+    }
+
+    .header-weather {
+        width: 224px;
+        max-width: 224px;
+    }
+
     .board-container {
         grid-template-columns: 1fr;
         height: auto;
@@ -2262,6 +2337,7 @@ body {
     .header-clock,
     .header-weather {
         max-width: 100%;
+        width: 100%;
     }
 
     .header-notice {

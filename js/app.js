@@ -537,36 +537,60 @@ class OfficeDashboard {
 
         const city = localStorage.getItem('office_weather_city') || '苏州';
         const weatherText = weatherBtn.querySelector('.header-weather-text');
+        const weatherCity = weatherBtn.querySelector('.header-weather-city');
         const weatherMainLine = weatherBtn.querySelector('.header-weather-line-main');
         const weatherSubLine = weatherBtn.querySelector('.header-weather-line-sub');
-        const weatherIcon = weatherBtn.querySelector('.header-weather-icon');
+        const weatherTodayIcon = weatherBtn.querySelector('.header-weather-icon-today');
+        const weatherNextIcons = weatherBtn.querySelectorAll('.header-weather-icon-next');
         const current = this.currentWeatherData || null;
         const forecast = Array.isArray(this.weatherForecastSummary) ? this.weatherForecastSummary : [];
-        const extraDays = forecast.slice(1, 3).map(item => {
-            const icon = this.getWeatherIcon(item.code);
-            return `${item.label[0]}${icon}${item.min}~${item.max}°`;
-        }).join(' ');
 
-        if (weatherIcon) {
-            weatherIcon.textContent = current?.icon || '🌤️';
+        const today = forecast[0] || null;
+        const tomorrow = forecast[1] || null;
+        const dayAfterTomorrow = forecast[2] || null;
+
+        const todaySummary = today
+            ? `今日 ${today.min}~${today.max}° · 当前 ${current?.temperature ?? '--'}°`
+            : current?.description
+                ? `今日 --~--° · 当前 ${current.temperature ?? '--'}°`
+                : '今天天气加载中';
+
+        const futureSummary = [tomorrow, dayAfterTomorrow]
+            .filter(Boolean)
+            .map(item => {
+                const shortLabel = item.label === '明天' ? '明' : item.label === '后天' ? '后' : item.label;
+                return `${shortLabel} ${item.min}~${item.max}°`;
+            })
+            .join(' · ');
+
+        if (weatherTodayIcon) {
+            weatherTodayIcon.textContent = current?.icon || (today ? this.getWeatherIcon(today.code) : '🌤️');
+        }
+
+        if (weatherNextIcons?.length) {
+            if (weatherNextIcons[0]) {
+                weatherNextIcons[0].textContent = tomorrow ? this.getWeatherIcon(tomorrow.code) : '🌦️';
+            }
+            if (weatherNextIcons[1]) {
+                weatherNextIcons[1].textContent = dayAfterTomorrow ? this.getWeatherIcon(dayAfterTomorrow.code) : '☁️';
+            }
+        }
+
+        if (weatherCity) {
+            weatherCity.textContent = city;
         }
 
         if (weatherText) {
-            const mainText = current?.description
-                ? `${city} ${current.temperature ?? '--'}°`
-                : `${city} 天气`;
-            const subText = extraDays || '明/后天气加载中';
-
             if (weatherMainLine && weatherSubLine) {
-                weatherMainLine.textContent = mainText;
-                weatherSubLine.textContent = subText;
+                weatherMainLine.textContent = todaySummary;
+                weatherSubLine.textContent = futureSummary || '明后天天气加载中';
             } else {
-                weatherText.textContent = `${mainText}${extraDays ? ` ${extraDays}` : ''}`;
+                weatherText.textContent = `${todaySummary}${futureSummary ? ` ${futureSummary}` : ''}`;
             }
         }
 
         weatherBtn.title = current?.description
-            ? `当前天气城市：${city}，${current.description} ${current.temperature ?? '--'}°，点击切换\n${extraDays || '明后天天气加载中'}`
+            ? `当前天气城市：${city}，${current.description} ${current.temperature ?? '--'}°，点击切换\n${todaySummary}${futureSummary ? `\n${futureSummary}` : ''}`
             : `当前天气城市：${city}，点击切换`;
     }
 
@@ -6414,7 +6438,7 @@ class OfficeDashboard {
         }
 
         const version = '2026-04-23 P3-18';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=5', 'app.js?v=98', 'style.css?v=32'];
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=5', 'app.js?v=99', 'style.css?v=33'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
