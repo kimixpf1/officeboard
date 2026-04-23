@@ -15,7 +15,7 @@
     <meta name="author" content="kimixpf1">
     <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
     
-    <link rel="stylesheet" href="css/style.css?v=38">
+    <link rel="stylesheet" href="css/style.css?v=40">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -207,12 +207,11 @@
 
         <!-- 日视图 -->
         <section id="boardView" class="board-view active">
-            <div class="board-wrapper">
-                <div id="boardDateLabel" class="board-date-label">
-                    <span class="board-date-label-date">----/--/--</span>
-                    <span class="board-date-label-week">---</span>
-                </div>
-                <div class="board-container">
+            <div id="boardDateLabel" class="board-date-label">
+                <span class="board-date-label-date">----/--/--</span>
+                <span class="board-date-label-week">---</span>
+            </div>
+            <div class="board-container">
                 <!-- 待办事项栏 -->
                 <div class="board-column" data-type="todo">
                     <div class="column-header">
@@ -320,7 +319,6 @@
                     <div class="column-content" id="documentList">
                         <!-- 文件卡片将动态插入 -->
                     </div>
-                </div>
                 </div>
             </div>
         </section>
@@ -1117,12 +1115,11 @@
     <script src="js/sync.js?v=25"></script>
     <script src="js/upload-flow.js?v=6"></script>
     <script src="js/app-date-view.js?v=6"></script>
-    <script src="js/app.js?v=105"></script>
+    <script src="js/app.js?v=106"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">
-        <div id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></div>
-        <p>© 2024-2026 kimixpf1. All Rights Reserved.</p>
+        <p>© 2024-2026 kimixpf1. All Rights Reserved. <span id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></span></p>
         <p class="copyright-note">本软件版权归作者所有，用户可免费使用但不得用于商业用途。</p>
     </footer>
 </body>

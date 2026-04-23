@@ -791,6 +791,7 @@ body {
     height: calc(100vh - 130px);
     overflow: hidden;
     box-sizing: border-box;
+    position: relative;
 }
 
 .board-view.active {
@@ -808,30 +809,20 @@ body {
     margin: 0;
 }
 
-.board-wrapper {
-    display: flex;
-    gap: var(--spacing-3);
-    min-height: calc(100% - 6px);
-    height: calc(100% - 6px);
-    max-width: 1600px;
-    margin: 0 auto;
-    align-items: stretch;
-}
-
 .board-date-label {
+    position: absolute;
+    top: var(--spacing-2);
+    left: var(--spacing-6);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
+    align-items: flex-start;
     gap: 2px;
-    width: 72px;
-    min-width: 72px;
-    flex-shrink: 0;
-    padding-top: var(--spacing-3);
+    z-index: 5;
+    pointer-events: none;
 }
 
 .board-date-label-date {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--gray-800);
     white-space: nowrap;
@@ -839,7 +830,7 @@ body {
 }
 
 .board-date-label-week {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--gray-600);
     white-space: nowrap;
@@ -850,8 +841,10 @@ body {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--spacing-4);
-    flex: 1;
-    min-width: 0;
+    min-height: calc(100% - 6px);
+    height: calc(100% - 6px);
+    max-width: 1600px;
+    margin: 0 auto;
     align-items: stretch;
 }
 
@@ -4842,7 +4835,7 @@ mark.highlight {
     left: 0;
     right: 0;
     background: linear-gradient(to top, rgba(255,255,255,0.95), rgba(255,255,255,0.8));
-    padding: 8px 20px;
+    padding: 4px 20px;
     text-align: center;
     font-size: 11px;
     color: var(--gray-500);
@@ -4859,12 +4852,11 @@ mark.highlight {
 }
 
 .copyright-footer p {
-    margin: 2px 0;
+    margin: 1px 0;
 }
 
 .deploy-version-badge {
-    display: block;
-    margin-bottom: 4px;
+    display: inline;
     font-size: 10px;
     color: var(--gray-400);
     line-height: 1.3;
