@@ -6451,14 +6451,56 @@ class OfficeDashboard {
         }
     }
 
+    async extendItemEndDate(id, type, newEndDate) {
+        if (!id || !newEndDate) return;
+        const originalItem = await db.getItem(parseInt(id));
+        if (!originalItem) return;
+
+        const updates = {};
+        const dayStates = { ...(originalItem.dayStates || {}) };
+        if (type === ITEM_TYPES.MEETING && this.isCrossDateMeeting(originalItem)) {
+            if (newEndDate <= originalItem.endDate) {
+                this.showError('只能向后延伸结束日期');
+                return;
+            }
+            updates.endDate = newEndDate;
+            updates.dayStates = dayStates;
+        } else if (type === ITEM_TYPES.DOCUMENT && this.isCrossDateDocument(originalItem)) {
+            if (newEndDate <= originalItem.docEndDate) {
+                this.showError('只能向后延伸结束日期');
+                return;
+            }
+            updates.docEndDate = newEndDate;
+            updates.dayStates = dayStates;
+        } else {
+            return;
+        }
+
+        try {
+            this.saveUndoHistory('update', { item: originalItem });
+            await db.updateItem(parseInt(id), updates);
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) {
+                syncManager.immediateSyncToCloud().catch(err => {
+                    console.error('云端同步失败:', err);
+                });
+            }
+            this.showSuccess(`已延伸结束日期至 ${newEndDate}`);
+        } catch (error) {
+            console.error('延伸日期失败:', error);
+            this.showError('延伸日期失败，请重试');
+            try { await this.loadItems(); } catch (refreshError) { console.warn('延伸后刷新失败:', refreshError.message); }
+        }
+    }
+
     updateDeployVersionBadge() {
         const badge = document.getElementById('deployVersionBadge');
         if (!badge) {
             return;
         }
 
-        const version = '2026-04-23 P3-30';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=7', 'app.js?v=109', 'style.css?v=45'];
+        const version = '2026-04-24 P3-31';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=26', 'sync.js?v=25', 'app-date-view.js?v=7', 'app.js?v=110', 'style.css?v=46'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

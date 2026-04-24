@@ -1,3 +1,46 @@
+## 2026-04-24 P3-31
+
+### 本次目标
+- 实施 Opus 4.7 长期优化储备中的“周 / 月视图拖拽延伸时间”能力
+- 在不影响现有线上功能的前提下，为跨日期会议 / 办文增加低侵入的向后延伸结束日期交互
+- 完成语法检查、诊断验证与规则文件回写
+
+### 当前状态
+- ✅ 已在 `calendar.js` 为跨日期会议 / 办文卡片增加右侧延伸手柄
+- ✅ 已实现拖拽命中周 / 月视图日期单元格后延伸结束日期的交互
+- ✅ 已限制只能向后延伸，不能缩短，避免误伤既有跨日期范围
+- ✅ 已在 `app.js` 增加 `extendItemEndDate(...)`，会议更新 `endDate`，办文更新 `docEndDate`，同时保留现有 `dayStates`
+- ✅ 已在延伸成功后调用 `loadItems()` 刷新，并在登录态下触发云端同步
+- ✅ 已补充延伸手柄、拖拽提示、目标日期高亮样式
+- ✅ 已修正月视图日期单元格 `data-date` 为标准 `YYYY-MM-DD`，确保拖拽目标识别稳定
+- ✅ 已将部署版本提升为 `2026-04-24 P3-31`，资源版本提升为 `style.css?v=46`、`calendar.js?v=26`、`app.js?v=110`
+- ✅ 已完成 `node --check js/calendar.js`、`node --check js/app.js` 与 diagnostics 0 错误
+
+### 本轮关键改动
+- calendar.js：新增 `_isCrossDateItem(...)`，仅对非周期性的跨日期会议 / 办文显示延伸手柄
+- calendar.js：新增 `_initExtendHandle(...)`、`_startExtendDrag(...)`、`_findCellAtPoint(...)`，处理鼠标与触屏拖拽延伸
+- calendar.js：延伸过程中高亮目标日期单元格，并提示“延伸至 YYYY-MM-DD”或“只能向后延伸”
+- calendar.js：月视图 `month-cell.dataset.date` 改为标准日期字符串，避免拖拽目标读取到中文展示标签
+- app.js：新增 `extendItemEndDate(id, type, newEndDate)`，集中处理数据校验、撤销快照、写入、刷新与同步
+- style.css：新增 `.calendar-item-extend-handle`、`.calendar-extend-indicator`、`.calendar-extend-target` 等样式
+- index.html：资源 query 提升为 `style.css?v=46`、`calendar.js?v=26`、`app.js?v=110`
+
+### 验证结果
+- `node --check js/calendar.js` 通过
+- `node --check js/app.js` 通过
+- `index.html` / `app.js` / `calendar.js` / `style.css` diagnostics 0 错误
+- 静态核对通过：
+  - 原有卡片点击跳转仍保留
+  - 原有卡片拖拽排序仍走 `handleDragStart` / `handleDragEnd`
+  - 延伸手柄独立拦截点击与拖拽，不与原拖拽排序混用
+  - 写入层只允许向后延伸，不能缩短
+  - `dayStates` 原样保留，避免影响跨日期每日覆盖状态
+
+### 遗留事项
+- 待本地页面真人拖拽验证周 / 月视图跨日期会议与办文延伸效果
+- 待线上强刷验证 `P3-31` 是否生效
+- 待真实数据环境继续观察跨日期完成态、同步和拖拽排序是否稳定
+
 ## 2026-04-23 P3-18
 
 ### 本次目标

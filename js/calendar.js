@@ -683,8 +683,7 @@ class CalendarView {
 
             const cellDiv = document.createElement('div');
             cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}`;
-            const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
-            cellDiv.dataset.date = fullDateLabel;
+            cellDiv.dataset.date = dateStr;
             this.bindQuickAddEvents(cellDiv, dateStr);
             cellDiv.appendChild(this.createCellTopBar(dateStr, `${month + 1}月${day}日`));
 
@@ -713,6 +712,125 @@ class CalendarView {
         return this.createCalendarItem(item, compact);
     }
 
+    _isCrossDateItem(item) {
+        if (!item) return false;
+        if (item.type === 'meeting' && item.date && item.endDate && item.endDate > item.date && !item.recurringGroupId) return true;
+        if (item.type === 'document' && item.docStartDate && item.docEndDate && !item.recurringGroupId) return true;
+        return false;
+    }
+
+    _initExtendHandle(el, item) {
+        const handle = document.createElement('div');
+        handle.className = 'calendar-item-extend-handle';
+        handle.title = '拖拽延伸结束日期';
+        handle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this._startExtendDrag(e, el, item);
+        });
+        handle.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const touch = e.touches[0];
+            this._startExtendDrag(touch, el, item);
+        }, { passive: false });
+        el.appendChild(handle);
+        el.classList.add('has-extend-handle');
+    }
+
+    _startExtendDrag(startEvent, el, item) {
+        const app = this.getDashboardApp();
+        if (!app) return;
+
+        let currentEndDate;
+        let startDate;
+        if (item.type === 'meeting') {
+            currentEndDate = item.endDate;
+            startDate = item.date;
+        } else if (item.type === 'document') {
+            currentEndDate = item.docEndDate;
+            startDate = item.docStartDate || item.docDate;
+        }
+        if (!currentEndDate || !startDate) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'calendar-extend-overlay';
+        document.body.appendChild(overlay);
+
+        const indicator = document.createElement('div');
+        indicator.className = 'calendar-extend-indicator';
+        indicator.textContent = `延伸至: ${currentEndDate}`;
+        document.body.appendChild(indicator);
+
+        const handleMove = (moveEvent) => {
+            if (moveEvent.cancelable) {
+                moveEvent.preventDefault();
+            }
+            const cx = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0]?.clientX);
+            const cy = moveEvent.clientY || (moveEvent.clientY !== undefined ? moveEvent.clientY : (moveEvent.touches && moveEvent.touches[0]?.clientY));
+            if (cx === undefined) return;
+
+            const targetCell = this._findCellAtPoint(cx, cy);
+            if (targetCell && targetCell.dataset && targetCell.dataset.date) {
+                const cellDateStr = targetCell.dataset.date;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(cellDateStr) && cellDateStr > currentEndDate) {
+                    indicator.textContent = `延伸至: ${cellDateStr}`;
+                    indicator.classList.add('valid');
+                    indicator.classList.remove('invalid');
+                    document.querySelectorAll('.calendar-extend-target').forEach(c => c.classList.remove('calendar-extend-target'));
+                    targetCell.classList.add('calendar-extend-target');
+                } else {
+                    indicator.classList.remove('valid');
+                    indicator.classList.add('invalid');
+                    indicator.textContent = cellDateStr <= currentEndDate ? '只能向后延伸' : '无效日期';
+                    document.querySelectorAll('.calendar-extend-target').forEach(c => c.classList.remove('calendar-extend-target'));
+                }
+            }
+        };
+
+        const handleEnd = async (endEvent) => {
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleEnd);
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('touchend', handleEnd);
+
+            const cx = endEvent.clientX || (endEvent.changedTouches && endEvent.changedTouches[0]?.clientX);
+            const cy = endEvent.clientY || (endEvent.changedTouches && endEvent.changedTouches[0]?.clientY);
+
+            overlay.remove();
+            indicator.remove();
+            document.querySelectorAll('.calendar-extend-target').forEach(c => c.classList.remove('calendar-extend-target'));
+
+            if (cx === undefined) return;
+
+            const targetCell = this._findCellAtPoint(cx, cy);
+            if (!targetCell || !targetCell.dataset || !targetCell.dataset.date) return;
+
+            const newEndDate = targetCell.dataset.date;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(newEndDate)) return;
+            if (newEndDate <= currentEndDate) return;
+
+            if (app.extendItemEndDate) {
+                await app.extendItemEndDate(item.id, item.type, newEndDate);
+            }
+        };
+
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd);
+    }
+
+    _findCellAtPoint(x, y) {
+        const els = document.elementsFromPoint(x, y);
+        for (const el of els) {
+            if (el.classList.contains('week-cell') || el.classList.contains('month-cell')) {
+                return el;
+            }
+        }
+        return null;
+    }
+
     createCalendarItem(item, compact = false) {
         const typeClass = `${item.type}-card`;
         const typeLabels = { todo: '待办', meeting: '会议', document: '文件' };
@@ -738,8 +856,10 @@ class CalendarView {
         el.draggable = true;
         el.style.cursor = 'pointer';
         el.style.whiteSpace = 'normal';
+        el.style.position = 'relative';
         el.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (e.target.closest('.calendar-item-extend-handle')) return;
             const targetDate = item._viewDate || (item.type === 'todo'
                 ? item.deadline?.split('T')[0]
                 : item.type === 'meeting'
@@ -748,6 +868,10 @@ class CalendarView {
             this.goToDate(targetDate);
         });
         el.addEventListener('dragstart', (e) => {
+            if (e.target.closest('.calendar-item-extend-handle')) {
+                e.preventDefault();
+                return;
+            }
             e.stopPropagation();
             if (window.officeDashboard?.handleDragStart) {
                 window.officeDashboard.handleDragStart(e, item);
@@ -817,12 +941,13 @@ class CalendarView {
             }
         }
 
+        if (this._isCrossDateItem(item)) {
+            this._initExtendHandle(el, item);
+        }
+
         return el;
     }
 
-    /**
-     * 获取类型颜色
-     */
     getTypeColor(type, alpha = 1) {
         const colors = {
             todo: alpha === 1 ? '#f59e0b' : `rgba(245, 158, 11, ${alpha})`,
