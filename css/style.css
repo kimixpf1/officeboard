@@ -158,8 +158,8 @@ body {
     justify-content: flex-start;
     gap: 0;
     min-height: 38px;
-    width: 260px;
-    max-width: 260px;
+    width: 280px;
+    max-width: 280px;
     padding: 3px 0;
     border: 1px solid rgba(79, 70, 229, 0.14);
     border-radius: 999px;
@@ -189,7 +189,7 @@ body {
 }
 
 .weather-current-city {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--gray-800);
     white-space: nowrap;
@@ -202,7 +202,7 @@ body {
 }
 
 .weather-current-temp {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--primary-color);
     white-space: nowrap;
@@ -222,7 +222,7 @@ body {
 }
 
 .weather-today-label {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--gray-800);
     white-space: nowrap;
@@ -235,7 +235,7 @@ body {
 }
 
 .weather-today .weather-temp-range {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--gray-700);
     white-space: nowrap;
@@ -272,7 +272,7 @@ body {
 }
 
 .weather-day-temp {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--gray-700);
     white-space: nowrap;
@@ -830,7 +830,7 @@ body {
 }
 
 .board-date-label-week {
-    font-size: 17px;
+    font-size: 19px;
     font-weight: 600;
     color: var(--gray-600);
     white-space: nowrap;
@@ -2340,8 +2340,8 @@ body {
     }
 
     .header-weather {
-        width: 200px;
-        max-width: 200px;
+        width: 220px;
+        max-width: 220px;
     }
 
     .board-container {
