@@ -1484,6 +1484,13 @@ body {
     background: var(--primary-light);
 }
 
+.week-cell.selected-date,
+.month-cell.selected-date {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+    background: rgba(99, 102, 241, 0.06);
+}
+
 .month-cell-date {
     font-size: var(--font-size-xs);
     font-weight: 600;

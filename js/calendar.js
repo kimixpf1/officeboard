@@ -554,6 +554,8 @@ class CalendarView {
         const weekDates = this.getWeekDates(this.currentDate);
         const today = new Date();
         const todayStr = this.formatLocalDate(today);
+        const app = this.getDashboardApp();
+        const selectedStr = app?.selectedDate || todayStr;
 
         const weekStart = weekDates[0];
         const weekOfMonth = this.getWeekOfMonth(weekStart);
@@ -589,7 +591,7 @@ class CalendarView {
             const sortedItems = this.getSortedItemsForDate(itemsByDate, dateStr);
 
             const cellDiv = document.createElement('div');
-            cellDiv.className = `week-cell${isToday ? ' today' : ''}`;
+            cellDiv.className = `week-cell${isToday ? ' today' : ''}${dateStr === selectedStr ? ' selected-date' : ''}`;
             cellDiv.dataset.date = dateStr;
             this.bindQuickAddEvents(cellDiv, dateStr);
             cellDiv.appendChild(this.createCellTopBar(dateStr, '左键进日视图'));
@@ -603,6 +605,13 @@ class CalendarView {
         }
 
         this.container.replaceChildren(container);
+
+        requestAnimationFrame(() => {
+            const selectedCell = container.querySelector('.selected-date');
+            if (selectedCell) {
+                selectedCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
     }
 
     /**
@@ -652,6 +661,8 @@ class CalendarView {
         const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
         const today = new Date();
         const todayStr = this.formatLocalDate(today);
+        const app = this.getDashboardApp();
+        const selectedStr = app?.selectedDate || todayStr;
 
         const container = document.createElement('div');
         container.className = 'month-view';
@@ -682,7 +693,7 @@ class CalendarView {
             const sortedItems = this.getSortedItemsForDate(itemsByDate, dateStr);
 
             const cellDiv = document.createElement('div');
-            cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}`;
+            cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}${dateStr === selectedStr ? ' selected-date' : ''}`;
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
             cellDiv.dataset.date = fullDateLabel;
             this.bindQuickAddEvents(cellDiv, dateStr);
@@ -704,6 +715,13 @@ class CalendarView {
         }
 
         this.container.replaceChildren(container);
+
+        requestAnimationFrame(() => {
+            const selectedCell = container.querySelector('.selected-date');
+            if (selectedCell) {
+                selectedCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
     }
 
     /**
