@@ -607,10 +607,8 @@ class CalendarView {
         this.container.replaceChildren(container);
 
         requestAnimationFrame(() => {
-            const selectedCell = container.querySelector('.selected-date');
-            if (selectedCell) {
-                selectedCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            const scrollParent = this.container.closest('.calendar-view') || this.container;
+            scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
         });
     }
 
