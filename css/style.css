@@ -2527,6 +2527,11 @@ body {
         padding: var(--spacing-2);
     }
 
+    .board-view.active {
+        display: flex;
+        flex-direction: column;
+    }
+
     .board-header {
         margin-bottom: var(--spacing-2);
     }
@@ -2535,7 +2540,28 @@ body {
         font-size: 1rem;
     }
 
+    .board-date-label {
+        position: static;
+        flex-direction: row;
+        justify-content: center;
+        gap: var(--spacing-2);
+        padding: var(--spacing-1) 0;
+        margin-bottom: var(--spacing-1);
+        pointer-events: auto;
+        flex-shrink: 0;
+    }
+
+    .board-date-label-date {
+        font-size: 15px;
+    }
+
+    .board-date-label-week {
+        font-size: 15px;
+    }
+
     .board-container {
+        flex: 1;
+        min-height: 0;
         padding: var(--spacing-1);
         gap: var(--spacing-2);
     }
@@ -2927,6 +2953,36 @@ body {
     height: 1px;
     background: var(--border-color);
     margin: var(--spacing-5) 0;
+}
+
+.sync-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-2);
+}
+
+.backup-list-area {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: var(--spacing-3);
+    margin-bottom: var(--spacing-3);
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.backup-list-area .backup-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.backup-list-area .backup-item:last-child {
+    border-bottom: none;
 }
 
 .sync-operations {

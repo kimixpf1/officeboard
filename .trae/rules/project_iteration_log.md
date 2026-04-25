@@ -1,3 +1,24 @@
+## 2026-04-24 P3-31 事故（已回退）
+
+### 事故经过
+- 实施了"周/月视图拖拽延伸时间"功能，修改了 `calendar.js`、`app.js`、`style.css`、`index.html`
+- 推送上线后，用户反馈周期性办文消失、跨日期办文找不到了
+- 立即 `git revert` 回退到 P3-30 并推送，线上恢复为 P3-30
+- 但 IndexedDB 数据已丢失（仅剩 1 条），云端数据也为空，数据无法恢复
+
+### 根因分析
+- `calendar.js` 的 `createCalendarItem` 中对所有卡片设置了 `el.style.position = 'relative'`，不仅限于跨日期事项
+- 修改了月视图 `month-cell` 的 `dataset.date` 赋值逻辑（从 `fullDateLabel` 改为 `dateStr`），可能影响了其他依赖该字段的功能
+- click 事件中增加了 `e.target.closest('.calendar-item-extend-handle')` 拦截，虽然理论上不影响逻辑但增加了复杂度
+- **上线前未用真实数据做全量回归验证**，只在空数据环境下检查了语法和基本渲染
+- 数据丢失的具体触发点未能确定，可能不是本次改动直接导致，而是之前某次同步或渲染异常间接引发
+
+### 教训沉淀（已写入 project_rules.md 数据安全铁律）
+- 渲染层改动绝不碰数据字段（`dataset.date`、`dayStates`、`endDate` 等）
+- 上线前必须用真实数据校验 IndexedDB 事项总数
+- 新增功能必须与既有数据完全隔离，不得修改既有卡片的任何属性
+- 推送后立即线上验证数据完整性，发现异常立即 revert
+
 ## 2026-04-23 P3-18
 
 ### 本次目标

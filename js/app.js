@@ -4088,6 +4088,9 @@ class OfficeDashboard {
         });
         document.getElementById('importFileInput')?.addEventListener('change', (e) => this.importData(e));
 
+        document.getElementById('exportBackupFileBtn')?.addEventListener('click', () => this.handleExportBackupFile());
+        document.getElementById('restoreBackupBtn')?.addEventListener('click', () => this.handleRestoreBackup());
+
         // 监听登录状态变化
         document.addEventListener('syncLoginStatusChanged', (e) => {
             this.updateLoginUI(e.detail);
@@ -4561,6 +4564,40 @@ class OfficeDashboard {
 
     toggleExportPasswordVisibility() {
         // 兼容性方法，不再使用
+    }
+
+    async handleExportBackupFile() {
+        const result = syncManager.exportBackupAsFile();
+        if (result) {
+            this.showSuccess('备份文件已导出');
+        } else {
+            this.showError('暂无备份数据可导出');
+        }
+    }
+
+    async handleRestoreBackup() {
+        const list = syncManager.getBackupList();
+        if (list.length === 0) {
+            this.showError('暂无备份数据可恢复');
+            return;
+        }
+        const latest = list[list.length - 1];
+        const confirmed = confirm(`确认恢复到 ${latest.ts} 的备份？\n该备份包含 ${latest.itemCount} 条事项。\n当前数据将被替换。`);
+        if (!confirmed) return;
+        this.showLoading(true, '正在恢复备份...');
+        try {
+            const result = await syncManager.restoreFromBackup(list.length - 1);
+            if (result.success) {
+                this.showSuccess(`已恢复 ${result.itemCount} 条事项`);
+                await this.loadItems();
+            } else {
+                this.showError('恢复失败: ' + result.error);
+            }
+        } catch (e) {
+            this.showError('恢复失败: ' + e.message);
+        } finally {
+            this.showLoading(false);
+        }
     }
 
     async syncBidirectional() {
@@ -6457,8 +6494,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-23 P3-30';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=25', 'app-date-view.js?v=7', 'app.js?v=109', 'style.css?v=45'];
+        const version = '2026-04-25 P3-32';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=25', 'sync.js?v=26', 'app-date-view.js?v=7', 'app.js?v=111', 'style.css?v=47'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -333,6 +333,8 @@ class SyncManager {
 
 
         try {
+            await this.autoBackupBeforeSync();
+
             const allItems = await db.getAllItems();
             const syncData = preparedSyncData || await this.buildSyncData(allItems);
             const hasLocalSideData = this.hasLocalNonItemData();
@@ -395,6 +397,8 @@ class SyncManager {
 
 
         try {
+            await this.autoBackupBeforeSync();
+
             // 同步设置
             if (cloudData.data.settings) {
                 const settings = cloudData.data.settings;
@@ -1682,6 +1686,103 @@ class SyncManager {
      */
     getUsername() {
         return this.currentUser?.user_metadata?.username || '';
+    }
+
+    async autoBackupBeforeSync() {
+        try {
+            const allItems = await db.getAllItems();
+            if (allItems.length === 0) return;
+            const backup = {
+                timestamp: new Date().toISOString(),
+                items: allItems,
+                sideData: this._collectSideDataForBackup()
+            };
+            const backupJson = JSON.stringify(backup);
+            const MAX_BACKUPS = 5;
+            let backupList = [];
+            try {
+                backupList = JSON.parse(localStorage.getItem('dataBackups') || '[]');
+            } catch (e) { backupList = []; }
+            backupList.push({ ts: backup.timestamp, size: backupJson.length, data: backupJson });
+            if (backupList.length > MAX_BACKUPS) {
+                backupList = backupList.slice(backupList.length - MAX_BACKUPS);
+            }
+            localStorage.setItem('dataBackups', JSON.stringify(backupList.map(b => ({ ts: b.ts, size: b.size, data: b.data }))));
+        } catch (e) {
+            console.warn('自动备份失败:', e.message);
+        }
+    }
+
+    _collectSideDataForBackup() {
+        const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
+            'countdownEvents', 'countdownTypeColors', 'countdownSortOrder',
+            'office_weather_city', 'theme'];
+        const result = {};
+        for (const k of keys) {
+            const v = localStorage.getItem(k);
+            if (v !== null) result[k] = v;
+        }
+        return result;
+    }
+
+    getBackupList() {
+        try {
+            const list = JSON.parse(localStorage.getItem('dataBackups') || '[]');
+            return list.map(b => ({ ts: b.ts, size: b.size, itemCount: 0 })).map((b, i) => {
+                try {
+                    const parsed = JSON.parse(list[i].data);
+                    b.itemCount = parsed.items?.length || 0;
+                } catch (e) {}
+                return b;
+            });
+        } catch (e) { return []; }
+    }
+
+    async restoreFromBackup(index) {
+        try {
+            const list = JSON.parse(localStorage.getItem('dataBackups') || '[]');
+            if (index < 0 || index >= list.length) throw new Error('备份索引无效');
+            const backup = JSON.parse(list[index].data);
+            if (!backup.items || backup.items.length === 0) throw new Error('备份数据为空');
+            const tx = db.db.transaction(db.STORES.ITEMS, 'readwrite');
+            const store = tx.objectStore(db.STORES.ITEMS);
+            await new Promise((resolve, reject) => {
+                const clearReq = store.clear();
+                clearReq.onsuccess = () => resolve();
+                clearReq.onerror = () => reject(clearReq.error);
+            });
+            for (const item of backup.items) {
+                await db.addItem(item);
+            }
+            if (backup.sideData) {
+                for (const [k, v] of Object.entries(backup.sideData)) {
+                    localStorage.setItem(k, v);
+                }
+            }
+            return { success: true, itemCount: backup.items.length };
+        } catch (e) {
+            console.error('恢复备份失败:', e);
+            return { success: false, error: e.message };
+        }
+    }
+
+    exportBackupAsFile() {
+        try {
+            const list = JSON.parse(localStorage.getItem('dataBackups') || '[]');
+            if (list.length === 0) return null;
+            const latest = JSON.parse(list[list.length - 1].data);
+            const blob = new Blob([JSON.stringify(latest, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `office-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            return true;
+        } catch (e) {
+            console.error('导出备份失败:', e);
+            return null;
+        }
     }
 }
 
