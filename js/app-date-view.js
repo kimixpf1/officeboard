@@ -117,11 +117,9 @@ class OfficeDateViewController {
             return;
         }
 
+        this.app.selectedDate = todayDate;
         if (window.calendarView) {
             window.calendarView.today();
-            this.app.selectedDate = window.calendarView.formatLocalDate(window.calendarView.currentDate);
-        } else {
-            this.app.selectedDate = todayDate;
         }
 
         this.updateDateDisplay();
