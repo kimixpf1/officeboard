@@ -4941,10 +4941,17 @@ mark.highlight {
     color: var(--gray-500);
 }
 
-/* 手机端隐藏版权 */
 @media (max-width: 768px) {
     .copyright-footer {
-        display: none;
+        display: block;
+        padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+        font-size: 10px;
+        opacity: 0.9;
+    }
+
+    .copyright-note,
+    .deploy-version-badge {
+        font-size: 9px;
     }
 }
 

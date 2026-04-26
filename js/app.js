@@ -229,12 +229,6 @@ class OfficeDashboard {
         try {
             await db.init();
 
-            await syncManager.waitForInit();
-
-            if (!syncManager.isLoggedIn()) {
-                await db.clearAllItems();
-            }
-
             this.initializeRecurringFieldOptions();
             this.bindEvents();
 
@@ -248,13 +242,20 @@ class OfficeDashboard {
             this.initHeaderWeather();
             this.initCountdownSystem();
 
+            syncManager.waitForInit().then(async () => {
+                if (syncManager.isLoggedIn()) {
+                    await this.loadItems();
+                }
+            }).catch(error => {
+                console.warn('同步初始化未完全完成，已跳过阻塞等待:', error?.message || error);
+            });
+
             setTimeout(() => {
                 this.checkApiKey().catch(err => {
                     console.warn('API密钥检查失败:', err.message);
                 });
             }, 1000);
 
-            // 启动会议自动完成检查
             this.startMeetingAutoCompleteCheck();
         } catch (error) {
             console.error('初始化失败:', error);
@@ -526,9 +527,31 @@ class OfficeDashboard {
             this.openTool('weather');
         });
         this.updateHeaderWeatherDisplay();
-        this.loadWeather().catch(error => {
+        this.refreshHeaderWeather(true).catch(error => {
             console.warn('顶部天气初始化失败:', error?.message || error);
         });
+
+        if (this.headerWeatherTimer) {
+            clearInterval(this.headerWeatherTimer);
+        }
+
+        this.headerWeatherTimer = setInterval(() => {
+            this.refreshHeaderWeather().catch(error => {
+                console.warn('顶部天气自动刷新失败:', error?.message || error);
+            });
+        }, 10 * 60 * 1000);
+    }
+
+    async refreshHeaderWeather(forceRefresh = false) {
+        const now = Date.now();
+        const hasRecentWeather = this.currentWeatherData && this.lastWeatherUpdatedAt && (now - this.lastWeatherUpdatedAt < 10 * 60 * 1000);
+
+        if (!forceRefresh && hasRecentWeather) {
+            this.updateHeaderWeatherDisplay();
+            return;
+        }
+
+        await this.loadWeather({ skipGlobalLoading: true });
     }
 
     updateHeaderWeatherDisplay() {
@@ -2081,7 +2104,8 @@ class OfficeDashboard {
     /**
      * 加载天气
      */
-    async loadWeather() {
+    async loadWeather(options = {}) {
+        const { skipGlobalLoading = false } = options;
         const weatherBody = document.getElementById('weatherBody');
 
         if (weatherBody) {
@@ -2096,7 +2120,7 @@ class OfficeDashboard {
             }
 
             localStorage.setItem('office_weather_city', cityConfig.name || '苏州');
-            await this.fetchWeather(cityConfig.lat, cityConfig.lon, cityConfig.name);
+            await this.fetchWeather(cityConfig.lat, cityConfig.lon, cityConfig.name, { skipGlobalLoading });
         } catch (e) {
             console.error('天气加载失败:', e);
             if (weatherBody) {
@@ -2120,7 +2144,8 @@ class OfficeDashboard {
     /**
      * 获取天气数据
      */
-    async fetchWeather(lat, lon, cityName) {
+    async fetchWeather(lat, lon, cityName, options = {}) {
+        const { skipGlobalLoading = false } = options;
         const weatherBody = document.getElementById('weatherBody');
         
         try {
@@ -2178,6 +2203,7 @@ class OfficeDashboard {
                     };
                 })
                 : [];
+            this.lastWeatherUpdatedAt = Date.now();
             this.updateHeaderWeatherDisplay();
 
             const weatherInfo = document.createElement('div');
@@ -2258,6 +2284,7 @@ class OfficeDashboard {
         } catch (e) {
             console.error('天气获取失败:', e);
             this.currentWeatherData = null;
+            this.lastWeatherUpdatedAt = null;
             this.updateHeaderWeatherDisplay();
 
             const errorEl = document.createElement('div');
@@ -6494,8 +6521,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-26 P3-36';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=27', 'app-date-view.js?v=9', 'app.js?v=115', 'style.css?v=48'];
+        const version = '2026-04-26 P3-37';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=28', 'app-date-view.js?v=9', 'app.js?v=116', 'style.css?v=49'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

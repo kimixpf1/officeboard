@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -178,6 +178,23 @@ class SyncManager {
             } catch (sessionError) {
                 console.warn('会话检查失败:', sessionError);
             }
+
+            this.supabase.auth.onAuthStateChange(async (event, session) => {
+                this.currentUser = session?.user || null;
+                this.updateLoginUI();
+
+                if (this.currentUser) {
+                    this.startPeriodicSync();
+                    this.initRealtimeSubscription();
+
+                    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+                        await this.smartSync();
+                    }
+                } else {
+                    this.stopPeriodicSync();
+                    this.unsubscribeRealtime();
+                }
+            });
         } catch (error) {
             this.initError = error.message;
             console.error('Supabase初始化异常:', error);
@@ -810,15 +827,12 @@ class SyncManager {
             clearInterval(this.periodicSyncTimer);
         }
 
-        // 每10分钟检查一次
+        // 每1分钟检查一次，缩短跨设备同步延迟
         this.periodicSyncTimer = setInterval(async () => {
             if (this.isLoggedIn() && !this.isSyncing) {
-
                 await this.smartSync();
             }
-        }, 600000);
-
-
+        }, 60000);
     }
 
     /**
@@ -837,7 +851,9 @@ class SyncManager {
     initRealtimeSubscription() {
         if (!this.supabase || !this.currentUser) return;
 
-
+        if (this.realtimeChannel) {
+            this.unsubscribeRealtime();
+        }
 
         this.realtimeChannel = this.supabase
             .channel(`user_data_changes_${this.currentUser.id}`)
@@ -850,15 +866,18 @@ class SyncManager {
                     filter: `user_id=eq.${this.currentUser.id}`
                 },
                 async (payload) => {
-
-                    // 收到其他设备的更新通知，执行智能同步
-                    if (payload.eventType === 'UPDATE' && !this.isSyncing) {
+                    if (!this.isSyncing) {
+                        document.dispatchEvent(new CustomEvent('syncRemoteDataChanged', {
+                            detail: { payload }
+                        }));
                         await this.smartSync();
                     }
                 }
             )
             .subscribe((status) => {
-
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    console.warn('实时同步通道异常:', status);
+                }
             });
     }
 
