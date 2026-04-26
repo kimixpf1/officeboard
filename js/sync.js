@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -737,7 +737,12 @@ class SyncManager {
         } else if (item.type === 'todo') {
             return `todo:${title}:${item.deadline || ''}`;
         } else if (item.type === 'document') {
-            return `doc:${item.docNumber || title}`;
+            const docStart = item.docStartDate || item.docDate || '';
+            const docEnd = item.docEndDate || docStart;
+            if (item.docNumber) {
+                return `doc:${item.docNumber}`;
+            }
+            return `doc:${title}:${docStart}:${docEnd}:${item.id || ''}`;
         }
         return `${item.type}:${title}`;
     }
@@ -756,6 +761,10 @@ class SyncManager {
                 const existing = seen.get(key);
                 if (item.type === 'meeting' && item.attendees && existing.attendees) {
                     existing.attendees = [...new Set([...existing.attendees, ...item.attendees])];
+                } else if (item.updatedAt && (!existing.updatedAt || item.updatedAt > existing.updatedAt)) {
+                    const idx = result.indexOf(existing);
+                    if (idx !== -1) result[idx] = item;
+                    seen.set(key, item);
                 }
                 continue;
             }
@@ -1531,7 +1540,13 @@ class SyncManager {
                     return { isDuplicate: true, existingItem: local };
                 }
                 if (cloudTitle === localTitle && cloudTitle.length > 3) {
-                    return { isDuplicate: true, existingItem: local };
+                    const cloudStart = cloudItem.docStartDate || cloudItem.docDate || '';
+                    const localStart = local.docStartDate || local.docDate || '';
+                    const cloudEnd = cloudItem.docEndDate || cloudStart;
+                    const localEnd = local.docEndDate || localStart;
+                    if (cloudStart === localStart && cloudEnd === localEnd) {
+                        return { isDuplicate: true, existingItem: local };
+                    }
                 }
             }
         }

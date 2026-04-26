@@ -102,7 +102,6 @@ class OfficeDateViewController {
             } else {
                 window.calendarView.next();
             }
-            this.app.selectedDate = window.calendarView.formatLocalDate(window.calendarView.currentDate);
         }
 
         this.updateDateDisplay();
