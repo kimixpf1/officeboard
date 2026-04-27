@@ -5876,10 +5876,13 @@ class OfficeDashboard {
                 titleEl.textContent = item.title;
                 cardMain.appendChild(titleEl);
 
-                const timeEl = document.createElement('div');
-                timeEl.className = 'card-time';
-                timeEl.textContent = this.formatDeadline(item.deadline, item.completed);
-                cardMain.appendChild(timeEl);
+                const statusText = this.formatTodoCompletedTime(item.completedAt, effectiveCompleted);
+                if (statusText) {
+                    const timeEl = document.createElement('div');
+                    timeEl.className = 'card-time';
+                    timeEl.textContent = statusText;
+                    cardMain.appendChild(timeEl);
+                }
 
                 if (item.description) {
                     cardDetail.appendChild(this._createDetailSection('备注', item.description));
@@ -6190,6 +6193,21 @@ class OfficeDashboard {
         }
         
         return `${dateStr}截止`;
+    }
+
+    formatTodoCompletedTime(completedAt, completed = false) {
+        if (!completed || !completedAt) {
+            return '';
+        }
+
+        const date = new Date(completedAt);
+        if (Number.isNaN(date.getTime())) {
+            return '已完成';
+        }
+
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes} 已完成`;
     }
 
     /**
@@ -6521,8 +6539,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-26 P3-38';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=117', 'style.css?v=50'];
+        const version = '2026-04-26 P3-39';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=118', 'style.css?v=50'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
