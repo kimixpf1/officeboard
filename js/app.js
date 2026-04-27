@@ -2114,11 +2114,32 @@ class OfficeDashboard {
 
         try {
             const savedCity = SecurityUtils.safeGetStorage('office_weather_city');
-            let cityConfig = savedCity ? safeJsonParse(savedCity, null) : null;
-            if (!cityConfig) {
+            let cityConfig = null;
+
+            if (savedCity) {
+                const trimmedCity = String(savedCity).trim();
+                if (trimmedCity.startsWith('{')) {
+                    cityConfig = safeJsonParse(trimmedCity, null);
+                } else {
+                    cityConfig = { name: trimmedCity };
+                }
+            }
+
+            const presetCity = Array.isArray(this.weatherPresetCities)
+                ? this.weatherPresetCities.find(city => city.name === cityConfig?.name)
+                : null;
+
+            cityConfig = {
+                name: cityConfig?.name || presetCity?.name || '苏州',
+                lat: Number(cityConfig?.lat ?? presetCity?.lat ?? 31.2989),
+                lon: Number(cityConfig?.lon ?? presetCity?.lon ?? 120.5853)
+            };
+
+            if (!Number.isFinite(cityConfig.lat) || !Number.isFinite(cityConfig.lon)) {
                 cityConfig = { name: '苏州', lat: 31.2989, lon: 120.5853 };
             }
 
+            SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(cityConfig));
             localStorage.setItem('office_weather_city', cityConfig.name || '苏州');
             await this.fetchWeather(cityConfig.lat, cityConfig.lon, cityConfig.name, { skipGlobalLoading });
         } catch (e) {
@@ -4357,10 +4378,22 @@ class OfficeDashboard {
             await syncManager.logout();
             // 清除本地数据
             await db.clearAllItems();
-            // 清除网站和工具数据
-            SecurityUtils.safeRemoveStorage('office_links');
-            SecurityUtils.safeRemoveStorage('office_tools');
-            SecurityUtils.safeRemoveStorage('office_weather_city');
+            // 清除本地附属数据
+            [
+                'office_links',
+                'office_tools',
+                'office_weather_city',
+                'office_contacts',
+                'office_schedule_content',
+                'office_memo_content',
+                'office_countdown_events',
+                'office_countdown_type_colors',
+                'office_countdown_sort_order'
+            ].forEach(key => SecurityUtils.safeRemoveStorage(key));
+            this.contacts = [];
+            this.currentWeatherData = null;
+            this.weatherForecastSummary = [];
+            this.lastWeatherUpdatedAt = null;
             // 清除记住的登录信息（退出时不删除，让用户下次还能免输入）
             // localStorage.removeItem('office_remembered_login');
             // 清空登录表单
@@ -4377,6 +4410,25 @@ class OfficeDashboard {
             // 重新加载默认数据
             this.loadLinks();
             this.loadTools();
+            this.loadContacts();
+            this.renderCountdownPanel();
+            this.updateCountdownNotice();
+            this.updateHeaderWeatherDisplay();
+            const weatherBody = document.getElementById('weatherBody');
+            if (weatherBody) {
+                this.renderWeatherStatus('正在获取天气...', 'weather-loading');
+            }
+            this.refreshHeaderWeather(true).catch(error => {
+                console.warn('退出后天气重置失败:', error?.message || error);
+            });
+            const scheduleText = document.getElementById('scheduleText');
+            const scheduleStatus = document.getElementById('scheduleStatus');
+            if (scheduleText) scheduleText.value = '';
+            if (scheduleStatus) scheduleStatus.textContent = '登录后可同步云端';
+            const memoText = document.getElementById('memoText');
+            const memoStatus = document.getElementById('memoStatus');
+            if (memoText) memoText.value = '';
+            if (memoStatus) memoStatus.textContent = '登录后可同步云端';
             // 刷新显示
             await this.loadItems();
             this.showSuccess('已退出登录');
@@ -6539,8 +6591,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-26 P3-39';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=118', 'style.css?v=50'];
+        const version = '2026-04-27 P3-40';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=119', 'style.css?v=50'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
