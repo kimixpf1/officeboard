@@ -111,6 +111,20 @@ class OfficeDashboard {
         this.deleteItemId = null;
         this.loadItemsRequestSeq = 0;
         this.dateViewController = new OfficeDateViewController(this);
+        this.weatherPresetCities = [
+            { name: '苏州', lat: 31.292622, lon: 120.599489 },
+            { name: '上海', lat: 31.2304, lon: 121.4737 },
+            { name: '南京', lat: 32.0603, lon: 118.7969 },
+            { name: '北京', lat: 39.9042, lon: 116.4074 },
+            { name: '杭州', lat: 30.2741, lon: 120.1551 },
+            { name: '广州', lat: 23.1291, lon: 113.2644 },
+            { name: '深圳', lat: 22.5431, lon: 114.0579 },
+            { name: '成都', lat: 30.5728, lon: 104.0668 },
+            { name: '武汉', lat: 30.5928, lon: 114.3055 },
+            { name: '无锡', lat: 31.4912, lon: 120.3119 },
+            { name: '常州', lat: 31.8106, lon: 119.9741 },
+            { name: '昆山', lat: 31.3848, lon: 120.9580 }
+        ];
 
         const urlParams = new URLSearchParams(window.location.search);
         const restoreDate = urlParams.get('restoreDate');
@@ -2166,42 +2180,61 @@ class OfficeDashboard {
      * 获取天气数据
      */
     async fetchWeather(lat, lon, cityName, options = {}) {
-        const { skipGlobalLoading = false } = options;
         const weatherBody = document.getElementById('weatherBody');
         
         try {
             if (weatherBody) {
                 this.renderWeatherStatus('正在加载天气...', 'weather-loading');
             }
-            
-            // 使用 open-meteo 免费天气API（无需key，国内可访问）
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FShanghai&forecast_days=3`;
-            
+
+            const apiKey = await cryptoManager.secureGetSecret('qweather_api_key');
+            if (!apiKey) {
+                throw new Error('未配置和风天气密钥');
+            }
+
+            const location = `${Number(lon).toFixed(2)},${Number(lat).toFixed(2)}`;
+            const host = 'n55ctw84yb.re.qweatherapi.com';
+            const baseUrl = `https://${host}`;
+            const commonQuery = `location=${encodeURIComponent(location)}&lang=zh&unit=m&key=${encodeURIComponent(apiKey)}`;
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 8000);
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                signal: controller.signal
-            });
+
+            const [nowResponse, dailyResponse] = await Promise.all([
+                fetch(`${baseUrl}/v7/weather/now?${commonQuery}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                }),
+                fetch(`${baseUrl}/v7/weather/3d?${commonQuery}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                })
+            ]);
             clearTimeout(timeout);
-            
-            if (!response.ok) {
+
+            if (!nowResponse.ok || !dailyResponse.ok) {
                 throw new Error('API请求失败');
             }
-            
-            const data = await response.json();
-            
-            if (!data.current) {
-                throw new Error('数据格式错误');
+
+            const [nowData, dailyData] = await Promise.all([
+                nowResponse.json(),
+                dailyResponse.json()
+            ]);
+
+            if (nowData.code !== '200' || !nowData.now) {
+                throw new Error('实时天气数据格式错误');
             }
-            
-            const temp = Math.round(data.current.temperature_2m);
-            const humidity = data.current.relative_humidity_2m;
-            const windSpeed = Math.round(data.current.wind_speed_10m);
-            const code = data.current.weather_code;
-            const desc = this.getWeatherDesc(code);
+
+            if (dailyData.code !== '200' || !Array.isArray(dailyData.daily)) {
+                throw new Error('天气预报数据格式错误');
+            }
+
+            const temp = Math.round(Number(nowData.now.temp));
+            const humidity = Number(nowData.now.humidity);
+            const windSpeed = Math.round(Number(nowData.now.windSpeed));
+            const code = Number(nowData.now.icon);
+            const desc = nowData.now.text || this.getWeatherDesc(code);
             const icon = this.getWeatherIcon(code);
 
             this.currentWeatherData = {
@@ -2213,17 +2246,16 @@ class OfficeDashboard {
                 icon,
                 code
             };
-            this.weatherForecastSummary = Array.isArray(data.daily?.time)
-                ? data.daily.time.slice(0, 3).map((dateStr, index) => {
-                    const date = new Date(dateStr);
-                    return {
-                        label: index === 0 ? '今天' : index === 1 ? '明天' : index === 2 ? '后天' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()],
-                        max: Math.round(data.daily.temperature_2m_max[index]),
-                        min: Math.round(data.daily.temperature_2m_min[index]),
-                        code: data.daily.weather_code[index]
-                    };
-                })
-                : [];
+            this.weatherForecastSummary = dailyData.daily.slice(0, 3).map((day, index) => {
+                const date = new Date(day.fxDate);
+                return {
+                    label: index === 0 ? '今天' : index === 1 ? '明天' : index === 2 ? '后天' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()],
+                    max: Math.round(Number(day.tempMax)),
+                    min: Math.round(Number(day.tempMin)),
+                    code: Number(day.iconDay),
+                    text: day.textDay || this.getWeatherDesc(Number(day.iconDay))
+                };
+            });
             this.lastWeatherUpdatedAt = Date.now();
             this.updateHeaderWeatherDisplay();
 
@@ -2265,17 +2297,18 @@ class OfficeDashboard {
             cityRowEl.append(cityEl, changeBtn);
             weatherInfo.append(iconEl, tempEl, descEl, detailEl, cityRowEl);
             
-            if (data.daily && data.daily.time) {
+            if (dailyData.daily.length) {
                 const forecastEl = document.createElement('div');
                 forecastEl.className = 'weather-forecast';
                 const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
-                for (let i = 0; i < Math.min(3, data.daily.time.length); i++) {
-                    const d = new Date(data.daily.time[i]);
+                for (let i = 0; i < Math.min(3, dailyData.daily.length); i++) {
+                    const item = dailyData.daily[i];
+                    const d = new Date(item.fxDate);
                     const dayName = i === 0 ? '今天' : dayNames[d.getDay()];
-                    const maxT = Math.round(data.daily.temperature_2m_max[i]);
-                    const minT = Math.round(data.daily.temperature_2m_min[i]);
-                    const dayIcon = this.getWeatherIcon(data.daily.weather_code[i]);
+                    const maxT = Math.round(Number(item.tempMax));
+                    const minT = Math.round(Number(item.tempMin));
+                    const dayIcon = this.getWeatherIcon(Number(item.iconDay));
 
                     const forecastDayEl = document.createElement('div');
                     forecastDayEl.className = 'forecast-day';
@@ -2321,7 +2354,7 @@ class OfficeDashboard {
             detailEl.style.fontSize = '12px';
             detailEl.style.color = 'var(--gray-500)';
             detailEl.style.marginTop = '8px';
-            detailEl.textContent = '请检查网络连接';
+            detailEl.textContent = e?.message === '未配置和风天气密钥' ? '和风天气密钥未配置' : '请检查网络连接';
 
             const retryBtn = document.createElement('button');
             retryBtn.type = 'button';
@@ -2347,20 +2380,7 @@ class OfficeDashboard {
         const weatherBody = document.getElementById('weatherBody');
         if (!weatherBody) return;
 
-        const cities = [
-            { name: '苏州', lat: 31.292622, lon: 120.599489 },
-            { name: '上海', lat: 31.2304, lon: 121.4737 },
-            { name: '南京', lat: 32.0603, lon: 118.7969 },
-            { name: '北京', lat: 39.9042, lon: 116.4074 },
-            { name: '杭州', lat: 30.2741, lon: 120.1551 },
-            { name: '广州', lat: 23.1291, lon: 113.2644 },
-            { name: '深圳', lat: 22.5431, lon: 114.0579 },
-            { name: '成都', lat: 30.5728, lon: 104.0668 },
-            { name: '武汉', lat: 30.5928, lon: 114.3055 },
-            { name: '无锡', lat: 31.4912, lon: 120.3119 },
-            { name: '常州', lat: 31.8106, lon: 119.9741 },
-            { name: '昆山', lat: 31.3848, lon: 120.9580 }
-        ];
+        const cities = this.weatherPresetCities;
 
         const selectorEl = document.createElement('div');
         selectorEl.className = 'city-selector';
@@ -2442,28 +2462,34 @@ class OfficeDashboard {
      * 获取天气图标
      */
     getWeatherIcon(code) {
-        if (code === 0 || code === 1) return '☀️';
-        if (code === 2 || code === 3) return '⛅';
-        if (code >= 45 && code <= 48) return '🌫️';
-        if (code >= 51 && code <= 67) return '🌧️';
-        if (code >= 71 && code <= 77) return '❄️';
-        if (code >= 80 && code <= 82) return '🌦️';
-        if (code >= 95 && code <= 99) return '⛈️';
+        if (code === 100 || code === 150) return '☀️';
+        if ([101, 102, 103, 151, 152, 153].includes(code)) return '⛅';
+        if ([104, 154].includes(code)) return '☁️';
+        if ([300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 350, 351, 399].includes(code)) return '🌧️';
+        if ([400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 456, 457, 499].includes(code)) return '❄️';
+        if ([500, 501, 509, 510, 514, 515].includes(code)) return '🌫️';
+        if ([502, 503, 504, 507, 508].includes(code)) return '🌪️';
+        if ([511, 512, 513].includes(code)) return '🌬️';
+        if ([900, 901].includes(code)) return '☀️';
+        if (code === 999) return '❓';
         return '🌤️';
     }
 
-    /**
-     * 天气代码转描述
-     */
     getWeatherDesc(code) {
         const map = {
-            0: '晴', 1: '晴', 2: '少云', 3: '多云',
-            45: '雾', 48: '雾凇',
-            51: '小雨', 53: '小雨', 55: '中雨',
-            61: '小雨', 63: '中雨', 65: '大雨',
-            71: '小雪', 73: '中雪', 75: '大雪',
-            80: '阵雨', 81: '阵雨', 82: '暴雨',
-            95: '雷暴', 96: '雷暴冰雹', 99: '强雷暴'
+            100: '晴', 101: '多云', 102: '少云', 103: '晴间多云', 104: '阴',
+            150: '晴', 151: '多云', 152: '少云', 153: '晴间多云', 154: '阴',
+            300: '阵雨', 301: '强阵雨', 302: '雷阵雨', 303: '强雷阵雨', 304: '雷阵雨伴有冰雹',
+            305: '小雨', 306: '中雨', 307: '大雨', 308: '极端降雨', 309: '毛毛雨',
+            310: '暴雨', 311: '大暴雨', 312: '特大暴雨', 313: '冻雨', 314: '小到中雨',
+            315: '中到大雨', 316: '大到暴雨', 317: '暴雨到大暴雨', 318: '大暴雨到特大暴雨',
+            350: '阵雨', 351: '强阵雨', 399: '雨',
+            400: '小雪', 401: '中雪', 402: '大雪', 403: '暴雪', 404: '雨夹雪',
+            405: '雨雪天气', 406: '阵雨夹雪', 407: '阵雪', 408: '小到中雪', 409: '中到大雪',
+            410: '大到暴雪', 456: '阵雨夹雪', 457: '阵雪', 499: '雪',
+            500: '薄雾', 501: '雾', 502: '霾', 503: '扬沙', 504: '浮尘', 507: '沙尘暴', 508: '强沙尘暴',
+            509: '浓雾', 510: '强浓雾', 511: '中度霾', 512: '重度霾', 513: '严重霾', 514: '大雾', 515: '特强浓雾',
+            900: '热', 901: '冷', 999: '未知'
         };
         return map[code] || '未知';
     }
@@ -6591,8 +6617,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-28 P3-41';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=120', 'style.css?v=50'];
+        const version = '2026-04-28 P3-42';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=30', 'app-date-view.js?v=9', 'app.js?v=121', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;

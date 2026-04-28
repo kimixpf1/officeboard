@@ -117,50 +117,54 @@ class CryptoManager {
         }
     }
 
-    /**
-     * 安全存储API Key
-     */
-    async secureStoreApiKey(apiKey) {
+    async secureStoreSecret(secretName, secretValue) {
         try {
-            const encrypted = await this.encrypt(apiKey);
-            await db.setSetting('kimi_api_key_encrypted', encrypted);
-            await db.setSetting('kimi_api_key_set', true);
+            const encrypted = await this.encrypt(secretValue);
+            await db.setSetting(`${secretName}_encrypted`, encrypted);
+            await db.setSetting(`${secretName}_set`, true);
             return true;
         } catch (error) {
-            console.error('存储API Key失败:', error);
+            console.error('存储敏感信息失败:', error);
             return false;
         }
     }
 
-    /**
-     * 安全获取API Key
-     */
-    async secureGetApiKey() {
+    async secureGetSecret(secretName) {
         try {
-            const encrypted = await db.getSetting('kimi_api_key_encrypted');
+            const encrypted = await db.getSetting(`${secretName}_encrypted`);
             if (!encrypted) return null;
 
             return await this.decrypt(encrypted);
         } catch (error) {
-            console.error('获取API Key失败:', error);
+            console.error('获取敏感信息失败:', error);
             return null;
         }
     }
 
-    /**
-     * 检查是否已设置API Key
-     */
-    async hasApiKey() {
-        const hasKey = await db.getSetting('kimi_api_key_set');
+    async hasSecret(secretName) {
+        const hasKey = await db.getSetting(`${secretName}_set`);
         return !!hasKey;
     }
 
-    /**
-     * 清除API Key
-     */
+    async clearSecret(secretName) {
+        await db.setSetting(`${secretName}_encrypted`, null);
+        await db.setSetting(`${secretName}_set`, false);
+    }
+
+    async secureStoreApiKey(apiKey) {
+        return this.secureStoreSecret('kimi_api_key', apiKey);
+    }
+
+    async secureGetApiKey() {
+        return this.secureGetSecret('kimi_api_key');
+    }
+
+    async hasApiKey() {
+        return this.hasSecret('kimi_api_key');
+    }
+
     async clearApiKey() {
-        await db.setSetting('kimi_api_key_encrypted', null);
-        await db.setSetting('kimi_api_key_set', false);
+        await this.clearSecret('kimi_api_key');
     }
 
     /**
