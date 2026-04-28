@@ -2131,12 +2131,12 @@ class OfficeDashboard {
 
             cityConfig = {
                 name: cityConfig?.name || presetCity?.name || '苏州',
-                lat: Number(cityConfig?.lat ?? presetCity?.lat ?? 31.2989),
-                lon: Number(cityConfig?.lon ?? presetCity?.lon ?? 120.5853)
+                lat: Number(cityConfig?.lat ?? presetCity?.lat ?? 31.292622),
+                lon: Number(cityConfig?.lon ?? presetCity?.lon ?? 120.599489)
             };
 
             if (!Number.isFinite(cityConfig.lat) || !Number.isFinite(cityConfig.lon)) {
-                cityConfig = { name: '苏州', lat: 31.2989, lon: 120.5853 };
+                cityConfig = { name: '苏州', lat: 31.292622, lon: 120.599489 };
             }
 
             SecurityUtils.safeSetStorage('office_weather_city', JSON.stringify(cityConfig));
@@ -2348,7 +2348,7 @@ class OfficeDashboard {
         if (!weatherBody) return;
 
         const cities = [
-            { name: '苏州', lat: 31.2989, lon: 120.5853 },
+            { name: '苏州', lat: 31.292622, lon: 120.599489 },
             { name: '上海', lat: 31.2304, lon: 121.4737 },
             { name: '南京', lat: 32.0603, lon: 118.7969 },
             { name: '北京', lat: 39.9042, lon: 116.4074 },
@@ -6591,8 +6591,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-27 P3-40';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=119', 'style.css?v=50'];
+        const version = '2026-04-28 P3-41';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=29', 'app-date-view.js?v=9', 'app.js?v=120', 'style.css?v=50'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
