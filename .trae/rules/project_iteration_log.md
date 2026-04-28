@@ -1,3 +1,46 @@
+## 2026-04-28 P3-44
+
+### 本次目标
+- 修复和风天气 Key 跨设备同步后在其他设备无法恢复使用的问题
+- 修复待办事项达到截止时间后通知栏未闪烁提醒的问题
+- 优化手机端在 WiFi 环境下相较蜂窝网络自动实时同步恢复较差的问题
+- 完成本地校验、提交推送与线上强刷复测
+
+### 当前状态
+- ✅ 已定位和风 Key 跨设备恢复失败根因：密文 `qweather_api_key_encrypted` 虽已同步，但解密依赖的 `crypto_master_key` 未同步，导致换设备后无法解密
+- ✅ 已在 `sync.js` 的 settings 打包、云端下载恢复、云端合并恢复路径中补齐 `crypto_master_key` 同步与本机恢复
+- ✅ 已定位待办提醒未闪烁根因：提醒逻辑读取 `this.items`，但 `app-date-view.js` 的 `loadItems()` 未将最新事项列表回填给 `app`
+- ✅ 已在 `app-date-view.js` 中补 `this.app.items = items`，到期待办现可正确驱动通知栏闪烁与轮播
+- ✅ 已增强移动端实时同步恢复链路：补充 `visibilitychange`、`online`、`focus`、`pageshow` 触发的重连与智能同步
+- ✅ 已为 Supabase 实时通道补充异常后自动重连、静默同步回补，并将定时同步周期缩短至 20 秒，改善手机 WiFi 下通道休眠后的恢复表现
+- ✅ 已完成 `node --check js/app.js`、`node --check js/sync.js`
+- ✅ 已完成 `app.js` / `sync.js` / `app-date-view.js` / `style.css` / `index.html` diagnostics 0 错误
+- ✅ 已将部署版本提升为 `2026-04-28 P3-44`，并同步提升 `sync.js?v=32`、`app-date-view.js?v=10`、`app.js?v=123`
+- 🔄 待提交并推送到 `origin/main`
+- 🔄 待线上强刷复测 `https://kimixpf1.github.io/officeboard/`
+
+### 本轮关键改动
+- sync.js：`buildSyncData()` 新增同步 `crypto_master_key`，确保换设备后可解密已同步的和风天气密钥密文
+- sync.js：云端下载恢复、云端合并恢复时同步回写 `crypto_master_key`、`qweather_api_key_encrypted`、`qweather_api_key_set`
+- sync.js：新增生命周期同步绑定、实时通道异常重连、静默回补与更高频定时同步
+- app-date-view.js：`loadItems()` 新增 `this.app.items = items`，确保待办提醒逻辑拿到当前事项数据
+- app.js：延续既有通知栏提醒逻辑，无需额外改结构，改由修正数据源恢复提醒生效
+- index.html / app.js：部署版本更新到 `P3-44`，资源 query 提升到 `sync.js?v=32`、`app-date-view.js?v=10`、`app.js?v=123`
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/sync.js` 通过
+- `app.js` diagnostics 0 错误
+- `sync.js` diagnostics 0 错误
+- `app-date-view.js` diagnostics 0 错误
+- `style.css` diagnostics 0 错误
+- `index.html` diagnostics 0 错误
+
+### 遗留事项
+- 待提交并推送 `P3-44` 到 `origin/main`
+- 待线上强刷验证是否已命中 `app.js?v=123`、`sync.js?v=32`、`app-date-view.js?v=10`
+- 待在线上验证和风 Key 跨设备恢复、待办截止提醒闪烁与手机 WiFi 下自动同步链路是否稳定
+
 ## 2026-04-28 P3-43
 
 ### 本次目标

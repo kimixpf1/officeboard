@@ -217,6 +217,8 @@ class OfficeDateViewController {
             ? this.getVisibleBoardItems(allItems)
             : allItems;
 
+        this.app.items = items;
+
         const grouped = this.groupItemsByType(items);
 
         this.app.renderColumn(ITEM_TYPES.TODO, grouped[ITEM_TYPES.TODO]);

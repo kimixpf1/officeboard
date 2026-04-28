@@ -1,20 +1,32 @@
 # Todolist
 
 ## 当前轮次目标
-- 完成和风天气接入后的跨设备密钥同步恢复收口
-- 为待办事项补充截止时间显示、到期通知框闪烁提醒与完成后自动停止提醒
+- 修复和风天气 Key 跨设备同步后无法在其他设备解密恢复的问题
+- 修复待办事项到达截止时间后通知栏未闪烁提醒的问题
+- 优化手机端在 WiFi 环境下的实时同步恢复与前台重连链路
 - 完成本地校验、提交推送与线上强刷复测
 
 ## 当前待办
-- 待提交并推送 `P3-43` 到 `origin/main`
-- 待线上强刷验证 `https://kimixpf1.github.io/officeboard/` 是否已加载 `P3-43` 与 `app.js?v=122`
-- 待在线上确认和风 Key 跨设备恢复、待办截止提醒闪烁与完成后停止提醒链路是否正常
+- 待提交并推送 `P3-44` 到 `origin/main`
+- 待线上强刷验证 `https://kimixpf1.github.io/officeboard/` 是否已加载 `P3-44` 与 `app.js?v=123`
+- 待在线上确认和风 Key 跨设备恢复、待办截止提醒闪烁与手机 WiFi 下自动同步是否正常
 
 ## 事故记录（P3-31 已回退）
 - ❌ P3-31 "周/月视图拖拽延伸时间"功能导致周期性办文消失、跨日期办文丢失
 - ✅ 已 git revert 回退到 P3-30 并推送，线上已恢复
 - ❌ IndexedDB 和云端数据已丢失，无法恢复
 - ✅ 已将数据安全铁律写入 project_rules.md
+
+## 已完成（本轮 P3-44）
+- ✅ 已定位和风 Key 跨设备恢复失败根因：仅同步了 `qweather_api_key_encrypted`，但未同步解密所需的 `crypto_master_key`
+- ✅ 已在 `sync.js` 的 settings 打包、云端下载恢复、云端合并恢复链路中补齐 `crypto_master_key` 同步与本机恢复
+- ✅ 已修复待办截止提醒未闪烁根因：`app.items` 未在事项加载后回填，导致提醒计算始终拿不到最新待办列表
+- ✅ 已在 `app-date-view.js` 的 `loadItems()` 中回填 `this.app.items = items`，确保通知栏提醒与当前视图事项数据一致
+- ✅ 已增强 Supabase 实时同步稳定性：补充前台恢复、`online/focus/pageshow/visibilitychange` 触发重连与静默同步，缩短定时同步间隔到 20 秒
+- ✅ 已补充实时通道异常后的自动重连与静默拉取，改善手机 WiFi 场景下实时通道休眠后的恢复速度
+- ✅ 已完成 `node --check js/app.js`、`node --check js/sync.js`
+- ✅ 已完成 `app.js` / `sync.js` / `app-date-view.js` / `style.css` / `index.html` diagnostics 0 错误
+- ✅ 已将部署版本提升为 `2026-04-28 P3-44`，并同步提升 `sync.js?v=32`、`app-date-view.js?v=10`、`app.js?v=123`
 
 ## 已完成（本轮 P3-43）
 - ✅ 已补全和风天气 Key 的跨设备同步恢复链路，`buildSyncData()`、云端下载与云端合并恢复路径均已统一处理 `qweather_api_key_encrypted` 与 `qweather_api_key_set`
@@ -56,5 +68,5 @@
 - 暂不在本轮引入服务端天气代理，先采用“静态站点 + 本机加密存储 + 浏览器请求带鉴权头”的方案
 
 ## 下一步
-- 提交推送后线上强刷，验证 `P3-43`、和风 Key 跨设备恢复与待办截止提醒闪烁命中情况
-- 在线上继续观察待办完成后提醒是否立即停止，以及通知框是否能在待办提醒与倒数日提醒之间正确切换
+- 提交推送后线上强刷，验证 `P3-44`、和风 Key 跨设备恢复、待办截止提醒闪烁与手机 WiFi 下自动同步命中情况
+- 在线上继续观察实时通道断开后的自动重连、前台恢复同步与待办提醒轮播是否稳定

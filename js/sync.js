@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -23,6 +23,9 @@ class SyncManager {
         this.syncTimeout = null;
         this.initPromise = null;
         this.periodicSyncTimer = null;
+        this.realtimeReconnectTimer = null;
+        this.realtimeReconnectAttempts = 0;
+        this.lifecycleHandlersBound = false;
 
         // 同步状态追踪
         this.lastLocalModifyTime = SafeStorage.get('lastLocalModifyTime') || null;  // 本地最后修改时间
@@ -94,6 +97,7 @@ class SyncManager {
         const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
         const qweatherKeyEncrypted = await db.getSetting('qweather_api_key_encrypted');
         const qweatherKeySet = await db.getSetting('qweather_api_key_set');
+        const cryptoMasterKey = SafeStorage.get('crypto_master_key');
 
         if (kimiKey) settings.kimi_api_key = kimiKey;
         if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
@@ -101,6 +105,7 @@ class SyncManager {
         if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
         if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
         if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
+        if (cryptoMasterKey) settings.crypto_master_key = cryptoMasterKey;
 
         return {
             sync_time: new Date().toISOString(),
@@ -156,6 +161,13 @@ class SyncManager {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true
+                },
+                realtime: {
+                    params: {
+                        eventsPerSecond: 2
+                    },
+                    heartbeatIntervalMs: 15000,
+                    reconnectAfterMs: (tries) => Math.min(1000 * Math.max(1, tries), 10000)
                 }
             });
 
@@ -169,6 +181,7 @@ class SyncManager {
                     this.currentUser = data.session.user;
 
                     this.updateLoginUI();
+                    this.bindLifecycleSyncHandlers();
 
                     // 执行智能同步
                     await this.smartSync();
@@ -188,6 +201,7 @@ class SyncManager {
                 this.updateLoginUI();
 
                 if (this.currentUser) {
+                    this.bindLifecycleSyncHandlers();
                     this.startPeriodicSync();
                     this.initRealtimeSubscription();
 
@@ -197,6 +211,7 @@ class SyncManager {
                 } else {
                     this.stopPeriodicSync();
                     this.unsubscribeRealtime();
+                    this.clearRealtimeReconnectTimer();
                 }
             });
         } catch (error) {
@@ -439,9 +454,14 @@ class SyncManager {
                 }
                 if (settings.qweather_api_key_encrypted) {
                     await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                    SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
                 }
-                if (settings.qweather_api_key_set) {
+                if (typeof settings.qweather_api_key_set !== 'undefined') {
                     await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                    SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
+                }
+                if (settings.crypto_master_key) {
+                    SafeStorage.set('crypto_master_key', settings.crypto_master_key);
                 }
             }
 
@@ -837,12 +857,12 @@ class SyncManager {
             clearInterval(this.periodicSyncTimer);
         }
 
-        // 每1分钟检查一次，缩短跨设备同步延迟
+        // 每20秒检查一次，缩短跨设备同步延迟，并兼容移动端实时通道失活场景
         this.periodicSyncTimer = setInterval(async () => {
             if (this.isLoggedIn() && !this.isSyncing) {
                 await this.smartSync();
             }
-        }, 60000);
+        }, 20000);
     }
 
     /**
@@ -861,6 +881,8 @@ class SyncManager {
     initRealtimeSubscription() {
         if (!this.supabase || !this.currentUser) return;
 
+        this.clearRealtimeReconnectTimer();
+
         if (this.realtimeChannel) {
             this.unsubscribeRealtime();
         }
@@ -876,6 +898,7 @@ class SyncManager {
                     filter: `user_id=eq.${this.currentUser.id}`
                 },
                 async (payload) => {
+                    this.realtimeReconnectAttempts = 0;
                     if (!this.isSyncing) {
                         document.dispatchEvent(new CustomEvent('syncRemoteDataChanged', {
                             detail: { payload }
@@ -884,9 +907,15 @@ class SyncManager {
                     }
                 }
             )
-            .subscribe((status) => {
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    this.realtimeReconnectAttempts = 0;
+                    return;
+                }
+
                 if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                     console.warn('实时同步通道异常:', status);
+                    this.scheduleRealtimeReconnect();
                 }
             });
     }
@@ -899,6 +928,81 @@ class SyncManager {
             this.realtimeChannel.unsubscribe();
             this.realtimeChannel = null;
         }
+    }
+
+    clearRealtimeReconnectTimer() {
+        if (this.realtimeReconnectTimer) {
+            clearTimeout(this.realtimeReconnectTimer);
+            this.realtimeReconnectTimer = null;
+        }
+    }
+
+    scheduleRealtimeReconnect() {
+        if (!this.currentUser || !this.isOnline()) {
+            return;
+        }
+
+        if (this.realtimeReconnectTimer) {
+            return;
+        }
+
+        const delay = Math.min(3000 * Math.max(1, this.realtimeReconnectAttempts + 1), 15000);
+        this.realtimeReconnectAttempts += 1;
+        this.realtimeReconnectTimer = setTimeout(async () => {
+            this.realtimeReconnectTimer = null;
+            if (!this.currentUser || !this.isOnline()) {
+                return;
+            }
+            try {
+                this.initRealtimeSubscription();
+                await this.silentSyncFromCloud();
+                document.dispatchEvent(new CustomEvent('syncRemoteDataChanged', {
+                    detail: { reason: 'realtime-reconnect' }
+                }));
+            } catch (error) {
+                console.warn('实时同步重连失败:', error);
+                this.scheduleRealtimeReconnect();
+            }
+        }, delay);
+    }
+
+    bindLifecycleSyncHandlers() {
+        if (this.lifecycleHandlersBound) {
+            return;
+        }
+
+        this.lifecycleHandlersBound = true;
+
+        const resumeSync = async () => {
+            if (!this.isLoggedIn() || this.isSyncing) {
+                return;
+            }
+            try {
+                this.initRealtimeSubscription();
+                await this.smartSync();
+            } catch (error) {
+                console.warn('恢复前台同步失败:', error);
+            }
+        };
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                resumeSync();
+            }
+        });
+
+        window.addEventListener('online', () => {
+            this._offlineNotified = false;
+            resumeSync();
+        });
+
+        window.addEventListener('focus', () => {
+            resumeSync();
+        });
+
+        window.addEventListener('pageshow', () => {
+            resumeSync();
+        });
     }
 
     /**
@@ -943,9 +1047,14 @@ class SyncManager {
                 }
                 if (settings.qweather_api_key_encrypted) {
                     await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                    SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
                 }
-                if (settings.qweather_api_key_set) {
+                if (typeof settings.qweather_api_key_set !== 'undefined') {
                     await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                    SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
+                }
+                if (settings.crypto_master_key) {
+                    SafeStorage.set('crypto_master_key', settings.crypto_master_key);
                 }
             }
 
@@ -1164,6 +1273,7 @@ class SyncManager {
 
             this.currentUser = data.user;
             this.updateLoginUI();
+            this.bindLifecycleSyncHandlers();
 
             // 执行智能同步
             await this.smartSync();
@@ -1249,6 +1359,7 @@ class SyncManager {
                 await this.syncToCloud().catch(e => console.warn('同步失败:', e));
                 this.stopPeriodicSync();
                 this.unsubscribeRealtime();
+                this.clearRealtimeReconnectTimer();
                 await this.supabase.auth.signOut().catch(e => console.warn('登出失败:', e));
             }
             this.currentUser = null;
@@ -1283,6 +1394,7 @@ class SyncManager {
         const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
         const qweatherKeyEncrypted = await db.getSetting('qweather_api_key_encrypted');
         const qweatherKeySet = await db.getSetting('qweather_api_key_set');
+        const cryptoMasterKey = SafeStorage.get('crypto_master_key');
 
         if (kimiKey) settings.kimi_api_key = kimiKey;
         if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
@@ -1290,6 +1402,7 @@ class SyncManager {
         if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
         if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
         if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
+        if (cryptoMasterKey) settings.crypto_master_key = cryptoMasterKey;
 
             const syncData = {
                 sync_time: new Date().toISOString(),
