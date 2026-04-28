@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -26,7 +26,7 @@
         <div id="apiKeyModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>AI 增强设置</h3>
+                    <h3>AI 与天气设置</h3>
                     <button type="button" id="closeApiKeyModal" class="btn-close" title="关闭">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -35,15 +35,13 @@
                     </button>
                 </div>
 
-                <!-- API Key 状态显示 -->
                 <div id="apiKeyStatus" class="api-key-status">
-                    <span class="status-icon">○</span>
-                    <span class="status-text">使用基础解析</span>
+                    <span class="status-icon"></span>
+                    <span class="status-text">使用基础解析  天气使用免费服务</span>
                 </div>
 
-                <p style="color:#666;font-size:13px;margin-bottom:16px;">配置AI API可大幅提升识别精度，推荐同时配置两个API。</p>
+                <p style="color:#666;font-size:13px;margin-bottom:16px;">AI Key 可提升识别精度；和风天气 Key 为可选项，登录同账号后会自动同步恢复。</p>
 
-                <!-- Kimi API（图片识别更强） -->
                 <div class="form-group">
                     <label for="kimiApiKeyInput">Kimi API Key（图片识别推荐）</label>
                     <div class="input-with-toggle">
@@ -58,7 +56,6 @@
                     <small class="form-hint">Kimi（月之暗面）图片理解能力最强，推荐用于图片识别</small>
                 </div>
 
-                <!-- DeepSeek API -->
                 <div class="form-group">
                     <label for="apiKeyInput">DeepSeek API Key（文字解析推荐）</label>
                     <div class="input-with-toggle">
@@ -73,13 +70,28 @@
                     <small class="form-hint">DeepSeek文字解析能力强，免费额度充足</small>
                 </div>
 
+                <div class="form-group">
+                    <label for="qweatherApiKeyInput">和风天气 API Key（可选，更准确天气）</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="qweatherApiKeyInput" placeholder="请输入和风天气 Key">
+                        <button type="button" id="toggleQweatherApiKeyVisibility" class="btn-toggle" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <small class="form-hint">未配置时自动使用免费天气；已配置后优先使用和风天气。</small>
+                </div>
+
                 <div class="api-key-help">
-                    <p>💡 获取API Key：</p>
+                    <p> 获取 API Key：</p>
                     <ol>
                         <li><b>Kimi</b>: <a href="https://platform.moonshot.cn/console/api-keys" target="_blank">platform.moonshot.cn</a> - 图片识别推荐</li>
                         <li><b>DeepSeek</b>: <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com</a> - 文字解析推荐</li>
+                        <li><b>和风天气</b>: <a href="https://console.qweather.com/" target="_blank">console.qweather.com</a> - 实时与 3 天天气</li>
                     </ol>
-                    <p style="margin-top:12px;color:#888;font-size:12px;">两个API都有免费额度，建议同时配置以获得最佳识别效果</p>
+                    <p style="margin-top:12px;color:#888;font-size:12px;">天气默认仍定位在姑苏区三香路附近的苏州点位。</p>
                 </div>
 
                 <div class="modal-actions">
@@ -88,7 +100,6 @@
                 </div>
             </div>
         </div>
-
         <!-- 顶部导航栏 -->
         <header class="header">
             <div class="header-left">
@@ -1124,10 +1135,10 @@
     <script src="js/ocr.js?v=35"></script>
     <script src="js/report.js?v=15"></script>
     <script src="js/calendar.js?v=28"></script>
-    <script src="js/sync.js?v=30"></script>
+    <script src="js/sync.js?v=31"></script>
     <script src="js/upload-flow.js?v=6"></script>
     <script src="js/app-date-view.js?v=9"></script>
-    <script src="js/app.js?v=121"></script>
+    <script src="js/app.js?v=122"></script>
     
     <!-- 版权声明 -->
     <footer class="copyright-footer">
@@ -1136,3 +1147,4 @@
     </footer>
 </body>
 </html>
+

@@ -1,3 +1,43 @@
+## 2026-04-28 P3-43
+
+### 本次目标
+- 将和风天气 Key 的跨设备同步恢复补齐到所有关键链路
+- 为待办事项补充截止时间显示、到期后顶部通知框闪烁提醒，以及完成后自动停止提醒
+- 完成本地校验、提交推送与线上强刷复测
+
+### 当前状态
+- ✅ 已确认 `sync.js` 中打包 settings、云端下载恢复与云端合并恢复路径都已统一补上 `qweather_api_key_encrypted` 与 `qweather_api_key_set`
+- ✅ 已确认待办 `deadline` 现有数据结构可直接复用，无需新增 schema
+- ✅ 已在 `app.js` 为待办卡片渲染截止时间，并为到期未完成待办接入顶部通知框闪烁提醒
+- ✅ 已支持多条到期待办在通知框轮播，且完成待办后立即停止对应提醒
+- ✅ 已保持原有倒数日提醒链路，只有在存在到期待办时才切换为待办提醒
+- ✅ 已完成 `node --check js/app.js`、`node --check js/sync.js`
+- ✅ 已完成 `app.js` / `sync.js` / `style.css` / `index.html` diagnostics 0 错误
+- ✅ 已确认部署版本显示为 `2026-04-28 P3-43`，资源版本命中 `sync.js?v=31`、`app.js?v=122`
+- 🔄 待提交并推送到 `origin/main`
+- 🔄 待线上强刷复测 `https://kimixpf1.github.io/officeboard/`
+
+### 本轮关键改动
+- sync.js：`buildSyncData()` 增补和风天气密钥密文与已设置标记的稳定打包
+- sync.js：云端下载恢复与云端合并恢复时，统一回写 `qweather_api_key_encrypted` 与 `qweather_api_key_set`
+- app.js：初始化后启动待办截止提醒轮询，确保通知框按秒刷新闪烁态与轮播内容
+- app.js：`updateCountdownNotice()` 改为优先显示到期未完成待办提醒，无到期待办时回退原倒数日提醒
+- app.js：待办卡片新增截止时间展示；待办完成时同步写入 `completedAt`
+- css/style.css：新增通知框待办提醒态、闪烁态与待办截止时间强调样式
+
+### 验证结果
+- `node --check js/app.js` 通过
+- `node --check js/sync.js` 通过
+- `app.js` diagnostics 0 错误
+- `sync.js` diagnostics 0 错误
+- `style.css` diagnostics 0 错误
+- `index.html` diagnostics 0 错误
+
+### 遗留事项
+- 待提交并推送 `P3-43` 到 `origin/main`
+- 待线上强刷验证是否已命中 `app.js?v=122` 与 `sync.js?v=31`
+- 待在线上验证和风 Key 跨设备恢复、待办截止提醒闪烁与完成后停止提醒链路是否稳定
+
 ## 2026-04-28 P3-42
 
 ### 本次目标

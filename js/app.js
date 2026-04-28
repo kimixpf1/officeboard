@@ -153,6 +153,9 @@ class OfficeDashboard {
         this.undoHistory = [];
         this.maxUndoSteps = 20;
 
+        this.todoReminderRefreshTimer = null;
+        this.todoReminderNoticeIndex = 0;
+
         this.init();
     }
 
@@ -247,6 +250,7 @@ class OfficeDashboard {
             this.bindEvents();
 
             await this.loadItems();
+            this.startTodoReminderLoop();
 
             this.initDatePicker();
 
@@ -331,6 +335,7 @@ class OfficeDashboard {
         // 切换API Key显示/隐藏
         document.getElementById('toggleApiKeyVisibility')?.addEventListener('click', () => this.toggleApiKeyVisibility());
         document.getElementById('toggleKimiApiKeyVisibility')?.addEventListener('click', () => this.toggleKimiApiKeyVisibility());
+        document.getElementById('toggleQweatherApiKeyVisibility')?.addEventListener('click', () => this.toggleQweatherApiKeyVisibility());
 
         // 测试API Key连接
         document.getElementById('testApiKey')?.addEventListener('click', () => this.testApiKeyConnection());
@@ -1096,8 +1101,9 @@ class OfficeDashboard {
     }
 
     updateCountdownNotice() {
+        const todoReminderActive = this.updateTodoReminderNotice();
         const noticeEl = document.getElementById('countdownNotice');
-        if (!noticeEl) {
+        if (!noticeEl || todoReminderActive) {
             return;
         }
 
@@ -1106,6 +1112,8 @@ class OfficeDashboard {
             clearInterval(this.countdownNoticeTimer);
             this.countdownNoticeTimer = null;
         }
+
+        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing');
 
         if (!upcoming.length) {
             noticeEl.hidden = true;
@@ -2181,81 +2189,22 @@ class OfficeDashboard {
      */
     async fetchWeather(lat, lon, cityName, options = {}) {
         const weatherBody = document.getElementById('weatherBody');
-        
-        try {
-            if (weatherBody) {
-                this.renderWeatherStatus('正在加载天气...', 'weather-loading');
-            }
+        const location = `${Number(lon).toFixed(2)},${Number(lat).toFixed(2)}`;
 
-            const apiKey = await cryptoManager.secureGetSecret('qweather_api_key');
-            if (!apiKey) {
-                throw new Error('未配置和风天气密钥');
-            }
-
-            const location = `${Number(lon).toFixed(2)},${Number(lat).toFixed(2)}`;
-            const host = 'n55ctw84yb.re.qweatherapi.com';
-            const baseUrl = `https://${host}`;
-            const commonQuery = `location=${encodeURIComponent(location)}&lang=zh&unit=m&key=${encodeURIComponent(apiKey)}`;
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-
-            const [nowResponse, dailyResponse] = await Promise.all([
-                fetch(`${baseUrl}/v7/weather/now?${commonQuery}`, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    signal: controller.signal
-                }),
-                fetch(`${baseUrl}/v7/weather/3d?${commonQuery}`, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    signal: controller.signal
-                })
-            ]);
-            clearTimeout(timeout);
-
-            if (!nowResponse.ok || !dailyResponse.ok) {
-                throw new Error('API请求失败');
-            }
-
-            const [nowData, dailyData] = await Promise.all([
-                nowResponse.json(),
-                dailyResponse.json()
-            ]);
-
-            if (nowData.code !== '200' || !nowData.now) {
-                throw new Error('实时天气数据格式错误');
-            }
-
-            if (dailyData.code !== '200' || !Array.isArray(dailyData.daily)) {
-                throw new Error('天气预报数据格式错误');
-            }
-
-            const temp = Math.round(Number(nowData.now.temp));
-            const humidity = Number(nowData.now.humidity);
-            const windSpeed = Math.round(Number(nowData.now.windSpeed));
-            const code = Number(nowData.now.icon);
-            const desc = nowData.now.text || this.getWeatherDesc(code);
-            const icon = this.getWeatherIcon(code);
+        const renderWeatherResult = (weather) => {
+            const { current, forecast, sourceLabel } = weather;
 
             this.currentWeatherData = {
                 cityName,
-                temperature: temp,
-                humidity,
-                windSpeed,
-                description: desc,
-                icon,
-                code
+                temperature: current.temperature,
+                humidity: current.humidity,
+                windSpeed: current.windSpeed,
+                description: current.description,
+                icon: current.icon,
+                code: current.code,
+                source: current.source
             };
-            this.weatherForecastSummary = dailyData.daily.slice(0, 3).map((day, index) => {
-                const date = new Date(day.fxDate);
-                return {
-                    label: index === 0 ? '今天' : index === 1 ? '明天' : index === 2 ? '后天' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()],
-                    max: Math.round(Number(day.tempMax)),
-                    min: Math.round(Number(day.tempMin)),
-                    code: Number(day.iconDay),
-                    text: day.textDay || this.getWeatherDesc(Number(day.iconDay))
-                };
-            });
+            this.weatherForecastSummary = forecast;
             this.lastWeatherUpdatedAt = Date.now();
             this.updateHeaderWeatherDisplay();
 
@@ -2264,19 +2213,19 @@ class OfficeDashboard {
 
             const iconEl = document.createElement('div');
             iconEl.className = 'weather-icon';
-            iconEl.textContent = icon;
+            iconEl.textContent = current.icon;
 
             const tempEl = document.createElement('div');
             tempEl.className = 'weather-temp';
-            tempEl.textContent = `${temp}°C`;
+            tempEl.textContent = `${current.temperature}°C`;
 
             const descEl = document.createElement('div');
             descEl.className = 'weather-desc';
-            descEl.textContent = desc;
+            descEl.textContent = current.description;
 
             const detailEl = document.createElement('div');
             detailEl.className = 'weather-detail';
-            detailEl.textContent = `湿度 ${humidity}% · 风速 ${windSpeed}km/h`;
+            detailEl.textContent = `湿度 ${current.humidity}% · 风速 ${current.windSpeed}km/h · ${sourceLabel}`;
 
             const cityRowEl = document.createElement('div');
             cityRowEl.className = 'weather-city-row';
@@ -2296,48 +2245,173 @@ class OfficeDashboard {
 
             cityRowEl.append(cityEl, changeBtn);
             weatherInfo.append(iconEl, tempEl, descEl, detailEl, cityRowEl);
-            
-            if (dailyData.daily.length) {
+
+            if (forecast.length) {
                 const forecastEl = document.createElement('div');
                 forecastEl.className = 'weather-forecast';
-                const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
-                for (let i = 0; i < Math.min(3, dailyData.daily.length); i++) {
-                    const item = dailyData.daily[i];
-                    const d = new Date(item.fxDate);
-                    const dayName = i === 0 ? '今天' : dayNames[d.getDay()];
-                    const maxT = Math.round(Number(item.tempMax));
-                    const minT = Math.round(Number(item.tempMin));
-                    const dayIcon = this.getWeatherIcon(Number(item.iconDay));
-
+                forecast.forEach(item => {
                     const forecastDayEl = document.createElement('div');
                     forecastDayEl.className = 'forecast-day';
 
                     const forecastNameEl = document.createElement('span');
                     forecastNameEl.className = 'forecast-name';
-                    forecastNameEl.textContent = dayName;
+                    forecastNameEl.textContent = item.label;
 
                     const forecastIconEl = document.createElement('span');
                     forecastIconEl.className = 'forecast-icon';
-                    forecastIconEl.textContent = dayIcon;
+                    forecastIconEl.textContent = this.getWeatherIcon(item.code);
 
                     const forecastTempEl = document.createElement('span');
                     forecastTempEl.className = 'forecast-temp';
-                    forecastTempEl.textContent = `${minT}~${maxT}°`;
+                    forecastTempEl.textContent = `${item.min}~${item.max}°`;
 
                     forecastDayEl.append(forecastNameEl, forecastIconEl, forecastTempEl);
                     forecastEl.appendChild(forecastDayEl);
-                }
+                });
 
                 weatherInfo.appendChild(forecastEl);
             }
-            
+
             if (weatherBody) {
                 weatherBody.replaceChildren(weatherInfo);
             }
+        };
+
+        const fetchQWeather = async () => {
+            const apiKey = await cryptoManager.secureGetSecret('qweather_api_key');
+            if (!apiKey) {
+                throw new Error('未配置和风天气密钥');
+            }
+
+            const host = 'n55ctw84yb.re.qweatherapi.com';
+            const baseUrl = `https://${host}`;
+            const commonQuery = `location=${encodeURIComponent(location)}&lang=zh&unit=m&key=${encodeURIComponent(apiKey)}`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+
+            try {
+                const [nowResponse, dailyResponse] = await Promise.all([
+                    fetch(`${baseUrl}/v7/weather/now?${commonQuery}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal
+                    }),
+                    fetch(`${baseUrl}/v7/weather/3d?${commonQuery}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal
+                    })
+                ]);
+
+                if (!nowResponse.ok || !dailyResponse.ok) {
+                    throw new Error('和风天气请求失败');
+                }
+
+                const [nowData, dailyData] = await Promise.all([
+                    nowResponse.json(),
+                    dailyResponse.json()
+                ]);
+
+                if (nowData.code !== '200' || !nowData.now) {
+                    throw new Error('和风实时天气数据格式错误');
+                }
+
+                if (dailyData.code !== '200' || !Array.isArray(dailyData.daily)) {
+                    throw new Error('和风天气预报数据格式错误');
+                }
+
+                return {
+                    current: {
+                        temperature: Math.round(Number(nowData.now.temp)),
+                        humidity: Number(nowData.now.humidity),
+                        windSpeed: Math.round(Number(nowData.now.windSpeed)),
+                        code: Number(nowData.now.icon),
+                        description: nowData.now.text || this.getWeatherDesc(Number(nowData.now.icon)),
+                        icon: this.getWeatherIcon(Number(nowData.now.icon)),
+                        source: 'qweather'
+                    },
+                    forecast: dailyData.daily.slice(0, 3).map((day, index) => ({
+                        label: index === 0 ? '今天' : index === 1 ? '明天' : '后天',
+                        max: Math.round(Number(day.tempMax)),
+                        min: Math.round(Number(day.tempMin)),
+                        code: Number(day.iconDay),
+                        text: day.textDay || this.getWeatherDesc(Number(day.iconDay))
+                    })),
+                    sourceLabel: '和风天气'
+                };
+            } finally {
+                clearTimeout(timeout);
+            }
+        };
+
+        const fetchOpenMeteo = async () => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+
+            try {
+                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FShanghai&forecast_days=3`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error('免费天气服务请求失败');
+                }
+
+                const data = await response.json();
+                if (!data.current || !data.daily) {
+                    throw new Error('免费天气服务数据格式错误');
+                }
+
+                const dailyCodes = Array.isArray(data.daily.weather_code) ? data.daily.weather_code : [];
+                const dailyMax = Array.isArray(data.daily.temperature_2m_max) ? data.daily.temperature_2m_max : [];
+                const dailyMin = Array.isArray(data.daily.temperature_2m_min) ? data.daily.temperature_2m_min : [];
+
+                return {
+                    current: {
+                        temperature: Math.round(Number(data.current.temperature_2m)),
+                        humidity: Number(data.current.relative_humidity_2m),
+                        windSpeed: Math.round(Number(data.current.wind_speed_10m)),
+                        code: Number(data.current.weather_code),
+                        description: this.getWeatherDesc(Number(data.current.weather_code)),
+                        icon: this.getWeatherIcon(Number(data.current.weather_code)),
+                        source: 'open-meteo'
+                    },
+                    forecast: dailyCodes.slice(0, 3).map((code, index) => ({
+                        label: index === 0 ? '今天' : index === 1 ? '明天' : '后天',
+                        max: Math.round(Number(dailyMax[index])),
+                        min: Math.round(Number(dailyMin[index])),
+                        code: Number(code),
+                        text: this.getWeatherDesc(Number(code))
+                    })),
+                    sourceLabel: '免费天气'
+                };
+            } finally {
+                clearTimeout(timeout);
+            }
+        };
+
+        try {
+            if (weatherBody) {
+                this.renderWeatherStatus('正在加载天气...', 'weather-loading');
+            }
+
+            let weather = null;
+
+            try {
+                weather = await fetchQWeather();
+            } catch (qweatherError) {
+                console.warn('和风天气获取失败，回退到免费天气:', qweatherError?.message || qweatherError);
+                weather = await fetchOpenMeteo();
+            }
+
+            renderWeatherResult(weather);
         } catch (e) {
             console.error('天气获取失败:', e);
             this.currentWeatherData = null;
+            this.weatherForecastSummary = [];
             this.lastWeatherUpdatedAt = null;
             this.updateHeaderWeatherDisplay();
 
@@ -2354,7 +2428,7 @@ class OfficeDashboard {
             detailEl.style.fontSize = '12px';
             detailEl.style.color = 'var(--gray-500)';
             detailEl.style.marginTop = '8px';
-            detailEl.textContent = e?.message === '未配置和风天气密钥' ? '和风天气密钥未配置' : '请检查网络连接';
+            detailEl.textContent = '请检查网络连接';
 
             const retryBtn = document.createElement('button');
             retryBtn.type = 'button';
@@ -2462,12 +2536,13 @@ class OfficeDashboard {
      * 获取天气图标
      */
     getWeatherIcon(code) {
-        if (code === 100 || code === 150) return '☀️';
-        if ([101, 102, 103, 151, 152, 153].includes(code)) return '⛅';
-        if ([104, 154].includes(code)) return '☁️';
-        if ([300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 350, 351, 399].includes(code)) return '🌧️';
-        if ([400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 456, 457, 499].includes(code)) return '❄️';
-        if ([500, 501, 509, 510, 514, 515].includes(code)) return '🌫️';
+        if (code === 0 || code === 100 || code === 150) return '☀️';
+        if ([1, 2, 101, 102, 103, 151, 152, 153].includes(code)) return '⛅';
+        if ([3, 104, 154].includes(code)) return '☁️';
+        if ([45, 48, 500, 501, 509, 510, 514, 515].includes(code)) return '🌫️';
+        if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 350, 351, 399].includes(code)) return '🌧️';
+        if ([71, 73, 75, 77, 85, 86, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 456, 457, 499].includes(code)) return '❄️';
+        if ([95, 96, 99].includes(code)) return '⛈️';
         if ([502, 503, 504, 507, 508].includes(code)) return '🌪️';
         if ([511, 512, 513].includes(code)) return '🌬️';
         if ([900, 901].includes(code)) return '☀️';
@@ -2477,6 +2552,13 @@ class OfficeDashboard {
 
     getWeatherDesc(code) {
         const map = {
+            0: '晴', 1: '大部晴朗', 2: '局部多云', 3: '阴',
+            45: '雾', 48: '冻雾',
+            51: '小毛毛雨', 53: '毛毛雨', 55: '浓毛毛雨', 56: '小冻毛毛雨', 57: '浓冻毛毛雨',
+            61: '小雨', 63: '中雨', 65: '大雨', 66: '小冻雨', 67: '大冻雨',
+            71: '小雪', 73: '中雪', 75: '大雪', 77: '米雪',
+            80: '小阵雨', 81: '中阵雨', 82: '暴雨阵雨', 85: '小阵雪', 86: '大阵雪',
+            95: '雷暴', 96: '雷暴伴小冰雹', 99: '雷暴伴大冰雹',
             100: '晴', 101: '多云', 102: '少云', 103: '晴间多云', 104: '阴',
             150: '晴', 151: '多云', 152: '少云', 153: '晴间多云', 154: '阴',
             300: '阵雨', 301: '强阵雨', 302: '雷阵雨', 303: '强雷阵雨', 304: '雷阵雨伴有冰雹',
@@ -4783,6 +4865,25 @@ class OfficeDashboard {
      * 打开API Key设置弹窗
      */
     async openApiKeyModal() {
+        const deepseekInput = document.getElementById('apiKeyInput');
+        const kimiInput = document.getElementById('kimiApiKeyInput');
+        const qweatherInput = document.getElementById('qweatherApiKeyInput');
+
+        if (deepseekInput) {
+            deepseekInput.value = ocrManager.getApiKey() || '';
+            deepseekInput.type = 'password';
+        }
+
+        if (kimiInput) {
+            kimiInput.value = ocrManager.getKimiApiKey() || '';
+            kimiInput.type = 'password';
+        }
+
+        if (qweatherInput) {
+            qweatherInput.value = await cryptoManager.secureGetSecret('qweather_api_key') || '';
+            qweatherInput.type = 'password';
+        }
+
         await this.updateApiKeyStatus();
         this.showModal('apiKeyModal');
     }
@@ -4796,24 +4897,33 @@ class OfficeDashboard {
 
         const deepseekKey = ocrManager.getApiKey();
         const kimiKey = ocrManager.getKimiApiKey();
+        const qweatherKey = await cryptoManager.secureGetSecret('qweather_api_key');
 
-        const configured = [];
-        if (kimiKey) configured.push('Kimi');
-        if (deepseekKey) configured.push('DeepSeek');
+        const aiConfigured = [];
+        if (kimiKey) aiConfigured.push('Kimi');
+        if (deepseekKey) aiConfigured.push('DeepSeek');
 
-        statusEl.className = configured.length > 0
+        const hasWeatherKey = !!qweatherKey;
+        const hasAnyConfig = aiConfigured.length > 0 || hasWeatherKey;
+
+        statusEl.className = hasAnyConfig
             ? 'api-key-status configured'
             : 'api-key-status';
 
         const icon = document.createElement('span');
         icon.className = 'status-icon';
-        icon.textContent = configured.length > 0 ? '✅' : '○';
+        icon.textContent = hasAnyConfig ? '✅' : '○';
 
         const text = document.createElement('span');
         text.className = 'status-text';
-        text.textContent = configured.length > 0
-            ? `AI增强已启用（${configured.join(' + ')}）`
+
+        const aiText = aiConfigured.length > 0
+            ? `AI增强已启用（${aiConfigured.join(' + ')}）`
             : '使用基础解析';
+        const weatherText = hasWeatherKey
+            ? '天气使用和风天气'
+            : '天气使用免费服务';
+        text.textContent = `${aiText}  ${weatherText}`;
 
         statusEl.replaceChildren(icon, text);
     }
@@ -4838,24 +4948,31 @@ class OfficeDashboard {
         }
     }
 
+    toggleQweatherApiKeyVisibility() {
+        const input = document.getElementById('qweatherApiKeyInput');
+        if (input) {
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+    }
+
     /**
      * 测试API Key连接
      */
     async testApiKeyConnection() {
         const deepseekKey = document.getElementById('apiKeyInput')?.value?.trim();
         const kimiKey = document.getElementById('kimiApiKeyInput')?.value?.trim();
+        const qweatherKey = document.getElementById('qweatherApiKeyInput')?.value?.trim();
 
-        if (!deepseekKey && !kimiKey) {
-            this.showError('请输入至少一个API Key');
+        if (!deepseekKey && !kimiKey && !qweatherKey) {
+            this.showError('请输入至少一个 API Key');
             return;
         }
 
         this.showLoading(true, '正在测试连接...');
 
         let successCount = 0;
-        let messages = [];
+        const messages = [];
 
-        // 测试DeepSeek API
         if (deepseekKey) {
             try {
                 const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -4882,7 +4999,6 @@ class OfficeDashboard {
             }
         }
 
-        // 测试Kimi API
         if (kimiKey) {
             try {
                 const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
@@ -4909,12 +5025,37 @@ class OfficeDashboard {
             }
         }
 
+        if (qweatherKey) {
+            try {
+                const response = await fetch(`https://n55ctw84yb.re.qweatherapi.com/v7/weather/now?location=120.60,31.29&lang=zh&unit=m&key=${encodeURIComponent(qweatherKey)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    messages.push('和风天气 ✗');
+                } else {
+                    const data = await response.json();
+                    if (data.code === '200' && data.now) {
+                        messages.push('和风天气 ✓');
+                        successCount++;
+                    } else {
+                        messages.push('和风天气 ✗');
+                    }
+                }
+            } catch (e) {
+                messages.push('和风天气 ✗');
+            }
+        }
+
         this.showLoading(false);
 
         if (successCount > 0) {
-            this.showSuccess(`连接成功: ${messages.join(', ')}`);
+            this.showSuccess(`连接成功: ${messages.join('，')}`);
         } else {
-            this.showError(`连接失败: ${messages.join(', ')}`);
+            this.showError(`连接失败: ${messages.join('，')}`);
         }
     }
 
@@ -4924,42 +5065,61 @@ class OfficeDashboard {
     async saveApiKey() {
         const deepseekInput = document.getElementById('apiKeyInput');
         const kimiInput = document.getElementById('kimiApiKeyInput');
+        const qweatherInput = document.getElementById('qweatherApiKeyInput');
         const deepseekKey = deepseekInput?.value?.trim();
         const kimiKey = kimiInput?.value?.trim();
+        const qweatherKey = qweatherInput?.value?.trim();
 
-        if (!deepseekKey && !kimiKey) {
-            this.showError('请输入至少一个API Key');
+        if (!deepseekKey && !kimiKey && !qweatherKey) {
+            this.showError('请至少填写一个 Key');
             return;
         }
 
         this.showLoading(true, '正在保存...');
 
         try {
-            // 保存DeepSeek API Key
             if (deepseekKey) {
                 await ocrManager.setApiKey(deepseekKey);
             }
 
-            // 保存Kimi API Key
             if (kimiKey) {
                 await ocrManager.setKimiApiKey(kimiKey);
             }
 
-            // 如果已登录，同步到云端
+            if (qweatherKey) {
+                const ok = await cryptoManager.secureStoreSecret('qweather_api_key', qweatherKey);
+                if (!ok) {
+                    throw new Error('和风天气 Key 保存失败');
+                }
+            }
+
             if (syncManager.isLoggedIn()) {
-                syncManager.markLocalChange();  // 标记本地改动
+                syncManager.markLocalChange();
                 await syncManager.silentSyncToCloud();
             }
 
             this.hideModal('apiKeyModal');
-            if (deepseekInput) deepseekInput.value = '';
-            if (kimiInput) kimiInput.value = '';
+            if (deepseekInput) {
+                deepseekInput.value = '';
+                deepseekInput.type = 'password';
+            }
+            if (kimiInput) {
+                kimiInput.value = '';
+                kimiInput.type = 'password';
+            }
+            if (qweatherInput) {
+                qweatherInput.value = '';
+                qweatherInput.type = 'password';
+            }
 
             const saved = [];
             if (deepseekKey) saved.push('DeepSeek');
             if (kimiKey) saved.push('Kimi');
-            this.showSuccess(`${saved.join('、')} API Key 已保存，AI识别已增强`);
+            if (qweatherKey) saved.push('和风天气');
+
+            this.showSuccess(`${saved.join('、')} Key 已保存`);
             await this.updateApiKeyStatus();
+            await this.refreshHeaderWeather(true);
         } catch (error) {
             console.error('保存API Key失败:', error);
             this.showError('保存失败: ' + error.message);
@@ -5666,7 +5826,9 @@ class OfficeDashboard {
      * 加载事项列表
      */
     async loadItems() {
-        return this.dateViewController.loadItems();
+        const result = await this.dateViewController.loadItems();
+        this.updateCountdownNotice();
+        return result;
     }
 
     /**
@@ -5955,6 +6117,13 @@ class OfficeDashboard {
                 cardMain.appendChild(titleEl);
 
                 const statusText = this.formatTodoCompletedTime(item.completedAt, effectiveCompleted);
+                const deadlineText = !effectiveCompleted ? this.formatDeadline(item.deadline, false) : '';
+                if (deadlineText) {
+                    const deadlineEl = document.createElement('div');
+                    deadlineEl.className = 'card-time todo-deadline';
+                    deadlineEl.textContent = deadlineText;
+                    cardMain.appendChild(deadlineEl);
+                }
                 if (statusText) {
                     const timeEl = document.createElement('div');
                     timeEl.className = 'card-time';
@@ -6271,6 +6440,116 @@ class OfficeDashboard {
         }
         
         return `${dateStr}截止`;
+    }
+
+    getTodoReminderItems(items = []) {
+        const now = Date.now();
+        return items
+            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed)
+            .map(item => {
+                const deadlineDate = new Date(item.deadline);
+                if (Number.isNaN(deadlineDate.getTime())) {
+                    return null;
+                }
+                return {
+                    item,
+                    deadlineDate,
+                    overdueMs: now - deadlineDate.getTime()
+                };
+            })
+            .filter(Boolean)
+            .filter(entry => entry.overdueMs >= 0)
+            .sort((a, b) => a.deadlineDate - b.deadlineDate);
+    }
+
+    getTodoReminderNoticeState() {
+        const reminderItems = this.getTodoReminderItems(this.items || []);
+        return {
+            active: reminderItems.length > 0,
+            items: reminderItems,
+            currentIndex: reminderItems.length > 0
+                ? this.todoReminderNoticeIndex % reminderItems.length
+                : 0,
+            flashing: reminderItems.length > 0 && Math.floor(Date.now() / 700) % 2 === 0
+        };
+    }
+
+    formatTodoReminderRelative(deadlineDate) {
+        if (!(deadlineDate instanceof Date) || Number.isNaN(deadlineDate.getTime())) {
+            return '已到截止时间';
+        }
+
+        const diffMs = Date.now() - deadlineDate.getTime();
+        const totalMinutes = Math.max(1, Math.floor(diffMs / 60000));
+        const days = Math.floor(totalMinutes / 1440);
+        const hours = Math.floor((totalMinutes % 1440) / 60);
+        const minutes = totalMinutes % 60;
+
+        if (days > 0) {
+            return `已超时 ${days}天${hours}小时`;
+        }
+        if (hours > 0) {
+            return `已超时 ${hours}小时${minutes}分钟`;
+        }
+        return `已超时 ${minutes}分钟`;
+    }
+
+    updateTodoReminderNotice() {
+        const noticeEl = document.getElementById('countdownNotice');
+        if (!noticeEl) {
+            return false;
+        }
+
+        const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
+        const titleEl = noticeEl.querySelector('.countdown-notice-title');
+        const descEl = noticeEl.querySelector('.countdown-notice-desc');
+        const state = this.getTodoReminderNoticeState();
+
+        noticeEl.classList.toggle('todo-reminder-active', state.active);
+        noticeEl.classList.toggle('todo-reminder-flashing', state.active && state.flashing);
+
+        if (!state.active) {
+            this.todoReminderNoticeIndex = 0;
+            return false;
+        }
+
+        const current = state.items[state.currentIndex];
+        if (!current) {
+            return false;
+        }
+
+        if (badgeEl) {
+            badgeEl.textContent = state.items.length > 1 ? `待办提醒 ${state.currentIndex + 1}/${state.items.length}` : '待办提醒';
+        }
+        if (titleEl) {
+            titleEl.textContent = `${current.item.title} 已到截止时间`;
+        }
+        if (descEl) {
+            descEl.textContent = `${this.formatDeadline(current.item.deadline)} · ${this.formatTodoReminderRelative(current.deadlineDate)} · 完成后停止提醒`;
+        }
+
+        noticeEl.hidden = false;
+        return true;
+    }
+
+    startTodoReminderLoop() {
+        if (this.todoReminderRefreshTimer) {
+            clearInterval(this.todoReminderRefreshTimer);
+            this.todoReminderRefreshTimer = null;
+        }
+
+        const tick = () => {
+            const state = this.getTodoReminderNoticeState();
+            if (state.items.length > 1) {
+                this.todoReminderNoticeIndex = (this.todoReminderNoticeIndex + 1) % state.items.length;
+            } else {
+                this.todoReminderNoticeIndex = 0;
+            }
+            this.updateCountdownNotice();
+        };
+
+        this.updateCountdownNotice();
+        this.todoReminderRefreshTimer = window.setInterval(tick, 1000);
     }
 
     formatTodoCompletedTime(completedAt, completed = false) {
@@ -6617,8 +6896,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-28 P3-42';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=30', 'app-date-view.js?v=9', 'app.js?v=121', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-28 P3-43';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=31', 'app-date-view.js?v=9', 'app.js?v=122', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -7643,7 +7922,10 @@ class OfficeDashboard {
      */
     async toggleTodoComplete(id, completed) {
         try {
-            await db.updateItem(id, { completed });
+            await db.updateItem(id, {
+                completed,
+                completedAt: completed ? new Date().toISOString() : null
+            });
             await this.loadItems();
             // 立即同步到云端
             if (syncManager.isLoggedIn()) {
@@ -9069,3 +9351,4 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new OfficeDashboard();
     window.officeDashboard = window.dashboard;
 });
+

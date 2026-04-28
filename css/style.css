@@ -327,6 +327,27 @@ body {
     text-overflow: ellipsis;
 }
 
+.countdown-notice.todo-reminder-active {
+    border-color: color-mix(in srgb, #ef4444 48%, var(--warning-color));
+    background: linear-gradient(135deg, color-mix(in srgb, #ef4444 12%, var(--bg-primary)), color-mix(in srgb, var(--warning-color) 24%, var(--bg-primary)));
+    box-shadow: 0 10px 26px rgba(239, 68, 68, 0.18);
+}
+
+.countdown-notice.todo-reminder-active .countdown-notice-badge {
+    background: color-mix(in srgb, #ef4444 16%, transparent);
+    color: color-mix(in srgb, #ef4444 78%, var(--gray-800));
+}
+
+.countdown-notice.todo-reminder-flashing {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.14), 0 12px 28px rgba(239, 68, 68, 0.28);
+}
+
+.todo-deadline {
+    color: color-mix(in srgb, #ef4444 72%, var(--gray-700));
+    font-weight: 600;
+}
+
 .header-center {
     display: flex;
     align-items: center;

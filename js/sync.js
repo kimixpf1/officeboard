@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -941,6 +941,12 @@ class SyncManager {
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
                 }
+                if (settings.qweather_api_key_encrypted) {
+                    await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                }
+                if (settings.qweather_api_key_set) {
+                    await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                }
             }
 
             // 同步备忘录
@@ -1271,15 +1277,19 @@ class SyncManager {
 
             // 获取设置数据（包括API Key）
             const settings = {};
-            const kimiKey = await db.getSetting('kimi_api_key');
-            const kimiKeySet = await db.getSetting('kimi_api_key_set');
-            const deepseekKey = await db.getSetting('deepseek_api_key');
-            const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
+        const kimiKey = await db.getSetting('kimi_api_key');
+        const kimiKeySet = await db.getSetting('kimi_api_key_set');
+        const deepseekKey = await db.getSetting('deepseek_api_key');
+        const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
+        const qweatherKeyEncrypted = await db.getSetting('qweather_api_key_encrypted');
+        const qweatherKeySet = await db.getSetting('qweather_api_key_set');
 
-            if (kimiKey) settings.kimi_api_key = kimiKey;
-            if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
-            if (deepseekKey) settings.deepseek_api_key = deepseekKey;
-            if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+        if (kimiKey) settings.kimi_api_key = kimiKey;
+        if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
+        if (deepseekKey) settings.deepseek_api_key = deepseekKey;
+        if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+        if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
+        if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
 
             const syncData = {
                 sync_time: new Date().toISOString(),
@@ -1378,7 +1388,12 @@ class SyncManager {
                 if (settings.deepseek_api_key_set) {
                     await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
                 }
-
+                if (settings.qweather_api_key_encrypted) {
+                    await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                }
+                if (settings.qweather_api_key_set) {
+                    await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                }
             }
 
             // 同步备忘录
