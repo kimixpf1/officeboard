@@ -1,3 +1,30 @@
+## 2026-04-29 v4.64
+
+### 本次目标
+- 彻底修复同账号跨设备删除/新增后无法实时同步，刷新后旧事项回流的问题
+- 收敛上传、下载、静默同步三条事项同步链路，统一按最终状态对齐本地与云端
+- 完成本地校验、提交推送与线上强刷复测
+
+### 当前状态
+- ✅ 已定位根因：`smartSync()`、`uploadToCloud()`、`downloadFromCloud()`、`silentSyncFromCloud()` 对缺失项的处理口径不一致，导致删除后的旧事项会在别的设备或刷新后被重新带回
+- ✅ 已在 `sync.js` 新增统一对账辅助方法：`getTimeMs()`、`getItemUpdatedTime()`、`findMatchingItem()`、`buildReconciledItems()`、`syncLocalItemsToState()`
+- ✅ 已修复 `uploadToCloud()`：上传前先读取云端当前 items，再按稳定键 + 更新时间生成最终 items，避免旧设备把已删除事项拼回云端
+- ✅ 已修复 `smartSync()`：改为基于统一对账结果刷新本地，并在存在本地修改时上传最终收敛结果，不再按数量变化粗暴增删
+- ✅ 已修复 `downloadFromCloud()` 与 `silentSyncFromCloud()`：统一使用 `syncLocalItemsToState()` 落地最终状态，确保删除、新增、修改都一致同步
+- ✅ 已将部署版本提升到 `2026-04-29 v4.64`，资源版本提升为 `sync.js?v=44`、`app.js?v=144`
+- 🔄 待执行本地语法检查、diagnostics、git 提交推送与线上强刷验证
+
+### 本轮关键改动
+- sync.js：新增统一事项对账与本地收敛方法，统一删除/新增/修改的判断口径
+- sync.js：`uploadToCloud()` 改为合并云端当前 items 后再 upsert，避免回流
+- sync.js：`smartSync()` 改为统一对账后决定本地刷新与回传云端
+- sync.js：`downloadFromCloud()` / `silentSyncFromCloud()` 改为直接收敛到目标状态，而不是分散式 put/add/delete
+- index.html / app.js：版本提升到 `v4.64`
+
+### 遗留事项
+- 待双设备实测“设备 1 删除 / 设备 2 实时消失 / 任一设备刷新后不回流”
+- 待双设备补测新增、编辑、完成状态、跨日期事项与周期性事项的同步一致性
+
 ## 2026-04-29 P3-49
 
 ### 本次目标

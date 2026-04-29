@@ -1,17 +1,23 @@
 # Todolist
 
 ## 当前轮次目标
-- 修复和风天气 Key 跨设备同步后无法在其他设备解密恢复的问题
-- 修复待办事项到达截止时间后通知栏未闪烁提醒的问题
-- 优化手机端在 WiFi 环境下的实时同步恢复与前台重连链路
+- 彻底修复同账号跨设备删除/新增后无法实时同步，刷新后旧事项回流的问题
+- 收敛上传、下载、静默同步三条事项同步链路，统一按最终状态对齐本地与云端
 - 完成本地校验、提交推送与线上强刷复测
 
 ## 当前待办
-- 已提交并推送 `P3-44`（commit `66dac0d`）到 `origin/main`
-- ✅ 已线上强刷验证 `https://kimixpf1.github.io/officeboard/` 命中 `P3-44`、`sync.js?v=32`、`app-date-view.js?v=10`、`app.js?v=123`
-- 待在真实登录/跨设备场景下继续确认和风 Key 恢复、待办截止提醒闪烁与手机 WiFi 下自动同步是否正常
+- 🔄 待验证同账号双设备场景：设备 1 删除/新增后，设备 2 是否可实时收敛且刷新后不回流
+- 待完成本地语法检查、diagnostics、git 提交推送与线上强刷复测
 
-## 事故记录（P3-31 已回退）
+## 已完成（本轮 v4.64）
+- ✅ 已定位跨设备删除回流根因：`smartSync()`、`uploadToCloud()`、`downloadFromCloud()`、`silentSyncFromCloud()` 四条链路对“云端缺失项”与“本地缺失项”的处理策略不一致
+- ✅ 已修复上传链路：`uploadToCloud()` 改为先读取云端当前事项，再用统一对账逻辑生成最终 items，避免设备 1 删除后被设备 2 旧数据重新拼回
+- ✅ 已修复智能同步链路：`smartSync()` 不再按数量变化粗暴增删，改为基于统一对账结果刷新本地，并在存在本地修改时上传最终收敛结果
+- ✅ 已修复下载/静默下载链路：`downloadFromCloud()` 与 `silentSyncFromCloud()` 改为统一使用 `syncLocalItemsToState()`，确保删除、修改、新增三种变化都按最终状态完整落地
+- ✅ 已新增同步辅助方法：`getTimeMs()`、`getItemUpdatedTime()`、`findMatchingItem()`、`buildReconciledItems()`、`syncLocalItemsToState()`，统一按稳定键与更新时间对账
+- ✅ 已将部署版本提升为 `2026-04-29 v4.64`，资源版本提升到 `sync.js?v=44`、`app.js?v=144`
+
+## 已完成（本轮 P3-44）
 - ❌ P3-31 "周/月视图拖拽延伸时间"功能导致周期性办文消失、跨日期办文丢失
 - ✅ 已 git revert 回退到 P3-30 并推送，线上已恢复
 - ❌ IndexedDB 和云端数据已丢失，无法恢复

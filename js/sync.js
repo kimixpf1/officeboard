@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -57,6 +57,91 @@ class SyncManager {
         this.lastLocalModifyTime = new Date().toISOString();
         SafeStorage.set('lastLocalModifyTime', this.lastLocalModifyTime);
 
+    }
+
+    getTimeMs(value) {
+        if (!value) return 0;
+        const ms = new Date(value).getTime();
+        return Number.isFinite(ms) ? ms : 0;
+    }
+
+    getItemUpdatedTime(item) {
+        if (!item) return 0;
+        return this.getTimeMs(item.updatedAt || item.createdAt);
+    }
+
+    findMatchingItem(items, targetItem) {
+        if (!Array.isArray(items) || !targetItem) {
+            return null;
+        }
+
+        const targetId = targetItem.id ? String(targetItem.id) : '';
+        const targetKey = this.getItemKey(targetItem);
+
+        return items.find(item => {
+            if (!item) return false;
+            if (targetId && item.id && String(item.id) === targetId) {
+                return true;
+            }
+            return this.getItemKey(item) === targetKey;
+        }) || null;
+    }
+
+    buildReconciledItems(localItems, cloudItems, baselineTime = 0) {
+        const normalizedLocalItems = Array.isArray(localItems) ? localItems : [];
+        const normalizedCloudItems = Array.isArray(cloudItems) ? cloudItems : [];
+        const reconciledItems = [];
+        const matchedLocalIds = new Set();
+
+        for (const cloudItem of normalizedCloudItems) {
+            const localMatch = this.findMatchingItem(normalizedLocalItems, cloudItem);
+            if (!localMatch) {
+                reconciledItems.push({ ...cloudItem });
+                continue;
+            }
+
+            matchedLocalIds.add(String(localMatch.id));
+            const localTime = this.getItemUpdatedTime(localMatch);
+            const cloudTime = this.getItemUpdatedTime(cloudItem);
+            reconciledItems.push(localTime > cloudTime ? { ...localMatch } : { ...cloudItem });
+        }
+
+        for (const localItem of normalizedLocalItems) {
+            if (matchedLocalIds.has(String(localItem.id))) {
+                continue;
+            }
+
+            const localTime = this.getItemUpdatedTime(localItem);
+            if (!baselineTime || localTime > baselineTime) {
+                reconciledItems.push({ ...localItem });
+            }
+        }
+
+        return this.deduplicateItems(reconciledItems);
+    }
+
+    async syncLocalItemsToState(targetItems, currentLocalItems = null) {
+        const existingLocalItems = Array.isArray(currentLocalItems) ? currentLocalItems : await db.getAllItems();
+        const targetList = Array.isArray(targetItems) ? targetItems : [];
+        const keptLocalIds = new Set();
+
+        for (const targetItem of targetList) {
+            const localMatch = this.findMatchingItem(existingLocalItems, targetItem);
+            if (localMatch) {
+                await db.putItem({ ...targetItem, id: localMatch.id });
+                keptLocalIds.add(String(localMatch.id));
+            } else {
+                const { id, ...itemData } = targetItem;
+                const addedId = await db.addItem(itemData);
+                keptLocalIds.add(String(addedId));
+            }
+        }
+
+        for (const localItem of existingLocalItems) {
+            if (!keptLocalIds.has(String(localItem.id))) {
+                await db.deleteItem(localItem.id);
+            }
+        }
     }
 
     hasLocalNonItemData() {
@@ -316,56 +401,38 @@ class SyncManager {
             const isFirstSync = !lastSyncTime;
 
             if (isFirstSync) {
-                // 首次同步（新设备/清除过缓存）：走合并逻辑，避免任何一端数据丢失
                 await this.mergeData(localItems, cloudData);
             } else {
                 const cloudHasUpdate = cloudUpdateTime && cloudUpdateTime > lastSyncTime;
                 const localHasModify = localModifyTime && localModifyTime > lastSyncTime;
-                const cloudItemCount = cloudItems.length;
-                const localItemCount = localItems.length;
-                const itemCountChanged = cloudItemCount !== localItemCount;
                 let needsUIRefresh = false;
+                let reconciledItems = null;
 
-                if (cloudHasUpdate || itemCountChanged) {
-                    const cloudById = new Map();
-                    cloudItems.forEach(ci => { if (ci.id) cloudById.set(String(ci.id), ci); });
-                    const cloudByKey = new Map();
-                    cloudItems.forEach(ci => cloudByKey.set(this.getItemKey(ci), ci));
+                if (cloudHasUpdate || localHasModify) {
+                    reconciledItems = this.buildReconciledItems(
+                        localItems,
+                        cloudItems,
+                        this.getTimeMs(this.lastCloudSyncTime)
+                    );
+                    const localChanged = JSON.stringify(this.deduplicateItems(localItems)) !== JSON.stringify(reconciledItems);
 
-                    for (const ci of cloudItems) {
-                        const localMatch = localItems.find(li =>
-                            (li.id && String(li.id) === String(ci.id)) ||
-                            this.getItemKey(li) === this.getItemKey(ci)
-                        );
-                        if (localMatch) {
-                            const cloudJson = JSON.stringify(ci);
-                            const localJson = JSON.stringify({...localMatch, id: ci.id || localMatch.id});
-                            if (cloudJson !== localJson) {
-                                await db.putItem({ ...ci, id: localMatch.id });
-                                needsUIRefresh = true;
-                            }
-                        } else {
-                            await db.addItem(ci);
-                            needsUIRefresh = true;
-                        }
+                    if (localChanged) {
+                        await this.syncLocalItemsToState(reconciledItems, localItems);
+                        needsUIRefresh = true;
                     }
 
-                    for (const li of localItems) {
-                        const inCloud = cloudById.has(String(li.id)) ||
-                                        cloudByKey.has(this.getItemKey(li));
-                        if (!inCloud) {
-                            try { await db.deleteItem(li.id); needsUIRefresh = true; } catch(e) {}
-                        }
+                    if (localHasModify) {
+                        const reconciledSyncData = await this.buildSyncData(reconciledItems);
+                        await this.uploadToCloud(cloudData, reconciledSyncData);
+                    } else if (cloudHasUpdate && cloudData.updated_at) {
+                        this.lastCloudSyncTime = cloudData.updated_at;
+                        SafeStorage.set('lastCloudSyncTime', cloudData.updated_at);
                     }
-                }
-
-                if (localHasModify) {
-                    await this.uploadToCloud(cloudData);
                 }
 
                 if (needsUIRefresh) {
                     document.dispatchEvent(new CustomEvent('syncDataLoaded', {
-                        detail: { itemCount: cloudItemCount }
+                        detail: { itemCount: reconciledItems?.length || cloudItems.length }
                     }));
                 }
 
@@ -427,9 +494,11 @@ class SyncManager {
 
             const allItems = await db.getAllItems();
             const syncData = preparedSyncData || await this.buildSyncData(allItems);
+            const normalizedLocalItems = Array.isArray(syncData.items) ? this.deduplicateItems(syncData.items) : [];
+            syncData.items = normalizedLocalItems;
             const hasLocalSideData = this.hasLocalNonItemData();
             
-            if (allItems.length === 0 && !hasLocalSideData) {
+            if (normalizedLocalItems.length === 0 && !hasLocalSideData) {
                 let cloudRow = existingCloudData;
                 if (!cloudRow) {
                     const { data } = await this.supabase
@@ -449,7 +518,7 @@ class SyncManager {
 
             const { data: existingRow } = await this.supabase
                 .from('user_data')
-                .select('data')
+                .select('*')
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 
@@ -457,20 +526,12 @@ class SyncManager {
                 syncData.dailyBackups = existingRow.data.dailyBackups;
             }
 
-            if (existingRow?.data?.items && allItems.length > 0) {
-                const cloudItems = existingRow.data.items || [];
-                const localIds = new Set(allItems.map(i => String(i.id)).filter(Boolean));
-                const cloudOnlyItems = cloudItems.filter(ci => ci.id && !localIds.has(String(ci.id)));
-                if (cloudOnlyItems.length > 0) {
-                    for (const item of cloudOnlyItems) {
-                        const exists = allItems.find(li => this.isSameItem(li, item));
-                        if (!exists) {
-                            syncData.items = syncData.items || [];
-                            syncData.items.push(item);
-                        }
-                    }
-                }
-            }
+            const cloudItems = Array.isArray(existingRow?.data?.items) ? existingRow.data.items : [];
+            syncData.items = this.buildReconciledItems(
+                normalizedLocalItems,
+                cloudItems,
+                this.getTimeMs(this.lastCloudSyncTime)
+            );
             
             const syncTime = new Date().toISOString();
             syncData.sync_time = syncTime;
@@ -490,13 +551,12 @@ class SyncManager {
                 return { success: false, error: error.message };
             }
 
-            // 使用云端实际返回的 updated_at（触发器会用 NOW() 覆盖）
             const actualSyncTime = upsertResult?.updated_at || syncTime;
             this.lastCloudSyncTime = actualSyncTime;
             SafeStorage.set('lastCloudSyncTime', actualSyncTime);
             
 
-            return { success: true, itemCount: allItems.length };
+            return { success: true, itemCount: syncData.items.length };
 
         } catch (error) {
             console.error('上传异常:', error);
@@ -610,55 +670,31 @@ class SyncManager {
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
 
-            const deduplicatedItems = this.deduplicateItems(cloudItems);
+            const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
             
             // 数据丢失保护：如果云端事项数远少于本地，阻止覆盖
             const backupItems = await db.getAllItems();
-            if (backupItems.length > 0 && deduplicatedItems.length < backupItems.length && backupItems.length >= 5) {
-                const lossRatio = deduplicatedItems.length / backupItems.length;
+            if (backupItems.length > 0 && deduplicatedCloudItems.length < backupItems.length && backupItems.length >= 5) {
+                const lossRatio = deduplicatedCloudItems.length / backupItems.length;
                 if (lossRatio < 0.3) {
-                    console.error(`数据丢失保护触发：本地 ${backupItems.length} 条，云端仅 ${deduplicatedItems.length} 条，跳过下载防止覆盖`);
+                    console.error(`数据丢失保护触发：本地 ${backupItems.length} 条，云端仅 ${deduplicatedCloudItems.length} 条，跳过下载防止覆盖`);
                     return { success: false, error: '数据丢失保护：云端数据量异常偏少，已阻止覆盖' };
                 }
             }
 
             let importedCount = 0;
             const importErrors = [];
-            const processedHashes = new Set();
 
-            for (const item of deduplicatedItems) {
-                try {
-                    const { id, ...itemData } = item;
-                    const existing = backupItems.find(b => b.hash === itemData.hash);
-                    if (existing) {
-                        const merged = { ...existing, ...itemData, id: existing.id };
-                        await db.putItem(merged);
-                        processedHashes.add(existing.hash);
-                    } else {
-                        const added = await db.addItem(itemData);
-                        if (added && added.hash) processedHashes.add(added.hash);
-                    }
-                    importedCount++;
-                } catch (e) {
-                    console.warn('导入失败:', e);
-                    importErrors.push(e);
-                }
+            try {
+                await this.syncLocalItemsToState(deduplicatedCloudItems, backupItems);
+                importedCount = deduplicatedCloudItems.length;
+            } catch (e) {
+                console.warn('导入失败:', e);
+                importErrors.push(e);
             }
 
             if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
                 return { success: false, error: '导入失败' };
-            }
-
-            if (backupItems.length > 0 && importedCount > 0) {
-                // 仅删除本地有但云端已删除的项（需本地无新增）
-                // 如果本地数据量大于云端，说明可能有本地新增，不删除
-                if (deduplicatedItems.length >= backupItems.length) {
-                    try {
-                        await db.deleteItemsByHashes(processedHashes);
-                    } catch (cleanupErr) {
-                        console.warn('清理多余项失败:', cleanupErr);
-                    }
-                }
             }
 
             // 更新同步时间
@@ -950,65 +986,12 @@ class SyncManager {
         let lastError = null;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                const localItems = await db.getAllItems();
-                const syncData = await this.buildSyncData(localItems);
-
-                const { data: cloudRow } = await this.supabase
-                    .from('user_data')
-                    .select('data')
-                    .eq('user_id', this.currentUser.id)
-                    .maybeSingle();
-
-                if (cloudRow?.data?.items) {
-                    const cloudItems = cloudRow.data.items || [];
-                    const localKeySet = new Set(localItems.map(i => this.getItemKey(i)));
-                    const cloudOnlyNew = cloudItems.filter(ci => !localKeySet.has(this.getItemKey(ci)));
-                    if (cloudOnlyNew.length > 0) {
-                        for (const ci of cloudOnlyNew) {
-                            const existsById = localItems.find(li => li.id && String(li.id) === String(ci.id));
-                            if (!existsById) {
-                                await db.addItem(ci);
-                            }
-                        }
-                        localItems.push(...cloudOnlyNew.filter(ci => !localItems.find(li => li.id && String(li.id) === String(ci.id))));
-                        syncData.items = (syncData.items || []);
-                        const syncKeys = new Set(syncData.items.map(i => this.getItemKey(i)));
-                        for (const ci of cloudOnlyNew) {
-                            if (!syncKeys.has(this.getItemKey(ci))) {
-                                syncData.items.push(ci);
-                            }
-                        }
-                    }
+                const result = await this.uploadToCloud();
+                if (result?.success) {
+                    return result;
                 }
-
-                if (cloudRow?.data?.dailyBackups) {
-                    syncData.dailyBackups = cloudRow.data.dailyBackups;
-                }
-
-                const syncTime = new Date().toISOString();
-                syncData.sync_time = syncTime;
-
-                const { data: upsertResult, error } = await this.supabase
-                    .from('user_data')
-                    .upsert({
-                        user_id: this.currentUser.id,
-                        data: syncData,
-                        updated_at: syncTime
-                    }, { onConflict: 'user_id' })
-                    .select()
-                    .single();
-
-                if (error) {
-                    lastError = error.message;
-                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-                    continue;
-                }
-
-                const actualSyncTime = upsertResult?.updated_at || syncTime;
-                this.lastCloudSyncTime = actualSyncTime;
-                SafeStorage.set('lastCloudSyncTime', actualSyncTime);
-
-                return { success: true, itemCount: localItems.length };
+                lastError = result?.error || '同步失败';
+                if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
             } catch (e) {
                 lastError = e.message;
                 if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
@@ -1292,39 +1275,17 @@ class SyncManager {
 
             let importedCount = 0;
             const importErrors = [];
-            const processedHashes = new Set();
 
-            for (const item of deduplicatedCloudItems) {
-                try {
-                    const { id, ...itemData } = item;
-                    const existing = backupItems.find(b => b.hash === itemData.hash);
-                    if (existing) {
-                        const merged = { ...existing, ...itemData, id: existing.id };
-                        await db.putItem(merged);
-                        processedHashes.add(existing.hash);
-                    } else {
-                        const added = await db.addItem(itemData);
-                        if (added && added.hash) processedHashes.add(added.hash);
-                    }
-                    importedCount++;
-                } catch (e) {
-                    console.warn('导入项目失败:', e);
-                    importErrors.push(e);
-                }
+            try {
+                await this.syncLocalItemsToState(deduplicatedCloudItems, backupItems);
+                importedCount = deduplicatedCloudItems.length;
+            } catch (e) {
+                console.warn('导入项目失败:', e);
+                importErrors.push(e);
             }
 
             if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
                 return { success: false };
-            }
-
-            if (backupItems.length > 0 && importedCount > 0) {
-                if (deduplicatedCloudItems.length >= backupItems.length) {
-                    try {
-                        await db.deleteItemsByHashes(processedHashes);
-                    } catch (cleanupErr) {
-                        console.warn('静默同步清理多余项失败:', cleanupErr);
-                    }
-                }
             }
 
             // 更新云端同步时间
