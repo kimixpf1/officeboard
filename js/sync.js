@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -323,6 +323,7 @@ class SyncManager {
 
                 if (cloudHasUpdate && localHasModify) {
                     await this.mergeData(localItems, cloudData);
+                    await this.uploadToCloud(cloudData);
                 } else if (cloudHasUpdate) {
                     await this.downloadFromCloud(cloudData);
                 } else if (localHasModify) {
@@ -387,7 +388,6 @@ class SyncManager {
             const syncData = preparedSyncData || await this.buildSyncData(allItems);
             const hasLocalSideData = this.hasLocalNonItemData();
             
-            // 空数据保护：如果本地事项为空但云端可能有数据，先检查云端
             if (allItems.length === 0 && !hasLocalSideData) {
                 let cloudRow = existingCloudData;
                 if (!cloudRow) {
@@ -405,18 +405,34 @@ class SyncManager {
                     return { success: true, itemCount: cloudItemCount, recovered: true };
                 }
             }
-            
-            const syncTime = new Date().toISOString();
-            syncData.sync_time = syncTime;
 
             const { data: existingRow } = await this.supabase
                 .from('user_data')
                 .select('data')
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
+
             if (existingRow?.data?.dailyBackups) {
                 syncData.dailyBackups = existingRow.data.dailyBackups;
             }
+
+            if (existingRow?.data?.items && allItems.length > 0) {
+                const cloudItems = existingRow.data.items || [];
+                const localIds = new Set(allItems.map(i => String(i.id)).filter(Boolean));
+                const cloudOnlyItems = cloudItems.filter(ci => ci.id && !localIds.has(String(ci.id)));
+                if (cloudOnlyItems.length > 0) {
+                    for (const item of cloudOnlyItems) {
+                        const exists = allItems.find(li => this.isSameItem(li, item));
+                        if (!exists) {
+                            syncData.items = syncData.items || [];
+                            syncData.items.push(item);
+                        }
+                    }
+                }
+            }
+            
+            const syncTime = new Date().toISOString();
+            syncData.sync_time = syncTime;
 
             const { data: upsertResult, error } = await this.supabase
                 .from('user_data')
@@ -425,8 +441,8 @@ class SyncManager {
                     data: syncData,
                     updated_at: syncTime
                 }, { onConflict: 'user_id' })
-                .select('updated_at')
-                .maybeSingle();
+                .select()
+                .single();
 
             if (error) {
                 console.error('上传失败:', error);
@@ -809,6 +825,11 @@ class SyncManager {
     /**
      * 获取事项的唯一标识键
      */
+    isSameItem(a, b) {
+        if (a.id && b.id && String(a.id) === String(b.id)) return true;
+        return this.getItemKey(a) === this.getItemKey(b);
+    }
+
     getItemKey(item) {
         const title = (item.title || '').trim().toLowerCase();
         const extractKeywords = (t) => {
@@ -871,25 +892,34 @@ class SyncManager {
      */
     async immediateSyncToCloud() {
         if (!this.supabase || !this.currentUser) {
-            console.warn('未登录，跳过同步');
             return { success: false };
         }
 
         if (!this.isOnline()) {
-            console.warn('离线状态，跳过同步');
             return { success: false, offline: true };
         }
 
-        // 记录本地修改时间
         this.recordLocalModify();
 
-        // 清除防抖定时器
         if (this.syncTimeout) {
             clearTimeout(this.syncTimeout);
             this.syncTimeout = null;
         }
 
-        return await this.uploadToCloud();
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const result = await this.uploadToCloud();
+                if (result.success) return result;
+                lastError = result.error;
+                if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            } catch (e) {
+                lastError = e.message;
+                if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            }
+        }
+        console.error('上传重试3次仍失败:', lastError);
+        return { success: false, error: lastError };
     }
 
     /**
