@@ -6940,12 +6940,11 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-51';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=130', 'db.js?v=25', 'style.css?v=51', 'crypto.js?v=16'];
+        const version = '2026-04-29 v4.51';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=131', 'db.js?v=25', 'style.css?v=51', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
-        badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
-    }
+        badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
 
     /**
      * 获取事项的状态组（用于拖拽排序分组）
