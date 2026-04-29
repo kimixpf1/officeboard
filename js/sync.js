@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -406,6 +406,15 @@ class SyncManager {
             
             const syncTime = new Date().toISOString();
             syncData.sync_time = syncTime;
+
+            const { data: existingRow } = await this.supabase
+                .from('user_data')
+                .select('data')
+                .eq('user_id', this.currentUser.id)
+                .maybeSingle();
+            if (existingRow?.data?.dailyBackups) {
+                syncData.dailyBackups = existingRow.data.dailyBackups;
+            }
 
             const { data: upsertResult, error } = await this.supabase
                 .from('user_data')
@@ -1916,6 +1925,43 @@ class SyncManager {
      */
     isLoggedIn() {
         return !!this.currentUser;
+    }
+
+    async getCloudBackupList() {
+        if (!this.isLoggedIn()) return [];
+        try {
+            const { data, error } = await this.supabase
+                .from('user_data')
+                .select('data')
+                .eq('user_id', this.currentUser.id)
+                .maybeSingle();
+            if (error || !data?.data) return [];
+            return data.data.dailyBackups || [];
+        } catch (e) {
+            console.warn('获取云端备份列表失败:', e);
+            return [];
+        }
+    }
+
+    async saveCloudBackupList(backups) {
+        if (!this.isLoggedIn()) return;
+        try {
+            const { data: existing, error: fetchErr } = await this.supabase
+                .from('user_data')
+                .select('data')
+                .eq('user_id', this.currentUser.id)
+                .maybeSingle();
+            const cloudData = (existing?.data) || {};
+            cloudData.dailyBackups = backups;
+            const { error } = await this.supabase
+                .from('user_data')
+                .update({ data: cloudData })
+                .eq('user_id', this.currentUser.id);
+            if (error) throw error;
+        } catch (e) {
+            console.warn('保存云端备份列表失败:', e);
+            throw e;
+        }
     }
 
     /**

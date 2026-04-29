@@ -6898,8 +6898,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-48';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=35', 'app-date-view.js?v=10', 'app.js?v=127', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-49';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=128', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -8394,15 +8394,12 @@ class OfficeDashboard {
     startDailyBackupSchedule() {
         const BACKUP_HOUR = 20;
         const CHECK_KEY = 'dailyBackupLastDate';
-        const STORAGE_KEY = 'dailyBackupAutoEnabled';
 
         const tryBackup = async () => {
             const now = new Date();
             const todayStr = this.formatDateLocal(now);
             const lastBackupDate = SafeStorage.get(CHECK_KEY);
-            const autoEnabled = SafeStorage.get(STORAGE_KEY) !== 'false';
 
-            if (!autoEnabled) return;
             if (lastBackupDate === todayStr) return;
             if (now.getHours() < BACKUP_HOUR) return;
 
@@ -8410,12 +8407,17 @@ class OfficeDashboard {
                 const allItems = await db.getAllItems();
                 if (allItems.length === 0) return;
 
+                SafeStorage.set(CHECK_KEY, todayStr);
+
                 const exportData = {
                     version: '2.0',
                     export_time: new Date().toISOString(),
                     type: 'daily-auto-backup',
                     items: allItems
                 };
+
+                await this.saveDailyBackupToCloud(exportData);
+
                 const dataStr = JSON.stringify(exportData, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -8428,10 +8430,9 @@ class OfficeDashboard {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                SafeStorage.set(CHECK_KEY, todayStr);
-                console.log(`每日自动备份完成：${allItems.length} 条事项`);
+                console.log(`每日双轨备份完成：${allItems.length} 条事项`);
             } catch (e) {
-                console.warn('每日自动备份失败:', e);
+                console.warn('每日备份失败:', e);
             }
         };
 
@@ -8440,6 +8441,69 @@ class OfficeDashboard {
         }
         this._dailyBackupTimer = setInterval(tryBackup, 60000);
         tryBackup();
+    }
+
+    async saveDailyBackupToCloud(exportData) {
+        if (!syncManager.isLoggedIn()) return;
+
+        try {
+            const todayStr = this.formatDateLocal(new Date());
+            const { items, ...meta } = exportData;
+            const compressedItems = items.map(i => {
+                const { hash, ...rest } = i;
+                return rest;
+            });
+            const backupEntry = {
+                date: todayStr,
+                time: new Date().toISOString(),
+                count: items.length,
+                items: compressedItems
+            };
+
+            const MAX_CLOUD_BACKUPS = 30;
+
+            const result = await syncManager.getCloudBackupList();
+            let backups = result || [];
+
+            backups.push(backupEntry);
+
+            backups.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            if (backups.length > MAX_CLOUD_BACKUPS) {
+                backups = backups.slice(0, MAX_CLOUD_BACKUPS);
+            }
+
+            await syncManager.saveCloudBackupList(backups);
+            console.log(`云端每日备份已保存：第 ${backups.length} 份，${items.length} 条事项`);
+        } catch (e) {
+            console.warn('云端备份失败:', e);
+        }
+    }
+
+    async restoreCloudBackup(backupDate) {
+        try {
+            const backups = await syncManager.getCloudBackupList() || [];
+            const backup = backups.find(b => b.date === backupDate);
+            if (!backup || !backup.items) {
+                throw new Error('未找到该日期的备份');
+            }
+
+            await db.clearAllItems();
+            let imported = 0;
+            for (const item of backup.items) {
+                try {
+                    const { id, ...itemData } = item;
+                    await db.addItem(itemData);
+                    imported++;
+                } catch (e) {
+                    console.warn('恢复项目失败:', e);
+                }
+            }
+
+            await this.loadItems();
+            return { success: true, message: `已恢复 ${backupDate} 的备份，共 ${imported} 条事项` };
+        } catch (e) {
+            throw new Error('恢复失败: ' + e.message);
+        }
     }
 
     /**
