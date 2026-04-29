@@ -6461,7 +6461,7 @@ class OfficeDashboard {
                 };
             })
             .filter(Boolean)
-            .filter(entry => entry.overdueMs >= 0)
+            .filter(entry => entry.overdueMs >= -180000)
             .sort((a, b) => a.deadlineDate - b.deadlineDate);
     }
 
@@ -6529,7 +6529,9 @@ class OfficeDashboard {
         }
         if (titleEl) {
             const title = current.item.title || '';
-            titleEl.textContent = title.length > 12 ? title.substring(0, 12) + '… 已到期' : `${title} 已到期`;
+            const overdue = current.overdueMs >= 0;
+            const label = overdue ? '已到期' : '即将到期';
+            titleEl.textContent = title.length > 12 ? title.substring(0, 12) + `… ${label}` : `${title} ${label}`;
         }
         if (descEl) {
             const relative = this.formatTodoReminderRelative(current.deadlineDate);
@@ -6938,8 +6940,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-50';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=129', 'db.js?v=25', 'style.css?v=51', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-51';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=130', 'db.js?v=25', 'style.css?v=51', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -7499,15 +7501,8 @@ class OfficeDashboard {
             this.hideModal('itemModal');
             await this.loadItems();
 
-            // 立即同步到云端（确保新数据上传）
             if (syncManager.isLoggedIn()) {
-
-                const result = await syncManager.immediateSyncToCloud();
-                if (result.success) {
-
-                } else {
-                    console.error('同步失败:', result.error);
-                }
+                syncManager.immediateSyncToCloud().catch(e => console.warn('后台同步失败:', e));
             }
 
         } catch (error) {
@@ -7519,10 +7514,7 @@ class OfficeDashboard {
     async runPostSaveRefresh() {
         await this.loadItems();
         if (syncManager.isLoggedIn()) {
-            const result = await syncManager.immediateSyncToCloud();
-            if (!result.success) {
-                console.error('同步失败:', result.error);
-            }
+            syncManager.immediateSyncToCloud().catch(e => console.warn('后台同步失败:', e));
         }
     }
 
@@ -8026,9 +8018,8 @@ class OfficeDashboard {
                 completedAt: completed ? new Date().toISOString() : null
             });
             await this.loadItems();
-            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
-                await syncManager.immediateSyncToCloud();
+                syncManager.immediateSyncToCloud().catch(e => console.warn('后台同步失败:', e));
             }
         } catch (error) {
             console.error('更新失败:', error);
@@ -8139,12 +8130,11 @@ class OfficeDashboard {
             const result = await db.updateItem(id, {
                 completed,
                 completedAt: completed ? new Date().toISOString() : null,
-                // 办文类型额外更新progress字段
                 ...(type === ITEM_TYPES.DOCUMENT && { progress: completed ? DOCUMENT_PROGRESS.COMPLETED : DOCUMENT_PROGRESS.PENDING })
             });
             await this.loadItems();
             if (syncManager.isLoggedIn()) {
-                await syncManager.immediateSyncToCloud();
+                syncManager.immediateSyncToCloud().catch(e => console.warn('后台同步失败:', e));
             }
         } catch (error) {
             console.error('更新完成状态失败:', error);
@@ -8220,9 +8210,8 @@ class OfficeDashboard {
                 await db.updateItem(id, { pinned: false });
             }
             await this.loadItems();
-            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
-                await syncManager.immediateSyncToCloud();
+                syncManager.immediateSyncToCloud().catch(e => {});
             }
             this.showSuccess(pinned ? '已置顶' : '已取消置顶');
         } catch (error) {
@@ -8299,9 +8288,8 @@ class OfficeDashboard {
                 await db.updateItem(id, { sunk: false });
             }
             await this.loadItems();
-            // 立即同步到云端
             if (syncManager.isLoggedIn()) {
-                await syncManager.immediateSyncToCloud();
+                syncManager.immediateSyncToCloud().catch(e => {});
             }
             this.showSuccess(sunk ? '已沉底' : '已取消沉底');
         } catch (error) {
