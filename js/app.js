@@ -4188,6 +4188,9 @@ class OfficeDashboard {
             // 保存历史用于撤回
             if (deletedItems.length > 0) {
                 this.saveUndoHistory('delete', { items: deletedItems });
+                if (syncManager.isLoggedIn()) {
+                    deletedItems.forEach(item => syncManager.markItemDeleted(item));
+                }
             }
 
             // 强制重新加载数据
@@ -5355,6 +5358,9 @@ class OfficeDashboard {
 
         // 保存撤回历史
         this.saveUndoHistory('delete', { items: matchedItems });
+        if (syncManager.isLoggedIn()) {
+            matchedItems.forEach(item => syncManager.markItemDeleted(item));
+        }
 
         // 执行删除
         for (const item of matchedItems) {
@@ -6952,8 +6958,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 v4.64';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=44', 'app-date-view.js?v=10', 'app.js?v=144', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
+        const version = '2026-04-29 v4.65';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=45', 'app-date-view.js?v=10', 'app.js?v=145', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -8358,10 +8364,16 @@ class OfficeDashboard {
                     if (Array.isArray(lastAction.data.items)) {
                         for (const item of lastAction.data.items) {
                             await db.addItem(item);
+                            if (syncManager.isLoggedIn()) {
+                                syncManager.clearDeletedMarker(item);
+                            }
                         }
                         this.showSuccess(`已撤回：恢复了 ${lastAction.data.items.length} 个事项`);
                     } else {
                         await db.addItem(lastAction.data.item);
+                        if (syncManager.isLoggedIn()) {
+                            syncManager.clearDeletedMarker(lastAction.data.item);
+                        }
                         this.showSuccess('已撤回：恢复了删除的事项');
                     }
                     break;
@@ -8441,18 +8453,30 @@ class OfficeDashboard {
                     if (Array.isArray(action.data.ids)) {
                         for (const item of action.data.items || []) {
                             await db.addItem(item);
+                            if (syncManager.isLoggedIn()) {
+                                syncManager.clearDeletedMarker(item);
+                            }
                         }
                     } else {
                         await db.addItem(action.data.item);
+                        if (syncManager.isLoggedIn()) {
+                            syncManager.clearDeletedMarker(action.data.item);
+                        }
                     }
                     this.showSuccess('已恢复：重新添加事项');
                     break;
                 case 'delete':
                     if (Array.isArray(action.data.items)) {
                         for (const item of action.data.items) {
+                            if (syncManager.isLoggedIn()) {
+                                syncManager.markItemDeleted(item);
+                            }
                             await db.deleteItem(item.id);
                         }
                     } else {
+                        if (syncManager.isLoggedIn()) {
+                            syncManager.markItemDeleted(action.data.item);
+                        }
                         await db.deleteItem(action.data.item.id);
                     }
                     this.showSuccess('已恢复：重新删除事项');
@@ -9258,6 +9282,9 @@ class OfficeDashboard {
             );
 
             this.saveUndoHistory('delete', { items: groupItems });
+            if (syncManager.isLoggedIn()) {
+                groupItems.forEach(item => syncManager.markItemDeleted(item));
+            }
 
             // 批量删除
             for (const groupItem of groupItems) {
@@ -9291,6 +9318,9 @@ class OfficeDashboard {
             const itemToDelete = await db.getItem(this.deleteItemId);
             if (itemToDelete) {
                 this.saveUndoHistory('delete', { item: itemToDelete });
+                if (syncManager.isLoggedIn()) {
+                    syncManager.markItemDeleted(itemToDelete);
+                }
             }
 
             await db.deleteItem(this.deleteItemId);

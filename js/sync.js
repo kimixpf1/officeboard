@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -32,6 +32,8 @@ class SyncManager {
         this.lastCloudSyncTime = SafeStorage.get('lastCloudSyncTime') || null;  // 最后成功同步到云端的时间
         this.isSyncing = false;  // 是否正在同步中
         this._offlineNotified = false;
+        this.deletedItemsKey = 'office_deleted_items_map';
+        this.deletedItemsMap = safeJsonParse(SafeStorage.get(this.deletedItemsKey), {});
 
         // 初始化Supabase
         this.initPromise = this.initSupabase();
@@ -59,6 +61,42 @@ class SyncManager {
 
     }
 
+    persistDeletedItemsMap() {
+        SafeStorage.set(this.deletedItemsKey, JSON.stringify(this.deletedItemsMap || {}));
+    }
+
+    getItemDeletionKey(item) {
+        if (!item) return '';
+        return `key:${this.getItemKey(item)}`;
+    }
+
+    markItemDeleted(item, deletedAt = new Date().toISOString()) {
+        const deletionKey = this.getItemDeletionKey(item);
+        if (!deletionKey) return;
+        this.deletedItemsMap[deletionKey] = deletedAt;
+        this.persistDeletedItemsMap();
+    }
+
+    getDeletedAt(item) {
+        const deletionKey = this.getItemDeletionKey(item);
+        if (!deletionKey) return '';
+        return this.deletedItemsMap[deletionKey] || '';
+    }
+
+    clearDeletedMarker(item) {
+        const deletionKey = this.getItemDeletionKey(item);
+        if (!deletionKey || !this.deletedItemsMap[deletionKey]) return;
+        delete this.deletedItemsMap[deletionKey];
+        this.persistDeletedItemsMap();
+    }
+
+    shouldKeepDeleted(item, deletedAt = '') {
+        const deletionTime = this.getTimeMs(deletedAt || this.getDeletedAt(item));
+        if (!deletionTime) return false;
+        const itemTime = this.getItemUpdatedTime(item);
+        return deletionTime >= itemTime;
+    }
+
     getTimeMs(value) {
         if (!value) return 0;
         const ms = new Date(value).getTime();
@@ -75,14 +113,10 @@ class SyncManager {
             return null;
         }
 
-        const targetId = targetItem.id ? String(targetItem.id) : '';
         const targetKey = this.getItemKey(targetItem);
 
         return items.find(item => {
             if (!item) return false;
-            if (targetId && item.id && String(item.id) === targetId) {
-                return true;
-            }
             return this.getItemKey(item) === targetKey;
         }) || null;
     }
@@ -91,23 +125,40 @@ class SyncManager {
         const normalizedLocalItems = Array.isArray(localItems) ? localItems : [];
         const normalizedCloudItems = Array.isArray(cloudItems) ? cloudItems : [];
         const reconciledItems = [];
-        const matchedLocalIds = new Set();
+        const matchedLocalKeys = new Set();
 
         for (const cloudItem of normalizedCloudItems) {
-            const localMatch = this.findMatchingItem(normalizedLocalItems, cloudItem);
-            if (!localMatch) {
-                reconciledItems.push({ ...cloudItem });
+            const cloudKey = this.getItemKey(cloudItem);
+            if (this.shouldKeepDeleted(cloudItem)) {
                 continue;
             }
 
-            matchedLocalIds.add(String(localMatch.id));
+            const localMatch = this.findMatchingItem(normalizedLocalItems, cloudItem);
+            if (!localMatch) {
+                reconciledItems.push({ ...cloudItem });
+                matchedLocalKeys.add(cloudKey);
+                continue;
+            }
+
+            matchedLocalKeys.add(cloudKey);
             const localTime = this.getItemUpdatedTime(localMatch);
             const cloudTime = this.getItemUpdatedTime(cloudItem);
-            reconciledItems.push(localTime > cloudTime ? { ...localMatch } : { ...cloudItem });
+            const winner = localTime > cloudTime ? { ...localMatch } : { ...cloudItem };
+
+            if (this.shouldKeepDeleted(winner)) {
+                continue;
+            }
+
+            reconciledItems.push(winner);
         }
 
         for (const localItem of normalizedLocalItems) {
-            if (matchedLocalIds.has(String(localItem.id))) {
+            const localKey = this.getItemKey(localItem);
+            if (matchedLocalKeys.has(localKey)) {
+                continue;
+            }
+
+            if (this.shouldKeepDeleted(localItem)) {
                 continue;
             }
 
@@ -122,23 +173,27 @@ class SyncManager {
 
     async syncLocalItemsToState(targetItems, currentLocalItems = null) {
         const existingLocalItems = Array.isArray(currentLocalItems) ? currentLocalItems : await db.getAllItems();
-        const targetList = Array.isArray(targetItems) ? targetItems : [];
+        const targetList = Array.isArray(targetItems) ? targetItems.filter(item => !this.shouldKeepDeleted(item)) : [];
         const keptLocalIds = new Set();
 
         for (const targetItem of targetList) {
             const localMatch = this.findMatchingItem(existingLocalItems, targetItem);
             if (localMatch) {
                 await db.putItem({ ...targetItem, id: localMatch.id });
+                this.clearDeletedMarker(localMatch);
+                this.clearDeletedMarker(targetItem);
                 keptLocalIds.add(String(localMatch.id));
             } else {
                 const { id, ...itemData } = targetItem;
                 const addedId = await db.addItem(itemData);
+                this.clearDeletedMarker(targetItem);
                 keptLocalIds.add(String(addedId));
             }
         }
 
         for (const localItem of existingLocalItems) {
             if (!keptLocalIds.has(String(localItem.id))) {
+                this.markItemDeleted(localItem);
                 await db.deleteItem(localItem.id);
             }
         }
@@ -195,6 +250,7 @@ class SyncManager {
         return {
             sync_time: new Date().toISOString(),
             items: Array.isArray(items) ? items : [],
+            deletedItems: this.deletedItemsMap || {},
             settings,
             memo: SafeStorage.get('office_memo_content') || '',
             schedule: SafeStorage.get('office_schedule_content') || '',
@@ -522,6 +578,12 @@ class SyncManager {
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 
+            if (existingRow?.data?.deletedItems && typeof existingRow.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...existingRow.data.deletedItems };
+                this.persistDeletedItemsMap();
+                syncData.deletedItems = this.deletedItemsMap;
+            }
+
             if (existingRow?.data?.dailyBackups) {
                 syncData.dailyBackups = existingRow.data.dailyBackups;
             }
@@ -666,6 +728,11 @@ class SyncManager {
                     sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
                 }
             }));
+
+            if (cloudData.data.deletedItems && typeof cloudData.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...cloudData.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
 
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
@@ -1256,6 +1323,11 @@ class SyncManager {
                     colors: safeJsonParse(data.data.countdownTypeColors || '{}', {})
                 }
             }));
+
+            if (data.data.deletedItems && typeof data.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...data.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
 
             // 同步事项 - 带去重逻辑（安全替换：失败回滚）
             const cloudItems = data.data.items || [];

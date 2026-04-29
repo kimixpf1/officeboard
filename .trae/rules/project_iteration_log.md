@@ -1,3 +1,31 @@
+## 2026-04-29 v4.65
+
+### 本次目标
+- 彻底修复同账号跨设备删除后，设备 2 本地旧事项重新上传导致“删除成功下一秒又回来”的问题
+- 为事项同步补上删除墓碑机制，让删除结果可以跨设备稳定传播
+- 完成本地校验、提交推送与线上强刷复测
+
+### 当前状态
+- ✅ 已定位更深层根因：当前同步结构只有 `items`，没有“删除记录”，所以设备 2 登录后会把本地仍存在的旧事项重新参与合并并回传云端
+- ✅ 已在 `sync.js` 增加 `deletedItemsMap`，并通过 `deletedItems` 字段随同步数据一起上传/下载
+- ✅ 已修复 `buildReconciledItems()`：合并时优先检查删除墓碑，已删除事项不会再参与赢家选择
+- ✅ 已修复 `syncLocalItemsToState()`：本地收敛时会记录删除墓碑并删除残留旧项，避免再次被静默同步带回
+- ✅ 已修复 `app.js` 删除链路：单条删除、批量删除、AI 删除、重做删除都会写入删除墓碑；撤回删除、重做新增会清理删除墓碑
+- ✅ 已将部署版本提升到 `2026-04-29 v4.65`，资源版本提升为 `sync.js?v=45`、`app.js?v=145`
+- 🔄 待执行本地语法检查、diagnostics、git 提交推送与线上强刷验证
+
+### 本轮关键改动
+- sync.js：新增 `deletedItemsKey` / `deletedItemsMap` / `markItemDeleted()` / `clearDeletedMarker()` / `shouldKeepDeleted()`
+- sync.js：`buildSyncData()` 新增同步 `deletedItems`
+- sync.js：`uploadToCloud()`、`downloadFromCloud()`、`silentSyncFromCloud()` 合并并保留云端删除墓碑
+- sync.js：`buildReconciledItems()`、`syncLocalItemsToState()` 改为优先尊重删除墓碑
+- app.js：删除、撤回、重做链路补齐删除墓碑写入和清理
+
+### 遗留事项
+- 待双设备实测“设备 1 删除 / 设备 2 实时消失 / 删除后不再自动复活”
+- 待双设备补测设备 2 本地新建事项删除后不会因登录同步立即回流
+- 待补测跨日期事项、周期性事项、批量删除与撤回删除链路
+
 ## 2026-04-29 v4.64
 
 ### 本次目标
