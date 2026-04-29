@@ -5996,6 +5996,11 @@ class OfficeDashboard {
                     return priorityA - priorityB;
                 }
 
+                const pWeight = { high: 0, medium: 1, low: 2 };
+                const pwA = pWeight[a.priority] ?? 1;
+                const pwB = pWeight[b.priority] ?? 1;
+                if (pwA !== pwB) return pwA - pwB;
+
                 const aHasOrder = hasOrder(a);
                 const bHasOrder = hasOrder(b);
 
@@ -6947,8 +6952,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 v4.55';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=135', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
+        const version = '2026-04-29 v4.56';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=136', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
