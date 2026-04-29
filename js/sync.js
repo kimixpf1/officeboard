@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -317,14 +317,15 @@ class SyncManager {
             } else {
                 // 判断云端是否有更新（云端更新时间 > 上次同步时间）
                 const cloudHasUpdate = cloudUpdateTime && cloudUpdateTime > lastSyncTime;
-
-                // 判断本地是否有修改（本地修改时间 > 上次同步时间）
                 const localHasModify = localModifyTime && localModifyTime > lastSyncTime;
+                const cloudItemCount = cloudItems.length;
+                const localItemCount = localItems.length;
+                const itemCountChanged = cloudItemCount !== localItemCount;
 
-                if (cloudHasUpdate && localHasModify) {
+                if ((cloudHasUpdate && localHasModify) || (itemCountChanged && cloudHasUpdate)) {
                     await this.mergeData(localItems, cloudData);
                     await this.uploadToCloud(cloudData);
-                } else if (cloudHasUpdate) {
+                } else if (cloudHasUpdate || (itemCountChanged && cloudItemCount > localItemCount)) {
                     await this.downloadFromCloud(cloudData);
                 } else if (localHasModify) {
                     await this.uploadToCloud(cloudData);
@@ -935,7 +936,7 @@ class SyncManager {
             if (this.isLoggedIn() && !this.isSyncing) {
                 await this.smartSync();
             }
-        }, 20000);
+        }, 10000);
     }
 
     /**
