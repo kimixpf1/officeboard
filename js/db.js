@@ -567,6 +567,47 @@ class Database {
             request.onerror = () => this._rejectWithLog(reject, request.error, 'getAllDocumentHashes读取失败');
         });
     }
+
+    async putItem(item) {
+        const db = await this.init();
+        const normalizedItem = this.normalizeItemForStorage(item);
+        normalizedItem.hash = this.generateHash(normalizedItem);
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORES.ITEMS, 'readwrite');
+            const store = transaction.objectStore(STORES.ITEMS);
+            const putRequest = store.put(normalizedItem);
+            putRequest.onsuccess = () => {
+                this.resetItemsCache();
+                resolve(putRequest.result);
+            };
+            putRequest.onerror = () => this._rejectWithLog(reject, putRequest.error, 'putItem写入失败');
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'putItem事务失败');
+        });
+    }
+
+    async deleteItemsByHashes(keepHashes) {
+        const db = await this.init();
+        const allItems = await this.getAllItems();
+        const toDelete = allItems.filter(item => !keepHashes.has(item.hash));
+        if (toDelete.length === 0) return;
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORES.ITEMS, 'readwrite');
+            const store = transaction.objectStore(STORES.ITEMS);
+            let deleted = 0;
+            for (const item of toDelete) {
+                const req = store.delete(item.id);
+                req.onsuccess = () => { deleted++; };
+                req.onerror = () => console.warn('删除多余项失败:', item.id);
+            }
+            transaction.oncomplete = () => {
+                this.resetItemsCache();
+                resolve(deleted);
+            };
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'deleteItemsByHashes失败');
+        });
+    }
 }
 
 const db = new Database();

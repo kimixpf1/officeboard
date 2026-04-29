@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -285,6 +285,16 @@ class SyncManager {
             // 情况2: 本地无事项数据
             if (localItems.length === 0) {
                 const hasLocalSideData = this.hasLocalNonItemData();
+                const cloudItems = cloudData.data.items || [];
+
+                // 数据丢失保护：如果本地空且云端也几乎没数据，但历史有过同步，说明数据已丢失
+                // 此时不应下载空数据，而应保留云端仅存的数据并警告
+                if (cloudItems.length === 0) {
+                    console.warn('本地和云端均无事项数据，跳过同步');
+                    this.isSyncing = false;
+                    return;
+                }
+
                 if (hasLocalSideData) {
                     await this.mergeData(localItems, cloudData);
                 } else {
@@ -531,44 +541,52 @@ class SyncManager {
 
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
-            // 调试：打印下载的数据的order值
 
             const deduplicatedItems = this.deduplicateItems(cloudItems);
             
-            // 安全替换：先备份，再清空+导入，失败则回滚
+            // 数据丢失保护：如果云端事项数远少于本地，阻止覆盖
             const backupItems = await db.getAllItems();
-            try {
-                await db.clearAllItems();
-            } catch (clearErr) {
-                console.error('清空本地数据失败，中止下载:', clearErr);
-                return { success: false, error: '清空失败' };
+            if (backupItems.length > 0 && deduplicatedItems.length < backupItems.length && backupItems.length >= 5) {
+                const lossRatio = deduplicatedItems.length / backupItems.length;
+                if (lossRatio < 0.3) {
+                    console.error(`数据丢失保护触发：本地 ${backupItems.length} 条，云端仅 ${deduplicatedItems.length} 条，跳过下载防止覆盖`);
+                    return { success: false, error: '数据丢失保护：云端数据量异常偏少，已阻止覆盖' };
+                }
             }
-            
+
             let importedCount = 0;
             const importErrors = [];
+            const processedHashes = new Set();
+
             for (const item of deduplicatedItems) {
                 try {
                     const { id, ...itemData } = item;
-                    await db.addItem(itemData);
+                    const existing = backupItems.find(b => b.hash === itemData.hash);
+                    if (existing) {
+                        const merged = { ...existing, ...itemData, id: existing.id };
+                        await db.putItem(merged);
+                        processedHashes.add(existing.hash);
+                    } else {
+                        const added = await db.addItem(itemData);
+                        if (added && added.hash) processedHashes.add(added.hash);
+                    }
                     importedCount++;
                 } catch (e) {
                     console.warn('导入失败:', e);
                     importErrors.push(e);
                 }
             }
-            
-            // 如果全部导入失败且本地有备份数据，回滚
+
             if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
-                console.warn('全部导入失败，回滚到本地备份数据');
-                for (const item of backupItems) {
-                    try {
-                        const { id, ...itemData } = item;
-                        await db.addItem(itemData);
-                    } catch (rollbackErr) {
-                        console.error('回滚失败:', rollbackErr);
-                    }
+                return { success: false, error: '导入失败' };
+            }
+
+            if (backupItems.length > 0 && importedCount > 0) {
+                try {
+                    await db.deleteItemsByHashes(processedHashes);
+                } catch (cleanupErr) {
+                    console.warn('清理多余项失败:', cleanupErr);
                 }
-                return { success: false, error: '导入失败，已回滚' };
             }
 
             // 更新同步时间
@@ -636,37 +654,41 @@ class SyncManager {
             const mergedItems = Array.from(mergedMap.values());
 
 
-            // 保存合并后的数据（安全替换：失败回滚）
+            // 保存合并后的数据（使用 putItem 保留 ID）
             const backupItems = localItems.slice();
-            try {
-                await db.clearAllItems();
-            } catch (clearErr) {
-                console.error('清空本地数据失败，中止合并:', clearErr);
-                return { success: false, error: '清空失败' };
-            }
             let savedCount = 0;
             const saveErrors = [];
+            const processedHashes = new Set();
+
             for (const item of mergedItems) {
                 try {
                     const { id, source, ...itemData } = item;
-                    await db.addItem(itemData);
+                    const existing = backupItems.find(b => b.hash === itemData.hash);
+                    if (existing) {
+                        const mergedItem = { ...existing, ...itemData, id: existing.id };
+                        await db.putItem(mergedItem);
+                        processedHashes.add(existing.hash);
+                    } else {
+                        const added = await db.addItem(itemData);
+                        if (added && added.hash) processedHashes.add(added.hash);
+                    }
                     savedCount++;
                 } catch (e) {
                     console.warn('保存失败:', e);
                     saveErrors.push(e);
                 }
             }
+
             if (savedCount === 0 && backupItems.length > 0 && saveErrors.length > 0) {
-                console.warn('合并后全部保存失败，回滚到本地数据');
-                for (const item of backupItems) {
-                    try {
-                        const { id, ...itemData } = item;
-                        await db.addItem(itemData);
-                    } catch (rollbackErr) {
-                        console.error('回滚失败:', rollbackErr);
-                    }
+                return { success: false, error: '合并保存失败' };
+            }
+
+            if (backupItems.length > 0 && savedCount > 0) {
+                try {
+                    await db.deleteItemsByHashes(processedHashes);
+                } catch (cleanupErr) {
+                    console.warn('合并后清理多余项失败:', cleanupErr);
                 }
-                return { success: false, error: '合并保存失败，已回滚' };
             }
 
             // 同步备忘录（云端优先）
@@ -782,14 +804,20 @@ class SyncManager {
             const keywords = extractKeywords(title);
             return `meeting:${keywords}:${item.date || ''}`;
         } else if (item.type === 'todo') {
+            if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
+                return `todo:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
+            }
             return `todo:${title}:${item.deadline || ''}`;
         } else if (item.type === 'document') {
+            if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
+                return `doc:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
+            }
             const docStart = item.docStartDate || item.docDate || '';
             const docEnd = item.docEndDate || docStart;
             if (item.docNumber) {
                 return `doc:${item.docNumber}`;
             }
-            return `doc:${title}:${docStart}:${docEnd}:${item.id || ''}`;
+            return `doc:${title}:${docStart}:${docEnd}`;
         }
         return `${item.type}:${title}`;
     }
@@ -1111,19 +1139,32 @@ class SyncManager {
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
             const backupItems = await db.getAllItems();
-            try {
-                await db.clearAllItems();
-            } catch (clearErr) {
-                console.error('静默同步清空失败:', clearErr);
-                return { success: false };
+
+            // 数据丢失保护：如果本地数据量显著大于云端，阻止静默覆盖
+            if (backupItems.length > 0 && deduplicatedCloudItems.length < backupItems.length && backupItems.length >= 5) {
+                const lossRatio = deduplicatedCloudItems.length / backupItems.length;
+                if (lossRatio < 0.3) {
+                    console.error(`静默同步数据丢失保护触发：本地 ${backupItems.length} 条，云端仅 ${deduplicatedCloudItems.length} 条，跳过`);
+                    return { success: false, protected: true };
+                }
             }
 
             let importedCount = 0;
             const importErrors = [];
+            const processedHashes = new Set();
+
             for (const item of deduplicatedCloudItems) {
                 try {
                     const { id, ...itemData } = item;
-                    await db.addItem(itemData);
+                    const existing = backupItems.find(b => b.hash === itemData.hash);
+                    if (existing) {
+                        const merged = { ...existing, ...itemData, id: existing.id };
+                        await db.putItem(merged);
+                        processedHashes.add(existing.hash);
+                    } else {
+                        const added = await db.addItem(itemData);
+                        if (added && added.hash) processedHashes.add(added.hash);
+                    }
                     importedCount++;
                 } catch (e) {
                     console.warn('导入项目失败:', e);
@@ -1132,16 +1173,15 @@ class SyncManager {
             }
 
             if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
-                console.warn('静默同步全部导入失败，回滚到本地数据');
-                for (const item of backupItems) {
-                    try {
-                        const { id, ...itemData } = item;
-                        await db.addItem(itemData);
-                    } catch (rollbackErr) {
-                        console.error('回滚失败:', rollbackErr);
-                    }
-                }
                 return { success: false };
+            }
+
+            if (backupItems.length > 0 && importedCount > 0) {
+                try {
+                    await db.deleteItemsByHashes(processedHashes);
+                } catch (cleanupErr) {
+                    console.warn('静默同步清理多余项失败:', cleanupErr);
+                }
             }
 
             // 更新云端同步时间
@@ -1870,7 +1910,7 @@ class SyncManager {
                 sideData: this._collectSideDataForBackup()
             };
             const backupJson = JSON.stringify(backup);
-            const MAX_BACKUPS = 5;
+            const MAX_BACKUPS = 20;
             let backupList = [];
             try {
                 backupList = JSON.parse(localStorage.getItem('dataBackups') || '[]');

@@ -6897,8 +6897,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-28 P3-44';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=32', 'app-date-view.js?v=10', 'app.js?v=123', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-45';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=33', 'app-date-view.js?v=10', 'app.js?v=124', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
