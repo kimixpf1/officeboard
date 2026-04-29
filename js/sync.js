@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -1786,6 +1786,9 @@ class SyncManager {
      * 从文件导入数据
      */
     async importFromFile(file, password = null) {
+        const wasSyncing = this.isSyncing;
+        this.isSyncing = true;
+
         try {
             const text = await file.text();
             let data;
@@ -1804,6 +1807,9 @@ class SyncManager {
             if (!data.items || !Array.isArray(data.items)) {
                 throw new Error('文件格式不正确');
             }
+
+            await db.clearAllItems();
+
             let importedCount = 0;
             for (const item of data.items) {
                 try {
@@ -1814,9 +1820,22 @@ class SyncManager {
                     console.warn('导入项目失败:', e);
                 }
             }
+
+            this.recordLocalModify();
+
+            if (this.currentUser && importedCount > 0) {
+                try {
+                    await this.uploadToCloud();
+                } catch (uploadErr) {
+                    console.warn('导入后上传云端失败:', uploadErr);
+                }
+            }
+
             return { success: true, message: `成功导入 ${importedCount} 个事项`, itemCount: importedCount };
         } catch (error) {
             throw new Error('导入失败: ' + error.message);
+        } finally {
+            this.isSyncing = wasSyncing || false;
         }
     }
 

@@ -6118,7 +6118,7 @@ class OfficeDashboard {
                 cardMain.appendChild(titleEl);
 
                 const statusText = this.formatTodoCompletedTime(item.completedAt, effectiveCompleted);
-                const deadlineText = !effectiveCompleted ? this.formatDeadline(item.deadline, false) : '';
+                const deadlineText = !effectiveCompleted && item.deadlineManuallySet ? this.formatDeadline(item.deadline, false) : '';
                 if (deadlineText) {
                     const deadlineEl = document.createElement('div');
                     deadlineEl.className = 'card-time todo-deadline';
@@ -6446,7 +6446,7 @@ class OfficeDashboard {
     getTodoReminderItems(items = []) {
         const now = Date.now();
         return items
-            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed)
+            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && item.deadlineManuallySet)
             .map(item => {
                 const deadlineDate = new Date(item.deadline);
                 if (Number.isNaN(deadlineDate.getTime())) {
@@ -6897,8 +6897,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-45';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=33', 'app-date-view.js?v=10', 'app.js?v=124', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-46';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=34', 'app-date-view.js?v=10', 'app.js?v=125', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -7090,7 +7090,16 @@ class OfficeDashboard {
         switch (type) {
             case ITEM_TYPES.TODO:
                 item.priority = document.getElementById('todoPriority').value;
-                item.deadline = document.getElementById('todoDeadline').value;
+                const newDeadline = document.getElementById('todoDeadline').value;
+                if (id) {
+                    const originalItem = await db.getItem(parseInt(id));
+                    if (originalItem && originalItem.deadline !== newDeadline) {
+                        item.deadlineManuallySet = true;
+                    } else if (originalItem) {
+                        item.deadlineManuallySet = originalItem.deadlineManuallySet || false;
+                    }
+                }
+                item.deadline = newDeadline;
                 item.completed = false;
 
                 // 周期性任务处理
@@ -7707,6 +7716,49 @@ class OfficeDashboard {
 
         if (choice === 'future') {
             const dayStates = this._freezeBeforeAndClearFrom(originalItem, selectedDate, fields, fields.map(field => originalItem[field]));
+            return {
+                ...globalUpdates,
+                dayStates
+            };
+        }
+
+        return {
+            ...globalUpdates,
+            dayStates: this.clearDayStatesFields(originalItem.dayStates, fields)
+        };
+    }
+
+    async applyCrossDateMeetingScopedUpdate(id, originalItem, choice, { fields, globalUpdates = {}, dayStateUpdates = {} }) {
+        this.saveUndoHistory('update', { item: originalItem });
+        const payload = this.getCrossDateMeetingUpdatePayload(originalItem, choice, fields, globalUpdates, dayStateUpdates);
+        await db.updateItem(parseInt(id), payload);
+        return payload;
+    }
+
+    getCrossDateMeetingUpdatePayload(originalItem, choice, fields, globalUpdates = {}, dayStateUpdates = {}, selectedDate = this.selectedDate) {
+        if (choice === 'this') {
+            const dayStates = { ...(originalItem.dayStates || {}) };
+            dayStates[selectedDate] = {
+                ...(dayStates[selectedDate] || {}),
+                ...dayStateUpdates
+            };
+            return { dayStates };
+        }
+
+        if (choice === 'future') {
+            const dayStates = { ...(originalItem.dayStates || {}) };
+            let currentDate = new Date(originalItem.date + 'T12:00:00');
+            const endDate = new Date(originalItem.endDate + 'T12:00:00');
+            while (currentDate <= endDate) {
+                const dateStr = this.formatDateLocal(currentDate);
+                if (dateStr >= selectedDate) {
+                    dayStates[dateStr] = {
+                        ...(dayStates[dateStr] || {}),
+                        ...dayStateUpdates
+                    };
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
             return {
                 ...globalUpdates,
                 dayStates
