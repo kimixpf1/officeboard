@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -197,6 +197,7 @@ class SyncManager {
             }
 
             this.supabase.auth.onAuthStateChange(async (event, session) => {
+                const wasLoggedIn = !!this.currentUser;
                 this.currentUser = session?.user || null;
                 this.updateLoginUI();
 
@@ -205,13 +206,14 @@ class SyncManager {
                     this.startPeriodicSync();
                     this.initRealtimeSubscription();
 
-                    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+                    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
                         await this.smartSync();
                     }
-                } else {
+                } else if (wasLoggedIn) {
                     this.stopPeriodicSync();
                     this.unsubscribeRealtime();
                     this.clearRealtimeReconnectTimer();
+                    this.showSessionExpiredNotice();
                 }
             });
         } catch (error) {
@@ -1918,6 +1920,22 @@ class SyncManager {
             }
         });
         document.dispatchEvent(event);
+    }
+
+    showSessionExpiredNotice() {
+        const existing = document.getElementById('sessionExpiredNotice');
+        if (existing) return;
+        const notice = document.createElement('div');
+        notice.id = 'sessionExpiredNotice';
+        notice.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;background:#ef4444;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(239,68,68,0.3);cursor:pointer;max-width:90vw;text-align:center;';
+        notice.textContent = '⚠️ 登录已过期，请点击重新登录';
+        notice.onclick = () => {
+            notice.remove();
+            const loginBtn = document.getElementById('loginBtn');
+            if (loginBtn) loginBtn.click();
+        };
+        document.body.appendChild(notice);
+        setTimeout(() => notice.remove(), 30000);
     }
 
     /**
