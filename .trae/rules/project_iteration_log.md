@@ -1,3 +1,101 @@
+## 2026-04-29 P3-49
+
+### 本次目标
+- 实现每晚 8 点双轨备份：云端滚动 30 份 + 本地自动下载
+- 修复新建待办修改截止时间不显示截止时间的问题
+- 修复同步时删除本地新增事项的问题
+
+### 当前状态
+- ✅ 已实现云端每日备份：存储在 user_data.data.dailyBackups 字段，与正常同步数据隔离
+- ✅ 已实现本地每日备份：8 点后自动下载 JSON 文件
+- ✅ 已在 uploadToCloud 中保留云端 dailyBackups 不被覆盖
+- ✅ 已修复 downloadFromCloud/silentSyncFromCloud 仅在云端数据量 ≥ 本地时才清理
+- ✅ 已修复新建待办时记录初始 deadline 并对比标记 deadlineManuallySet
+- ✅ 已提交推送 P3-49
+
+## 2026-04-29 P3-46 数据丢失事故
+
+### 事故经过
+- 用户在正常使用中编辑/删除事项报"更新失败事项不存在"
+- 刷新页面后可短暂编辑，但周期性办文自动复制（3→6→7）
+- 用户删除多余项后刷新，所有数据全部消失
+- 尝试从另一设备导入备份，导入后立即被同步覆盖再次清空
+
+### 根因分析
+1. **clearAllItems+addItem 模式**：sync.js 的 downloadFromCloud / mergeData / silentSyncFromCloud 使用"清空+重建"模式，每次同步后所有事项 IndexedDB 自增 ID 变化，导致编辑/删除时报"事项不存在"
+2. **getItemKey 去重键含 item.id**：document 类型去重键使用 `doc:title:start:end:id`，同步后 ID 变化导致同一事项被当作新事项重复创建
+3. **无数据丢失保护**：本地清空后 smartSync 把空数据上传覆盖云端
+4. **导入未暂停同步**：importFromFile 导入后 smartSync 立即触发，空数据覆盖刚导入的数据
+
+### 已实施的防数据丢失机制（P3-46 起）
+- **putItem 替代 clearAllItems+addItem**：同步时保留已有 ID，避免编辑失败
+- **deleteItemsByHashes 按需清理**：仅在云端数据量 ≥ 本地时才清理多余项
+- **数据量比保护**：本地≥5条且云端不足30%时阻止下载覆盖
+- **导入暂停同步**：importFromFile 期间设 isSyncing=true，导入后自动 uploadToCloud
+- **自动备份提升到 20 份**：同步前 autoBackupBeforeSync 保留最近 20 份到 localStorage
+- **云端每日备份（P3-49）**：每晚 8 点保存到云端 dailyBackups 字段，滚动 30 份
+- **本地每日备份（P3-49）**：每晚 8 点自动下载 JSON 文件到本地
+- **云端备份与同步数据隔离**：dailyBackups 存在独立字段，uploadToCloud 时合并保留
+
+### 数据安全铁律（P3-46 事故追加）
+- 同步链路绝对不能使用"清空+重建"模式，必须保留已有 ID
+- 导入备份必须暂停同步并主动上传覆盖云端
+- 同步时删除本地项必须检查数据量比，本地比云端多时（有本地新增）不删除
+- 云端备份必须与同步数据隔离存放，不被正常同步覆盖
+
+## 2026-04-29 P3-46
+
+### 本次目标
+- 修复同步导致数据丢失事故：消除 clearAllItems+addItem 模式，改用 putItem 保留 ID
+- 修复周期性办文去重键不含 recurringGroupId 导致同步时重复复制
+- 修复导入备份后被同步覆盖的问题：导入时暂停同步+自动上传云端
+- 修复待办截止时间只有用户手动修改才显示（添加 deadlineManuallySet 标记）
+- 修复跨日期会议更新报错 applyCrossDateMeetingScopedUpdate is not a function
+- 增加数据丢失保护：本地数据量远大于云端时阻止覆盖
+
+### 当前状态
+- ✅ 已消除 sync.js 中所有 clearAllItems+addItem 替换模式，改用 putItem 保留 ID + deleteItemsByHashes 清理多余项
+- ✅ 已修复 getItemKey 对周期性事项去重键不含 recurringGroupId 的问题
+- ✅ 已修复 importFromFile 导入时暂停同步（isSyncing=true），导入后自动上传云端覆盖空数据
+- ✅ 已修复待办截止时间显示：新增 deadlineManuallySet 标记，只有编辑时修改了 deadline 才标记为 true
+- ✅ 已补齐 applyCrossDateMeetingScopedUpdate 和 getCrossDateMeetingUpdatePayload 方法
+- ✅ 已增加数据丢失保护：downloadFromCloud / silentSyncFromCloud 在本地≥5条且云端不足30%时阻止覆盖
+- ✅ 自动备份数量从 5 提升到 20
+- ✅ 已完成 node --check 与 diagnostics 0 错误
+- ✅ 已提交推送 `b155645` 到 origin/main
+- 🔄 待线上强刷验证 P3-46
+
+### 本轮关键改动
+- db.js：新增 putItem（按主键 upsert）、deleteItemsByHashes（按 hash 集合清理多余项）
+- sync.js：downloadFromCloud / mergeData / silentSyncFromCloud 全部改用 putItem 替代 clearAllItems+addItem
+- sync.js：getItemKey 新增 todo:recurring 和 doc:recurring 键类型，document 键不再含 item.id
+- sync.js：importFromFile 导入前设 isSyncing=true 阻止并发同步，导入后 recordLocalModify + uploadToCloud
+- sync.js：smartSync 情况2增加云端空数据保护，downloadFromCloud/silentSyncFromCloud 增加数据量比保护
+- sync.js：autoBackupBeforeSync 备份数量 MAX_BACKUPS 从 5 提升到 20
+- app.js：saveItem 编辑待办时对比 deadline 变化，变化则标记 deadlineManuallySet=true
+- app.js：待办卡片截止时间显示和通知栏提醒均增加 deadlineManuallySet 过滤条件
+- app.js：新增 applyCrossDateMeetingScopedUpdate 和 getCrossDateMeetingUpdatePayload 方法
+- index.html / app.js：版本提升到 P3-46，资源 query 提升
+
+### 事故复盘（P3-46 事故级修复）
+- 根因1：sync.js 中 downloadFromCloud / mergeData / silentSyncFromCloud 使用 clearAllItems() + addItem() 模式，每次同步后所有事项 ID 变化，导致编辑/删除报"事项不存在"
+- 根因2：getItemKey 对 document 类型使用 item.id 作为键的一部分，同步后 ID 变化导致去重失效，周期性办文被重复创建
+- 根因3：用户删除重复项后触发 smartSync，此时本地已清空 → downloadFromCloud → 云端也被清空
+- 根因4：importFromFile 导入后未暂停同步，smartSync 立即触发并把空数据覆盖回去
+- 教训：同步链路绝对不能使用"清空+重建"模式，必须保留已有 ID；导入备份必须暂停同步并主动上传覆盖云端
+
+### 验证结果
+- node --check js/app.js 通过
+- node --check js/sync.js 通过
+- app.js diagnostics 0 错误
+- sync.js diagnostics 0 错误
+
+### 遗留事项
+- 待线上强刷验证 P3-46
+- 待在导入备份后确认数据是否正确恢复并同步到云端
+- 待确认跨日期会议单独更新某天状态是否正常
+- 待确认待办截止时间显示是否只对手动修改的生效
+
 ## 2026-04-28 P3-44
 
 ### 本次目标
@@ -16,8 +114,9 @@
 - ✅ 已完成 `node --check js/app.js`、`node --check js/sync.js`
 - ✅ 已完成 `app.js` / `sync.js` / `app-date-view.js` / `style.css` / `index.html` diagnostics 0 错误
 - ✅ 已将部署版本提升为 `2026-04-28 P3-44`，并同步提升 `sync.js?v=32`、`app-date-view.js?v=10`、`app.js?v=123`
-- 🔄 待提交并推送到 `origin/main`
-- 🔄 待线上强刷复测 `https://kimixpf1.github.io/officeboard/`
+- ✅ 已提交并推送 `66dac0d fix: 修复同步恢复与待办提醒` 到 `origin/main`
+- ✅ 已线上强刷确认 `https://kimixpf1.github.io/officeboard/` 命中 `P3-44`、`sync.js?v=32`、`app-date-view.js?v=10`、`app.js?v=123`
+- 🔄 当前线上页面在未登录状态下会因本机未配置和风 Key 而回退到 Open-Meteo，尚需在真实登录/跨设备场景下继续验证和风 Key 恢复、待办截止提醒闪烁与手机 WiFi 自动同步
 
 ### 本轮关键改动
 - sync.js：`buildSyncData()` 新增同步 `crypto_master_key`，确保换设备后可解密已同步的和风天气密钥密文
@@ -37,9 +136,9 @@
 - `index.html` diagnostics 0 错误
 
 ### 遗留事项
-- 待提交并推送 `P3-44` 到 `origin/main`
-- 待线上强刷验证是否已命中 `app.js?v=123`、`sync.js?v=32`、`app-date-view.js?v=10`
-- 待在线上验证和风 Key 跨设备恢复、待办截止提醒闪烁与手机 WiFi 下自动同步链路是否稳定
+- 待在真实登录/跨设备场景下验证和风 Key 跨设备恢复是否稳定
+- 待在存在已到期未完成待办的数据下验证通知栏闪烁、轮播与完成后停止提醒链路
+- 待在真实手机 WiFi 前台恢复场景下继续观察自动同步链路是否稳定
 
 ## 2026-04-28 P3-43
 

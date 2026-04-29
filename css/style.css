@@ -282,14 +282,15 @@ body {
 .countdown-notice {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 220px;
+    gap: 10px;
+    min-width: 0;
     max-width: 320px;
-    padding: 10px 14px;
+    padding: 6px 12px;
     border: 1px solid color-mix(in srgb, var(--warning-color) 24%, var(--border-color));
     border-radius: 14px;
     background: linear-gradient(135deg, color-mix(in srgb, var(--warning-color) 10%, var(--bg-primary)), color-mix(in srgb, var(--primary-light) 28%, var(--bg-primary)));
-    box-shadow: 0 10px 24px rgba(245, 158, 11, 0.12);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.08);
+    overflow: hidden;
 }
 
 .countdown-notice[hidden] {
@@ -330,7 +331,7 @@ body {
 .countdown-notice.todo-reminder-active {
     border-color: color-mix(in srgb, #ef4444 48%, var(--warning-color));
     background: linear-gradient(135deg, color-mix(in srgb, #ef4444 12%, var(--bg-primary)), color-mix(in srgb, var(--warning-color) 24%, var(--bg-primary)));
-    box-shadow: 0 10px 26px rgba(239, 68, 68, 0.18);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.12);
 }
 
 .countdown-notice.todo-reminder-active .countdown-notice-badge {
@@ -339,8 +340,30 @@ body {
 }
 
 .countdown-notice.todo-reminder-flashing {
-    transform: scale(1.02);
-    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.14), 0 12px 28px rgba(239, 68, 68, 0.28);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12), 0 4px 14px rgba(239, 68, 68, 0.2);
+}
+
+.todo-reminder-complete-btn {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, #ef4444 30%, var(--border-color));
+    border-radius: 999px;
+    background: color-mix(in srgb, #ef4444 10%, var(--bg-primary));
+    color: #ef4444;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.todo-reminder-complete-btn:hover {
+    background: color-mix(in srgb, #ef4444 20%, var(--bg-primary));
+    transform: none;
+}
+
+.todo-reminder-complete-btn:active {
+    transform: scale(0.95);
 }
 
 .todo-deadline {

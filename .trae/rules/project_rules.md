@@ -76,6 +76,20 @@
 - 根因：渲染层改动越界影响了数据层，且上线前未用真实数据做全量回归验证
 - 教训：**渲染层改动绝不碰数据字段，上线前必须校验 IndexedDB 数据完整性**
 
+- 2026-04-29 P3-46 事故：sync.js 使用 clearAllItems+addItem 模式导致同步后所有事项 ID 变化，编辑/删除报"事项不存在"；getItemKey 去重键含 item.id 导致周期性办文同步时重复创建；用户删除重复项后同步把空数据覆盖云端，全部数据丢失；导入备份后同步立即覆盖清空
+- 根因：同步链路使用"清空+重建"模式、去重键不稳定、无数据丢失保护、导入未暂停同步
+- 教训：**同步链路绝对不能用清空重建模式，必须保留已有 ID；导入必须暂停同步；云端备份必须与同步数据隔离**
+
+## 同步防数据丢失机制（P3-46 起实施，必须长期遵守）
+- **putItem 替代 clearAllItems+addItem**：同步时保留已有 ID，避免编辑失败
+- **deleteItemsByHashes 按需清理**：仅在云端数据量 ≥ 本地时才清理多余项
+- **数据量比保护**：本地≥5条且云端不足30%时阻止下载覆盖
+- **导入暂停同步**：importFromFile 期间设 isSyncing=true，导入后自动 uploadToCloud
+- **自动备份 20 份**：同步前 autoBackupBeforeSync 保留最近 20 份到 localStorage
+- **云端每日备份**：每晚 8 点保存到云端 dailyBackups 字段，滚动 30 份，与同步数据隔离
+- **本地每日备份**：每晚 8 点自动下载 JSON 文件到本地
+- **uploadToCloud 保留 dailyBackups**：上传时先读取云端已有 dailyBackups 合并回去
+
 ## .trae/rules/ 目录维护
 - 固定维护五个文件：project_rules.md、project_framework.md、todolist.md、project_iteration_log.md、universal_template.md
 - project_rules.md 只记录长期规则

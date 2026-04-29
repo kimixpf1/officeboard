@@ -252,6 +252,7 @@ class OfficeDashboard {
 
             await this.loadItems();
             this.startTodoReminderLoop();
+            this.bindTodoReminderComplete();
 
             this.initDatePicker();
 
@@ -6505,6 +6506,7 @@ class OfficeDashboard {
         const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
         const titleEl = noticeEl.querySelector('.countdown-notice-title');
         const descEl = noticeEl.querySelector('.countdown-notice-desc');
+        const completeBtn = document.getElementById('todoReminderCompleteBtn');
         const state = this.getTodoReminderNoticeState();
 
         noticeEl.classList.toggle('todo-reminder-active', state.active);
@@ -6512,22 +6514,30 @@ class OfficeDashboard {
 
         if (!state.active) {
             this.todoReminderNoticeIndex = 0;
+            if (completeBtn) completeBtn.style.display = 'none';
             return false;
         }
 
         const current = state.items[state.currentIndex];
         if (!current) {
+            if (completeBtn) completeBtn.style.display = 'none';
             return false;
         }
 
         if (badgeEl) {
-            badgeEl.textContent = state.items.length > 1 ? `待办提醒 ${state.currentIndex + 1}/${state.items.length}` : '待办提醒';
+            badgeEl.textContent = state.items.length > 1 ? `待办 ${state.currentIndex + 1}/${state.items.length}` : '待办提醒';
         }
         if (titleEl) {
-            titleEl.textContent = `${current.item.title} 已到截止时间`;
+            const title = current.item.title || '';
+            titleEl.textContent = title.length > 12 ? title.substring(0, 12) + '… 已到期' : `${title} 已到期`;
         }
         if (descEl) {
-            descEl.textContent = `${this.formatDeadline(current.item.deadline)} · ${this.formatTodoReminderRelative(current.deadlineDate)} · 完成后停止提醒`;
+            const relative = this.formatTodoReminderRelative(current.deadlineDate);
+            descEl.textContent = `${relative}`;
+        }
+        if (completeBtn) {
+            completeBtn.style.display = '';
+            completeBtn.dataset.itemId = current.item.id;
         }
 
         noticeEl.hidden = false;
@@ -6552,6 +6562,36 @@ class OfficeDashboard {
 
         this.updateCountdownNotice();
         this.todoReminderRefreshTimer = window.setInterval(tick, 1000);
+    }
+
+    bindTodoReminderComplete() {
+        const btn = document.getElementById('todoReminderCompleteBtn');
+        if (!btn) return;
+
+        let completing = false;
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (completing) return;
+
+            const itemId = parseInt(btn.dataset.itemId);
+            if (!itemId) return;
+
+            completing = true;
+            btn.textContent = '处理中...';
+            btn.style.pointerEvents = 'none';
+
+            try {
+                await this.toggleTodoComplete(itemId, true);
+                this.updateCountdownNotice();
+            } catch (err) {
+                console.warn('通知栏完成待办失败:', err);
+            } finally {
+                completing = false;
+                btn.textContent = '✓ 完成';
+                btn.style.pointerEvents = '';
+            }
+        });
     }
 
     formatTodoCompletedTime(completedAt, completed = false) {
@@ -6898,8 +6938,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-49';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=128', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-50';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=129', 'db.js?v=25', 'style.css?v=51', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
