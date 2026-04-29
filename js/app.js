@@ -151,6 +151,7 @@ class OfficeDashboard {
 
         // 撤回历史
         this.undoHistory = [];
+        this.redoStack = [];
         this.maxUndoSteps = 20;
 
         this.todoReminderRefreshTimer = null;
@@ -392,12 +393,16 @@ class OfficeDashboard {
 
         // 撤回按钮
         document.getElementById('undoBtn')?.addEventListener('click', () => this.undoLastAction());
+        document.getElementById('redoBtn')?.addEventListener('click', () => this.redoLastAction());
 
-        // 键盘快捷键：Ctrl+Z 撤回
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 this.undoLastAction();
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                this.redoLastAction();
             }
         });
 
@@ -6525,17 +6530,19 @@ class OfficeDashboard {
         }
 
         if (badgeEl) {
-            badgeEl.textContent = state.items.length > 1 ? `待办 ${state.currentIndex + 1}/${state.items.length}` : '待办提醒';
+            badgeEl.textContent = state.items.length > 1 ? `待办 ${state.currentIndex + 1}/${state.items.length}` : '待办';
         }
         if (titleEl) {
             const title = current.item.title || '';
             const overdue = current.overdueMs >= 0;
             const label = overdue ? '已到期' : '即将到期';
-            titleEl.textContent = title.length > 12 ? title.substring(0, 12) + `… ${label}` : `${title} ${label}`;
+            titleEl.textContent = `${title} ${label}`;
+            titleEl.title = `${title} ${label}`;
         }
         if (descEl) {
             const relative = this.formatTodoReminderRelative(current.deadlineDate);
-            descEl.textContent = `${relative}`;
+            descEl.textContent = relative;
+            descEl.title = relative;
         }
         if (completeBtn) {
             completeBtn.style.display = '';
@@ -6940,8 +6947,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 v4.54';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=134', 'db.js?v=25', 'style.css?v=52', 'crypto.js?v=16'];
+        const version = '2026-04-29 v4.55';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=36', 'app-date-view.js?v=10', 'app.js?v=135', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -8304,18 +8311,14 @@ class OfficeDashboard {
             timestamp: Date.now()
         });
 
+        this.redoStack = [];
+
         // 限制历史记录数量
         if (this.undoHistory.length > this.maxUndoSteps) {
             this.undoHistory.shift();
         }
 
-        // 启用撤回按钮
-        const undoBtn = document.getElementById('undoBtn');
-        if (undoBtn) {
-            undoBtn.disabled = false;
-            undoBtn.style.opacity = '1';
-            undoBtn.style.cursor = 'pointer';
-        }
+        this.updateUndoBtnState();
     }
 
     /**
@@ -8328,6 +8331,7 @@ class OfficeDashboard {
         }
 
         const lastAction = this.undoHistory.pop();
+        this.redoStack.push(lastAction);
 
         try {
             switch (lastAction.action) {
@@ -8413,6 +8417,99 @@ class OfficeDashboard {
                 undoBtn.style.cursor = 'not-allowed';
             }
         }
+
+        this.updateRedoBtnState();
+    }
+
+    async redoLastAction() {
+        if (this.redoStack.length === 0) {
+            this.showError('没有可恢复的操作');
+            return;
+        }
+
+        const action = this.redoStack.pop();
+        this.undoHistory.push(action);
+
+        try {
+            switch (action.action) {
+                case 'add':
+                    if (Array.isArray(action.data.ids)) {
+                        for (const item of action.data.items || []) {
+                            await db.addItem(item);
+                        }
+                    } else {
+                        await db.addItem(action.data.item);
+                    }
+                    this.showSuccess('已恢复：重新添加事项');
+                    break;
+                case 'delete':
+                    if (Array.isArray(action.data.items)) {
+                        for (const item of action.data.items) {
+                            await db.deleteItem(item.id);
+                        }
+                    } else {
+                        await db.deleteItem(action.data.item.id);
+                    }
+                    this.showSuccess('已恢复：重新删除事项');
+                    break;
+                case 'update':
+                    if (Array.isArray(action.data.items)) {
+                        const currentItems = [];
+                        for (const item of action.data.items) {
+                            const current = await db.getItem(item.id);
+                            if (current) currentItems.push(current);
+                            await db.updateItem(item.id, item);
+                        }
+                    } else {
+                        await db.updateItem(action.data.item.id, action.data.item);
+                    }
+                    this.showSuccess('已恢复：重新应用修改');
+                    break;
+                case 'complete':
+                    await db.updateItem(action.data.id, { completed: true, completedAt: new Date().toISOString() });
+                    this.showSuccess('已恢复：标记完成');
+                    break;
+                case 'pin':
+                    await db.updateItem(action.data.id, { pinned: !action.data.oldValue });
+                    this.showSuccess('已恢复：置顶状态');
+                    break;
+                case 'sink':
+                    await db.updateItem(action.data.id, { sunk: !action.data.oldValue });
+                    this.showSuccess('已恢复：沉底状态');
+                    break;
+                default:
+                    this.showError('无法恢复此操作');
+            }
+
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) {
+                syncManager.immediateSyncToCloud().catch(e => {});
+            }
+        } catch (error) {
+            console.error('恢复失败:', error);
+            this.showError('恢复失败: ' + error.message);
+        }
+
+        this.updateUndoBtnState();
+        this.updateRedoBtnState();
+    }
+
+    updateUndoBtnState() {
+        const undoBtn = document.getElementById('undoBtn');
+        if (!undoBtn) return;
+        const hasHistory = this.undoHistory.length > 0;
+        undoBtn.disabled = !hasHistory;
+        undoBtn.style.opacity = hasHistory ? '1' : '0.4';
+        undoBtn.style.cursor = hasHistory ? 'pointer' : 'not-allowed';
+    }
+
+    updateRedoBtnState() {
+        const redoBtn = document.getElementById('redoBtn');
+        if (!redoBtn) return;
+        const hasRedo = this.redoStack.length > 0;
+        redoBtn.disabled = !hasRedo;
+        redoBtn.style.opacity = hasRedo ? '1' : '0.4';
+        redoBtn.style.cursor = hasRedo ? 'pointer' : 'not-allowed';
     }
 
     startDailyBackupSchedule() {
