@@ -6898,8 +6898,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-47';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=35', 'app-date-view.js?v=10', 'app.js?v=126', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-48';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=35', 'app-date-view.js?v=10', 'app.js?v=127', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -6951,6 +6951,7 @@ class OfficeDashboard {
             const deadlineEl = document.getElementById('todoDeadline');
 
             if (deadlineEl) deadlineEl.value = `${dateStr}T${timeStr}`;
+            this._todoDeadlineInitial = `${dateStr}T${timeStr}`;
 
             // 重置周期性选项
             const recurringFields = document.getElementById('recurringFields');
@@ -7098,6 +7099,10 @@ class OfficeDashboard {
                         item.deadlineManuallySet = true;
                     } else if (originalItem) {
                         item.deadlineManuallySet = originalItem.deadlineManuallySet || false;
+                    }
+                } else {
+                    if (this._todoDeadlineInitial && this._todoDeadlineInitial !== newDeadline) {
+                        item.deadlineManuallySet = true;
                     }
                 }
                 item.deadline = newDeadline;
