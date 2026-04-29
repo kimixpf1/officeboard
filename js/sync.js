@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -319,20 +319,29 @@ class SyncManager {
                 // 首次同步（新设备/清除过缓存）：走合并逻辑，避免任何一端数据丢失
                 await this.mergeData(localItems, cloudData);
             } else {
-                // 判断云端是否有更新（云端更新时间 > 上次同步时间）
                 const cloudHasUpdate = cloudUpdateTime && cloudUpdateTime > lastSyncTime;
                 const localHasModify = localModifyTime && localModifyTime > lastSyncTime;
                 const cloudItemCount = cloudItems.length;
                 const localItemCount = localItems.length;
                 const itemCountChanged = cloudItemCount !== localItemCount;
 
-                if ((cloudHasUpdate && localHasModify) || (itemCountChanged && cloudHasUpdate)) {
-                    await this.mergeData(localItems, cloudData);
+                if (cloudHasUpdate || itemCountChanged) {
+                    const localKeySet = new Set(localItems.map(i => this.getItemKey(i)));
+                    const cloudOnlyNew = cloudItems.filter(ci => !localKeySet.has(this.getItemKey(ci)));
+                    if (cloudOnlyNew.length > 0) {
+                        for (const ci of cloudOnlyNew) {
+                            const existsById = localItems.find(li => li.id && String(li.id) === String(ci.id));
+                            if (!existsById) {
+                                await db.addItem(ci);
+                            }
+                        }
+                    }
+                }
+
+                if (localHasModify) {
                     await this.uploadToCloud(cloudData);
                 } else if (cloudHasUpdate || (itemCountChanged && cloudItemCount > localItemCount)) {
                     await this.downloadFromCloud(cloudData);
-                } else if (localHasModify) {
-                    await this.uploadToCloud(cloudData);
                 } else {
                     // 两边都没变化 - 但仍需同步备忘录
                     if (cloudData?.data?.memo !== undefined) {
@@ -914,10 +923,65 @@ class SyncManager {
         let lastError = null;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                const result = await this.uploadToCloud();
-                if (result.success) return result;
-                lastError = result.error;
-                if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                const localItems = await db.getAllItems();
+                const syncData = await this.buildSyncData(localItems);
+
+                const { data: cloudRow } = await this.supabase
+                    .from('user_data')
+                    .select('data')
+                    .eq('user_id', this.currentUser.id)
+                    .maybeSingle();
+
+                if (cloudRow?.data?.items) {
+                    const cloudItems = cloudRow.data.items || [];
+                    const localKeySet = new Set(localItems.map(i => this.getItemKey(i)));
+                    const cloudOnlyNew = cloudItems.filter(ci => !localKeySet.has(this.getItemKey(ci)));
+                    if (cloudOnlyNew.length > 0) {
+                        for (const ci of cloudOnlyNew) {
+                            const existsById = localItems.find(li => li.id && String(li.id) === String(ci.id));
+                            if (!existsById) {
+                                await db.addItem(ci);
+                            }
+                        }
+                        localItems.push(...cloudOnlyNew.filter(ci => !localItems.find(li => li.id && String(li.id) === String(ci.id))));
+                        syncData.items = (syncData.items || []);
+                        const syncKeys = new Set(syncData.items.map(i => this.getItemKey(i)));
+                        for (const ci of cloudOnlyNew) {
+                            if (!syncKeys.has(this.getItemKey(ci))) {
+                                syncData.items.push(ci);
+                            }
+                        }
+                    }
+                }
+
+                if (cloudRow?.data?.dailyBackups) {
+                    syncData.dailyBackups = cloudRow.data.dailyBackups;
+                }
+
+                const syncTime = new Date().toISOString();
+                syncData.sync_time = syncTime;
+
+                const { data: upsertResult, error } = await this.supabase
+                    .from('user_data')
+                    .upsert({
+                        user_id: this.currentUser.id,
+                        data: syncData,
+                        updated_at: syncTime
+                    }, { onConflict: 'user_id' })
+                    .select()
+                    .single();
+
+                if (error) {
+                    lastError = error.message;
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                    continue;
+                }
+
+                const actualSyncTime = upsertResult?.updated_at || syncTime;
+                this.lastCloudSyncTime = actualSyncTime;
+                SafeStorage.set('lastCloudSyncTime', actualSyncTime);
+
+                return { success: true, itemCount: localItems.length };
             } catch (e) {
                 lastError = e.message;
                 if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
