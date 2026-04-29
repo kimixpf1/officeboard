@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -582,10 +582,14 @@ class SyncManager {
             }
 
             if (backupItems.length > 0 && importedCount > 0) {
-                try {
-                    await db.deleteItemsByHashes(processedHashes);
-                } catch (cleanupErr) {
-                    console.warn('清理多余项失败:', cleanupErr);
+                // 仅删除本地有但云端已删除的项（需本地无新增）
+                // 如果本地数据量大于云端，说明可能有本地新增，不删除
+                if (deduplicatedItems.length >= backupItems.length) {
+                    try {
+                        await db.deleteItemsByHashes(processedHashes);
+                    } catch (cleanupErr) {
+                        console.warn('清理多余项失败:', cleanupErr);
+                    }
                 }
             }
 
@@ -1177,10 +1181,12 @@ class SyncManager {
             }
 
             if (backupItems.length > 0 && importedCount > 0) {
-                try {
-                    await db.deleteItemsByHashes(processedHashes);
-                } catch (cleanupErr) {
-                    console.warn('静默同步清理多余项失败:', cleanupErr);
+                if (deduplicatedCloudItems.length >= backupItems.length) {
+                    try {
+                        await db.deleteItemsByHashes(processedHashes);
+                    } catch (cleanupErr) {
+                        console.warn('静默同步清理多余项失败:', cleanupErr);
+                    }
                 }
             }
 

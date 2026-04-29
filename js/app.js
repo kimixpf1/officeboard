@@ -276,6 +276,7 @@ class OfficeDashboard {
             }, 1000);
 
             this.startMeetingAutoCompleteCheck();
+            this.startDailyBackupSchedule();
         } catch (error) {
             console.error('初始化失败:', error);
             this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
@@ -6897,8 +6898,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 P3-46';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=34', 'app-date-view.js?v=10', 'app.js?v=125', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
+        const version = '2026-04-29 P3-47';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=35', 'app-date-view.js?v=10', 'app.js?v=126', 'db.js?v=25', 'style.css?v=50', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;
@@ -8383,6 +8384,57 @@ class OfficeDashboard {
                 undoBtn.style.cursor = 'not-allowed';
             }
         }
+    }
+
+    startDailyBackupSchedule() {
+        const BACKUP_HOUR = 20;
+        const CHECK_KEY = 'dailyBackupLastDate';
+        const STORAGE_KEY = 'dailyBackupAutoEnabled';
+
+        const tryBackup = async () => {
+            const now = new Date();
+            const todayStr = this.formatDateLocal(now);
+            const lastBackupDate = SafeStorage.get(CHECK_KEY);
+            const autoEnabled = SafeStorage.get(STORAGE_KEY) !== 'false';
+
+            if (!autoEnabled) return;
+            if (lastBackupDate === todayStr) return;
+            if (now.getHours() < BACKUP_HOUR) return;
+
+            try {
+                const allItems = await db.getAllItems();
+                if (allItems.length === 0) return;
+
+                const exportData = {
+                    version: '2.0',
+                    export_time: new Date().toISOString(),
+                    type: 'daily-auto-backup',
+                    items: allItems
+                };
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const dateStr = todayStr.replace(/-/g, '');
+                a.download = `办公面板每日备份_${dateStr}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                SafeStorage.set(CHECK_KEY, todayStr);
+                console.log(`每日自动备份完成：${allItems.length} 条事项`);
+            } catch (e) {
+                console.warn('每日自动备份失败:', e);
+            }
+        };
+
+        if (this._dailyBackupTimer) {
+            clearInterval(this._dailyBackupTimer);
+        }
+        this._dailyBackupTimer = setInterval(tryBackup, 60000);
+        tryBackup();
     }
 
     /**
