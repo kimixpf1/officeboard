@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -324,25 +324,52 @@ class SyncManager {
                 const cloudItemCount = cloudItems.length;
                 const localItemCount = localItems.length;
                 const itemCountChanged = cloudItemCount !== localItemCount;
+                let needsUIRefresh = false;
 
                 if (cloudHasUpdate || itemCountChanged) {
-                    const localKeySet = new Set(localItems.map(i => this.getItemKey(i)));
-                    const cloudOnlyNew = cloudItems.filter(ci => !localKeySet.has(this.getItemKey(ci)));
-                    if (cloudOnlyNew.length > 0) {
-                        for (const ci of cloudOnlyNew) {
-                            const existsById = localItems.find(li => li.id && String(li.id) === String(ci.id));
-                            if (!existsById) {
-                                await db.addItem(ci);
+                    const cloudById = new Map();
+                    cloudItems.forEach(ci => { if (ci.id) cloudById.set(String(ci.id), ci); });
+                    const cloudByKey = new Map();
+                    cloudItems.forEach(ci => cloudByKey.set(this.getItemKey(ci), ci));
+
+                    for (const ci of cloudItems) {
+                        const localMatch = localItems.find(li =>
+                            (li.id && String(li.id) === String(ci.id)) ||
+                            this.getItemKey(li) === this.getItemKey(ci)
+                        );
+                        if (localMatch) {
+                            const cloudJson = JSON.stringify(ci);
+                            const localJson = JSON.stringify({...localMatch, id: ci.id || localMatch.id});
+                            if (cloudJson !== localJson) {
+                                await db.putItem({ ...ci, id: localMatch.id });
+                                needsUIRefresh = true;
                             }
+                        } else {
+                            await db.addItem(ci);
+                            needsUIRefresh = true;
+                        }
+                    }
+
+                    for (const li of localItems) {
+                        const inCloud = cloudById.has(String(li.id)) ||
+                                        cloudByKey.has(this.getItemKey(li));
+                        if (!inCloud) {
+                            try { await db.deleteItem(li.id); needsUIRefresh = true; } catch(e) {}
                         }
                     }
                 }
 
                 if (localHasModify) {
                     await this.uploadToCloud(cloudData);
-                } else if (cloudHasUpdate || (itemCountChanged && cloudItemCount > localItemCount)) {
-                    await this.downloadFromCloud(cloudData);
-                } else {
+                }
+
+                if (needsUIRefresh) {
+                    document.dispatchEvent(new CustomEvent('syncDataLoaded', {
+                        detail: { itemCount: cloudItemCount }
+                    }));
+                }
+
+                if (!localHasModify && !needsUIRefresh) {
                     // 两边都没变化 - 但仍需同步备忘录
                     if (cloudData?.data?.memo !== undefined) {
                         const localMemo = SafeStorage.get('office_memo_content') || '';
