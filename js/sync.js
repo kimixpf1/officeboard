@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -1118,11 +1118,16 @@ class SyncManager {
                 },
                 async (payload) => {
                     this.realtimeReconnectAttempts = 0;
-                    if (!this.isSyncing) {
-                        document.dispatchEvent(new CustomEvent('syncRemoteDataChanged', {
-                            detail: { payload }
-                        }));
-                        await this.smartSync();
+                    if (this.isSyncing) return;
+                    try {
+                        const result = await this.silentSyncFromCloud();
+                        if (result?.success) {
+                            document.dispatchEvent(new CustomEvent('syncDataLoaded', {
+                                detail: { itemCount: result.itemCount, source: 'realtime' }
+                            }));
+                        }
+                    } catch (e) {
+                        console.warn('实时同步处理失败:', e);
                     }
                 }
             )
@@ -1329,34 +1334,38 @@ class SyncManager {
                 this.persistDeletedItemsMap();
             }
 
-            // 同步事项 - 带去重逻辑（安全替换：失败回滚）
+            // 同步事项 - 使用对账合并，保留本设备未上传的新增
             const cloudItems = data.data.items || [];
             
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
-            const backupItems = await db.getAllItems();
+            const localItems = await db.getAllItems();
 
             // 数据丢失保护：如果本地数据量显著大于云端，阻止静默覆盖
-            if (backupItems.length > 0 && deduplicatedCloudItems.length < backupItems.length && backupItems.length >= 5) {
-                const lossRatio = deduplicatedCloudItems.length / backupItems.length;
+            if (localItems.length > 0 && deduplicatedCloudItems.length < localItems.length && localItems.length >= 5) {
+                const lossRatio = deduplicatedCloudItems.length / localItems.length;
                 if (lossRatio < 0.3) {
-                    console.error(`静默同步数据丢失保护触发：本地 ${backupItems.length} 条，云端仅 ${deduplicatedCloudItems.length} 条，跳过`);
+                    console.error(`静默同步数据丢失保护触发：本地 ${localItems.length} 条，云端仅 ${deduplicatedCloudItems.length} 条，跳过`);
                     return { success: false, protected: true };
                 }
             }
 
+            const reconciledItems = this.buildReconciledItems(
+                localItems,
+                deduplicatedCloudItems,
+                this.getTimeMs(this.lastCloudSyncTime)
+            );
+
             let importedCount = 0;
-            const importErrors = [];
 
             try {
-                await this.syncLocalItemsToState(deduplicatedCloudItems, backupItems);
-                importedCount = deduplicatedCloudItems.length;
+                await this.syncLocalItemsToState(reconciledItems, localItems);
+                importedCount = reconciledItems.length;
             } catch (e) {
-                console.warn('导入项目失败:', e);
-                importErrors.push(e);
+                console.warn('静默同步导入失败:', e);
             }
 
-            if (importedCount === 0 && backupItems.length > 0 && importErrors.length > 0) {
+            if (importedCount === 0 && localItems.length > 0) {
                 return { success: false };
             }
 

@@ -4263,21 +4263,23 @@ class OfficeDashboard {
             this.updateLoginUI(e.detail);
         });
 
-        // 监听云端数据同步完成（恢复会话时）
+        // 监听云端数据同步完成（恢复会话时 / 实时同步）
         document.addEventListener('syncDataLoaded', async (e) => {
 
-            await this.loadItems(); // 刷新数据
+            await this.loadItems();
             if (e.detail.syncResult && e.detail.syncResult.itemCount > 0) {
                 this.showSuccess(`已从云端同步 ${e.detail.syncResult.itemCount} 个事项`);
             }
         });
 
         // 监听远程数据变更（实时同步）
-        // 使用智能同步，自动判断同步方向
         document.addEventListener('syncRemoteDataChanged', async (e) => {
 
             if (!syncManager.isSyncing) {
-                await syncManager.smartSync();
+                const result = await syncManager.silentSyncFromCloud();
+                if (result?.success) {
+                    await this.loadItems();
+                }
             }
         });
 
@@ -6958,8 +6960,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 v4.65';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=45', 'app-date-view.js?v=10', 'app.js?v=145', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
+        const version = '2026-04-29 v4.66';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=46', 'app-date-view.js?v=10', 'app.js?v=146', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
