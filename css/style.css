@@ -2715,6 +2715,13 @@ body {
     }
 
     /* 周视图手机端 - 改为垂直列表 */
+    .calendar-view {
+        height: auto;
+        max-height: none;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .week-view {
         display: flex;
         flex-direction: column;

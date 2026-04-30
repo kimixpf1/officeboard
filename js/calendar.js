@@ -171,6 +171,14 @@ class CalendarView {
     today() {
         this.currentDate = new Date();
         this.render();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const todayCell = this.container.querySelector('.week-cell.today, .month-day.today');
+                if (todayCell) {
+                    todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        });
     }
 
     /**

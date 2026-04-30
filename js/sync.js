@@ -592,18 +592,16 @@ class SyncManager {
             }
 
             const cloudItems = Array.isArray(existingRow?.data?.items) ? existingRow.data.items : [];
-            const cloudDeletedKeys = new Set();
-            if (Array.isArray(cloudItems)) {
-                for (const ci of cloudItems) {
-                    if (this.shouldKeepDeleted(ci)) {
-                        cloudDeletedKeys.add(this.getItemKey(ci));
-                    }
-                }
+
+            const cloudOnlyItems = [];
+            const localKeys = new Set(normalizedLocalItems.map(item => this.getItemKey(item)));
+            for (const ci of cloudItems) {
+                if (this.shouldKeepDeleted(ci)) continue;
+                if (localKeys.has(this.getItemKey(ci))) continue;
+                cloudOnlyItems.push(ci);
             }
-            syncData.items = normalizedLocalItems.filter(item => {
-                if (this.shouldKeepDeleted(item)) return false;
-                return true;
-            });
+
+            syncData.items = [...normalizedLocalItems.filter(item => !this.shouldKeepDeleted(item)), ...cloudOnlyItems];
             
             const syncTime = new Date().toISOString();
             syncData.sync_time = syncTime;
