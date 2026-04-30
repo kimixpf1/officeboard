@@ -333,7 +333,6 @@ body {
 .countdown-notice.todo-reminder-active {
     border-color: color-mix(in srgb, #ef4444 48%, var(--warning-color));
     background: linear-gradient(135deg, color-mix(in srgb, #ef4444 12%, var(--bg-primary)), color-mix(in srgb, var(--warning-color) 24%, var(--bg-primary)));
-    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.12);
 }
 
 .countdown-notice.todo-reminder-active .countdown-notice-badge {
@@ -346,8 +345,8 @@ body {
 }
 
 @keyframes todoFlash {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15), 0 4px 14px rgba(239, 68, 68, 0.2); }
-    50% { opacity: 0.7; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.08), 0 2px 8px rgba(239, 68, 68, 0.1); }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
 }
 
 .todo-reminder-complete-btn {
