@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -589,11 +589,18 @@ class SyncManager {
             }
 
             const cloudItems = Array.isArray(existingRow?.data?.items) ? existingRow.data.items : [];
-            syncData.items = this.buildReconciledItems(
-                normalizedLocalItems,
-                cloudItems,
-                this.getTimeMs(this.lastCloudSyncTime)
-            );
+            const cloudDeletedKeys = new Set();
+            if (Array.isArray(cloudItems)) {
+                for (const ci of cloudItems) {
+                    if (this.shouldKeepDeleted(ci)) {
+                        cloudDeletedKeys.add(this.getItemKey(ci));
+                    }
+                }
+            }
+            syncData.items = normalizedLocalItems.filter(item => {
+                if (this.shouldKeepDeleted(item)) return false;
+                return true;
+            });
             
             const syncTime = new Date().toISOString();
             syncData.sync_time = syncTime;
@@ -1043,6 +1050,11 @@ class SyncManager {
             return { success: false, offline: true };
         }
 
+        if (this.isSyncing) {
+            return { success: false, skipped: true };
+        }
+
+        this.isSyncing = true;
         this.recordLocalModify();
 
         if (this.syncTimeout) {
@@ -1055,6 +1067,7 @@ class SyncManager {
             try {
                 const result = await this.uploadToCloud();
                 if (result?.success) {
+                    this.isSyncing = false;
                     return result;
                 }
                 lastError = result?.error || '同步失败';
@@ -1064,6 +1077,7 @@ class SyncManager {
                 if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
             }
         }
+        this.isSyncing = false;
         console.error('上传重试3次仍失败:', lastError);
         return { success: false, error: lastError };
     }
@@ -1241,6 +1255,12 @@ class SyncManager {
             return { success: false, offline: true };
         }
 
+        if (this.isSyncing) {
+            return { success: false, skipped: true };
+        }
+
+        this.isSyncing = true;
+
         try {
             const { data, error } = await this.supabase
                 .from('user_data')
@@ -1379,6 +1399,8 @@ class SyncManager {
         } catch (error) {
             console.error('静默下载异常:', error);
             return { success: false };
+        } finally {
+            this.isSyncing = false;
         }
     }
 
