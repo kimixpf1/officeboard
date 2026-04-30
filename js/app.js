@@ -6960,8 +6960,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-29 v4.66';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=46', 'app-date-view.js?v=10', 'app.js?v=146', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
+        const version = '2026-04-29 v4.67';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=28', 'sync.js?v=46', 'app-date-view.js?v=10', 'app.js?v=147', 'db.js?v=25', 'style.css?v=53', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -7297,7 +7297,21 @@ class OfficeDashboard {
         try {
             if (id) {
                 // 编辑模式 - 先保存原始数据用于撤回
-                const originalItem = await db.getItem(parseInt(id));
+                let originalItem = await db.getItem(parseInt(id));
+                if (!originalItem) {
+                    const allItems = await db.getAllItems();
+                    const formTitle = item.title?.trim();
+                    const formType = item.type;
+                    if (formTitle && formType) {
+                        originalItem = allItems.find(i => 
+                            i.type === formType && (i.title || '').trim() === formTitle
+                        ) || null;
+                    }
+                    if (originalItem) {
+                        document.getElementById('itemId').value = originalItem.id;
+                        id = String(originalItem.id);
+                    }
+                }
                 const recurringGroupId = document.getElementById('recurringGroupId')?.value;
                 const occurrenceIndex = parseInt(document.getElementById('occurrenceIndex')?.value) || 0;
 
@@ -7474,8 +7488,24 @@ class OfficeDashboard {
                     if (originalItem) {
                         this.saveUndoHistory('update', { item: originalItem });
                     }
-                    await db.updateItem(parseInt(id), item);
-                    this.showSuccess('事项已更新');
+                    try {
+                        await db.updateItem(parseInt(id), item);
+                        this.showSuccess('事项已更新');
+                    } catch (updateErr) {
+                        console.warn('按ID更新失败，尝试按标题查找后更新:', updateErr);
+                        const allItems = await db.getAllItems();
+                        const matchByTitle = allItems.find(i =>
+                            i.type === item.type && (i.title || '').trim() === (item.title || '').trim()
+                        );
+                        if (matchByTitle) {
+                            await db.updateItem(matchByTitle.id, { ...item, id: undefined });
+                            this.showSuccess('事项已更新');
+                        } else {
+                            const { id: _id, ...itemData } = item;
+                            await db.addItem(itemData);
+                            this.showSuccess('事项已保存为新记录');
+                        }
+                    }
                 }
             } else {
                 // 新建模式
@@ -7785,7 +7815,20 @@ class OfficeDashboard {
     async applyCrossDateMeetingScopedUpdate(id, originalItem, choice, { fields, globalUpdates = {}, dayStateUpdates = {} }) {
         this.saveUndoHistory('update', { item: originalItem });
         const payload = this.getCrossDateMeetingUpdatePayload(originalItem, choice, fields, globalUpdates, dayStateUpdates);
-        await db.updateItem(parseInt(id), payload);
+        try {
+            await db.updateItem(parseInt(id), payload);
+        } catch (e) {
+            console.warn('按ID更新跨日期会议失败，尝试按标题查找:', e);
+            const allItems = await db.getAllItems();
+            const match = allItems.find(i =>
+                i.type === ITEM_TYPES.MEETING && (i.title || '').trim() === (originalItem.title || '').trim()
+            );
+            if (match) {
+                await db.updateItem(match.id, payload);
+            } else {
+                throw e;
+            }
+        }
         return payload;
     }
 
@@ -7828,7 +7871,20 @@ class OfficeDashboard {
     async applyCrossDateDocumentScopedUpdate(id, originalItem, choice, { fields, globalUpdates = {}, dayStateUpdates = {} }) {
         this.saveUndoHistory('update', { item: originalItem });
         const payload = this.getCrossDateDocumentUpdatePayload(originalItem, choice, fields, globalUpdates, dayStateUpdates);
-        await db.updateItem(parseInt(id), payload);
+        try {
+            await db.updateItem(parseInt(id), payload);
+        } catch (e) {
+            console.warn('按ID更新跨日期办文失败，尝试按标题查找:', e);
+            const allItems = await db.getAllItems();
+            const match = allItems.find(i =>
+                i.type === ITEM_TYPES.DOCUMENT && (i.title || '').trim() === (originalItem.title || '').trim()
+            );
+            if (match) {
+                await db.updateItem(match.id, payload);
+            } else {
+                throw e;
+            }
+        }
         return payload;
     }
 
