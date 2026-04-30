@@ -230,21 +230,25 @@ class SyncManager {
     }
 
     async buildSyncData(items) {
-        const settings = {};
-        const kimiKey = await db.getSetting('kimi_api_key');
-        const kimiKeySet = await db.getSetting('kimi_api_key_set');
-        const deepseekKey = await db.getSetting('deepseek_api_key');
-        const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
-        const qweatherKeyEncrypted = await db.getSetting('qweather_api_key_encrypted');
-        const qweatherKeySet = await db.getSetting('qweather_api_key_set');
-        const cryptoMasterKey = SafeStorage.get('crypto_master_key');
+        const settingKeys = [
+            ['kimi_api_key', 'kimi_api_key'],
+            ['kimi_api_key_set', 'kimi_api_key_set'],
+            ['deepseek_api_key', 'deepseek_api_key'],
+            ['deepseek_api_key_set', 'deepseek_api_key_set'],
+            ['qweather_api_key_encrypted', 'qweather_api_key_encrypted'],
+            ['qweather_api_key_set', 'qweather_api_key_set']
+        ];
 
-        if (kimiKey) settings.kimi_api_key = kimiKey;
-        if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
-        if (deepseekKey) settings.deepseek_api_key = deepseekKey;
-        if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
-        if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
-        if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
+        const settingValues = await Promise.all(
+            settingKeys.map(([dbKey]) => db.getSetting(dbKey))
+        );
+
+        const settings = {};
+        for (let i = 0; i < settingKeys.length; i++) {
+            if (settingValues[i]) settings[settingKeys[i][1]] = settingValues[i];
+        }
+
+        const cryptoMasterKey = SafeStorage.get('crypto_master_key');
         if (cryptoMasterKey) settings.crypto_master_key = cryptoMasterKey;
 
         return {
@@ -324,8 +328,7 @@ class SyncManager {
                     this.updateLoginUI();
                     this.bindLifecycleSyncHandlers();
 
-                    // 执行智能同步
-                    await this.smartSync();
+                    this.smartSync().catch(e => console.warn('会话同步失败:', e));
 
                     // 启动定时同步
                     this.startPeriodicSync();
@@ -350,9 +353,9 @@ class SyncManager {
                     if (event === 'SIGNED_IN') {
                         this.lastCloudSyncTime = null;
                         SafeStorage.remove('lastCloudSyncTime');
-                        await this.smartSync();
+                        this.smartSync().catch(e => console.warn('SIGNED_IN同步失败:', e));
                     } else if (event === 'INITIAL_SESSION') {
-                        await this.smartSync();
+                        this.smartSync().catch(e => console.warn('INITIAL_SESSION同步失败:', e));
                     }
                 } else if (wasLoggedIn) {
                     this.stopPeriodicSync();
@@ -546,7 +549,7 @@ class SyncManager {
 
 
         try {
-            await this.autoBackupBeforeSync();
+            this.autoBackupBeforeSync();
 
             const allItems = await db.getAllItems();
             const syncData = preparedSyncData || await this.buildSyncData(allItems);
@@ -640,36 +643,38 @@ class SyncManager {
 
 
         try {
-            await this.autoBackupBeforeSync();
+            this.autoBackupBeforeSync();
 
             // 同步设置
             if (cloudData.data.settings) {
                 const settings = cloudData.data.settings;
+                const settingWrites = [];
                 if (settings.kimi_api_key) {
-                    await db.setSetting('kimi_api_key', settings.kimi_api_key);
+                    settingWrites.push(db.setSetting('kimi_api_key', settings.kimi_api_key));
                     SafeStorage.set('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
-                    await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
+                    settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
                 }
                 if (settings.deepseek_api_key) {
-                    await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
+                    settingWrites.push(db.setSetting('deepseek_api_key', settings.deepseek_api_key));
                     SafeStorage.set('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
-                    await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
+                    settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
                 }
                 if (settings.qweather_api_key_encrypted) {
-                    await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                    settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
                     SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
                 }
                 if (typeof settings.qweather_api_key_set !== 'undefined') {
-                    await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                    settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
                     SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
                 }
                 if (settings.crypto_master_key) {
                     SafeStorage.set('crypto_master_key', settings.crypto_master_key);
                 }
+                if (settingWrites.length > 0) await Promise.all(settingWrites);
             }
 
             // 同步备忘录
@@ -2172,29 +2177,31 @@ class SyncManager {
         return this.currentUser?.user_metadata?.username || '';
     }
 
-    async autoBackupBeforeSync() {
-        try {
-            const allItems = await db.getAllItems();
-            if (allItems.length === 0) return;
-            const backup = {
-                timestamp: new Date().toISOString(),
-                items: allItems,
-                sideData: this._collectSideDataForBackup()
-            };
-            const backupJson = JSON.stringify(backup);
-            const MAX_BACKUPS = 20;
-            let backupList = [];
+    autoBackupBeforeSync() {
+        Promise.resolve().then(async () => {
             try {
-                backupList = JSON.parse(localStorage.getItem('dataBackups') || '[]');
-            } catch (e) { backupList = []; }
-            backupList.push({ ts: backup.timestamp, size: backupJson.length, data: backupJson });
-            if (backupList.length > MAX_BACKUPS) {
-                backupList = backupList.slice(backupList.length - MAX_BACKUPS);
+                const allItems = await db.getAllItems();
+                if (allItems.length === 0) return;
+                const backup = {
+                    timestamp: new Date().toISOString(),
+                    items: allItems,
+                    sideData: this._collectSideDataForBackup()
+                };
+                const backupJson = JSON.stringify(backup);
+                const MAX_BACKUPS = 20;
+                let backupList = [];
+                try {
+                    backupList = JSON.parse(localStorage.getItem('dataBackups') || '[]');
+                } catch (e) { backupList = []; }
+                backupList.push({ ts: backup.timestamp, size: backupJson.length, data: backupJson });
+                if (backupList.length > MAX_BACKUPS) {
+                    backupList = backupList.slice(backupList.length - MAX_BACKUPS);
+                }
+                localStorage.setItem('dataBackups', JSON.stringify(backupList.map(b => ({ ts: b.ts, size: b.size, data: b.data }))));
+            } catch (e) {
+                console.warn('自动备份失败:', e.message);
             }
-            localStorage.setItem('dataBackups', JSON.stringify(backupList.map(b => ({ ts: b.ts, size: b.size, data: b.data }))));
-        } catch (e) {
-            console.warn('自动备份失败:', e.message);
-        }
+        });
     }
 
     _collectSideDataForBackup() {
