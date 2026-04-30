@@ -350,26 +350,7 @@ body {
 }
 
 .todo-reminder-complete-btn {
-    flex-shrink: 0;
-    padding: 3px 10px;
-    border: 1px solid color-mix(in srgb, #ef4444 30%, var(--border-color));
-    border-radius: 999px;
-    background: color-mix(in srgb, #ef4444 10%, var(--bg-primary));
-    color: #ef4444;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s, transform 0.1s;
-}
-
-.todo-reminder-complete-btn:hover {
-    background: color-mix(in srgb, #ef4444 20%, var(--bg-primary));
-    transform: none;
-}
-
-.todo-reminder-complete-btn:active {
-    transform: scale(0.95);
+    display: none;
 }
 
 .todo-deadline {

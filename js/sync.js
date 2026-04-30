@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * 用户登录同步模块
  * 使用Supabase Auth实现账号密码登录和数据同步
  * 
@@ -1050,11 +1050,6 @@ class SyncManager {
             return { success: false, offline: true };
         }
 
-        if (this.isSyncing) {
-            return { success: false, skipped: true };
-        }
-
-        this.isSyncing = true;
         this.recordLocalModify();
 
         if (this.syncTimeout) {
@@ -1062,24 +1057,26 @@ class SyncManager {
             this.syncTimeout = null;
         }
 
-        let lastError = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                const result = await this.uploadToCloud();
-                if (result?.success) {
-                    this.isSyncing = false;
-                    return result;
+        this._pendingUpload = (async () => {
+            let lastError = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const result = await this.uploadToCloud();
+                    if (result?.success) {
+                        return result;
+                    }
+                    lastError = result?.error || '同步失败';
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                } catch (e) {
+                    lastError = e.message;
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
-                lastError = result?.error || '同步失败';
-                if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-            } catch (e) {
-                lastError = e.message;
-                if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
             }
-        }
-        this.isSyncing = false;
-        console.error('上传重试3次仍失败:', lastError);
-        return { success: false, error: lastError };
+            console.error('上传重试3次仍失败:', lastError);
+            return { success: false, error: lastError };
+        })();
+
+        return this._pendingUpload;
     }
 
     /**
@@ -1255,11 +1252,9 @@ class SyncManager {
             return { success: false, offline: true };
         }
 
-        if (this.isSyncing) {
-            return { success: false, skipped: true };
+        if (this._pendingUpload) {
+            try { await this._pendingUpload; } catch(e) {}
         }
-
-        this.isSyncing = true;
 
         try {
             const { data, error } = await this.supabase
@@ -1399,8 +1394,6 @@ class SyncManager {
         } catch (error) {
             console.error('静默下载异常:', error);
             return { success: false };
-        } finally {
-            this.isSyncing = false;
         }
     }
 
