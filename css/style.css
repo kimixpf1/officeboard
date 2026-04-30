@@ -332,6 +332,7 @@ body {
 }
 
 .countdown-notice.todo-reminder-active {
+    position: relative;
     border-color: color-mix(in srgb, #ef4444 48%, var(--warning-color));
     background: linear-gradient(135deg, color-mix(in srgb, #ef4444 12%, var(--bg-primary)), color-mix(in srgb, var(--warning-color) 24%, var(--bg-primary)));
 }
@@ -341,12 +342,20 @@ body {
     color: color-mix(in srgb, #ef4444 78%, var(--gray-800));
 }
 
-.countdown-notice.todo-reminder-active .countdown-notice-title,
+.countdown-notice.todo-reminder-active .countdown-notice-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    animation: marqueeScroll 6s linear infinite;
+}
+
 .countdown-notice.todo-reminder-active .countdown-notice-desc {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    line-height: 1.3;
+    display: none;
+}
+
+@keyframes marqueeScroll {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
 }
 
 .countdown-notice.todo-reminder-flashing {
@@ -359,7 +368,10 @@ body {
 }
 
 .todo-reminder-complete-btn {
-    flex-shrink: 0;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     padding: 2px 8px;
     border: 1px solid color-mix(in srgb, #ef4444 30%, var(--border-color));
     border-radius: 999px;
@@ -371,6 +383,7 @@ body {
     white-space: nowrap;
     transition: background 0.15s;
     line-height: 1.2;
+    z-index: 1;
 }
 
 .todo-reminder-complete-btn:hover {
