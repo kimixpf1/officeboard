@@ -612,11 +612,11 @@ class CalendarView {
                 this._scrollToTodayAfterRender = false;
                 const todayCell = container.querySelector('.week-cell.today');
                 if (todayCell) {
-                    todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    todayCell.scrollIntoView({ behavior: 'instant', block: 'start' });
                 }
             } else {
                 const scrollParent = this.container.closest('.calendar-view') || this.container;
-                scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+                scrollParent.scrollTo({ top: 0, behavior: 'instant' });
             }
         });
     }
@@ -728,12 +728,12 @@ class CalendarView {
                 this._scrollToTodayAfterRender = false;
                 const todayCell = container.querySelector('.month-cell.today');
                 if (todayCell) {
-                    todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    todayCell.scrollIntoView({ behavior: 'instant', block: 'start' });
                 }
             } else {
                 const selectedCell = container.querySelector('.selected-date');
                 if (selectedCell) {
-                    selectedCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    selectedCell.scrollIntoView({ behavior: 'instant', block: 'center' });
                 }
             }
         });
