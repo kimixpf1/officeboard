@@ -1,3 +1,63 @@
+## 2026-05-01 v5.2~v5.5
+
+### 本次目标
+- 修复周视图点击今天跳转闪烁问题
+- 让 today() 走与切换周完全一致的渲染路径，不添加额外滚动
+
+### 当前状态
+- ✅ v5.2：新增 `_scrollToTodayAfterRender` 标志，renderWeekView 末尾根据标志决定滚动目标
+- ✅ v5.3：将 `scrollIntoView` 的 `behavior` 从 `smooth` 改为 `instant`，减少动画过渡
+- ✅ v5.4：today 场景下改为同步执行 scrollIntoView，不用 requestAnimationFrame
+- ✅ v5.5：彻底去掉 `today()` 中多余的 `_scrollToTodayAfterRender` 和额外滚动逻辑，与切换周保持完全一致
+- ✅ 已将部署版本提升为 `2026-05-01 v5.5`
+- ✅ 已完成 node --check 与 diagnostics 0 错误
+- 🔄 待线上强刷验证
+
+### 本轮关键改动
+- calendar.js：`today()` 简化为只设 `currentDate` + `render()`，不再添加任何额外滚动
+- calendar.js：`renderWeekView` 和 `renderMonthView` 末尾去掉 `_scrollToTodayAfterRender` 分支，统一走原有滚动路径
+
+### 遗留事项
+- 待线上强刷验证周视图 today 与切换周行为一致
+
+## 2026-05-01 v5.1
+
+### 本次目标
+- 全面分析并优化项目性能卡顿点
+- 同步链路 O(n²)→O(n)、IndexedDB 串行→批量事务、定时器频率调优
+- 完成本地校验、提交推送与线上强刷复测
+
+### 当前状态
+- ✅ 已全面分析 31 个性能瓶颈，覆盖同步、DB、定时器、算法、网络等 8 个类别
+- ✅ 已将 `buildReconciledItems` 和 `syncLocalItemsToState` 从 O(n²) 降为 O(n)，用 Map 索引替代线性查找
+- ✅ 已在 `db.js` 新增 `batchPutItems`、`batchAddItems`、`batchDeleteItems` 批量事务方法
+- ✅ 已将 `syncLocalItemsToState`、`mergeData`、`checkMeetingAutoComplete` 从逐条串行写入改为批量事务写入
+- ✅ 已将 `smartSync` 中 `JSON.stringify` 全量比对改为基于更新时间的 Map 快速比对，避免大数组序列化
+- ✅ 已将定时同步从 10s 调整为 30s，减少网络和计算开销
+- ✅ 已将 `silentSyncFromCloud`、`syncFromCloud`、`syncToCloud` 中串行设置读写改为 `Promise.all` 并行
+- ✅ 已将部署版本提升为 `2026-05-01 v5.1`，资源版本提升到 `sync.js?v=51`、`app.js?v=154`、`db.js?v=26`
+- ✅ 已完成 `node --check js/db.js`、`node --check js/sync.js`、`node --check js/app.js`
+- ✅ 已完成 `db.js` / `sync.js` / `app.js` diagnostics 0 错误
+- ✅ 已提交推送 `37c0091` 到 `origin/main`
+- 🔄 待线上强刷验证
+
+### 本轮关键改动
+- db.js：新增 `batchPutItems`、`batchAddItems`、`batchDeleteItems` 三个单事务批量操作方法
+- sync.js：`buildReconciledItems` 和 `syncLocalItemsToState` 用 Map 索引替代 `findMatchingItem` 线性查找
+- sync.js：`syncLocalItemsToState` 改为先收集待写入项，再调用批量方法一次性写入
+- sync.js：`mergeData` 改为批量写入 + Map 索引查找替代串行 `putItem`/`addItem`
+- sync.js：`smartSync` 中 `JSON.stringify` 比对改为基于 `getItemUpdatedTime` 的 Map 快速比对
+- sync.js：`silentSyncFromCloud` 和 `syncFromCloud` 中串行 `setSetting` 改为 `Promise.all` 并行
+- sync.js：`syncToCloud` 中串行 `getSetting` 改为 `Promise.all` 并行读取
+- sync.js：定时同步从 10s 调整为 30s
+- app.js：`checkMeetingAutoComplete` 改为批量 `batchPutItems` + 一次 `immediateSyncToCloud`
+- index.html / app.js：版本提升到 `v5.1`
+
+### 遗留事项
+- 待线上强刷验证是否命中 `sync.js?v=51`、`app.js?v=154`、`db.js?v=26`
+- 待在真实登录/跨设备场景下验证同步速度提升
+- 待继续观察实时通道稳定性
+
 ## 2026-04-29 v4.65
 
 ### 本次目标
