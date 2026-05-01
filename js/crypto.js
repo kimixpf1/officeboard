@@ -14,7 +14,18 @@ class CryptoManager {
      */
     async getMasterKey() {
         if (this.masterKey) return this.masterKey;
+        if (this._masterKeyPromise) return this._masterKeyPromise;
 
+        this._masterKeyPromise = this._loadOrGenerateMasterKey();
+        try {
+            return await this._masterKeyPromise;
+        } catch (e) {
+            this._masterKeyPromise = null;
+            throw e;
+        }
+    }
+
+    async _loadOrGenerateMasterKey() {
         try {
             let storedKey = await db.getSetting('crypto_master_key');
 

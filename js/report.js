@@ -319,7 +319,16 @@ class ReportGenerator {
         document.body.appendChild(container);
 
         try {
-            // 使用html2canvas生成图片
+            if (typeof html2canvas === 'undefined') {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('图片导出组件加载失败，请检查网络'));
+                    document.head.appendChild(script);
+                });
+            }
+
             const canvas = await html2canvas(container, {
                 scale: 2, // 高清
                 useCORS: true,
@@ -360,15 +369,19 @@ class ReportGenerator {
                 const dateStr = formatLocalDate(date);
                 return { start: dateStr, end: dateStr };
 
-            case 'weekly':
-                const dayOfWeek = date.getDay();
-                const diff = date.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-                const weekStart = new Date(date.setDate(diff));
-                const weekEnd = new Date(date.setDate(weekStart.getDate() + 6));
+            case 'weekly': {
+                const d = new Date(date);
+                const dayOfWeek = d.getDay();
+                const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                d.setDate(diff);
+                const weekStart = new Date(d);
+                d.setDate(d.getDate() + 6);
+                const weekEnd = new Date(d);
                 return {
                     start: formatLocalDate(weekStart),
                     end: formatLocalDate(weekEnd)
                 };
+            }
 
             case 'monthly':
                 const monthStart = new Date(year, month, 1);

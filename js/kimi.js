@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿/**
  * Kimi API 集成模块
  * 支持 Kimi Code API
  */
@@ -333,10 +333,10 @@ class KimiAPI {
                 data.completed = data.completed || false;
                 break;
             case 'meeting':
-                data.attendees = Array.isArray(data.attendees) ? data.attendees : [];
                 if (typeof data.attendees === 'string') {
                     data.attendees = data.attendees.split(/[,，、]/).map(s => s.trim()).filter(Boolean);
                 }
+                data.attendees = Array.isArray(data.attendees) ? data.attendees : [];
                 break;
             case 'document':
                 data.progress = data.progress || 'pending';

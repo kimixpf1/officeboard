@@ -2253,7 +2253,7 @@ class SyncManager {
 
     _collectSideDataForBackup() {
         const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
-            'countdownEvents', 'countdownTypeColors', 'countdownSortOrder',
+            'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
             'office_weather_city', 'theme'];
         const result = {};
         for (const k of keys) {

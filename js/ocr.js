@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -1825,21 +1825,30 @@ class OCRManager {
         return typeof Tesseract !== 'undefined';
     }
 
-    /**
-     * 初始化OCR引擎
-     */
+    async _ensureTesseractLoaded(progressCallback) {
+        if (this.isTesseractLoaded()) return;
+
+        if (progressCallback) progressCallback('正在下载OCR引擎（首次约3MB）...');
+
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('OCR引擎下载失败，请检查网络连接'));
+            document.head.appendChild(script);
+        });
+    }
+
     async init(progressCallback = null) {
         if (this.isInitialized) return;
 
         try {
-            if (progressCallback) progressCallback('正在加载OCR引擎...');
+            await this._ensureTesseractLoaded(progressCallback);
 
-            // 检查Tesseract是否可用
             if (!this.isTesseractLoaded()) {
                 throw new Error('OCR引擎未加载，请检查网络连接或刷新页面重试');
             }
 
-            // 使用静态方法，不需要创建worker
             this.isInitialized = true;
 
             if (progressCallback) progressCallback('OCR引擎就绪');

@@ -693,7 +693,8 @@ class CalendarView {
             const cellDiv = document.createElement('div');
             cellDiv.className = `month-cell${isToday ? ' today' : ''}${sortedItems.length === 0 ? ' empty-cell' : ''}${dateStr === selectedStr ? ' selected-date' : ''}`;
             const fullDateLabel = `${month + 1}月${day}日 周${weekDays[(startDayOfWeek - 1 + day - 1) % 7]}`;
-            cellDiv.dataset.date = fullDateLabel;
+            cellDiv.dataset.date = dateStr;
+            cellDiv.title = fullDateLabel;
             this.bindQuickAddEvents(cellDiv, dateStr);
             cellDiv.appendChild(this.createCellTopBar(dateStr, `${month + 1}月${day}日`));
 
