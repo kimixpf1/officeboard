@@ -1461,6 +1461,8 @@ body {
     overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: var(--gray-400) transparent;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .week-cell::-webkit-scrollbar {
@@ -1520,6 +1522,8 @@ body {
     overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: var(--gray-400) transparent;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .month-cell::-webkit-scrollbar {

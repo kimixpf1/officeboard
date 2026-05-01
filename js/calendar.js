@@ -170,6 +170,7 @@ class CalendarView {
      */
     today() {
         this.currentDate = new Date();
+        this.lastRenderSignature = null;
         this.render();
     }
 
