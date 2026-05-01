@@ -609,10 +609,7 @@ class CalendarView {
 
         if (this._scrollToTodayAfterRender) {
             this._scrollToTodayAfterRender = false;
-            const todayCell = container.querySelector('.week-cell.today');
-            if (todayCell) {
-                todayCell.scrollIntoView({ behavior: 'instant', block: 'start' });
-            }
+            this.container.scrollIntoView({ behavior: 'instant', block: 'start' });
         } else {
             requestAnimationFrame(() => {
                 const scrollParent = this.container.closest('.calendar-view') || this.container;
@@ -725,10 +722,7 @@ class CalendarView {
 
         if (this._scrollToTodayAfterRender) {
             this._scrollToTodayAfterRender = false;
-            const todayCell = container.querySelector('.month-cell.today');
-            if (todayCell) {
-                todayCell.scrollIntoView({ behavior: 'instant', block: 'start' });
-            }
+            this.container.scrollIntoView({ behavior: 'instant', block: 'start' });
         } else {
             requestAnimationFrame(() => {
                 const selectedCell = container.querySelector('.selected-date');
