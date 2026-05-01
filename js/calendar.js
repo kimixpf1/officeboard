@@ -170,15 +170,8 @@ class CalendarView {
      */
     today() {
         this.currentDate = new Date();
+        this._scrollToTodayAfterRender = true;
         this.render();
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                const todayCell = this.container.querySelector('.week-cell.today, .month-day.today');
-                if (todayCell) {
-                    todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            });
-        });
     }
 
     /**
@@ -615,8 +608,16 @@ class CalendarView {
         this.container.replaceChildren(container);
 
         requestAnimationFrame(() => {
-            const scrollParent = this.container.closest('.calendar-view') || this.container;
-            scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+            if (this._scrollToTodayAfterRender) {
+                this._scrollToTodayAfterRender = false;
+                const todayCell = container.querySelector('.week-cell.today');
+                if (todayCell) {
+                    todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                const scrollParent = this.container.closest('.calendar-view') || this.container;
+                scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         });
     }
 
@@ -723,9 +724,17 @@ class CalendarView {
         this.container.replaceChildren(container);
 
         requestAnimationFrame(() => {
-            const selectedCell = container.querySelector('.selected-date');
-            if (selectedCell) {
-                selectedCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (this._scrollToTodayAfterRender) {
+                this._scrollToTodayAfterRender = false;
+                const todayCell = container.querySelector('.month-cell.today');
+                if (todayCell) {
+                    todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                const selectedCell = container.querySelector('.selected-date');
+                if (selectedCell) {
+                    selectedCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }
         });
     }
