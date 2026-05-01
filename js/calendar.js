@@ -171,6 +171,7 @@ class CalendarView {
     today() {
         this.currentDate = new Date();
         this.lastRenderSignature = null;
+        this._scrollToToday = true;
         this.render();
     }
 
@@ -608,6 +609,14 @@ class CalendarView {
         this.container.replaceChildren(container);
 
         requestAnimationFrame(() => {
+            if (this._scrollToToday) {
+                this._scrollToToday = false;
+                const todayCell = container.querySelector('.today');
+                if (todayCell) {
+                    todayCell.scrollIntoView({ behavior: 'instant', block: 'center' });
+                    return;
+                }
+            }
             const scrollParent = this.container.closest('.calendar-view') || this.container;
             scrollParent.scrollTo({ top: 0, behavior: 'instant' });
         });
@@ -717,6 +726,14 @@ class CalendarView {
         this.container.replaceChildren(container);
 
         requestAnimationFrame(() => {
+            if (this._scrollToToday) {
+                this._scrollToToday = false;
+                const todayCell = container.querySelector('.today');
+                if (todayCell) {
+                    todayCell.scrollIntoView({ behavior: 'instant', block: 'center' });
+                    return;
+                }
+            }
             const selectedCell = container.querySelector('.selected-date');
             if (selectedCell) {
                 selectedCell.scrollIntoView({ behavior: 'instant', block: 'center' });

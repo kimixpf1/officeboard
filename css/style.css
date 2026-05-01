@@ -2831,7 +2831,8 @@ body {
     }
 
     .month-cell.empty-cell {
-        display: none;
+        min-height: 60px;
+        background: var(--gray-50);
     }
 
     .month-cell.today {
