@@ -107,7 +107,7 @@ class OfficeDateViewController {
         this.updateDateDisplay();
     }
 
-    goToToday() {
+    async goToToday() {
         const todayDate = this.app.formatDateLocal(new Date());
         this.app.currentDate = new Date();
 
@@ -118,7 +118,7 @@ class OfficeDateViewController {
 
         this.app.selectedDate = todayDate;
         if (window.calendarView) {
-            window.calendarView.today();
+            await window.calendarView.today();
         }
 
         this.updateDateDisplay();

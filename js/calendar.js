@@ -168,11 +168,11 @@ class CalendarView {
     /**
      * 回到今天
      */
-    today() {
+    async today() {
         this.currentDate = new Date();
         this.lastRenderSignature = null;
         this._scrollToToday = true;
-        this.render();
+        await this.render();
     }
 
     /**
