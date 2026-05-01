@@ -10,6 +10,27 @@ class CalendarView {
         this.container = document.getElementById('calendarContainer');
         this.lastRenderSignature = '';
         this.lastRenderAt = 0;
+        this._forceRender = false;
+    }
+
+    parseLocalDate(dateStr) {
+        if (dateStr instanceof Date) return new Date(dateStr);
+        const parts = String(dateStr).split('-');
+        if (parts.length === 3) {
+            return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        }
+        return new Date(dateStr);
+    }
+
+    safeReplaceChildren(newChild) {
+        if (this.container.replaceChildren) {
+            this.container.replaceChildren(newChild);
+        } else {
+            while (this.container.firstChild) {
+                this.container.removeChild(this.container.firstChild);
+            }
+            this.container.appendChild(newChild);
+        }
     }
 
     getDashboardApp() {
@@ -103,6 +124,12 @@ class CalendarView {
     }
 
     shouldSkipRender() {
+        if (this._forceRender) {
+            this._forceRender = false;
+            this.lastRenderSignature = '';
+            this.lastRenderAt = 0;
+            return false;
+        }
         const signature = `${this.currentView}:${this.formatLocalDate(this.currentDate)}`;
         const now = Date.now();
 
@@ -119,7 +146,7 @@ class CalendarView {
      * 设置当前日期
      */
     setDate(date, shouldRender = true) {
-        this.currentDate = new Date(date);
+        this.currentDate = this.parseLocalDate(date);
         if (shouldRender) {
             this.render();
         }
@@ -201,7 +228,7 @@ class CalendarView {
      * 获取周开始日期（周一）
      */
     getWeekStart(date) {
-        const d = new Date(date);
+        const d = date instanceof Date ? new Date(date) : this.parseLocalDate(date);
         const day = d.getDay();
         const diff = d.getDate() - day + (day === 0 ? -6 : 1);
         return new Date(d.setDate(diff));
@@ -248,7 +275,7 @@ class CalendarView {
                 errorEl.style.padding = '40px';
                 errorEl.style.color = '#666';
                 errorEl.textContent = '加载日历失败，请刷新重试';
-                this.container.replaceChildren(errorEl);
+                this.safeReplaceChildren(errorEl);
             }
         }
     }
@@ -606,7 +633,7 @@ class CalendarView {
             container.appendChild(cellDiv);
         }
 
-        this.container.replaceChildren(container);
+        this.safeReplaceChildren(container);
 
         requestAnimationFrame(() => {
             if (this._scrollToToday) {
@@ -723,7 +750,7 @@ class CalendarView {
             container.appendChild(emptyDiv);
         }
 
-        this.container.replaceChildren(container);
+        this.safeReplaceChildren(container);
 
         requestAnimationFrame(() => {
             if (this._scrollToToday) {
