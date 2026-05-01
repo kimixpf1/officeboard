@@ -6960,8 +6960,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-04-30 v4.73';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=29', 'sync.js?v=50', 'app-date-view.js?v=10', 'app.js?v=153', 'db.js?v=25', 'style.css?v=57', 'crypto.js?v=16'];
+        const version = '2026-05-01 v5.1';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=35', 'upload-flow.js?v=6', 'calendar.js?v=29', 'sync.js?v=51', 'app-date-view.js?v=10', 'app.js?v=154', 'db.js?v=26', 'style.css?v=57', 'crypto.js?v=16'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -8737,11 +8737,12 @@ class OfficeDashboard {
             const now = new Date();
             const allItems = await db.getAllItems();
             const todayStr = this.formatDateLocal(now);
-            let hasNewCompleted = false;
 
             const incompleteMeetings = allItems.filter(item =>
                 item.type === ITEM_TYPES.MEETING && !item.completed
             );
+
+            const batchUpdates = [];
 
             for (const meeting of incompleteMeetings) {
                 let shouldComplete = false;
@@ -8787,16 +8788,15 @@ class OfficeDashboard {
                 }
 
                 if (shouldComplete && updatePayload) {
-                    await db.updateItem(meeting.id, updatePayload);
-                    hasNewCompleted = true;
-
-                    if (syncManager.isLoggedIn()) {
-                        await syncManager.immediateSyncToCloud();
-                    }
+                    batchUpdates.push({ ...meeting, ...updatePayload, updatedAt: now.toISOString() });
                 }
             }
 
-            if (hasNewCompleted) {
+            if (batchUpdates.length > 0) {
+                await db.batchPutItems(batchUpdates);
+                if (syncManager.isLoggedIn()) {
+                    syncManager.immediateSyncToCloud();
+                }
                 await this.loadItems();
             }
         } catch (error) {

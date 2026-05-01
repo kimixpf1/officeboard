@@ -127,13 +127,19 @@ class SyncManager {
         const reconciledItems = [];
         const matchedLocalKeys = new Set();
 
+        const localKeyMap = new Map();
+        for (const li of normalizedLocalItems) {
+            const k = this.getItemKey(li);
+            if (!localKeyMap.has(k)) localKeyMap.set(k, li);
+        }
+
         for (const cloudItem of normalizedCloudItems) {
             const cloudKey = this.getItemKey(cloudItem);
             if (this.shouldKeepDeleted(cloudItem)) {
                 continue;
             }
 
-            const localMatch = this.findMatchingItem(normalizedLocalItems, cloudItem);
+            const localMatch = localKeyMap.get(cloudKey) || null;
             if (!localMatch) {
                 reconciledItems.push({ ...cloudItem });
                 matchedLocalKeys.add(cloudKey);
@@ -174,28 +180,50 @@ class SyncManager {
     async syncLocalItemsToState(targetItems, currentLocalItems = null) {
         const existingLocalItems = Array.isArray(currentLocalItems) ? currentLocalItems : await db.getAllItems();
         const targetList = Array.isArray(targetItems) ? targetItems.filter(item => !this.shouldKeepDeleted(item)) : [];
+
+        const localKeyMap = new Map();
+        for (const li of existingLocalItems) {
+            const k = this.getItemKey(li);
+            if (!localKeyMap.has(k)) localKeyMap.set(k, li);
+        }
+
         const keptLocalIds = new Set();
+        const itemsToPut = [];
+        const itemsToAdd = [];
 
         for (const targetItem of targetList) {
-            const localMatch = this.findMatchingItem(existingLocalItems, targetItem);
+            const localMatch = localKeyMap.get(this.getItemKey(targetItem));
             if (localMatch) {
-                await db.putItem({ ...targetItem, id: localMatch.id });
+                itemsToPut.push({ ...targetItem, id: localMatch.id });
                 this.clearDeletedMarker(localMatch);
                 this.clearDeletedMarker(targetItem);
                 keptLocalIds.add(String(localMatch.id));
             } else {
                 const { id, ...itemData } = targetItem;
-                const addedId = await db.addItem(itemData);
+                itemsToAdd.push(itemData);
                 this.clearDeletedMarker(targetItem);
-                keptLocalIds.add(String(addedId));
             }
         }
 
+        if (itemsToPut.length > 0) {
+            await db.batchPutItems(itemsToPut);
+            for (const item of itemsToPut) keptLocalIds.add(String(item.id));
+        }
+
+        if (itemsToAdd.length > 0) {
+            const addedIds = await db.batchAddItems(itemsToAdd);
+            for (const aid of addedIds) keptLocalIds.add(String(aid));
+        }
+
+        const toDelete = [];
         for (const localItem of existingLocalItems) {
             if (!keptLocalIds.has(String(localItem.id))) {
                 this.markItemDeleted(localItem);
-                await db.deleteItem(localItem.id);
+                toDelete.push(localItem.id);
             }
+        }
+        if (toDelete.length > 0) {
+            await db.batchDeleteItems(toDelete);
         }
     }
 
@@ -473,7 +501,13 @@ class SyncManager {
                         cloudItems,
                         this.getTimeMs(this.lastCloudSyncTime)
                     );
-                    const localChanged = JSON.stringify(this.deduplicateItems(localItems)) !== JSON.stringify(reconciledItems);
+                    const localTimeMap = new Map();
+                    for (const li of localItems) localTimeMap.set(this.getItemKey(li), this.getItemUpdatedTime(li));
+                    const localChanged = reconciledItems.length !== localItems.length
+                        || reconciledItems.some(r => {
+                            const localTime = localTimeMap.get(this.getItemKey(r));
+                            return localTime === undefined || this.getItemUpdatedTime(r) !== localTime;
+                        });
 
                     if (localChanged) {
                         await this.syncLocalItemsToState(reconciledItems, localItems);
@@ -839,23 +873,29 @@ class SyncManager {
             const mergedItems = Array.from(mergedMap.values());
 
 
-            // 保存合并后的数据（使用 putItem 保留 ID）
+            // 保存合并后的数据（使用批量写入）
             const backupItems = localItems.slice();
             let savedCount = 0;
             const saveErrors = [];
             const processedHashes = new Set();
 
+            const backupHashMap = new Map();
+            for (const b of backupItems) {
+                if (b.hash) backupHashMap.set(b.hash, b);
+            }
+
+            const itemsToPut = [];
+            const itemsToAdd = [];
+
             for (const item of mergedItems) {
                 try {
                     const { id, source, ...itemData } = item;
-                    const existing = backupItems.find(b => b.hash === itemData.hash);
+                    const existing = backupHashMap.get(itemData.hash);
                     if (existing) {
-                        const mergedItem = { ...existing, ...itemData, id: existing.id };
-                        await db.putItem(mergedItem);
+                        itemsToPut.push({ ...existing, ...itemData, id: existing.id });
                         processedHashes.add(existing.hash);
                     } else {
-                        const added = await db.addItem(itemData);
-                        if (added && added.hash) processedHashes.add(added.hash);
+                        itemsToAdd.push(itemData);
                     }
                     savedCount++;
                 } catch (e) {
@@ -863,6 +903,9 @@ class SyncManager {
                     saveErrors.push(e);
                 }
             }
+
+            if (itemsToPut.length > 0) await db.batchPutItems(itemsToPut);
+            if (itemsToAdd.length > 0) await db.batchAddItems(itemsToAdd);
 
             if (savedCount === 0 && backupItems.length > 0 && saveErrors.length > 0) {
                 return { success: false, error: '合并保存失败' };
@@ -1095,7 +1138,7 @@ class SyncManager {
             if (this.isLoggedIn() && !this.isSyncing) {
                 await this.smartSync();
             }
-        }, 10000);
+        }, 30000);
     }
 
     /**
@@ -1273,31 +1316,33 @@ class SyncManager {
             // 同步设置
             if (data.data.settings) {
                 const settings = data.data.settings;
+                const settingWrites = [];
                 if (settings.kimi_api_key) {
-                    await db.setSetting('kimi_api_key', settings.kimi_api_key);
+                    settingWrites.push(db.setSetting('kimi_api_key', settings.kimi_api_key));
                     SafeStorage.set('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
-                    await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
+                    settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
                 }
                 if (settings.deepseek_api_key) {
-                    await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
+                    settingWrites.push(db.setSetting('deepseek_api_key', settings.deepseek_api_key));
                     SafeStorage.set('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
-                    await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
+                    settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
                 }
                 if (settings.qweather_api_key_encrypted) {
-                    await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                    settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
                     SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
                 }
                 if (typeof settings.qweather_api_key_set !== 'undefined') {
-                    await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                    settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
                     SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
                 }
                 if (settings.crypto_master_key) {
                     SafeStorage.set('crypto_master_key', settings.crypto_master_key);
                 }
+                if (settingWrites.length > 0) await Promise.all(settingWrites);
             }
 
             // 同步备忘录
@@ -1631,12 +1676,14 @@ class SyncManager {
 
             // 获取设置数据（包括API Key）
             const settings = {};
-        const kimiKey = await db.getSetting('kimi_api_key');
-        const kimiKeySet = await db.getSetting('kimi_api_key_set');
-        const deepseekKey = await db.getSetting('deepseek_api_key');
-        const deepseekKeySet = await db.getSetting('deepseek_api_key_set');
-        const qweatherKeyEncrypted = await db.getSetting('qweather_api_key_encrypted');
-        const qweatherKeySet = await db.getSetting('qweather_api_key_set');
+        const [kimiKey, kimiKeySet, deepseekKey, deepseekKeySet, qweatherKeyEncrypted, qweatherKeySet] = await Promise.all([
+            db.getSetting('kimi_api_key'),
+            db.getSetting('kimi_api_key_set'),
+            db.getSetting('deepseek_api_key'),
+            db.getSetting('deepseek_api_key_set'),
+            db.getSetting('qweather_api_key_encrypted'),
+            db.getSetting('qweather_api_key_set')
+        ]);
         const cryptoMasterKey = SafeStorage.get('crypto_master_key');
 
         if (kimiKey) settings.kimi_api_key = kimiKey;
@@ -1730,26 +1777,28 @@ class SyncManager {
             // 同步设置数据（API Key等）
             if (data.data.settings) {
                 const settings = data.data.settings;
+                const settingWrites = [];
                 if (settings.kimi_api_key) {
-                    await db.setSetting('kimi_api_key', settings.kimi_api_key);
+                    settingWrites.push(db.setSetting('kimi_api_key', settings.kimi_api_key));
                     SafeStorage.set('kimiApiKey', settings.kimi_api_key);
                 }
                 if (settings.kimi_api_key_set) {
-                    await db.setSetting('kimi_api_key_set', settings.kimi_api_key_set);
+                    settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
                 }
                 if (settings.deepseek_api_key) {
-                    await db.setSetting('deepseek_api_key', settings.deepseek_api_key);
+                    settingWrites.push(db.setSetting('deepseek_api_key', settings.deepseek_api_key));
                     SafeStorage.set('deepseekApiKey', settings.deepseek_api_key);
                 }
                 if (settings.deepseek_api_key_set) {
-                    await db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set);
+                    settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
                 }
                 if (settings.qweather_api_key_encrypted) {
-                    await db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted);
+                    settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
                 }
                 if (settings.qweather_api_key_set) {
-                    await db.setSetting('qweather_api_key_set', settings.qweather_api_key_set);
+                    settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
                 }
+                if (settingWrites.length > 0) await Promise.all(settingWrites);
             }
 
             // 同步备忘录

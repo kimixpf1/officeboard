@@ -608,6 +608,97 @@ class Database {
             transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'deleteItemsByHashes失败');
         });
     }
+
+    async batchPutItems(items) {
+        if (!items || items.length === 0) return;
+        const db = await this.init();
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORES.ITEMS, 'readwrite');
+            const store = transaction.objectStore(STORES.ITEMS);
+            for (const item of items) {
+                const normalizedItem = this.normalizeItemForStorage(item);
+                normalizedItem.hash = this.generateHash(normalizedItem);
+                store.put(normalizedItem);
+            }
+            transaction.oncomplete = () => {
+                this.resetItemsCache();
+                resolve();
+            };
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'batchPutItems失败');
+        });
+    }
+
+    async batchAddItems(itemsData) {
+        if (!itemsData || itemsData.length === 0) return [];
+        const db = await this.init();
+        const addedIds = [];
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORES.ITEMS, 'readwrite');
+            const store = transaction.objectStore(STORES.ITEMS);
+            const hashIndex = store.index('hash');
+
+            const pendingChecks = itemsData.length;
+            let checked = 0;
+
+            for (const itemData of itemsData) {
+                const normalizedItem = this.normalizeItemForStorage(itemData);
+                normalizedItem.hash = this.generateHash(normalizedItem);
+                if (!normalizedItem.createdAt) {
+                    normalizedItem.createdAt = new Date().toISOString();
+                }
+                if (!normalizedItem.updatedAt) {
+                    normalizedItem.updatedAt = normalizedItem.createdAt;
+                }
+
+                const checkReq = hashIndex.get(normalizedItem.hash);
+                checkReq.onsuccess = () => {
+                    if (checkReq.result) {
+                        const existing = checkReq.result;
+                        if (normalizedItem.recurringGroupId && existing.recurringGroupId === normalizedItem.recurringGroupId) {
+                            addedIds.push(existing.id);
+                        } else {
+                            normalizedItem.hash = normalizedItem.hash + '_' + Date.now();
+                            const addReq = store.add(normalizedItem);
+                            addReq.onsuccess = () => addedIds.push(addReq.result);
+                        }
+                    } else {
+                        const addReq = store.add(normalizedItem);
+                        addReq.onsuccess = () => addedIds.push(addReq.result);
+                    }
+                    checked++;
+                };
+                checkReq.onerror = () => {
+                    checked++;
+                };
+            }
+
+            transaction.oncomplete = () => {
+                this.resetItemsCache();
+                resolve(addedIds);
+            };
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'batchAddItems失败');
+        });
+    }
+
+    async batchDeleteItems(ids) {
+        if (!ids || ids.length === 0) return;
+        const db = await this.init();
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORES.ITEMS, 'readwrite');
+            const store = transaction.objectStore(STORES.ITEMS);
+            for (const id of ids) {
+                store.delete(id);
+            }
+            transaction.oncomplete = () => {
+                this.resetItemsCache();
+                resolve();
+            };
+            transaction.onerror = () => this._rejectWithLog(reject, transaction.error, 'batchDeleteItems失败');
+        });
+    }
 }
 
 const db = new Database();
