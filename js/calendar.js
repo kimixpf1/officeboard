@@ -638,7 +638,7 @@ class CalendarView {
         requestAnimationFrame(() => {
             if (this._scrollToToday) {
                 this._scrollToToday = false;
-                const todayCell = container.querySelector('.today');
+                const todayCell = container.querySelector('.week-cell.today');
                 if (todayCell) {
                     todayCell.scrollIntoView({ behavior: 'instant', block: 'center' });
                     return;
@@ -755,7 +755,7 @@ class CalendarView {
         requestAnimationFrame(() => {
             if (this._scrollToToday) {
                 this._scrollToToday = false;
-                const todayCell = container.querySelector('.today');
+                const todayCell = container.querySelector('.month-cell.today');
                 if (todayCell) {
                     todayCell.scrollIntoView({ behavior: 'instant', block: 'center' });
                     return;

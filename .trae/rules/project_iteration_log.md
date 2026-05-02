@@ -1,26 +1,28 @@
-## 2026-05-01 v5.2~v5.5
+## 2026-05-01 v5.12
 
 ### 本次目标
-- 修复周视图点击今天跳转闪烁问题
-- 让 today() 走与切换周完全一致的渲染路径，不添加额外滚动
+- 修复周视图点击“今天”在移动端误命中隐藏表头的问题
+- 让周视图和月视图的 today 滚动目标都精确落到日期单元格
+- 完成本地模拟测试、推送部署与线上强刷验证
 
 ### 当前状态
-- ✅ v5.2：新增 `_scrollToTodayAfterRender` 标志，renderWeekView 末尾根据标志决定滚动目标
-- ✅ v5.3：将 `scrollIntoView` 的 `behavior` 从 `smooth` 改为 `instant`，减少动画过渡
-- ✅ v5.4：today 场景下改为同步执行 scrollIntoView，不用 requestAnimationFrame
-- ✅ v5.5：彻底去掉 `today()` 中多余的 `_scrollToTodayAfterRender` 和额外滚动逻辑，与切换周保持完全一致
-- ✅ 已将部署版本提升为 `2026-05-01 v5.5`
-- ✅ 已完成 node --check 与 diagnostics 0 错误
-- 🔄 待线上强刷验证
+- ✅ 已将周视图 today 滚动目标收敛到 `.week-cell.today`
+- ✅ 已将月视图 today 滚动目标收敛到 `.month-cell.today`
+- ✅ 已完成 `node --check js/calendar.js`、`node --check js/app.js`、`node --check js/app-date-view.js`
+- ✅ 已完成本地移动端模拟测试，周/月视图 today 均可正确滚动，月视图天数完整
+- 🔄 待提交推送与线上强刷验证
 
 ### 本轮关键改动
-- calendar.js：`today()` 简化为只设 `currentDate` + `render()`，不再添加任何额外滚动
-- calendar.js：`renderWeekView` 和 `renderMonthView` 末尾去掉 `_scrollToTodayAfterRender` 分支，统一走原有滚动路径
+- calendar.js：周视图 today 滚动从泛化 `.today` 改为精确 `.week-cell.today`
+- calendar.js：月视图 today 滚动从选中项逻辑改为精确 `.month-cell.today`
+- index.html / app.js：部署版本提升到 `2026-05-01 v5.12`，资源版本同步更新
 
 ### 遗留事项
-- 待线上强刷验证周视图 today 与切换周行为一致
+- 待提交并推送到 `origin/main`
+- 待线上强刷确认版本号与资源版本命中 `v5.12`
+- 待线上复测周视图与月视图的今天按钮跳转是否稳定
 
-## 2026-05-01 v5.1
+
 
 ### 本次目标
 - 全面分析并优化项目性能卡顿点
