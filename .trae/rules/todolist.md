@@ -1,20 +1,27 @@
 # Todolist
 
 ## 当前轮次目标
-- 继续修复并验证周视图“今天”按钮在移动端/线上页面的跳转问题
-- 确认本地与线上版本号一致且缓存已更新
-- 完成本地校验、线上强刷复测与结果记录
+- 修复周视图"今天"按钮在移动端误命中隐藏表头的问题
+- 完成本地校验、推送部署与线上验证
 
-## 当前待办
-- 待在线上强刷验证 `https://kimixpf1.github.io/officeboard/` 命中 `v5.12`
-- 待确认周视图点击“今天”能滚动到 `.week-cell.today`
-- 待确认月视图点击“今天”能滚动到 `.month-cell.today`
-
-## 已完成（本轮 v5.12）
+## 已完成（v5.12）
 - ✅ 修复周视图今天按钮误命中 `.week-header.today` 的滚动目标问题
 - ✅ 收敛周视图 today 滚动到 `.week-cell.today`
 - ✅ 收敛月视图 today 滚动到 `.month-cell.today`
 - ✅ 版本号提升到 v5.12
+- ✅ node --check / diagnostics 全部 0 错误
+- ✅ 本地移动端模拟测试通过
+- ✅ 已提交推送 `d96239b` + 文档修正 `a81ecdf` 到 origin/main
+- ✅ 通过 GitHub API 确认远程 calendar.js 包含 `.week-cell.today` 和 `.month-cell.today`
+- ✅ 通过 GitHub API 确认远程 app.js 包含 `2026-05-01 v5.12`
+- ✅ 通过 GitHub API 确认远程 index.html 引用 `calendar.js?v=38` 和 `app.js?v=160`
+
+## 待用户线上验证
+- 在浏览器强刷 `https://kimixpf1.github.io/officeboard/`（Ctrl+Shift+R）
+- 确认页面右下角版本号显示 `2026-05-01 v5.12`
+- 切到周视图，点击"今天"按钮，确认滚动到今天日期框
+- 切到月视图，点击"今天"按钮，确认滚动到今天日期框
+- 手机端（窄屏）重复上述周/月视图测试
 
 ## 后续优化计划（待执行）
 - 第二阶段：数据安全加固（getStore 事务保护、restoreFromBackup 事务性、deletedItemsMap 容量保护）

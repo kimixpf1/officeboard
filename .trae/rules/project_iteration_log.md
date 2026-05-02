@@ -10,17 +10,29 @@
 - ✅ 已将月视图 today 滚动目标收敛到 `.month-cell.today`
 - ✅ 已完成 `node --check js/calendar.js`、`node --check js/app.js`、`node --check js/app-date-view.js`
 - ✅ 已完成本地移动端模拟测试，周/月视图 today 均可正确滚动，月视图天数完整
-- 🔄 待提交推送与线上强刷验证
+- ✅ 代码安全审查通过：纯 UI 滚动修改，无数据/安全风险
+- ✅ 已提交推送 `d96239b` + 文档修正 `a81ecdf` 到 `origin/main`
+- ✅ 通过 GitHub API 确认远程仓库 calendar.js / app.js / index.html 均已更新
+
+### 验证结果
+- `node --check js/calendar.js` 通过
+- `node --check js/app.js` 通过
+- `node --check js/app-date-view.js` 通过
+- calendar.js / app.js / app-date-view.js diagnostics 0 错误
+- 本地移动端模拟测试通过：周视图 `.week-cell.today`、月视图 `.month-cell.today`、月视图天数完整
 
 ### 本轮关键改动
 - calendar.js：周视图 today 滚动从泛化 `.today` 改为精确 `.week-cell.today`
 - calendar.js：月视图 today 滚动从选中项逻辑改为精确 `.month-cell.today`
 - index.html / app.js：部署版本提升到 `2026-05-01 v5.12`，资源版本同步更新
 
+### 提交记录
+- `d96239b` fix: refine today scroll targets
+- `a81ecdf` docs: update v5.12 iteration log
+
 ### 遗留事项
-- 待提交并推送到 `origin/main`
-- 待线上强刷确认版本号与资源版本命中 `v5.12`
-- 待线上复测周视图与月视图的今天按钮跳转是否稳定
+- 待用户线上强刷确认版本号显示 `2026-05-01 v5.12`
+- 待用户线上复测周视图与月视图的今天按钮跳转是否稳定
 
 ## 2026-05-01 v5.1
 
