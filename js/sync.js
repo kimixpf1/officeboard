@@ -68,6 +68,31 @@ class SyncManager {
         SafeStorage.set(this.deletedItemsKey, JSON.stringify(this.deletedItemsMap || {}));
     }
 
+    async _restoreSettingsFromCloud(settings) {
+        if (!settings) return;
+        const settingWrites = [];
+        if (settings.kimi_api_key_encrypted) { settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted)); }
+        if (settings.kimi_api_key_set) { settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set)); }
+        if (settings.kimi_api_key) { settingWrites.push(db.setSetting('kimi_api_key', null)); }
+        if (settings.deepseek_api_key_encrypted) { settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted)); }
+        if (settings.deepseek_api_key_set) { settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set)); }
+        if (settings.deepseek_api_key) { settingWrites.push(db.setSetting('deepseek_api_key', null)); }
+        if (settings.qweather_api_key_encrypted) {
+            settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
+            SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
+        }
+        if (typeof settings.qweather_api_key_set !== 'undefined') {
+            settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
+            SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
+        }
+        if (settings.crypto_master_key) { SafeStorage.set('crypto_master_key', settings.crypto_master_key); }
+        if (settingWrites.length > 0) await Promise.all(settingWrites);
+        if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
+            await ocrManager.loadApiKeysFromDB();
+            if (typeof app !== 'undefined' && typeof app.updateApiKeyStatus === 'function') { app.updateApiKeyStatus(); }
+        }
+    }
+
     _cleanupDeletedItemsMap() {
         if (!this.deletedItemsMap || typeof this.deletedItemsMap !== 'object') return;
         const now = Date.now();
@@ -704,46 +729,7 @@ class SyncManager {
             this.autoBackupBeforeSync();
 
             // 同步设置
-            if (cloudData.data.settings) {
-                const settings = cloudData.data.settings;
-                const settingWrites = [];
-                if (settings.kimi_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted));
-                }
-                if (settings.kimi_api_key_set) {
-                    settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
-                }
-                if (settings.kimi_api_key) {
-                    settingWrites.push(db.setSetting('kimi_api_key', null));
-                }
-                if (settings.deepseek_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted));
-                }
-                if (settings.deepseek_api_key_set) {
-                    settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
-                }
-                if (settings.deepseek_api_key) {
-                    settingWrites.push(db.setSetting('deepseek_api_key', null));
-                }
-                if (settings.qweather_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
-                    SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
-                }
-                if (typeof settings.qweather_api_key_set !== 'undefined') {
-                    settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
-                    SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
-                }
-                if (settings.crypto_master_key) {
-                    SafeStorage.set('crypto_master_key', settings.crypto_master_key);
-                }
-                if (settingWrites.length > 0) await Promise.all(settingWrites);
-                if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
-                    await ocrManager.loadApiKeysFromDB();
-                    if (typeof app !== 'undefined' && typeof app.updateApiKeyStatus === 'function') {
-                        app.updateApiKeyStatus();
-                    }
-                }
-            }
+            await this._restoreSettingsFromCloud(cloudData.data.settings);
 
             // 同步备忘录
             if (cloudData.data.memo !== undefined) {
@@ -1350,46 +1336,7 @@ class SyncManager {
             }
 
             // 同步设置
-            if (data.data.settings) {
-                const settings = data.data.settings;
-                const settingWrites = [];
-                if (settings.kimi_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted));
-                }
-                if (settings.kimi_api_key_set) {
-                    settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
-                }
-                if (settings.kimi_api_key) {
-                    settingWrites.push(db.setSetting('kimi_api_key', null));
-                }
-                if (settings.deepseek_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted));
-                }
-                if (settings.deepseek_api_key_set) {
-                    settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
-                }
-                if (settings.deepseek_api_key) {
-                    settingWrites.push(db.setSetting('deepseek_api_key', null));
-                }
-                if (settings.qweather_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
-                    SafeStorage.set('qweatherApiKeyEncrypted', settings.qweather_api_key_encrypted);
-                }
-                if (typeof settings.qweather_api_key_set !== 'undefined') {
-                    settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
-                    SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
-                }
-                if (settings.crypto_master_key) {
-                    SafeStorage.set('crypto_master_key', settings.crypto_master_key);
-                }
-                if (settingWrites.length > 0) await Promise.all(settingWrites);
-                if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
-                    await ocrManager.loadApiKeysFromDB();
-                    if (typeof app !== 'undefined' && typeof app.updateApiKeyStatus === 'function') {
-                        app.updateApiKeyStatus();
-                    }
-                }
-            }
+            await this._restoreSettingsFromCloud(data.data.settings);
 
             // 同步备忘录
             if (data.data.memo !== undefined) {
@@ -1821,44 +1768,7 @@ class SyncManager {
             if (progressCallback) progressCallback('正在合并数据...');
 
             // 同步设置数据（API Key等）
-            if (data.data.settings) {
-                const settings = data.data.settings;
-                const settingWrites = [];
-                if (settings.kimi_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted));
-                }
-                if (settings.kimi_api_key_set) {
-                    settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
-                }
-                if (settings.kimi_api_key) {
-                    settingWrites.push(db.setSetting('kimi_api_key', null));
-                }
-                if (settings.deepseek_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted));
-                }
-                if (settings.deepseek_api_key_set) {
-                    settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
-                }
-                if (settings.deepseek_api_key) {
-                    settingWrites.push(db.setSetting('deepseek_api_key', null));
-                }
-                if (settings.qweather_api_key_encrypted) {
-                    settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
-                }
-                if (settings.qweather_api_key_set) {
-                    settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
-                }
-                if (settings.crypto_master_key) {
-                    SafeStorage.set('crypto_master_key', settings.crypto_master_key);
-                }
-                if (settingWrites.length > 0) await Promise.all(settingWrites);
-                if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
-                    await ocrManager.loadApiKeysFromDB();
-                    if (typeof app !== 'undefined' && typeof app.updateApiKeyStatus === 'function') {
-                        app.updateApiKeyStatus();
-                    }
-                }
-            }
+            await this._restoreSettingsFromCloud(data.data.settings);
 
             // 同步备忘录
             if (data.data.memo !== undefined) {

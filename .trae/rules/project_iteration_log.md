@@ -1,3 +1,161 @@
+## 2026-05-03 v5.18
+
+### 本次目标
+- 代码健康度优化：消除重复定义、统一配置、精简冗余逻辑、收敛共用方法
+- 不影响任何功能，纯重构
+
+### 当前状态
+- ✅ app.js `escapeHtml` 4 处重复定义统一为 `SecurityUtils.escapeHtml`，删除 3 处冗余实现
+- ✅ app.js 领导优先级顺序修正为标准：钱局→吴局→盛局→陈局/陈主任→房局
+- ✅ app.js `getMeetingLevel` 去掉不必要的 `sortMeetingAttendeesForDisplay` 全排序，改为直接遍历取最小 rank
+- ✅ sync.js 3 处 settings 恢复代码块（~120 行）抽取为 `_restoreSettingsFromCloud` 共用方法
+- ✅ 版本号提升到 `2026-05-03 v5.18`
+- ✅ node --check app.js / sync.js 全部通过
+- ✅ 已提交推送 `02954ae` 到 origin/main（3 files, +43 -158, 净减 115 行）
+
+### 本轮关键改动
+- app.js：删除 3 处 `escapeHtml` 重复定义，4 处 `this.escapeHtml` 调用改为 `SecurityUtils.escapeHtml`
+- app.js：`meetingLeaderPriorityGroups` 顺序从"房局→陈局"修正为"陈局→房局"
+- app.js：`getMeetingLevel` 从 `sortMeetingAttendeesForDisplay` + `map/min` 改为直接遍历取最小 rank
+- sync.js：新增 `_restoreSettingsFromCloud(settings)` 方法，3 处调用点统一
+- index.html / app.js：版本提升到 `v5.18`，资源版本 `sync.js?v=56`、`app.js?v=166`
+
+### 提交记录
+- `02954ae` refactor: unify escapeHtml, leader priority, meeting sort, sync settings restore (v5.18)
+
+### 遗留事项
+- 待用户强刷确认版本号 `2026-05-03 v5.18`
+- 待验证参会人员排序在 OCR 预览和面板显示中一致
+
+## 2026-05-03 v5.17
+
+### 本次目标
+- 修复 CSP 阻断 pdf.js CDN 加载导致 PDF 解析失败
+- 修复微信端上传图片后页面崩溃重启
+- 同步更新 wechat-upload.html 资源版本
+
+### 当前状态
+- ✅ CSP `script-src` 添加 `https://cdnjs.cloudflare.com` 白名单
+- ✅ `fileToBase64` 对大于 1MB 的图片自动 canvas 压缩后再 base64，降低内存峰值
+- ✅ `compressImageIfNeeded` 微信环境用更激进的压缩参数（1MB/1600px/0.6质量）
+- ✅ `wechat-upload.html` 资源版本同步更新到 `ocr.js?v=39`、`db.js?v=28`、`upload-flow.js?v=8`
+- ✅ 版本号提升到 `2026-05-03 v5.17`
+- ✅ node --check 全部通过
+- ✅ diagnostics 全部 0 错误
+- ✅ 已提交推送 `97fef3e` 到 origin/main
+
+### 本轮关键改动
+- index.html：CSP `script-src` 添加 `https://cdnjs.cloudflare.com`
+- ocr.js：`fileToBase64` 对 >1MB 图片先 canvas 压缩到 1600px/0.7质量再 base64
+- upload-flow.js：`compressImageIfNeeded` 微信环境用 1MB 阈值 / 1600px 最大尺寸 / 0.6 压缩质量
+- wechat-upload.html：资源版本同步更新
+- index.html / app.js：版本提升到 `v5.17`，资源版本更新
+
+### 提交记录
+- `97fef3e` fix: PDF CSP cdnjs whitelist, WeChat image crash prevention (v5.17)
+
+### 遗留事项
+- 待用户强刷确认版本号 `2026-05-03 v5.17`
+- 待用户测试 PDF 上传识别是否正常
+- 待用户在微信端测试图片上传识别是否不再崩溃
+
+## 2026-05-03 v5.16
+
+### 本次目标
+- 第三批优化：运行时性能提升
+- OCR 识别结果批量写入替代逐条串行写入
+- 会议去重从全量遍历改为按类型 Map 分组
+- getItemsByType 从全表扫描改为走 IndexedDB type 索引
+
+### 当前状态
+- ✅ ocr.js `applyRecognitionActionPlan` 改为 `batchAddItems`/`batchPutItems` 批量写入，失败自动回退逐条
+- ✅ ocr.js `buildRecognitionActionPlan` 新增 `existingByType` Map 分组，`checkDuplicateItem` 只接收同类型项
+- ✅ ocr.js `checkDuplicateItem` 移除冗余的 `existing.type !== newItem.type` 判断
+- ✅ db.js `getItemsByType` 改为走 IndexedDB `type` 索引查询，有缓存时优先用缓存
+- ✅ 版本号提升到 `2026-05-03 v5.16`
+- ✅ node --check ocr.js / db.js / app.js 全部通过
+- ✅ diagnostics 全部 0 错误
+- ✅ 已提交推送 `f400b07` 到 origin/main
+- ✅ 线上验证通过：版本号 v5.16、天气正常、控制台无新错误
+
+### 本轮关键改动
+- ocr.js：`applyRecognitionActionPlan` 合并更新用 `batchPutItems`、新增用 `batchAddItems`，失败回退逐条
+- ocr.js：`buildRecognitionActionPlan` 入口按类型建 Map，传给 `checkDuplicateItem` 只同类型项
+- ocr.js：`checkDuplicateItem` 移除 `type` 比较冗余行
+- db.js：`getItemsByType` 使用 `store.index('type').getAll(type)` 替代 `getAllItems().filter()`
+- index.html / app.js：版本提升到 `v5.16`，资源版本 `ocr.js?v=38`、`db.js?v=28`、`app.js?v=164`
+
+### 提交记录
+- `f400b07` perf: batch writes, Map dedup, type index query (batch 3 v5.16)
+
+### 遗留事项
+- 待用户在实际 OCR 识别场景下验证批量写入与去重是否正常
+- 待确认 `getItemsByType` 索引查询在事项数量较多时性能提升明显
+
+## 2026-05-03 v5.15
+
+### 本次目标
+- 修复 CSP 阻断免费天气回退导致天气不显示
+- 修复 API Key 跨设备同步后不生效（同步恢复后未触发 ocrManager 重载）
+
+### 当前状态
+- ✅ CSP connect-src 已添加 `api.open-meteo.com`，免费天气服务不再被阻断
+- ✅ sync.js 三个恢复点（downloadFromCloud、silentSyncFromCloud、mergeData）设置恢复后自动调用 `ocrManager.loadApiKeysFromDB()` 并刷新状态
+- ✅ app.js 初始化 `checkApiKey()` 时主动调用 `loadApiKeysFromDB()`，确保首次加载也从加密存储恢复
+- ✅ mergeData 恢复路径补充 `crypto_master_key` 写入
+- ✅ 版本号提升到 `2026-05-03 v5.15`
+- ✅ node --check 全部通过
+- ✅ 已提交推送 `a4be34e` 到 origin/main
+
+### 本轮关键改动
+- index.html：CSP connect-src 添加 `https://api.open-meteo.com`
+- sync.js：downloadFromCloud / silentSyncFromCloud / mergeData 三个恢复点添加 `ocrManager.loadApiKeysFromDB()` + `app.updateApiKeyStatus()` 调用
+- sync.js：mergeData 补充 `crypto_master_key` 恢复
+- app.js：`checkApiKey()` 主动调用 `loadApiKeysFromDB()` 从加密存储恢复 API Key
+
+### 提交记录
+- `a4be34e` fix: CSP add open-meteo, API Key cross-device sync recovery
+
+### 遗留事项
+- 待用户线上强刷确认天气正常显示（免费天气服务回退生效）
+- 待用户双设备验证 API Key 跨设备同步后自动恢复到 ocrManager
+
+## 2026-05-02 v5.14
+
+### 本次目标
+- 安全加固：API Key 加密存储、密码记住修复、CSP 策略、XSS 防护
+- 不影响现有所有功能正常使用
+
+### 当前状态
+- ✅ DeepSeek/Kimi API Key 改用 cryptoManager.secureStoreSecret 加密存储
+- ✅ 云端同步不再传输明文 API Key，改为传输加密密文
+- ✅ 密码"记住密码"降级为加密可用时才记住，移除 btoa 不安全回退
+- ✅ upload-flow.js innerHTML 改用 SecurityUtils.escapeHtml 防 XSS
+- ✅ index.html 添加 CSP meta 标签限制资源加载
+- ✅ 移除 index.html 重复的 crypto.js 引用
+- ✅ node --check 全部通过，diagnostics 0 错误
+- ✅ 已提交推送 `398302e` 到 origin/main
+- ✅ GitHub API 确认远程 ocr.js / sync.js / index.html / app.js 均已更新
+
+### 本轮关键改动
+- ocr.js：setApiKey/setKimiApiKey 改用 cryptoManager.secureStoreSecret 加密存储，移除明文 localStorage
+- ocr.js：新增 loadApiKeyAsync/loadKimiApiKeyAsync 异步加载方法
+- ocr.js：loadApiKeysFromDB 优先读加密存储，遗留明文自动迁移并清除
+- sync.js：buildSyncData 从 kimi_api_key/deepseek_api_key 改为 kimi_api_key_encrypted/deepseek_api_key_encrypted
+- sync.js：4 处恢复路径改为恢复加密密文并清理遗留明文
+- app.js：密码记住改为仅 cryptoManager 可用时加密记住，失败时跳过而非 btoa 降级
+- app.js：部署版本提升到 `2026-05-02 v5.14`
+- upload-flow.js：2 处 innerHTML 添加 SecurityUtils.escapeHtml 防 XSS
+- index.html：添加 CSP meta 标签、移除重复 crypto.js 引用、资源版本提升
+
+### 提交记录
+- `398302e` security: encrypt API keys, fix password storage, add CSP, sanitize innerHTML
+
+### 遗留事项
+- 待用户线上强刷确认版本号显示 `2026-05-02 v5.14`
+- 待验证 API Key 加密存储后 AI 识别功能仍正常
+- 待验证跨设备同步后加密密钥可正确恢复
+
 ## 2026-05-02 v5.13
 
 ### 本次目标

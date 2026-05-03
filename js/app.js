@@ -1066,7 +1066,7 @@ class OfficeDashboard {
         const nextEvent = events[0] || null;
 
         summaryEl.innerHTML = nextEvent
-            ? `<strong>${this.escapeHtml(nextEvent.name)}</strong><span>${nextEvent.daysLeft === 0 ? '今天就是' : `还有 ${nextEvent.daysLeft} 天`} · ${this.escapeHtml(nextEvent.date)}</span>`
+            ? `<strong>${SecurityUtils.escapeHtml(nextEvent.name)}</strong><span>${nextEvent.daysLeft === 0 ? '今天就是' : `还有 ${nextEvent.daysLeft} 天`} · ${SecurityUtils.escapeHtml(nextEvent.date)}</span>`
             : '这里会自动展示今年剩余节假日首日，以及你新增的生日、节日和纪念日。';
 
         if (calendarTypeSelect) {
@@ -1087,7 +1087,7 @@ class OfficeDashboard {
         listEl.innerHTML = events.map(item => {
             const isSoon = item.daysLeft <= 3;
             const isCustom = item.type !== 'holiday';
-            const style = item.color ? ` style="--countdown-accent:${this.escapeHtml(item.color)}"` : '';
+            const style = item.color ? ` style="--countdown-accent:${SecurityUtils.escapeHtml(item.color)}"` : '';
             const actionButtons = isCustom
                 ? `<button type="button" class="countdown-item-edit" data-id="${item.id}" title="编辑">编辑</button>
                    <button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
@@ -1097,9 +1097,9 @@ class OfficeDashboard {
                     <div class="countdown-item-info">
                         <div class="countdown-item-title-row">
                             <span class="countdown-item-type-dot"></span>
-                            <div class="countdown-item-title">${this.escapeHtml(item.name)}</div>
+                            <div class="countdown-item-title">${SecurityUtils.escapeHtml(item.name)}</div>
                         </div>
-                        <div class="countdown-item-meta">${this.escapeHtml(item.date)} · ${this.escapeHtml(item.metaLabel || (item.type === 'holiday' ? '节假日' : '自定义'))}</div>
+                        <div class="countdown-item-meta">${SecurityUtils.escapeHtml(item.date)} · ${SecurityUtils.escapeHtml(item.metaLabel || (item.type === 'holiday' ? '节假日' : '自定义'))}</div>
                     </div>
                     <div class="countdown-item-side">
                         <div class="countdown-item-days ${isSoon ? 'soon' : ''}">${item.daysLeft === 0 ? '今天' : `${item.daysLeft} 天`}</div>
@@ -1360,15 +1360,6 @@ class OfficeDashboard {
         this.renderCountdownPanel();
         this.updateCountdownNotice();
         this.showSuccess('已删除倒数日');
-    }
-
-    escapeHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -3291,15 +3282,6 @@ class OfficeDashboard {
             console.error('导入Excel失败:', e);
             alert('导入失败: ' + e.message);
         }
-    }
-
-    /**
-     * HTML转义
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     /**
@@ -5852,10 +5834,12 @@ class OfficeDashboard {
      */
     getMeetingLevel(meeting) {
         const title = meeting.title || '';
-        const attendees = this.sortMeetingAttendeesForDisplay(meeting.attendees || []);
-        const attendeeRank = attendees.length > 0
-            ? Math.min(...attendees.map(attendee => this.getMeetingLeaderRankFromText(attendee)))
-            : Number.MAX_SAFE_INTEGER;
+        const attendees = meeting.attendees || [];
+        let attendeeRank = Number.MAX_SAFE_INTEGER;
+        for (let i = 0; i < attendees.length; i++) {
+            const rank = this.getMeetingLeaderRankFromText(attendees[i]);
+            if (rank < attendeeRank) attendeeRank = rank;
+        }
         const titleRank = this.getMeetingLeaderRankFromText(title);
         return Math.min(attendeeRank, titleRank);
     }
@@ -6956,8 +6940,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-03 v5.17';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=39', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=55', 'app-date-view.js?v=13', 'app.js?v=165', 'db.js?v=28', 'style.css?v=59', 'crypto.js?v=17'];
+        const version = '2026-05-03 v5.18';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=39', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=56', 'app-date-view.js?v=13', 'app.js?v=166', 'db.js?v=28', 'style.css?v=59', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -9585,15 +9569,6 @@ class OfficeDashboard {
     getTypeLabel(type) {
         const labels = { todo: '待办', meeting: '会议', document: '文件' };
         return labels[type] || type;
-    }
-
-    /**
-     * HTML转义
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     /**
