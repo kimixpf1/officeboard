@@ -311,8 +311,20 @@ class Database {
      * 按类型获取事项
      */
     async getItemsByType(type) {
-        const allItems = await this.getAllItems();
-        return allItems.filter(item => item?.type === type);
+        if (this.shouldReuseItemsCache()) {
+            return this.itemsCache.filter(item => item?.type === type);
+        }
+
+        const db = await this.init();
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORES.ITEMS, 'readonly');
+            const store = transaction.objectStore(STORES.ITEMS);
+            const index = store.index('type');
+            const request = index.getAll(type);
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => this._rejectWithLog(reject, request.error, 'getItemsByType读取失败');
+        });
     }
 
     /**

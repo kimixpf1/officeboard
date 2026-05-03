@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -2212,6 +2212,12 @@ class OCRManager {
             ...item,
             attendees: Array.isArray(item.attendees) ? [...item.attendees] : []
         }));
+        const existingByType = new Map();
+        for (const item of workingExistingItems) {
+            const type = item.type || 'unknown';
+            if (!existingByType.has(type)) existingByType.set(type, []);
+            existingByType.get(type).push(item);
+        }
         const createItems = [];
         const mergeUpdates = [];
         const mergeUpdateMap = new Map();
@@ -2260,7 +2266,8 @@ class OCRManager {
                 continue;
             }
 
-            const duplicateInfo = this.checkDuplicateItem(item, workingExistingItems);
+            const sameTypeItems = existingByType.get(item.type) || [];
+            const duplicateInfo = this.checkDuplicateItem(item, sameTypeItems);
             if (duplicateInfo.isDuplicate) {
                 if (item.type === 'meeting' && duplicateInfo.existingItem) {
                     const existing = duplicateInfo.existingItem;
@@ -2341,24 +2348,55 @@ class OCRManager {
     }
 
     async applyRecognitionActionPlan(actionPlan, context = {}) {
-        const createdItems = [];
         const mergeSummaries = Array.isArray(actionPlan?.mergeSummaries) ? actionPlan.mergeSummaries : [];
         const skippedItems = Array.isArray(actionPlan?.skippedItems) ? actionPlan.skippedItems : [];
+        const mergeUpdates = Array.isArray(actionPlan?.mergeUpdates) ? actionPlan.mergeUpdates : [];
+        const createItems = Array.isArray(actionPlan?.createItems) ? actionPlan.createItems : [];
 
-        for (const mergeUpdate of Array.isArray(actionPlan?.mergeUpdates) ? actionPlan.mergeUpdates : []) {
-            await db.updateItem(mergeUpdate.id, {
-                attendees: mergeUpdate.attendees,
-                displayTitle: mergeUpdate.displayTitle
-            });
+        if (mergeUpdates.length > 0) {
+            const putItems = mergeUpdates.map(mu => ({
+                id: mu.id,
+                attendees: mu.attendees,
+                displayTitle: mu.displayTitle
+            }));
+            try {
+                await db.batchPutItems(putItems);
+            } catch (error) {
+                console.error('批量合并更新失败，回退逐条更新:', error);
+                for (const mu of mergeUpdates) {
+                    try {
+                        await db.updateItem(mu.id, { attendees: mu.attendees, displayTitle: mu.displayTitle });
+                    } catch (e) {
+                        console.error('单条合并更新失败:', e);
+                    }
+                }
+            }
         }
 
-        for (const item of Array.isArray(actionPlan?.createItems) ? actionPlan.createItems : []) {
-            try {
+        let createdItems = [];
+        if (createItems.length > 0) {
+            const persistedItems = createItems.map(item => {
                 const { previewReason, matchedExistingSummary, ...persistedItem } = item;
-                const id = await db.addItem(persistedItem);
-                createdItems.push({ id, ...persistedItem, previewReason, matchedExistingSummary });
+                return persistedItem;
+            });
+            try {
+                const addedIds = await db.batchAddItems(persistedItems);
+                createdItems = createItems.map((item, i) => {
+                    const { previewReason, matchedExistingSummary, ...persistedItem } = item;
+                    return { id: addedIds[i], ...persistedItem, previewReason, matchedExistingSummary };
+                });
             } catch (error) {
-                console.error('创建卡片失败:', error);
+                console.error('批量创建失败，回退逐条创建:', error);
+                createdItems = [];
+                for (const item of createItems) {
+                    try {
+                        const { previewReason, matchedExistingSummary, ...persistedItem } = item;
+                        const id = await db.addItem(persistedItem);
+                        createdItems.push({ id, ...persistedItem, previewReason, matchedExistingSummary });
+                    } catch (e) {
+                        console.error('创建卡片失败:', e);
+                    }
+                }
             }
         }
 
@@ -2709,10 +2747,6 @@ class OCRManager {
         const newKeywords = extractKeywords(newTitle);
 
         for (const existing of existingItems) {
-            // 同类型才比较
-            if (existing.type !== newItem.type) continue;
-
-            // 会议：比较关键词和日期
             if (newItem.type === 'meeting') {
                 if (this.isSameMeetingForMerge(newItemData, existing)) {
                     return { isDuplicate: true, existingItem: existing, shouldMerge: true };
