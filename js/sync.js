@@ -285,9 +285,9 @@ class SyncManager {
 
     async buildSyncData(items) {
         const settingKeys = [
-            ['kimi_api_key', 'kimi_api_key'],
+            ['kimi_api_key_encrypted', 'kimi_api_key_encrypted'],
             ['kimi_api_key_set', 'kimi_api_key_set'],
-            ['deepseek_api_key', 'deepseek_api_key'],
+            ['deepseek_api_key_encrypted', 'deepseek_api_key_encrypted'],
             ['deepseek_api_key_set', 'deepseek_api_key_set'],
             ['qweather_api_key_encrypted', 'qweather_api_key_encrypted'],
             ['qweather_api_key_set', 'qweather_api_key_set']
@@ -707,19 +707,23 @@ class SyncManager {
             if (cloudData.data.settings) {
                 const settings = cloudData.data.settings;
                 const settingWrites = [];
-                if (settings.kimi_api_key) {
-                    settingWrites.push(db.setSetting('kimi_api_key', settings.kimi_api_key));
-                    SafeStorage.set('kimiApiKey', settings.kimi_api_key);
+                if (settings.kimi_api_key_encrypted) {
+                    settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted));
                 }
                 if (settings.kimi_api_key_set) {
                     settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
                 }
-                if (settings.deepseek_api_key) {
-                    settingWrites.push(db.setSetting('deepseek_api_key', settings.deepseek_api_key));
-                    SafeStorage.set('deepseekApiKey', settings.deepseek_api_key);
+                if (settings.kimi_api_key) {
+                    settingWrites.push(db.setSetting('kimi_api_key', null));
+                }
+                if (settings.deepseek_api_key_encrypted) {
+                    settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted));
                 }
                 if (settings.deepseek_api_key_set) {
                     settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
+                }
+                if (settings.deepseek_api_key) {
+                    settingWrites.push(db.setSetting('deepseek_api_key', null));
                 }
                 if (settings.qweather_api_key_encrypted) {
                     settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
@@ -1343,19 +1347,23 @@ class SyncManager {
             if (data.data.settings) {
                 const settings = data.data.settings;
                 const settingWrites = [];
-                if (settings.kimi_api_key) {
-                    settingWrites.push(db.setSetting('kimi_api_key', settings.kimi_api_key));
-                    SafeStorage.set('kimiApiKey', settings.kimi_api_key);
+                if (settings.kimi_api_key_encrypted) {
+                    settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted));
                 }
                 if (settings.kimi_api_key_set) {
                     settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
                 }
-                if (settings.deepseek_api_key) {
-                    settingWrites.push(db.setSetting('deepseek_api_key', settings.deepseek_api_key));
-                    SafeStorage.set('deepseekApiKey', settings.deepseek_api_key);
+                if (settings.kimi_api_key) {
+                    settingWrites.push(db.setSetting('kimi_api_key', null));
+                }
+                if (settings.deepseek_api_key_encrypted) {
+                    settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted));
                 }
                 if (settings.deepseek_api_key_set) {
                     settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
+                }
+                if (settings.deepseek_api_key) {
+                    settingWrites.push(db.setSetting('deepseek_api_key', null));
                 }
                 if (settings.qweather_api_key_encrypted) {
                     settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));
@@ -1702,19 +1710,19 @@ class SyncManager {
 
             // 获取设置数据（包括API Key）
             const settings = {};
-        const [kimiKey, kimiKeySet, deepseekKey, deepseekKeySet, qweatherKeyEncrypted, qweatherKeySet] = await Promise.all([
-            db.getSetting('kimi_api_key'),
+        const [kimiKeyEnc, kimiKeySet, deepseekKeyEnc, deepseekKeySet, qweatherKeyEncrypted, qweatherKeySet] = await Promise.all([
+            db.getSetting('kimi_api_key_encrypted'),
             db.getSetting('kimi_api_key_set'),
-            db.getSetting('deepseek_api_key'),
+            db.getSetting('deepseek_api_key_encrypted'),
             db.getSetting('deepseek_api_key_set'),
             db.getSetting('qweather_api_key_encrypted'),
             db.getSetting('qweather_api_key_set')
         ]);
         const cryptoMasterKey = SafeStorage.get('crypto_master_key');
 
-        if (kimiKey) settings.kimi_api_key = kimiKey;
+        if (kimiKeyEnc) settings.kimi_api_key_encrypted = kimiKeyEnc;
         if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
-        if (deepseekKey) settings.deepseek_api_key = deepseekKey;
+        if (deepseekKeyEnc) settings.deepseek_api_key_encrypted = deepseekKeyEnc;
         if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
         if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
         if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
@@ -1804,19 +1812,23 @@ class SyncManager {
             if (data.data.settings) {
                 const settings = data.data.settings;
                 const settingWrites = [];
-                if (settings.kimi_api_key) {
-                    settingWrites.push(db.setSetting('kimi_api_key', settings.kimi_api_key));
-                    SafeStorage.set('kimiApiKey', settings.kimi_api_key);
+                if (settings.kimi_api_key_encrypted) {
+                    settingWrites.push(db.setSetting('kimi_api_key_encrypted', settings.kimi_api_key_encrypted));
                 }
                 if (settings.kimi_api_key_set) {
                     settingWrites.push(db.setSetting('kimi_api_key_set', settings.kimi_api_key_set));
                 }
-                if (settings.deepseek_api_key) {
-                    settingWrites.push(db.setSetting('deepseek_api_key', settings.deepseek_api_key));
-                    SafeStorage.set('deepseekApiKey', settings.deepseek_api_key);
+                if (settings.kimi_api_key) {
+                    settingWrites.push(db.setSetting('kimi_api_key', null));
+                }
+                if (settings.deepseek_api_key_encrypted) {
+                    settingWrites.push(db.setSetting('deepseek_api_key_encrypted', settings.deepseek_api_key_encrypted));
                 }
                 if (settings.deepseek_api_key_set) {
                     settingWrites.push(db.setSetting('deepseek_api_key_set', settings.deepseek_api_key_set));
+                }
+                if (settings.deepseek_api_key) {
+                    settingWrites.push(db.setSetting('deepseek_api_key', null));
                 }
                 if (settings.qweather_api_key_encrypted) {
                     settingWrites.push(db.setSetting('qweather_api_key_encrypted', settings.qweather_api_key_encrypted));

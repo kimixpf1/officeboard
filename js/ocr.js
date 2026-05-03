@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -52,9 +52,11 @@ class OCRManager {
     async setApiKey(key) {
         this.deepseekApiKey = key;
         SafeStorage.set('deepseekApiKey', key);
-        // 同时保存到 IndexedDB 以便跨设备同步
+        if (typeof cryptoManager !== 'undefined' && key) {
+            await cryptoManager.secureStoreSecret('deepseek_api_key', key);
+            SafeStorage.remove('deepseekApiKey');
+        }
         if (typeof db !== 'undefined') {
-            await db.setSetting('deepseek_api_key', key);
             await db.setSetting('deepseek_api_key_set', key ? new Date().toISOString() : null);
         }
     }
@@ -63,10 +65,16 @@ class OCRManager {
      * 获取DeepSeek API Key
      */
     getApiKey() {
-        if (!this.deepseekApiKey) {
-            this.deepseekApiKey = SafeStorage.get('deepseekApiKey');
+        return this.deepseekApiKey || SafeStorage.get('deepseekApiKey') || null;
+    }
+
+    async loadApiKeyAsync() {
+        if (this.deepseekApiKey) return this.deepseekApiKey;
+        if (typeof cryptoManager !== 'undefined') {
+            const key = await cryptoManager.secureGetSecret('deepseek_api_key');
+            if (key) { this.deepseekApiKey = key; return key; }
         }
-        return this.deepseekApiKey;
+        return null;
     }
 
     /**
@@ -75,9 +83,11 @@ class OCRManager {
     async setKimiApiKey(key) {
         this.kimiApiKey = key;
         SafeStorage.set('kimiApiKey', key);
-        // 同时保存到 IndexedDB 以便跨设备同步
+        if (typeof cryptoManager !== 'undefined' && key) {
+            await cryptoManager.secureStoreSecret('kimi_api_key', key);
+            SafeStorage.remove('kimiApiKey');
+        }
         if (typeof db !== 'undefined') {
-            await db.setSetting('kimi_api_key', key);
             await db.setSetting('kimi_api_key_set', key ? new Date().toISOString() : null);
         }
     }
@@ -86,27 +96,43 @@ class OCRManager {
      * 获取Kimi API Key
      */
     getKimiApiKey() {
-        if (!this.kimiApiKey) {
-            this.kimiApiKey = SafeStorage.get('kimiApiKey');
+        return this.kimiApiKey || SafeStorage.get('kimiApiKey') || null;
+    }
+
+    async loadKimiApiKeyAsync() {
+        if (this.kimiApiKey) return this.kimiApiKey;
+        if (typeof cryptoManager !== 'undefined') {
+            const key = await cryptoManager.secureGetSecret('kimi_api_key');
+            if (key) { this.kimiApiKey = key; return key; }
         }
-        return this.kimiApiKey;
+        return null;
     }
 
     /**
      * 从 IndexedDB 加载 API Key（用于同步后恢复）
      */
     async loadApiKeysFromDB() {
-        if (typeof db !== 'undefined') {
-            const deepseekKey = await db.getSetting('deepseek_api_key');
-            const kimiKey = await db.getSetting('kimi_api_key');
-
-            if (deepseekKey && !this.deepseekApiKey) {
-                this.deepseekApiKey = deepseekKey;
-                SafeStorage.set('deepseekApiKey', deepseekKey);
+        if (typeof db === 'undefined') return;
+        if (typeof cryptoManager !== 'undefined') {
+            const encDeepseek = await cryptoManager.secureGetSecret('deepseek_api_key');
+            if (encDeepseek && !this.deepseekApiKey) this.deepseekApiKey = encDeepseek;
+            const encKimi = await cryptoManager.secureGetSecret('kimi_api_key');
+            if (encKimi && !this.kimiApiKey) this.kimiApiKey = encKimi;
+        }
+        const legacyDeepseek = await db.getSetting('deepseek_api_key');
+        if (legacyDeepseek && !this.deepseekApiKey) {
+            this.deepseekApiKey = legacyDeepseek;
+            if (typeof cryptoManager !== 'undefined') {
+                await cryptoManager.secureStoreSecret('deepseek_api_key', legacyDeepseek);
+                await db.setSetting('deepseek_api_key', null);
             }
-            if (kimiKey && !this.kimiApiKey) {
-                this.kimiApiKey = kimiKey;
-                SafeStorage.set('kimiApiKey', kimiKey);
+        }
+        const legacyKimi = await db.getSetting('kimi_api_key');
+        if (legacyKimi && !this.kimiApiKey) {
+            this.kimiApiKey = legacyKimi;
+            if (typeof cryptoManager !== 'undefined') {
+                await cryptoManager.secureStoreSecret('kimi_api_key', legacyKimi);
+                await db.setSetting('kimi_api_key', null);
             }
         }
     }

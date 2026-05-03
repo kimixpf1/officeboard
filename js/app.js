@@ -4419,22 +4419,17 @@ class OfficeDashboard {
             // 处理记住密码
             if (rememberPassword) {
                 try {
-                    const encPassword = (typeof cryptoManager !== 'undefined')
-                        ? await cryptoManager.encrypt(password)
-                        : btoa(password);
-                    SecurityUtils.safeSetStorage('office_remembered_login', JSON.stringify({
-                        username: username,
-                        password: encPassword,
-                        enc: (typeof cryptoManager !== 'undefined') ? 'v2' : 'v1',
-                        device: navigator.userAgent.slice(0, 50)
-                    }));
+                    if (typeof cryptoManager !== 'undefined') {
+                        const encPassword = await cryptoManager.encrypt(password);
+                        SecurityUtils.safeSetStorage('office_remembered_login', JSON.stringify({
+                            username: username,
+                            password: encPassword,
+                            enc: 'v2',
+                            device: navigator.userAgent.slice(0, 50)
+                        }));
+                    }
                 } catch (e) {
-                    SecurityUtils.safeSetStorage('office_remembered_login', JSON.stringify({
-                        username: username,
-                        password: btoa(password),
-                        enc: 'v1',
-                        device: navigator.userAgent.slice(0, 50)
-                    }));
+                    console.warn('记住密码加密失败，跳过记住');
                 }
             } else {
                 SecurityUtils.safeRemoveStorage('office_remembered_login');
@@ -6960,8 +6955,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-02 v5.13';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=36', 'upload-flow.js?v=6', 'calendar.js?v=38', 'sync.js?v=53', 'app-date-view.js?v=13', 'app.js?v=161', 'db.js?v=27', 'style.css?v=59', 'crypto.js?v=17'];
+        const version = '2026-05-02 v5.14';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=37', 'upload-flow.js?v=7', 'calendar.js?v=38', 'sync.js?v=54', 'app-date-view.js?v=13', 'app.js?v=162', 'db.js?v=27', 'style.css?v=59', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

@@ -474,7 +474,7 @@
                 card.style.cssText = 'border:1px solid var(--border-color,#e5e7eb);border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:var(--bg-primary,#fff);color:var(--gray-800);';
                 const text = document.createElement('div');
                 text.style.cssText = 'font-size:13px;line-height:1.6;color:var(--gray-800);';
-                text.innerHTML = `<div><b>${index + 1}. ${item.title || '未知事项'}</b></div><div>归并到：${item.targetTitle || item.title || '未知事项'}</div><div>新增参会：${item.addedAttendees?.length ? item.addedAttendees.join('、') : '-'}</div>`;
+                text.innerHTML = `<div><b>${index + 1}. ${SecurityUtils.escapeHtml(item.title || '未知事项')}</b></div><div>归并到：${SecurityUtils.escapeHtml(item.targetTitle || item.title || '未知事项')}</div><div>新增参会：${item.addedAttendees?.length ? SecurityUtils.escapeHtml(item.addedAttendees.join('、')) : '-'}</div>`;
                 appendReason(text, item.reason, '#b45309');
                 appendMatchedExisting(text, item, '#92400e');
                 const del = document.createElement('button');
@@ -501,7 +501,7 @@
                 const text = document.createElement('div');
                 text.style.cssText = 'font-size:13px;line-height:1.6;color:var(--gray-800);';
                 const titleText = getSkippedTitle(item);
-                text.innerHTML = `<div><b>${index + 1}. ${titleText}</b></div>`;
+                text.innerHTML = `<div><b>${index + 1}. ${SecurityUtils.escapeHtml(titleText)}</b></div>`;
                 appendReason(text, getSkippedReason(item), '#6b7280');
                 appendMatchedExisting(text, item, '#6b7280');
                 const del = document.createElement('button');
