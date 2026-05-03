@@ -1,3 +1,31 @@
+## 2026-05-02 v5.13
+
+### 本次目标
+- 数据安全加固第二阶段：getStore 事务保护、restoreFromBackup 事务性、deletedItemsMap 容量保护
+- 不影响现有所有功能正常使用
+
+### 当前状态
+- ✅ getStore 已添加 transaction.onerror / onabort 监听
+- ✅ restoreFromBackup 已改为单事务批量写入，中途失败不会丢数据
+- ✅ deletedItemsMap 已添加 30 天过期清理 + 500 条容量上限
+- ✅ node --check db.js / sync.js / app.js 全部通过
+- ✅ diagnostics 全部 0 错误
+- ✅ 本地模拟测试 11 项检查全部通过
+- ✅ 已提交推送 `d0e251a` 到 origin/main
+
+### 本轮关键改动
+- db.js：getStore 添加事务错误/中止监听，防止静默失败
+- sync.js：restoreFromBackup 从"清空+逐条 addItem"改为"单事务 clear+batch add"，中途失败事务回滚
+- sync.js：新增 _cleanupDeletedItemsMap 方法，初始化时自动清理 30 天以上过期记录和超 500 条的冗余记录
+- index.html / app.js：部署版本提升到 `2026-05-02 v5.13`，资源版本更新
+
+### 提交记录
+- `d0e251a` fix: phase2 data safety - transaction protection, restore atomicity, deletedItems cleanup
+
+### 遗留事项
+- 待用户线上强刷确认版本号显示 `2026-05-02 v5.13`
+- 待验证恢复备份功能正常（单事务写入后事项列表刷新）
+
 ## 2026-05-01 v5.12
 
 ### 本次目标
