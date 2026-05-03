@@ -637,7 +637,10 @@
 
     async function compressImageIfNeeded(file, maxSizeMB = 2) {
         if (!file.type.startsWith('image/')) return file;
-        if (file.size <= maxSizeMB * 1024 * 1024) return file;
+
+        const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+        const effectiveMaxMB = isWechat ? 1 : maxSizeMB;
+        if (file.size <= effectiveMaxMB * 1024 * 1024) return file;
 
         return new Promise((resolve) => {
             const img = new Image();
@@ -645,7 +648,7 @@
             img.onload = () => {
                 URL.revokeObjectURL(url);
                 let { width, height } = img;
-                const maxDim = 2048;
+                const maxDim = isWechat ? 1600 : 2048;
                 if (width > maxDim || height > maxDim) {
                     const ratio = Math.min(maxDim / width, maxDim / height);
                     width = Math.round(width * ratio);
@@ -666,7 +669,7 @@
                         }
                     },
                     'image/jpeg',
-                    0.8
+                    isWechat ? 0.6 : 0.8
                 );
             };
             img.onerror = () => {
