@@ -34,6 +34,9 @@ class SyncManager {
         this._offlineNotified = false;
         this.deletedItemsKey = 'office_deleted_items_map';
         this.deletedItemsMap = safeJsonParse(SafeStorage.get(this.deletedItemsKey), {});
+        this._deletedItemsMaxAge = 30 * 24 * 60 * 60 * 1000;
+        this._deletedItemsMaxCount = 500;
+        this._cleanupDeletedItemsMap();
 
         // 初始化Supabase
         this.initPromise = this.initSupabase();
@@ -63,6 +66,29 @@ class SyncManager {
 
     persistDeletedItemsMap() {
         SafeStorage.set(this.deletedItemsKey, JSON.stringify(this.deletedItemsMap || {}));
+    }
+
+    _cleanupDeletedItemsMap() {
+        if (!this.deletedItemsMap || typeof this.deletedItemsMap !== 'object') return;
+        const now = Date.now();
+        let changed = false;
+        const entries = Object.entries(this.deletedItemsMap);
+        for (const [key, ts] of entries) {
+            const ms = new Date(ts).getTime();
+            if (!Number.isFinite(ms) || (now - ms) > this._deletedItemsMaxAge) {
+                delete this.deletedItemsMap[key];
+                changed = true;
+            }
+        }
+        if (entries.length > this._deletedItemsMaxCount) {
+            const sorted = Object.entries(this.deletedItemsMap).sort((a, b) => new Date(a[1]).getTime() - new Date(b[1]).getTime());
+            const excess = sorted.length - this._deletedItemsMaxCount;
+            for (let i = 0; i < excess; i++) {
+                delete this.deletedItemsMap[sorted[i][0]];
+            }
+            changed = true;
+        }
+        if (changed) this.persistDeletedItemsMap();
     }
 
     getItemDeletionKey(item) {
@@ -2282,21 +2308,32 @@ class SyncManager {
             if (index < 0 || index >= list.length) throw new Error('备份索引无效');
             const backup = JSON.parse(list[index].data);
             if (!backup.items || backup.items.length === 0) throw new Error('备份数据为空');
-            const tx = db.db.transaction(db.STORES.ITEMS, 'readwrite');
-            const store = tx.objectStore(db.STORES.ITEMS);
+            const database = await db.init();
             await new Promise((resolve, reject) => {
+                const tx = database.transaction(db.STORES.ITEMS, 'readwrite');
+                const store = tx.objectStore(db.STORES.ITEMS);
                 const clearReq = store.clear();
-                clearReq.onsuccess = () => resolve();
+                clearReq.onsuccess = () => {
+                    for (const item of backup.items) {
+                        const normalized = db.normalizeItemForStorage ? db.normalizeItemForStorage(item) : item;
+                        if (!normalized.hash) normalized.hash = db.generateHash ? db.generateHash(normalized) : '';
+                        if (!normalized.createdAt) normalized.createdAt = new Date().toISOString();
+                        if (!normalized.updatedAt) normalized.updatedAt = normalized.createdAt;
+                        delete normalized.id;
+                        store.add(normalized);
+                    }
+                };
                 clearReq.onerror = () => reject(clearReq.error);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(new Error('恢复备份事务中止'));
             });
-            for (const item of backup.items) {
-                await db.addItem(item);
-            }
             if (backup.sideData) {
                 for (const [k, v] of Object.entries(backup.sideData)) {
                     localStorage.setItem(k, v);
                 }
             }
+            db.resetItemsCache();
             return { success: true, itemCount: backup.items.length };
         } catch (e) {
             console.error('恢复备份失败:', e);

@@ -136,6 +136,8 @@ class Database {
     async getStore(storeName, mode = 'readonly') {
         const db = await this.init();
         const transaction = db.transaction(storeName, mode);
+        transaction.onerror = () => console.warn('getStore事务错误:', storeName, transaction.error);
+        transaction.onabort = () => console.warn('getStore事务中止:', storeName);
         return transaction.objectStore(storeName);
     }
 
