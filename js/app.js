@@ -289,8 +289,9 @@ class OfficeDashboard {
      * 检查API Key（可选，不再强制要求）
      */
     async checkApiKey() {
-        // API Key现在是可选的，不再强制显示设置弹窗
-        // 用户可以直接使用内置的本地规则解析
+        if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
+            await ocrManager.loadApiKeysFromDB();
+        }
         this.updateApiKeyStatus();
     }
 
@@ -6955,8 +6956,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-02 v5.14';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=37', 'upload-flow.js?v=7', 'calendar.js?v=38', 'sync.js?v=54', 'app-date-view.js?v=13', 'app.js?v=162', 'db.js?v=27', 'style.css?v=59', 'crypto.js?v=17'];
+        const version = '2026-05-03 v5.15';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=37', 'upload-flow.js?v=7', 'calendar.js?v=38', 'sync.js?v=55', 'app-date-view.js?v=13', 'app.js?v=163', 'db.js?v=27', 'style.css?v=59', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
