@@ -85,7 +85,10 @@ class SyncManager {
             settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
             SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
         }
-        if (settings.crypto_master_key) { SafeStorage.set('crypto_master_key', settings.crypto_master_key); }
+        if (settings.crypto_master_key) {
+            SafeStorage.set('crypto_master_key', settings.crypto_master_key);
+            settingWrites.push(db.setSetting('crypto_master_key', settings.crypto_master_key));
+        }
         if (settingWrites.length > 0) await Promise.all(settingWrites);
         if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
             await ocrManager.loadApiKeysFromDB();

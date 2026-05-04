@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -53,8 +53,10 @@ class OCRManager {
         this.deepseekApiKey = key;
         SafeStorage.set('deepseekApiKey', key);
         if (typeof cryptoManager !== 'undefined' && key) {
-            await cryptoManager.secureStoreSecret('deepseek_api_key', key);
-            SafeStorage.remove('deepseekApiKey');
+            const encrypted = await cryptoManager.secureStoreSecret('deepseek_api_key', key);
+            if (encrypted) {
+                SafeStorage.remove('deepseekApiKey');
+            }
         }
         if (typeof db !== 'undefined') {
             await db.setSetting('deepseek_api_key_set', key ? new Date().toISOString() : null);
