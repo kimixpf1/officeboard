@@ -4838,6 +4838,64 @@ mark.highlight {
     color: var(--gray-600);
 }
 
+.app-skeleton {
+    min-height: 100vh;
+    background: var(--bg-primary, #f5f5f5);
+    padding: 0;
+}
+.sk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    min-height: 56px;
+}
+.sk-header-left { display: flex; align-items: center; gap: 16px; }
+.sk-title {
+    width: 180px; height: 24px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+}
+.sk-meta { display: flex; gap: 12px; align-items: center; }
+.sk-clock { width: 80px; height: 20px; background: rgba(255,255,255,0.15); border-radius: 4px; }
+.sk-weather { width: 200px; height: 20px; background: rgba(255,255,255,0.15); border-radius: 4px; }
+.sk-header-center { display: flex; gap: 8px; align-items: center; }
+.sk-input { width: 300px; height: 34px; background: rgba(255,255,255,0.15); border-radius: 6px; }
+.sk-toolbar { width: 200px; height: 34px; background: rgba(255,255,255,0.1); border-radius: 6px; }
+.sk-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.sk-column { display: flex; flex-direction: column; gap: 12px; }
+.sk-section-title { width: 100px; height: 18px; background: #e0e0e0; border-radius: 3px; }
+.sk-card {
+    width: 100%; height: 60px;
+    background: linear-gradient(90deg, #e8e8e8 25%, #f0f0f0 50%, #e8e8e8 75%);
+    background-size: 200% 100%;
+    border-radius: 8px;
+    animation: sk-shimmer 1.5s infinite;
+}
+@keyframes sk-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+[data-theme="dark"] .sk-card {
+    background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+    background-size: 200% 100%;
+}
+[data-theme="dark"] .sk-section-title { background: #333; }
+@media (max-width: 768px) {
+    .sk-body { grid-template-columns: 1fr; }
+    .sk-header-center { display: none; }
+    .sk-title { width: 140px; }
+    .sk-weather { width: 140px; }
+}
+
 [data-theme="dark"] .memo-body textarea,
 [data-theme="dark"] .schedule-body textarea {
     background: var(--bg-tertiary);

@@ -21,7 +21,37 @@
 
 </head>
 <body>
-    <div id="app">
+    <div id="appSkeleton" class="app-skeleton">
+        <div class="sk-header">
+            <div class="sk-header-left">
+                <div class="sk-title"></div>
+                <div class="sk-meta">
+                    <div class="sk-clock"></div>
+                    <div class="sk-weather"></div>
+                </div>
+            </div>
+            <div class="sk-header-center">
+                <div class="sk-input"></div>
+                <div class="sk-toolbar"></div>
+            </div>
+        </div>
+        <div class="sk-body">
+            <div class="sk-column">
+                <div class="sk-section-title"></div>
+                <div class="sk-card"></div>
+                <div class="sk-card"></div>
+            </div>
+            <div class="sk-column">
+                <div class="sk-section-title"></div>
+                <div class="sk-card"></div>
+            </div>
+            <div class="sk-column">
+                <div class="sk-section-title"></div>
+                <div class="sk-card"></div>
+            </div>
+        </div>
+    </div>
+    <div id="app" style="display:none">
         <!-- API Key 设置弹窗 -->
         <div id="apiKeyModal" class="modal">
             <div class="modal-content">
@@ -1137,14 +1167,14 @@
     <script src="js/db.js?v=28"></script>
     <script src="js/sync.js?v=56"></script>
     <script src="js/app-date-view.js?v=13"></script>
-    <script src="js/app.js?v=166"></script>
+    <script src="js/app.js?v=167"></script>
 
     <!-- defer 加载：首屏不需要的模块（按文档顺序执行，DOMContentLoaded 前完成） -->
     <script defer src="js/crypto.js?v=17"></script>
     <script defer src="js/kimi.js?v=16"></script>
     <script defer src="js/ocr.js?v=39"></script>
     <script defer src="js/report.js?v=16"></script>
-    <script defer src="js/calendar.js?v=38"></script>
+    <script defer src="js/calendar.js?v=39"></script>
     <script defer src="js/upload-flow.js?v=8"></script>
     
     <!-- 版权声明 -->

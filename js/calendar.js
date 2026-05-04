@@ -636,16 +636,15 @@ class CalendarView {
         this.safeReplaceChildren(container);
 
         requestAnimationFrame(() => {
+            const scrollParent = this.container.closest('.calendar-view') || this.container;
+            scrollParent.scrollTo({ top: 0, behavior: 'instant' });
             if (this._scrollToToday) {
                 this._scrollToToday = false;
                 const todayCell = container.querySelector('.week-cell.today');
                 if (todayCell) {
-                    todayCell.scrollIntoView({ behavior: 'instant', block: 'center' });
-                    return;
+                    todayCell.scrollTop = 0;
                 }
             }
-            const scrollParent = this.container.closest('.calendar-view') || this.container;
-            scrollParent.scrollTo({ top: 0, behavior: 'instant' });
         });
     }
 
