@@ -2123,7 +2123,11 @@ class OCRManager {
         try {
             // 图片识别 - 优先使用Kimi API（更精准）
             if (fileType === 'image') {
-                const kimiApiKey = this.getKimiApiKey();
+                let kimiApiKey = this.getKimiApiKey();
+                if (!kimiApiKey) {
+                    await this.loadApiKeysFromDB();
+                    kimiApiKey = this.getKimiApiKey();
+                }
 
                 if (kimiApiKey) {
                     // 使用Kimi API直接识别图片（推荐，更精准）
@@ -3439,13 +3443,13 @@ class OCRManager {
      */
     fileToBase64(file) {
         return new Promise((resolve, reject) => {
-            if (file.type.startsWith('image/') && file.size > 1024 * 1024) {
+            if (file.type.startsWith('image/') && file.size > (/MicroMessenger/i.test(navigator.userAgent) ? 512 * 1024 : 1024 * 1024)) {
                 const img = new Image();
                 const url = URL.createObjectURL(file);
                 img.onload = () => {
                     URL.revokeObjectURL(url);
                     let { width, height } = img;
-                    const maxDim = 1600;
+                    const maxDim = /MicroMessenger/i.test(navigator.userAgent) ? 1200 : 1600;
                     if (width > maxDim || height > maxDim) {
                         const ratio = Math.min(maxDim / width, maxDim / height);
                         width = Math.round(width * ratio);
@@ -3456,7 +3460,7 @@ class OCRManager {
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    const dataUrl = canvas.toDataURL('image/jpeg', /MicroMessenger/i.test(navigator.userAgent) ? 0.5 : 0.7);
                     resolve(dataUrl.split(',')[1]);
                 };
                 img.onerror = () => {
