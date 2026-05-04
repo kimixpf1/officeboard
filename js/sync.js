@@ -38,8 +38,8 @@ class SyncManager {
         this._deletedItemsMaxCount = 500;
         this._cleanupDeletedItemsMap();
 
-        // 初始化Supabase
-        this.initPromise = this.initSupabase();
+        // 初始化Supabase（事件驱动，不再轮询等待）
+        this.initPromise = this._waitForSupabaseLib().then(() => this._doInitSupabase());
     }
 
     isOnline() {
@@ -347,30 +347,41 @@ class SyncManager {
     }
 
     /**
+     * 事件驱动等待 Supabase 库加载，替代轮询
+     */
+    _waitForSupabaseLib() {
+        if (typeof window.supabase !== 'undefined') {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            let settled = false;
+            const done = () => {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener('supabase-loaded', onLoaded);
+                clearTimeout(timer);
+                resolve();
+            };
+            const onLoaded = () => done();
+            const timer = setTimeout(() => {
+                if (!settled && typeof window.supabase === 'undefined') {
+                    this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。';
+                    console.error(this.initError);
+                }
+                done();
+            }, 20000);
+            window.addEventListener('supabase-loaded', onLoaded, { once: true });
+        });
+    }
+
+    /**
      * 初始化Supabase客户端
      */
-    async initSupabase() {
-
-        // 等待Supabase库加载（最多等待20秒）
-        let waitTime = 0;
-        const maxWait = 20000;
-        while (typeof window.supabase === 'undefined' && waitTime < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-            waitTime += 200;
-            if (waitTime % 2000 === 0) {
-
-            }
-        }
-
-
-
+    async _doInitSupabase() {
         if (typeof window.supabase === 'undefined') {
-            this.initError = '网络服务未加载，请检查网络连接后刷新页面重试。';
-            console.error(this.initError);
+            // _waitForSupabaseLib 超时已设置 initError
             return;
         }
-
-
 
         try {
             // ES模块导出的是{ createClient }，需要检查
