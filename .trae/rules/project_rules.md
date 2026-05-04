@@ -103,3 +103,11 @@
 - todolist.md 只记录当前轮次的操作面板信息
 - project_iteration_log.md 只记录每一轮的正式留痕
 - universal_template.md 只记录跨项目可复用的通用模板与原则
+
+## GLM 用量自动查询（跨项目通用规则）
+
+- 每次会话结束前，如果本次会话使用了 GLM 模型（Bigmodel Plan / GLM-5.1 / GLM-4.5-Air 等智谱模型），必须自动运行 `python "c:\Users\42151\.glm-tools\glm_usage.py" --all` 查询并报告两个 Key 的用量
+- 格式固定为：额度使用情况 → Token 消耗 (今日) → 本月累计
+- 如果用户说"查 GLM 用量"或"查用量"，也要立即执行查询
+- 如果用户后续说只需要查 key2，则改为 `python "c:\Users\42151\.glm-tools\glm_usage.py" key2`
+- 此规则对所有项目生效，不得删除

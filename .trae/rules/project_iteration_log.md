@@ -1,3 +1,44 @@
+## 2026-05-04 v5.20
+
+### 本次目标
+- 代码健康度优化第三批：首屏加载体验、死代码清理、字体加载优化
+- 修复周视图"今天"按钮电脑端滚动位置问题
+- 不影响任何功能，纯性能优化和 bug 修复
+
+### 当前状态
+- ✅ 已删除 `js/templates.js`（53KB，792行完全未被引用的死代码）
+- ✅ 已移除 Google Fonts 外链，改用系统字体栈（`-apple-system, PingFang SC, Microsoft YaHei` 等）
+- ✅ CSP 收紧：去掉 `fonts.googleapis.com` 和 `fonts.gstatic.com`
+- ✅ 已添加首屏骨架屏（紫色标题栏 + 三列灰色 shimmer 卡片），JS init 完成后自动移除
+- ✅ 已修复周视图"今天"按钮电脑端滚动位置：`scrollIntoView({ block: 'center' })` 改为 `scrollTo({ top: 0 })` + `todayCell.scrollTop = 0`
+- ✅ 版本号提升到 `2026-05-04 v5.20`
+- ✅ node --check 全部通过
+- ✅ diagnostics 全部 0 错误
+- ✅ 已提交推送 `0006ee6` 到 origin/main
+- ✅ 线上验证通过：版本号 v5.20、周视图今天按钮修复、骨架屏正常、零字体请求、控制台无新增错误
+
+### 本轮关键改动
+- index.html：删除 Google Fonts preconnect 和 stylesheet 链接；CSP 去掉字体域名；添加首屏骨架屏 HTML
+- css/style.css：字体变量改为系统字体栈；追加骨架屏样式（shimmer 动画 + 暗色模式适配 + 移动端响应式）
+- js/app.js：init() 中添加骨架屏移除逻辑；版本提升到 v5.20
+- js/calendar.js：周视图 renderWeekView 末尾，today 滚动从 `scrollIntoView({ block: 'center' })` 改为统一 `scrollTo({ top: 0 })`
+- js/templates.js：已删除（53KB 死代码）
+
+### 周视图"今天"按钮修复根因
+- v5.12 修复时用了 `scrollIntoView({ block: 'center' })`，移动端正常但电脑端会把 `.week-cell.today` 推到视口中心
+- 导致上方的 `.week-title`（"2026年5月第X周"）被推出视口，需要往上滚才能看到
+- 修复方案：统一改为"外层容器 scrollTo top 0 + today 格子内部 scrollTop 0"，和左右切换周行为一致
+- 电脑端和手机端都兼容
+
+### 提交记录
+- `cd12ffb` chore: remove dead code templates.js (53KB unused)
+- `0813511` perf: remove Google Fonts, use system font stack (v5.20)
+- `0006ee6` perf: skeleton screen + fix week today scroll (v5.20)
+
+### 遗留事项
+- 待用户手机端验证周视图"今天"按钮
+- 后续优化：Supabase CDN 本地化、轮询改事件驱动、app.js 拆分
+
 ## 2026-05-03 v5.18
 
 ### 本次目标

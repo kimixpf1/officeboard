@@ -1089,7 +1089,7 @@
                     }
                     try {
                         Object.defineProperty(window, 'supabase', {
-                            value: Object.freeze(module),
+                            value: module,
                             writable: false,
                             configurable: false
                         });
