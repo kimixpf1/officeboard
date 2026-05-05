@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -137,6 +137,18 @@ class OCRManager {
                 await db.setSetting('kimi_api_key', null);
             }
         }
+        if (!this.deepseekApiKey && typeof SafeStorage !== 'undefined') {
+            const ssDeepseek = SafeStorage.get('deepseekApiKey');
+            if (ssDeepseek) this.deepseekApiKey = ssDeepseek;
+        }
+        if (!this.kimiApiKey && typeof SafeStorage !== 'undefined') {
+            const ssKimi = SafeStorage.get('kimiApiKey');
+            if (ssKimi) this.kimiApiKey = ssKimi;
+        }
+        console.log('[OCR] Key restore:', {
+            kimi: this.kimiApiKey ? this.kimiApiKey.substring(0, 8) + '...' : 'NONE',
+            deepseek: this.deepseekApiKey ? this.deepseekApiKey.substring(0, 8) + '...' : 'NONE'
+        });
     }
 
     /**
@@ -2140,30 +2152,30 @@ class OCRManager {
                         text = kimiResult.text || '';
                         metadata.recognitionMethod = 'kimi';
                     } catch (kimiError) {
-                        console.warn('Kimi识别失败:', kimiError.message);
-                        const isWechat = /MicroMessenger/i.test(navigator.userAgent);
-                        if (isWechat) {
-                            throw new Error('Kimi识别失败：' + (kimiError.message || '网络异常') + '。微信环境不支持离线OCR，请检查网络后重试。');
-                        }
-                        if (progressCallback) progressCallback('Kimi服务异常，尝试离线OCR备用...');
+                        // Kimi过载或失败，尝试备用方案
+                        console.warn('Kimi识别失败，尝试备用方案:', kimiError.message);
+                        if (progressCallback) progressCallback('Kimi服务异常，切换到备用识别...');
+                        
+                        // 尝试 Tesseract OCR + DeepSeek AI
                         if (progressCallback) progressCallback('正在识别图片文字...');
                         const imageResult = await this.recognizeImage(file, progressCallback);
                         text = imageResult.text;
                         metadata.confidence = imageResult.confidence;
                         metadata.recognitionMethod = 'tesseract-fallback';
+
+                        // AI解析
                         if (progressCallback) progressCallback('正在用AI分析内容...');
                         items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
                     }
                 } else {
-                    const isWechat = /MicroMessenger/i.test(navigator.userAgent);
-                    if (isWechat) {
-                        throw new Error('未检测到AI识别密钥（Kimi/DeepSeek）。微信环境不支持离线OCR，请先在主页面设置AI密钥后再使用识别功能。');
-                    }
+                    // 使用Tesseract OCR + DeepSeek AI
                     if (progressCallback) progressCallback('正在识别图片文字...');
                     const imageResult = await this.recognizeImage(file, progressCallback);
                     text = imageResult.text;
                     metadata.confidence = imageResult.confidence;
                     metadata.recognitionMethod = 'tesseract';
+
+                    // AI解析
                     if (progressCallback) progressCallback('正在用AI分析内容...');
                     items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
                 }
@@ -3283,6 +3295,7 @@ class OCRManager {
         if (!apiKey) {
             throw new Error('请先设置Kimi API Key');
         }
+        console.log('[OCR] Kimi Key prefix:', apiKey.substring(0, 10) + '..., length:', apiKey.length);
 
         if (progressCallback) progressCallback('正在使用Kimi AI识别图片...');
 
