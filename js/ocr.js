@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -2140,30 +2140,30 @@ class OCRManager {
                         text = kimiResult.text || '';
                         metadata.recognitionMethod = 'kimi';
                     } catch (kimiError) {
-                        // Kimi过载或失败，尝试备用方案
-                        console.warn('Kimi识别失败，尝试备用方案:', kimiError.message);
-                        if (progressCallback) progressCallback('Kimi服务异常，切换到备用识别...');
-                        
-                        // 尝试 Tesseract OCR + DeepSeek AI
+                        console.warn('Kimi识别失败:', kimiError.message);
+                        const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+                        if (isWechat) {
+                            throw new Error('Kimi识别失败：' + (kimiError.message || '网络异常') + '。微信环境不支持离线OCR，请检查网络后重试。');
+                        }
+                        if (progressCallback) progressCallback('Kimi服务异常，尝试离线OCR备用...');
                         if (progressCallback) progressCallback('正在识别图片文字...');
                         const imageResult = await this.recognizeImage(file, progressCallback);
                         text = imageResult.text;
                         metadata.confidence = imageResult.confidence;
                         metadata.recognitionMethod = 'tesseract-fallback';
-
-                        // AI解析
                         if (progressCallback) progressCallback('正在用AI分析内容...');
                         items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
                     }
                 } else {
-                    // 使用Tesseract OCR + DeepSeek AI
+                    const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+                    if (isWechat) {
+                        throw new Error('未检测到AI识别密钥（Kimi/DeepSeek）。微信环境不支持离线OCR，请先在主页面设置AI密钥后再使用识别功能。');
+                    }
                     if (progressCallback) progressCallback('正在识别图片文字...');
                     const imageResult = await this.recognizeImage(file, progressCallback);
                     text = imageResult.text;
                     metadata.confidence = imageResult.confidence;
                     metadata.recognitionMethod = 'tesseract';
-
-                    // AI解析
                     if (progressCallback) progressCallback('正在用AI分析内容...');
                     items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
                 }

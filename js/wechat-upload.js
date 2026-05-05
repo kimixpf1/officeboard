@@ -58,7 +58,18 @@
             setStatus('正在初始化识别环境...');
             await db.init();
             if (typeof ocrManager?.loadApiKeysFromDB === 'function') {
-                await ocrManager.loadApiKeysFromDB();
+                try {
+                    await ocrManager.loadApiKeysFromDB();
+                } catch (keyErr) {
+                    console.warn('API Key 恢复失败:', keyErr.message);
+                }
+            }
+            const hasKimi = ocrManager?.getKimiApiKey();
+            const hasDeepseek = ocrManager?.getApiKey();
+            if (!hasKimi && !hasDeepseek) {
+                setStatus('⚠️ 未检测到AI密钥，请先在主页面设置Kimi或DeepSeek API Key后再使用识别功能。');
+                chooseBtn.disabled = true;
+                return;
             }
             setStatus('初始化完成，请选择图片或直接拍摄。');
         } catch (error) {
