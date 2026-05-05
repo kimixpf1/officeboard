@@ -2596,6 +2596,7 @@ body {
             'date'
             'calendar'
             'type'
+            'customtype'
             'color'
             'submit';
     }
@@ -3955,10 +3956,15 @@ mark.highlight {
         'name name'
         'date date'
         'calendar type'
+        'customtype customtype'
         'color submit';
     gap: 10px;
     margin-bottom: 10px;
     align-items: center;
+}
+
+#countdownCustomType {
+    grid-area: customtype;
 }
 
 .countdown-add-form > * {

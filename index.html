@@ -198,7 +198,7 @@
                     <span class="countdown-notice-badge">提醒</span>
                     <div class="countdown-notice-content">
                         <div class="countdown-notice-title">暂无临近倒数日</div>
-                        <div class="countdown-notice-desc">距离十天内的重要节日和纪念日会显示在这里</div>
+                        <div class="countdown-notice-desc">距离十天内的重要日子会显示在这里</div>
                     </div>
                     <button type="button" id="todoReminderCompleteBtn" class="todo-reminder-complete-btn" style="display:none" title="标记完成">✓ 完成</button>
                 </div>
@@ -826,7 +826,7 @@
             <div class="panel-body countdown-body">
                 <div class="countdown-summary" id="countdownSummary"></div>
                 <div class="countdown-add-form">
-                    <input type="text" id="countdownName" placeholder="纪念日名称，如妈妈生日" maxlength="30">
+                    <input type="text" id="countdownName" placeholder="名称，如妈妈生日、考研倒计时" maxlength="30">
                     <input type="date" id="countdownDate">
                     <select id="countdownCalendarType" title="这里可以切换公历或农历">
                         <option value="solar">公历</option>
@@ -836,12 +836,14 @@
                         <option value="birthday">生日</option>
                         <option value="anniversary">纪念日</option>
                         <option value="festival">节日</option>
+                        <option value="other">其他</option>
                     </select>
+                    <input type="text" id="countdownCustomType" placeholder="自定义类型名称，如：考试日" maxlength="10" style="display:none;">
                     <input type="color" id="countdownColor" value="#ec4899" title="类型底色">
                     <button type="button" id="addCountdownBtn" class="btn-add-link">+ 添加</button>
                 </div>
                 <div class="countdown-form-tip">日期类型这里可切换“公历 / 农历”。选农历时只要挑一个对应的公历日期，系统会自动记住农历并换算成之后每年的公历日期。</div>
-                <div class="countdown-section-title">今年剩余节假日与纪念日</div>
+                <div class="countdown-section-title">今年剩余节假日与重要日子</div>
                 <div class="countdown-list" id="countdownList"></div>
             </div>
         </div>
@@ -1178,7 +1180,7 @@
     <script src="js/db.js?v=28"></script>
     <script src="js/sync.js?v=59"></script>
     <script src="js/app-date-view.js?v=13"></script>
-    <script src="js/app.js?v=170"></script>
+    <script src="js/app.js?v=171"></script>
 
     <!-- defer 加载：首屏不需要的模块（按文档顺序执行，DOMContentLoaded 前完成） -->
     <script defer src="js/crypto.js?v=17"></script>

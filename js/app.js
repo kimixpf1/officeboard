@@ -699,12 +699,18 @@ class OfficeDashboard {
         const calendarTypeSelect = document.getElementById('countdownCalendarType');
         const typeSelect = document.getElementById('countdownEventType');
         const colorInput = document.getElementById('countdownColor');
+        const customTypeInput = document.getElementById('countdownCustomType');
         const syncColor = () => {
             if (!colorInput || !typeSelect) {
                 return;
             }
             const colors = this.getCountdownTypeColors();
             colorInput.value = colors[typeSelect.value] || '#f97316';
+        };
+        const toggleCustomTypeInput = () => {
+            if (customTypeInput) {
+                customTypeInput.style.display = typeSelect?.value === 'other' ? '' : 'none';
+            }
         };
 
         if (!panel || !toggle) {
@@ -729,7 +735,10 @@ class OfficeDashboard {
             closePanel();
         });
         addBtn?.addEventListener('click', handleAdd);
-        typeSelect?.addEventListener('change', syncColor);
+        typeSelect?.addEventListener('change', () => {
+            syncColor();
+            toggleCustomTypeInput();
+        });
         calendarTypeSelect?.addEventListener('change', () => {
             if (dateInput) {
                 dateInput.title = calendarTypeSelect.value === 'lunar'
@@ -897,7 +906,8 @@ class OfficeDashboard {
         const defaults = {
             birthday: '#ec4899',
             anniversary: '#8b5cf6',
-            festival: '#f97316'
+            festival: '#f97316',
+            other: '#06b6d4'
         };
         const saved = safeJsonParse(SafeStorage.get(this.countdownTypeColorsKey || 'office_countdown_type_colors'), null);
         return {
@@ -955,7 +965,8 @@ class OfficeDashboard {
         const typeMap = {
             birthday: '生日',
             anniversary: '纪念日',
-            festival: '节日'
+            festival: '节日',
+            other: item.customEventType || '其他'
         };
         const base = typeMap[item.eventType] || (item.type === 'holiday' ? '节日' : '纪念日');
         if (item.type === 'holiday') {
@@ -1071,7 +1082,7 @@ class OfficeDashboard {
 
         summaryEl.innerHTML = nextEvent
             ? `<strong>${SecurityUtils.escapeHtml(nextEvent.name)}</strong><span>${nextEvent.daysLeft === 0 ? '今天就是' : `还有 ${nextEvent.daysLeft} 天`} · ${SecurityUtils.escapeHtml(nextEvent.date)}</span>`
-            : '这里会自动展示今年剩余节假日首日，以及你新增的生日、节日和纪念日。';
+            : '这里会自动展示今年剩余节假日首日，以及你新增的生日、节日、纪念日和其他重要日子。';
 
         if (calendarTypeSelect) {
             calendarTypeSelect.title = calendarTypeSelect.value === 'lunar'
@@ -1180,6 +1191,7 @@ class OfficeDashboard {
         const colorInput = document.getElementById('countdownColor');
         const addBtn = document.getElementById('addCountdownBtn');
         const dateTip = document.querySelector('.countdown-form-tip');
+        const customTypeInput = document.getElementById('countdownCustomType');
 
         if (nameInput) {
             nameInput.value = target.name || '';
@@ -1192,6 +1204,10 @@ class OfficeDashboard {
         }
         if (typeSelect) {
             typeSelect.value = target.eventType || 'anniversary';
+        }
+        if (customTypeInput) {
+            customTypeInput.value = target.customEventType || '';
+            customTypeInput.style.display = target.eventType === 'other' ? '' : 'none';
         }
         if (colorInput) {
             colorInput.value = target.color || this.getCountdownTypeColors()[target.eventType || 'anniversary'] || '#f97316';
@@ -1216,6 +1232,7 @@ class OfficeDashboard {
         const colorInput = document.getElementById('countdownColor');
         const addBtn = document.getElementById('addCountdownBtn');
         const dateTip = document.querySelector('.countdown-form-tip');
+        const customTypeInput = document.getElementById('countdownCustomType');
         const colors = this.getCountdownTypeColors();
 
         if (nameInput) {
@@ -1230,6 +1247,10 @@ class OfficeDashboard {
         }
         if (typeSelect) {
             typeSelect.value = 'birthday';
+        }
+        if (customTypeInput) {
+            customTypeInput.value = '';
+            customTypeInput.style.display = 'none';
         }
         if (colorInput) {
             colorInput.value = colors.birthday || '#ec4899';
@@ -1250,15 +1271,22 @@ class OfficeDashboard {
         const typeSelect = document.getElementById('countdownEventType');
         const colorInput = document.getElementById('countdownColor');
         const addBtn = document.getElementById('addCountdownBtn');
+        const customTypeInput = document.getElementById('countdownCustomType');
         const name = nameInput?.value?.trim();
         const date = dateInput?.value;
         const calendarType = calendarTypeSelect?.value || 'solar';
         const eventType = typeSelect?.value || 'anniversary';
+        const customEventType = customTypeInput?.value?.trim() || '';
         const color = colorInput?.value || this.getCountdownTypeColors()[eventType] || '#f97316';
         const editingId = addBtn?.dataset.editingId;
 
         if (!name || !date) {
             this.showError('请先填写倒数日名称和日期');
+            return;
+        }
+
+        if (eventType === 'other' && !customEventType) {
+            this.showError('请填写自定义类型名称');
             return;
         }
 
@@ -1290,6 +1318,7 @@ class OfficeDashboard {
             type: 'custom',
             calendarType,
             eventType,
+            customEventType: eventType === 'other' ? customEventType : '',
             color,
             lunarMonth: lunarInfo?.month || null,
             lunarDay: lunarInfo?.day || null,
@@ -6944,8 +6973,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-05 v5.25';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=43', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=57', 'app-date-view.js?v=13', 'app.js?v=170', 'db.js?v=28', 'style.css?v=59', 'crypto.js?v=17'];
+        const version = '2026-05-05 v5.26';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=43', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=57', 'app-date-view.js?v=13', 'app.js?v=171', 'db.js?v=28', 'style.css?v=59', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
