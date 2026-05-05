@@ -1,3 +1,76 @@
+## 2026-05-05 v5.24
+
+### 本次目标
+- 修复微信轻量页面（wechat-upload.html）AI 识别图片功能失败
+- 阻止微信环境下 fallback 到 Tesseract OCR（CDN 不通导致下载引擎+语言包失败）
+- 增强微信页面 API Key 恢复检查，无 Key 时给明确提示
+
+### 根因分析
+1. 微信页面进入识别流程后，先尝试 Kimi API 调用
+2. 如果 Kimi Key 未恢复或 Kimi API 调用失败，代码会 fallback 到 Tesseract OCR
+3. Tesseract 需要从 `cdn.jsdelivr.net` 下载引擎（~3MB）+ 中文语言包（~12MB）
+4. 微信内置浏览器对 jsdelivr CDN 访问受限，下载失败 → 直接报错
+5. 用户看到"使用Kimi → 加载OCR → 下载语言包 → 失败"的快速闪烁
+
+### 当前状态
+- ✅ ocr.js：Kimi 失败 catch 块增加微信环境检测，直接抛出明确错误而非走 Tesseract
+- ✅ ocr.js：无 Kimi Key 的 else 块增加微信环境检测，直接提示设置 API Key
+- ✅ wechat-upload.js：init() 增加 API Key 恢复容错和 Key 存在性检查，无 Key 时禁用按钮并提示
+- ✅ 版本号提升到 v5.24
+- ✅ node --check 全部通过（ocr.js / wechat-upload.js / app.js）
+- ✅ diagnostics 全部 0 错误
+- ✅ 已提交推送 `3d8b397` 到 origin/main
+
+### 本轮关键改动
+- ocr.js：`analyzeDocument` 图片识别两个分支（Kimi 失败 catch + 无 Kimi Key else）增加微信环境判断，阻止 Tesseract fallback
+- wechat-upload.js：`init()` 增加 `loadApiKeysFromDB()` 容错 + Key 存在性检查
+- index.html / wechat-upload.html：资源版本 `ocr.js?v=42`、`wechat-upload.js?v=10`
+- app.js：版本提升到 v5.24
+
+### 提交记录
+- `3d8b397` fix: WeChat OCR block Tesseract fallback + API Key check (v5.24)
+
+### 遗留事项
+- 待用户微信端验证：有 Kimi Key 时识别是否正常（不再闪"下载语言包"）
+- 待用户微信端验证：无 Kimi Key 时是否显示"未检测到AI密钥"提示
+
+## 2026-05-04 v5.21
+
+### 本次目标
+- Supabase 初始化从轮询改为事件驱动，消除 200ms×100 的 while 循环开销
+- window.supabase 属性锁定防篡改（Object.defineProperty writable:false configurable:false）
+- 修复 Object.freeze 与 esm.sh 模块不可配置属性冲突导致 freeze 失败的问题
+
+### 当前状态
+- ✅ sync.js：构造函数改为 `this.initPromise = this._waitForSupabaseLib().then(() => this._doInitSupabase())`
+- ✅ sync.js：新增 `_waitForSupabaseLib()` 事件驱动等待（addEventListener supabase-loaded + 20s 超时）
+- ✅ sync.js：旧 `initSupabase` 重命名为 `_doInitSupabase`，移除 while 轮询循环
+- ✅ index.html：loadSupabase 函数增加 Object.defineProperty 冻结 window.supabase
+- ✅ index.html：修复 Object.freeze(module) 报错 "Cannot redefine property: AuthAdminApi"，改为只冻结 window 属性
+- ✅ app.js：版本提升到 v5.21
+- ✅ node --check / diagnostics 0 错误
+- ✅ 本地模拟测试 68 项全部通过
+- ✅ 线上验证通过：版本号 v5.21、supabase writable:false configurable:false、createClient 可用、骨架屏正常移除、控制台无新错误
+- ✅ 已提交推送 `d7776d4` 到 origin/main
+
+### 本轮关键改动
+- sync.js：事件驱动初始化替代轮询，20s 超时保护
+- index.html：Object.defineProperty 锁定 window.supabase（不冻结模块内部属性）
+- app.js：版本提升到 v5.21
+
+### 事故记录（推送截断事故）
+- 过程：尝试用 GitHub API `create_or_update_file` 推送 index.html 修复，content 参数被截断导致远程文件从 69KB 变为 2.4KB，线上白屏
+- 恢复：用户在独立终端执行 `git push --force origin main` 恢复完整版本
+- 教训：已写入 project_rules.md 推送安全铁律——禁止通过 GitHub API 推送超过 1KB 的文件
+
+### 提交记录
+- `95c89c4` perf: event-driven Supabase init + security hardening (v5.21)
+- `d7776d4` fix: remove Object.freeze on supabase module (causes error with non-configurable props)
+
+### 遗留事项
+- 待用户手机端验证功能正常
+- 待继续第 5 步：Supabase SDK 本地化（P0）
+
 ## 2026-05-04 v5.20
 
 ### 本次目标

@@ -25,6 +25,13 @@
         summaryEl.classList.toggle('error', isError);
     }
 
+    function disableChooseWithNoKeyTip() {
+        chooseBtn.disabled = true;
+        backBtn.disabled = false;
+        setStatus('未检测到 Kimi API Key，请回主页面先配置 AI 密钥后再使用微信识别。');
+        setSummary('当前微信轻量页不支持在无 Kimi Key 时回退到本地 OCR，请点击“返回主页面”先完成配置。', true);
+    }
+
     function showPreviewDialog(fileName, previewResult) {
         return window.UploadFlowUtils.showRecognitionPreviewModal(fileName, previewResult, {
             layout: 'compact',
@@ -60,6 +67,15 @@
             if (typeof ocrManager?.loadApiKeysFromDB === 'function') {
                 await ocrManager.loadApiKeysFromDB();
             }
+            const kimiApiKey = typeof ocrManager?.getKimiApiKey === 'function'
+                ? ocrManager.getKimiApiKey()
+                : null;
+            if (!kimiApiKey) {
+                disableChooseWithNoKeyTip();
+                return;
+            }
+            chooseBtn.disabled = false;
+            backBtn.disabled = false;
             setStatus('初始化完成，请选择图片或直接拍摄。');
         } catch (error) {
             setStatus(`初始化失败：${error.message}`);

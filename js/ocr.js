@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * OCR 文档识别模块
  * 支持图片和PDF的文字提取
  * 支持DeepSeek API和Kimi API（月之暗面，图片理解更强）
@@ -2111,6 +2111,7 @@ class OCRManager {
      */
     async analyzeDocument(file, progressCallback = null, options = {}) {
         const fileType = this.getFileType(file);
+        const isWeChatBrowser = /MicroMessenger/i.test(navigator.userAgent || '');
 
         // 检查文件类型
         if (fileType === 'unknown') {
@@ -2152,6 +2153,11 @@ class OCRManager {
                         text = kimiResult.text || '';
                         metadata.recognitionMethod = 'kimi';
                     } catch (kimiError) {
+                        // 微信环境禁止回退到本地 Tesseract，直接抛出明确错误
+                        if (isWeChatBrowser) {
+                            throw new Error(`微信环境下 Kimi 识别失败，已禁止回退到本地 OCR：${kimiError.message}`);
+                        }
+
                         // Kimi过载或失败，尝试备用方案
                         console.warn('Kimi识别失败，尝试备用方案:', kimiError.message);
                         if (progressCallback) progressCallback('Kimi服务异常，切换到备用识别...');
@@ -2168,6 +2174,10 @@ class OCRManager {
                         items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
                     }
                 } else {
+                    if (isWeChatBrowser) {
+                        throw new Error('微信环境未检测到 Kimi API Key，已禁止回退到本地 OCR，请回主页面先配置 AI 密钥。');
+                    }
+
                     // 使用Tesseract OCR + DeepSeek AI
                     if (progressCallback) progressCallback('正在识别图片文字...');
                     const imageResult = await this.recognizeImage(file, progressCallback);

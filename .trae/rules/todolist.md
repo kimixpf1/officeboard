@@ -1,18 +1,27 @@
 # Todolist
 
+## 已完成（v5.24 微信识别修复）
+- ✅ 排查微信页面 AI 识别失败根因（Tesseract CDN 不通）
+- ✅ ocr.js 阻止微信环境 Tesseract fallback
+- ✅ wechat-upload.js 增加 API Key 恢复检查和提示
+- ✅ 版本提升到 v5.24
+- ✅ node --check / diagnostics 0 错误
+- ✅ 已提交推送 `3d8b397` 到 origin/main
+- 🔄 待用户微信端验证
+
+## 已完成（v5.21 性能优化）
+- ✅ Supabase 初始化轮询改事件驱动
+- ✅ window.supabase 属性锁定防篡改
+- ✅ 已提交推送 `d7776d4` 到 origin/main
+
 ## 已完成（v5.20 第三/四批优化）
 - ✅ 删除死代码 templates.js（53KB）
 - ✅ 移除 Google Fonts 改用系统字体栈
 - ✅ CSP 收紧去掉字体域名
 - ✅ 首屏骨架屏（shimmer 动画）
 - ✅ 修复周视图"今天"按钮电脑端滚动位置
-- ✅ 版本提升到 v5.20
-- ✅ node --check / diagnostics 0 错误
-- ✅ 已提交推送 `0006ee6` 到 origin/main
-- ✅ 线上验证通过
 
 ## 待执行
-- 🔴P0 Supabase 初始化轮询改事件驱动（sync.js）
 - 🔴P0 Supabase CDN 本地化（index.html + vendor/）
 - 🟡P1 loadItems 防抖合并
 - 🟡P1 console.log 生产环境静默
