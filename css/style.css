@@ -284,7 +284,8 @@ body {
     align-items: center;
     gap: 10px;
     min-width: 0;
-    max-width: 320px;
+    width: 280px;
+    max-width: 280px;
     min-height: 36px;
     height: auto;
     padding: 6px 12px;
@@ -296,7 +297,8 @@ body {
 }
 
 .countdown-notice[hidden] {
-    display: none;
+    visibility: hidden;
+    display: flex !important;
 }
 
 .countdown-notice-badge {
@@ -355,6 +357,10 @@ body {
     text-overflow: ellipsis;
 }
 
+.countdown-notice.todo-reminder-active .countdown-notice-content {
+    padding-right: 30px;
+}
+
 @keyframes marqueeScroll {
     0% { transform: translateX(100%); }
     100% { transform: translateX(-100%); }
@@ -410,7 +416,8 @@ body {
 .header-notice {
     display: flex;
     align-items: center;
-    flex: 0 0 auto;
+    flex: 0 0 280px;
+    width: 280px;
     min-width: 0;
 }
 
