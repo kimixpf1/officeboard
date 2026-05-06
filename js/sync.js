@@ -639,6 +639,11 @@ class SyncManager {
         }
 
         this.isSyncing = false;
+
+        if (this._pendingRealtimeSync) {
+            this._pendingRealtimeSync = false;
+            this.silentSyncFromCloud().catch(e => console.warn('补执行静默同步失败:', e?.message));
+        }
     }
 
     /**
@@ -1155,6 +1160,7 @@ class SyncManager {
                 }
             }
             console.error('上传重试3次仍失败:', lastError);
+            document.dispatchEvent(new CustomEvent('syncError', { detail: { source: 'upload', message: '数据同步失败，请检查网络连接' } }));
             return { success: false, error: lastError };
         })();
 
@@ -1211,7 +1217,10 @@ class SyncManager {
                 },
                 async (payload) => {
                     this.realtimeReconnectAttempts = 0;
-                    if (this.isSyncing) return;
+                    if (this.isSyncing) {
+                        this._pendingRealtimeSync = true;
+                        return;
+                    }
                     try {
                         const result = await this.silentSyncFromCloud();
                         if (result?.success) {
@@ -1442,6 +1451,7 @@ class SyncManager {
             // 更新云端同步时间
             if (data.updated_at) {
                 this.lastCloudSyncTime = data.updated_at;
+                SafeStorage.set('lastCloudSyncTime', data.updated_at);
             }
 
 
