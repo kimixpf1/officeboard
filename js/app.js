@@ -252,8 +252,6 @@ class OfficeDashboard {
             this.bindEvents();
 
             await this.loadItems();
-            this.startTodoReminderLoop();
-            this.bindTodoReminderComplete();
 
             const skeleton = document.getElementById('appSkeleton');
             if (skeleton) skeleton.remove();
@@ -262,10 +260,18 @@ class OfficeDashboard {
             this.initDatePicker();
 
             this.updateDateDisplay();
-            this.updateDeployVersionBadge();
-            this.initHeaderClock();
-            this.initHeaderWeather();
-            this.initCountdownSystem();
+
+            const _ric = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (fn) => setTimeout(fn, 0);
+            _ric(() => {
+                this.startTodoReminderLoop();
+                this.bindTodoReminderComplete();
+                this.initHeaderClock();
+                this.initHeaderWeather();
+                this.initCountdownSystem();
+                this.startMeetingAutoCompleteCheck();
+                this.startDailyBackupSchedule();
+                this.updateDeployVersionBadge();
+            });
 
             syncManager.waitForInit().then(async () => {
                 if (syncManager.isLoggedIn()) {
@@ -280,9 +286,6 @@ class OfficeDashboard {
                     console.warn('API密钥检查失败:', err.message);
                 });
             }, 1000);
-
-            this.startMeetingAutoCompleteCheck();
-            this.startDailyBackupSchedule();
         } catch (error) {
             console.error('初始化失败:', error);
             this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
@@ -1104,11 +1107,11 @@ class OfficeDashboard {
             const isCustom = item.type !== 'holiday';
             const style = item.color ? ` style="--countdown-accent:${SecurityUtils.escapeHtml(item.color)}"` : '';
             const actionButtons = isCustom
-                ? `<button type="button" class="countdown-item-edit" data-id="${item.id}" title="编辑">编辑</button>
-                   <button type="button" class="countdown-item-delete" data-id="${item.id}" title="删除">×</button>`
+                ? `<button type="button" class="countdown-item-edit" data-id="${SecurityUtils.escapeHtml(item.id)}" title="编辑">编辑</button>
+                   <button type="button" class="countdown-item-delete" data-id="${SecurityUtils.escapeHtml(item.id)}" title="删除">×</button>`
                 : '';
             return `
-                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${item.id}" draggable="true"${style}>
+                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${SecurityUtils.escapeHtml(item.id)}" draggable="true"${style}>
                     <div class="countdown-item-info">
                         <div class="countdown-item-title-row">
                             <span class="countdown-item-type-dot"></span>
@@ -2782,8 +2785,13 @@ class OfficeDashboard {
         document.addEventListener('contactsSynced', (e) => {
             const newContacts = e.detail.contacts;
             this.contacts = newContacts;
-            this.renderContacts(newContacts);
-
+            const searchInput = document.getElementById('contactsSearchInput');
+            const keyword = searchInput?.value?.trim() || '';
+            if (keyword) {
+                this.filterContacts(keyword);
+            } else {
+                this.renderContacts(newContacts);
+            }
         });
 
         // 初始加载
@@ -4361,10 +4369,11 @@ class OfficeDashboard {
                     try {
                         passwordInput.value = await cryptoManager.decrypt(data.password);
                     } catch (e) {
-                        passwordInput.value = atob(data.password);
+                        console.warn('记住密码解密失败，请重新输入');
+                        if (rememberCheckbox) rememberCheckbox.checked = false;
                     }
                 } else {
-                    passwordInput.value = atob(data.password);
+                    if (rememberCheckbox) rememberCheckbox.checked = false;
                 }
             } else {
                 passwordInput.value = '';
@@ -4720,7 +4729,8 @@ class OfficeDashboard {
         const file = e.target.files[0];
         if (!file) return;
 
-        const password = prompt('如果文件有密码保护，请输入密码（无密码请留空）：');
+        const password = await this.showPasswordPrompt('导入密码', '如果文件有密码保护，请输入密码（无密码请留空）');
+        if (password === null) { e.target.value = ''; return; }
 
         this.showLoading(true, '正在导入...');
 
@@ -6973,8 +6983,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-05 v5.28';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=43', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=57', 'app-date-view.js?v=13', 'app.js?v=173', 'db.js?v=28', 'style.css?v=61', 'crypto.js?v=17'];
+        const version = '2026-05-05 v5.29';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=43', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=57', 'app-date-view.js?v=13', 'app.js?v=174', 'db.js?v=28', 'style.css?v=61', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -9682,6 +9692,58 @@ class OfficeDashboard {
         });
     }
 
+    showPasswordPrompt(title, placeholder) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            const mc = document.createElement('div');
+            mc.className = 'modal-content';
+            mc.style.maxWidth = '400px';
+            const hdr = document.createElement('div');
+            hdr.className = 'modal-header';
+            const h3 = document.createElement('h3');
+            h3.textContent = title || '请输入密码';
+            const cb = document.createElement('button');
+            cb.type = 'button';
+            cb.className = 'btn-close';
+            cb.textContent = '×';
+            cb.addEventListener('click', () => { modal.remove(); resolve(null); });
+            hdr.append(h3, cb);
+            const body = document.createElement('div');
+            body.className = 'modal-body';
+            body.style.padding = '16px';
+            const inp = document.createElement('input');
+            inp.type = 'password';
+            inp.className = 'form-input';
+            inp.placeholder = placeholder || '请输入密码（无密码请留空）';
+            inp.style.width = '100%';
+            body.appendChild(inp);
+            const acts = document.createElement('div');
+            acts.className = 'modal-actions';
+            const cbtn = document.createElement('button');
+            cbtn.type = 'button';
+            cbtn.className = 'btn-secondary';
+            cbtn.textContent = '取消';
+            cbtn.addEventListener('click', () => { modal.remove(); resolve(null); });
+            const obtn = document.createElement('button');
+            obtn.type = 'button';
+            obtn.className = 'btn-primary';
+            obtn.textContent = '确定';
+            obtn.addEventListener('click', () => { modal.remove(); resolve(inp.value || ''); });
+            acts.append(cbtn, obtn);
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { modal.remove(); resolve(inp.value || ''); }
+            });
+            mc.append(hdr, body, acts);
+            modal.appendChild(mc);
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) { modal.remove(); resolve(null); }
+            });
+            inp.focus();
+        });
+    }
+
     showRecognitionLog(title, content) {
         const modal = document.createElement('div');
         modal.className = 'modal active';
@@ -9706,7 +9768,7 @@ class OfficeDashboard {
         modalBody.className = 'modal-body';
         modalBody.style.padding = '16px';
         if (typeof content === 'string') {
-            modalBody.innerHTML = content;
+            modalBody.textContent = content;
         } else {
             modalBody.appendChild(content);
         }
