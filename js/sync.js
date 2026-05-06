@@ -652,7 +652,7 @@ class SyncManager {
     /**
      * 上传本地数据到云端
      */
-    async uploadToCloud(existingCloudData = null, preparedSyncData = null) {
+    async uploadToCloud(existingCloudData = null, preparedSyncData = null, skipCloudMerge = false) {
 
 
         try {
@@ -701,11 +701,13 @@ class SyncManager {
             const cloudItems = Array.isArray(existingRow?.data?.items) ? existingRow.data.items : [];
 
             const cloudOnlyItems = [];
-            const localKeys = new Set(normalizedLocalItems.map(item => this.getItemKey(item)));
-            for (const ci of cloudItems) {
-                if (this.shouldKeepDeleted(ci)) continue;
-                if (localKeys.has(this.getItemKey(ci))) continue;
-                cloudOnlyItems.push(ci);
+            if (!skipCloudMerge) {
+                const localKeys = new Set(normalizedLocalItems.map(item => this.getItemKey(item)));
+                for (const ci of cloudItems) {
+                    if (this.shouldKeepDeleted(ci)) continue;
+                    if (localKeys.has(this.getItemKey(ci))) continue;
+                    cloudOnlyItems.push(ci);
+                }
             }
 
             syncData.items = [...normalizedLocalItems.filter(item => !this.shouldKeepDeleted(item)), ...cloudOnlyItems];
@@ -1425,6 +1427,12 @@ class SyncManager {
 
             const localItems = await db.getAllItems();
 
+            // 导入保护窗口：导入后30秒内拒绝静默同步覆盖
+            if (this._importProtectUntil && Date.now() < this._importProtectUntil) {
+                console.log(`导入保护窗口中，跳过静默同步（剩余 ${Math.round((this._importProtectUntil - Date.now()) / 1000)}s）`);
+                return { success: false, protected: true };
+            }
+
             // 数据丢失保护：如果本地数据量显著大于云端，阻止静默覆盖
             if (localItems.length > 0 && deduplicatedCloudItems.length < localItems.length && localItems.length >= 5) {
                 const lossRatio = deduplicatedCloudItems.length / localItems.length;
@@ -2090,7 +2098,7 @@ class SyncManager {
 
             if (this.currentUser && importedCount > 0) {
                 try {
-                    await this.uploadToCloud();
+                    await this.uploadToCloud(null, null, true);
                 } catch (uploadErr) {
                     console.warn('导入后上传云端失败:', uploadErr);
                 }
@@ -2101,6 +2109,8 @@ class SyncManager {
             throw new Error('导入失败: ' + error.message);
         } finally {
             this.isSyncing = wasSyncing || false;
+            this._pendingRealtimeSync = false;
+            this._importProtectUntil = Date.now() + 30000;
         }
     }
 
