@@ -1076,14 +1076,11 @@ class SyncManager {
     }
 
     getItemKey(item) {
-        const title = (item.title || '').trim().toLowerCase();
-        const extractKeywords = (t) => {
-            return t.replace(/会议|研究|工作|座谈|讨论|调研|培训|学习|协调|推进|落实/g, '').trim();
-        };
+        // 用标题原文（去空格、去标点、统一小写）生成 key，不再暴力去高频词
+        const title = (item.title || '').replace(/\s+/g, '').replace(/[，。、！？：；""''【】《》（）\[\]{}]/g, '').toLowerCase();
 
         if (item.type === 'meeting') {
-            const keywords = extractKeywords(title);
-            return `meeting:${keywords}:${item.date || ''}`;
+            return `meeting:${title}:${item.date || ''}`;
         } else if (item.type === 'todo') {
             if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
                 return `todo:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
