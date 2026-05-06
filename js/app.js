@@ -3148,13 +3148,22 @@ class OfficeDashboard {
             // 使用SheetJS解析
             if (typeof XLSX === 'undefined') {
                 // 动态加载SheetJS
-                await new Promise((resolve, reject) => {
+                const loadScript = (src) => new Promise((resolve, reject) => {
                     const script = document.createElement('script');
-                    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js';
+                    script.src = src;
                     script.onload = resolve;
-                    script.onerror = reject;
+                    script.onerror = () => reject(new Error('SheetJS库加载失败: ' + src));
                     document.head.appendChild(script);
                 });
+                try {
+                    await loadScript('https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js');
+                } catch (cdnErr) {
+                    try {
+                        await loadScript('vendor/xlsx.full.min.js');
+                    } catch (localErr) {
+                        throw new Error('SheetJS库加载失败，请检查网络连接或刷新页面重试');
+                    }
+                }
             }
 
             const data = await file.arrayBuffer();
@@ -3296,7 +3305,7 @@ class OfficeDashboard {
 
         } catch (e) {
             console.error('导入Excel失败:', e);
-            alert('导入失败: ' + e.message);
+            alert('导入失败: ' + (e?.message || '未知错误，请检查文件格式'));
         }
     }
 
