@@ -1,3 +1,68 @@
+## 2026-05-06 v5.33
+
+### 本次目标
+- 修复手机端菜单栏中间留白布局异常
+- 修复编辑已有待办被错误新增的问题
+- 修复 smartSync 删除墓碑未合并导致跨设备删除回弹
+
+### 当前状态
+- ✅ 手机端 header-notice 640px 断点：flex:0 0 auto + width:100% + justify-content:flex-start
+- ✅ 手机端 countdown-notice[hidden] 改为 display:none（不再占位撑高 header）
+- ✅ 平板端 1024px 断点补 flex:0 0 auto + max-width:100%
+- ✅ saveItem 编辑失败不再偷偷 addItem，改为 throw 明确报错
+- ✅ saveItem itemId 改 let 支持后续回填
+- ✅ smartSync 情况3 补 deletedItemsMap 合并云端墓碑
+- ✅ 版本号提升到 v5.33，资源版本 style.css?v=63、app.js?v=178、sync.js?v=62
+- ✅ node --check 全部通过，diagnostics 0 错误
+- ✅ 已提交 `a0033e4`，待推送到 origin/main
+
+### 本轮关键改动
+- css/style.css：平板端补 header-notice flex 覆盖；移动端 flex-start 对齐 + hidden 不占位
+- js/app.js：saveItem 编辑失败兜底移除 addItem；itemId 改 let；版本 v5.33
+- js/sync.js：smartSync 情况3 补 cloudData.deletedItems 合并到本地 deletedItemsMap
+- index.html：资源版本 style.css?v=63、sync.js?v=62、app.js?v=178
+
+### 同步排查结论
+- 电脑端未登录时新增/删除只留在本地，不上云，这是预期行为
+- 未登录电脑不影响其他已登录设备的同步
+- 已登录设备间同步逻辑正常，删除墓碑链路已补齐
+
+### 提交记录
+- `a0033e4` fix: mobile header layout, edit-to-new bug, sync tombstone merge (v5.33)
+
+### 遗留事项
+- 待线上强刷确认版本号 `2026-05-06 v5.33`
+- 待手机端验证菜单栏不再中间留白
+- 待验证编辑已有待办不再误新增
+- 待双设备验证删除墓碑不再回弹
+
+## 2026-05-06 v5.31
+
+### 本次目标
+- 代码健康度快速优化：合并重复代码、消除空catch、全局错误捕获
+- 不影响任何功能，纯重构
+
+### 当前状态
+- ✅ M5: 5个toggle函数合并为通用 toggleInputVisibility(inputId)
+- ✅ M6: 删除重复的 updateApiKeyStatus 定义（保留L4901版本）
+- ✅ M7: sync.js 两处空 catch 补充 console.warn 日志
+- ✅ M9: 添加全局 unhandledrejection / error 捕获监听
+- ✅ 版本号提升到 v5.31，资源版本 sync.js?v=61、app.js?v=176
+- ✅ node --check 通过
+- ✅ 已提交 `245b868`，待推送到 origin/main
+
+### 本轮关键改动
+- js/app.js：toggleInputVisibility通用方法、删除重复updateApiKeyStatus、全局错误捕获
+- js/sync.js：两处空catch补充日志
+- index.html：资源版本 sync.js?v=61、app.js?v=176
+
+### 提交记录
+- `245b868` refactor: merge toggles, delete duplicate, empty catch logging, global error capture (v5.31)
+
+### 遗留事项
+- 待线上强刷确认版本号 `2026-05-06 v5.31`
+- 待验证全局错误捕获在控制台正常输出
+
 ## 2026-05-06 v5.30
 
 ### 本次目标

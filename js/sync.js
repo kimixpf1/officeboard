@@ -550,6 +550,11 @@ class SyncManager {
             // 情况3: 两边都有数据，需要比较时间
             const cloudItems = cloudData.data.items || [];
 
+            if (cloudData.data.deletedItems && typeof cloudData.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...cloudData.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
+
             const isFirstSync = !lastSyncTime;
 
             if (isFirstSync) {

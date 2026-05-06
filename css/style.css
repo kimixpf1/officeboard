@@ -2418,6 +2418,11 @@ body {
         justify-content: center;
     }
 
+    .header-notice {
+        flex: 0 0 auto;
+        max-width: 100%;
+    }
+
     .header-center {
         flex-wrap: wrap;
     }
@@ -2524,13 +2529,21 @@ body {
     }
 
     .header-notice {
-        width: 100%;
-        justify-content: center;
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        justify-content: flex-start;
     }
 
     .countdown-notice {
+        width: 100%;
         max-width: 320px;
         justify-content: flex-start;
+    }
+
+    .countdown-notice[hidden] {
+        display: none !important;
+        visibility: visible !important;
     }
 
     .header-center {
