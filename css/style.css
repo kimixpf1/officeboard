@@ -482,6 +482,15 @@ body {
     to { transform: rotate(360deg); }
 }
 
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+.btn-loading svg {
+    animation: spin 0.8s linear infinite;
+}
+
 .toolbar-views {
     display: flex;
     align-items: center;

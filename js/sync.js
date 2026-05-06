@@ -890,12 +890,14 @@ class SyncManager {
             
             // 先添加云端数据
             for (const item of cloudItems) {
+                if (this.shouldKeepDeleted(item)) continue;
                 const key = this.getItemKey(item);
                 mergedMap.set(key, { ...item, source: 'cloud' });
             }
             
             // 再合并本地数据
             for (const item of localItems) {
+                if (this.shouldKeepDeleted(item)) continue;
                 const key = this.getItemKey(item);
                 if (mergedMap.has(key)) {
                     const existing = mergedMap.get(key);

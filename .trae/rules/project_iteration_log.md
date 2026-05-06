@@ -979,8 +979,29 @@
 - `index.html` diagnostics 0 错误
 
 ### 遗留事项
-- 待提交并推送 `v5.36` 到 `origin/main`
-- 待线上强刷验证是否已命中 `app.js?v=181`
+- 待线上强刷验证是否已命中 `app.js?v=182`
+
+---
+
+## v5.37（2026-05-06）
+
+### 修复内容
+1. **跨设备删除同步修复**：`mergeData()` 合并循环增加 `shouldKeepDeleted` 墓碑过滤，已删除事项不再被复活。根因：mergeData 在合并云端和本地数据时完全不检查墓碑，导致设备 A 删除的事项在设备 B 首次同步或 mergeData 路径中被当作有效数据写入
+2. **AI loading 改为按钮本身转圈**：打字识别时放大镜按钮 SVG 旋转，图片/PDF 识别时上传按钮 SVG 旋转。不再使用旁边的 `aiStatus` 文字标签，顶部布局完全不变
+3. 新增 CSS `.btn-loading` 类：`pointer-events: none` + `opacity: 0.7` + SVG `animation: spin`
+
+### 修改文件
+- `js/sync.js`：mergeData 两处合并循环加 `shouldKeepDeleted` 过滤
+- `js/app.js`：parseNaturalLanguage 的 showStatus/hideStatus 改为操作 parseBtn；handleFileUpload 的改为操作 uploadBtn
+- `css/style.css`：新增 `.btn-loading` 和 `.btn-loading svg` 样式
+- `index.html`：资源戳更新
+
+### 验证清单
+- [ ] 电脑端删除待办/会议后，手机端刷新后也消失
+- [ ] 电脑端删除后刷新，删除的事项不会恢复
+- [ ] 打字 AI 解析时，放大镜按钮图标旋转，顶部布局不动
+- [ ] 图片/PDF 识别时，上传按钮图标旋转，顶部布局不动
+- [ ] 手机端和电脑端均正常
 
 ---
 
