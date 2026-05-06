@@ -4,10 +4,10 @@
 - ✅ 排查微信页面 AI 识别失败根因（Tesseract CDN 不通）
 - ✅ ocr.js 阻止微信环境 Tesseract fallback
 - ✅ wechat-upload.js 增加 API Key 恢复检查和提示
-- ✅ 版本提升到 v5.24
-- ✅ node --check / diagnostics 0 错误
-- ✅ 已提交推送 `3d8b397` 到 origin/main
-- 🔄 待用户微信端验证
+- ✅ 线上验证：微信 UA 已命中 `ocr.js?v=44`、`wechat-upload.js?v=10`，无 Key 时按钮禁用和提示生效
+- ✅ node --check 通过（ocr.js / wechat-upload.js）
+- ✅ 已提交推送 `131ddfb` 到 origin/main
+- 🔄 待用户微信端验证有 Key 的真实识别链路
 
 ## 已完成（v5.21 性能优化）
 - ✅ Supabase 初始化轮询改事件驱动

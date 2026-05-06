@@ -246,6 +246,12 @@ class OfficeDashboard {
      */
     async init() {
         try {
+            window.addEventListener('unhandledrejection', (e) => {
+                console.warn('未捕获的Promise异常:', e.reason?.message || e.reason);
+            });
+            window.addEventListener('error', (e) => {
+                console.warn('未捕获的运行时错误:', e.message);
+            });
             await db.init();
 
             this.initializeRecurringFieldOptions();
@@ -300,37 +306,6 @@ class OfficeDashboard {
             await ocrManager.loadApiKeysFromDB();
         }
         this.updateApiKeyStatus();
-    }
-
-    /**
-     * 更新API Key状态显示
-     */
-    async updateApiKeyStatus() {
-        const statusEl = document.getElementById('apiKeyStatus');
-        if (!statusEl) return;
-
-        const deepseekKey = ocrManager.getApiKey();
-        const kimiKey = ocrManager.getKimiApiKey();
-
-        const configured = [];
-        if (kimiKey) configured.push('Kimi');
-        if (deepseekKey) configured.push('DeepSeek');
-
-        statusEl.className = configured.length > 0
-            ? 'api-key-status configured'
-            : 'api-key-status';
-
-        const icon = document.createElement('span');
-        icon.className = 'status-icon';
-        icon.textContent = configured.length > 0 ? '✅' : '○';
-
-        const text = document.createElement('span');
-        text.className = 'status-text';
-        text.textContent = configured.length > 0
-            ? `AI增强已启用（${configured.join(' + ')}）`
-            : '使用基础解析';
-
-        statusEl.replaceChildren(icon, text);
     }
 
     /**
@@ -4584,12 +4559,14 @@ class OfficeDashboard {
     /**
      * 切换登录密码显示
      */
-    toggleLoginPasswordVisibility() {
-        const input = document.getElementById('loginPassword');
+    toggleInputVisibility(inputId) {
+        const input = document.getElementById(inputId);
         if (input) {
             input.type = input.type === 'password' ? 'text' : 'password';
         }
     }
+
+    toggleLoginPasswordVisibility() { this.toggleInputVisibility('loginPassword'); }
 
     /**
      * 显示修改密码面板
@@ -4779,13 +4756,9 @@ class OfficeDashboard {
         // 兼容性方法，不再使用
     }
 
-    toggleSupabaseKeyVisibility() {
-        // 兼容性方法，不再使用
-    }
+    toggleSupabaseKeyVisibility() {}
 
-    toggleExportPasswordVisibility() {
-        // 兼容性方法，不再使用
-    }
+    toggleExportPasswordVisibility() {}
 
     async handleExportBackupFile() {
         const result = syncManager.exportBackupAsFile();
@@ -4962,32 +4935,11 @@ class OfficeDashboard {
         statusEl.replaceChildren(icon, text);
     }
 
-    /**
-     * 切换API Key显示/隐藏
-     */
-    toggleApiKeyVisibility() {
-        const input = document.getElementById('apiKeyInput');
-        if (input) {
-            input.type = input.type === 'password' ? 'text' : 'password';
-        }
-    }
+    toggleApiKeyVisibility() { this.toggleInputVisibility('apiKeyInput'); }
 
-    /**
-     * 切换Kimi API Key显示/隐藏
-     */
-    toggleKimiApiKeyVisibility() {
-        const input = document.getElementById('kimiApiKeyInput');
-        if (input) {
-            input.type = input.type === 'password' ? 'text' : 'password';
-        }
-    }
+    toggleKimiApiKeyVisibility() { this.toggleInputVisibility('kimiApiKeyInput'); }
 
-    toggleQweatherApiKeyVisibility() {
-        const input = document.getElementById('qweatherApiKeyInput');
-        if (input) {
-            input.type = input.type === 'password' ? 'text' : 'password';
-        }
-    }
+    toggleQweatherApiKeyVisibility() { this.toggleInputVisibility('qweatherApiKeyInput'); }
 
     /**
      * 测试API Key连接
@@ -6983,8 +6935,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-06 v5.30';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=43', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=60', 'app-date-view.js?v=13', 'app.js?v=175', 'db.js?v=28', 'style.css?v=61', 'crypto.js?v=17'];
+        const version = '2026-05-06 v5.31';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=43', 'upload-flow.js?v=8', 'calendar.js?v=38', 'sync.js?v=61', 'app-date-view.js?v=13', 'app.js?v=176', 'db.js?v=28', 'style.css?v=61', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

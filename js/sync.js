@@ -2263,7 +2263,7 @@ class SyncManager {
                 try {
                     const parsed = JSON.parse(list[i].data);
                     b.itemCount = parsed.items?.length || 0;
-                } catch (e) {}
+                } catch (e) { console.warn('备份数据解析失败:', e?.message); }
                 return b;
             });
         } catch (e) { return []; }

@@ -96,6 +96,16 @@
 - **本地每日备份**：每晚 8 点自动下载 JSON 文件到本地
 - **uploadToCloud 保留 dailyBackups**：上传时先读取云端已有 dailyBackups 合并回去
 
+## 推送安全铁律（2026-05-04 事故教训）
+
+### 绝对禁止
+- **禁止通过 GitHub API（create_or_update_file / push_files）推送任何超过 1KB 的文件**：API 参数 content 字段容易截断，导致线上白屏。index.html（~69KB）被截断到 2.4KB 就是此原因
+- **禁止在 git push 失败时用 API 绕过**：如果终端环境的 git push 不生效，必须请用户在独立终端手动执行，绝不能用 API 替代
+
+### 必须执行
+- **推送后必须验证远程文件完整性**：通过 GitHub API 检查远程文件的 size 字段，确认与本地一致
+- **git push --force 在当前 PowerShell 环境下可能静默失败**：exit code 0 但实际未推送。推送后必须通过 GitHub API 的 list_commits 确认远程 HEAD 已更新
+
 ## .trae/rules/ 目录维护
 - 固定维护五个文件：project_rules.md、project_framework.md、todolist.md、project_iteration_log.md、universal_template.md
 - project_rules.md 只记录长期规则
@@ -106,8 +116,7 @@
 
 ## GLM 用量自动查询（跨项目通用规则）
 
-- 每次会话结束前，如果本次会话使用了 GLM 模型（Bigmodel Plan / GLM-5.1 / GLM-4.5-Air 等智谱模型），必须自动运行 `python "c:\Users\42151\.glm-tools\glm_usage.py" --all` 查询并报告两个 Key 的用量
+- 每次会话结束前，如果本次会话使用了 GLM 模型（Bigmodel Plan / GLM-5.1 / GLM-4.5-Air 等智谱模型），必须自动运行 `python "c:\Users\42151\.glm-tools\glm_usage.py"` 查询并报告用量
 - 格式固定为：额度使用情况 → Token 消耗 (今日) → 本月累计
-- 如果用户说"查 GLM 用量"或"查用量"，也要立即执行查询
-- 如果用户后续说只需要查 key2，则改为 `python "c:\Users\42151\.glm-tools\glm_usage.py" key2`
+- 如果用户说"查 GLM 用量"、"报告用量"或"查用量"，也要立即执行查询
 - 此规则对所有项目生效，不得删除

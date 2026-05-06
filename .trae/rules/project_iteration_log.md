@@ -1,3 +1,158 @@
+## 2026-05-06 v5.30
+
+### 本次目标
+- 修复跨设备同步丢失会议记录：silentSyncFromCloud的lastCloudSyncTime未持久化
+- 修复Realtime事件被isSyncing互斥丢弃导致同步中断
+- 上传失败3次后通知用户（之前静默失败无感知）
+
+### 当前状态
+- ✅ 修复1: silentSyncFromCloud 成功后 SafeStorage.set('lastCloudSyncTime') 持久化
+- ✅ 修复2: Realtime回调被isSyncing阻断时设 _pendingRealtimeSync=true，smartSync结束后补执行
+- ✅ 修复3: immediateSyncToCloud 重试3次失败后 dispatchEvent('syncError') 通知UI
+- ✅ 版本号提升到 v5.30，资源版本 sync.js?v=60、app.js?v=175
+- ✅ node --check 通过，diagnostics 0 错误
+- ✅ 已提交推送 `ad3ebd5` 到 origin/main
+
+### 本轮关键改动
+- js/sync.js：lastCloudSyncTime持久化、Realtime待处理标记+补执行、上传失败通知
+- js/app.js：版本 v5.30、scriptVersions 更新
+- index.html：资源版本 sync.js?v=60、app.js?v=175
+
+### 提交记录
+- `ad3ebd5` fix: sync reliability - persist lastSyncTime, realtime retry, upload failure alert (v5.30)
+
+### 遗留事项
+- 待用户双设备验证：手机端新增会议后电脑端能正确同步
+- 待验证上传失败时UI是否显示提示
+- 待验证Realtime补执行逻辑是否正常触发
+
+## 2026-05-05 v5.29
+
+### 本次目标
+- 安全加固：innerHTML注入修复、移除atob密码明文回退、prompt改自定义模态框
+- 性能优化：init()非首屏延迟初始化
+- Bug修复：通讯录搜索后同步事件覆盖搜索状态
+
+### 当前状态
+- ✅ H1-A: 倒数日卡片 data-id 加 SecurityUtils.escapeHtml（3处）
+- ✅ H1-B: showRecognitionLog innerHTML 改 textContent
+- ✅ H2: 移除 atob 密码明文回退，解密失败取消记住勾选
+- ✅ H3: 新增 showPasswordPrompt 方法，importData 中 prompt() 改自定义模态框
+- ✅ H4: init() 中8个非首屏步骤用 requestIdleCallback 延迟执行
+- ✅ Bug: contactsSynced 事件监听器增加搜索状态保持
+- ✅ 版本号提升到 v5.29，资源版本 app.js?v=174
+- ✅ node --check 通过，diagnostics 0 错误
+- ✅ 已提交推送 `ecb1bd4` 到 origin/main
+- ✅ 线上验证通过：版本号 v5.29、app.js?v=174
+
+### 本轮关键改动
+- js/app.js：安全修复4项 + init延迟初始化 + 通讯录搜索bug + 版本v5.29
+- index.html：资源版本 app.js?v=174
+
+### 提交记录
+- `ecb1bd4` fix: security hardening + init lazy load + contacts search bug (v5.29)
+
+### 遗留事项
+- 待用户验证通讯录搜索不再跳回全部列表
+- 待用户验证导入备份时自定义密码弹窗正常
+- 待验证记住密码解密失败时不再明文回填
+- H5 Supabase SDK 本地化待单独迭代
+
+## 2026-05-05 v5.28
+
+### 本次目标
+- 修复待办提醒框宽度比倒数日提醒框窄的问题（max-width不固定导致）
+- 修复提醒框出现/消失时菜单栏其他组件位置移动的问题（header-notice未固定宽度）
+
+### 当前状态
+- ✅ .countdown-notice 宽度从 max-width:320px 改为固定 width:280px + max-width:280px
+- ✅ .countdown-notice[hidden] 从 display:none 改为 visibility:hidden + display:flex !important（保留空间占位）
+- ✅ 新增 .countdown-notice.todo-reminder-active .countdown-notice-content padding-right:30px（防止绝对定位完成按钮遮挡文字）
+- ✅ .header-notice 从 flex:0 0 auto 改为 flex:0 0 280px + width:280px（固定容器宽度防布局偏移）
+- ✅ 版本号提升到 v5.28，资源版本 style.css?v=61、app.js?v=173
+- ✅ 已提交推送 `1cc9853` 到 origin/main
+- 🔄 待线上强刷验证版本号 `2026-05-05 v5.28`
+
+### 本轮关键改动
+- css/style.css：countdown-notice 固定280px、hidden保留空间、content padding-right、header-notice固定280px
+- index.html：资源版本 style.css?v=61、app.js?v=173
+- js/app.js：版本 v5.28、scriptVersions 更新
+
+### 提交记录
+- `1cc9853` fix: notice fixed width + hidden reserve space + content padding (v5.28)
+
+### 遗留事项
+- 待线上强刷确认版本号 `2026-05-05 v5.28`
+- 待验证待办提醒框与倒数日提醒框宽度一致
+- 待验证提醒框出现/消失时菜单栏不再偏移
+
+## 2026-05-05 v5.27
+
+### 本次目标
+- 待办提醒框改为和倒数日提醒框一样大的两行布局
+- 完成按钮从"✓ 完成"简化为只有"✓"
+- 顶部菜单栏天气框间距缩小，避免碰到 AI 输入框
+
+### 当前状态
+- ✅ countdown-notice 高度从固定 36px 改为 min-height:36px + height:auto
+- ✅ 待办提醒 desc 从 display:none 改为正常两行显示（ellipisis 截断）
+- ✅ 待办提醒 title 去掉 marquee 滚动动画，改为 ellipsis 截断
+- ✅ 完成按钮文字从"✓ 完成"改为"✓"，处理中从"处理中..."改为"..."
+- ✅ 完成按钮 padding 从 2px 8px 缩小到 2px 6px，font-size 从 11px 增到 12px
+- ✅ 天气框宽度从 290px 缩小到 260px
+- ✅ 天气四个分区 padding 从 2px 4px 缩小到 2px 2px
+- ✅ weather-tomorrow border-right 去掉省空间
+- ✅ 版本号提升到 v5.27，资源版本更新
+- ✅ node --check 通过，diagnostics 0 错误
+- ✅ 已提交推送 `6f64b1c` 到 origin/main
+
+### 本轮关键改动
+- css/style.css：countdown-notice height 改 auto、待办提醒两行显示、完成按钮缩小、天气框 260px
+- index.html：完成按钮文字改"✓"、资源版本 style.css?v=60、app.js?v=172
+- js/app.js：完成按钮文字"✓"和"..."、版本 v5.27
+
+### 提交记录
+- `6f64b1c` fix: todo reminder two-line layout, compact complete btn, header spacing (v5.27)
+
+### 遗留事项
+- 待线上强刷确认版本号 `2026-05-05 v5.27`
+- 待验证待办提醒框两行显示效果
+- 待验证天气框间距是否不再碰到 AI 输入框
+
+## 2026-05-05 v5.26
+
+### 本次目标
+- 倒数日类型增加"其他"自定义选项，支持用户填写自定义类型名称（如考试日、还房贷日等）
+
+### 当前状态
+- ✅ index.html 类型 select 新增"其他"选项 + 自定义类型名称输入框
+- ✅ app.js 选"其他"时自动显示自定义输入框，切回其他类型时隐藏
+- ✅ app.js `getCountdownEventLabel` 支持 other 类型显示自定义名称
+- ✅ app.js `getCountdownTypeColors` 新增 other 默认颜色 `#06b6d4`（青色）
+- ✅ app.js `handleAddCountdownEvent` 选"其他"时校验自定义名称非空，保存 `customEventType` 字段
+- ✅ app.js `startEditCountdownEvent` 编辑时回填自定义类型名称和显示状态
+- ✅ app.js `resetCountdownForm` 重置时清空并隐藏自定义输入框
+- ✅ style.css 表单 grid 布局新增 customtype 区域（桌面端+移动端）
+- ✅ node --check 通过，diagnostics 0 错误
+- ✅ 本地浏览器测试通过：选"其他"→ 输入框显示 → 填写"考试日" → 添加成功 → 卡片显示自定义类型标签 → 编辑回填正确 → 空名称拦截正确
+- ✅ 已提交推送 `ccca0f8` 到 origin/main
+- ✅ GitHub API 确认远程 HEAD 已更新为 `ccca0f8`，三文件完整
+
+### 本轮关键改动
+- index.html：倒数日类型 select 新增 `<option value="other">其他</option>` + `<input id="countdownCustomType">` + 更新名称 placeholder 和分区标题文案
+- app.js：initCountdownPanel 新增 `toggleCustomTypeInput` 函数，typeSelect change 事件联动
+- app.js：`getCountdownEventLabel` other 类型读取 `item.customEventType`
+- app.js：`getCountdownTypeColors` 新增 `other: '#06b6d4'`
+- app.js：`handleAddCountdownEvent` 读取 customTypeInput，校验非空，payload 新增 `customEventType` 字段
+- app.js：`startEditCountdownEvent` / `resetCountdownForm` 处理 customTypeInput 回填和重置
+- css/style.css：桌面端和移动端 grid-template-areas 新增 `customtype` 行
+
+### 提交记录
+- `ccca0f8` feat: add custom 'other' type to countdown events (v5.26)
+
+### 遗留事项
+- 待线上强刷确认版本号 `2026-05-05 v5.26`
+
 ## 2026-05-05 v5.24
 
 ### 本次目标
@@ -16,23 +171,22 @@
 - ✅ ocr.js：Kimi 失败 catch 块增加微信环境检测，直接抛出明确错误而非走 Tesseract
 - ✅ ocr.js：无 Kimi Key 的 else 块增加微信环境检测，直接提示设置 API Key
 - ✅ wechat-upload.js：init() 增加 API Key 恢复容错和 Key 存在性检查，无 Key 时禁用按钮并提示
-- ✅ 版本号提升到 v5.24
-- ✅ node --check 全部通过（ocr.js / wechat-upload.js / app.js）
-- ✅ diagnostics 全部 0 错误
-- ✅ 已提交推送 `3d8b397` 到 origin/main
+- ✅ node --check 通过（ocr.js / wechat-upload.js）
+- ✅ 已提交推送 `131ddfb` 到 origin/main
+- ✅ 线上验证通过：微信 UA 强刷后已命中 `ocr.js?v=44`、`wechat-upload.js?v=10`，无 Key 时按钮禁用与提示生效，控制台无新报错
+- 🔄 待用户在真实微信环境验证：已配置 Kimi Key 时图片识别是否正常（不再闪“下载语言包”）
 
 ### 本轮关键改动
 - ocr.js：`analyzeDocument` 图片识别两个分支（Kimi 失败 catch + 无 Kimi Key else）增加微信环境判断，阻止 Tesseract fallback
 - wechat-upload.js：`init()` 增加 `loadApiKeysFromDB()` 容错 + Key 存在性检查
-- index.html / wechat-upload.html：资源版本 `ocr.js?v=42`、`wechat-upload.js?v=10`
-- app.js：版本提升到 v5.24
+- wechat-upload.html：资源版本更新为 `ocr.js?v=44`、`wechat-upload.js?v=10`
 
 ### 提交记录
-- `3d8b397` fix: WeChat OCR block Tesseract fallback + API Key check (v5.24)
+- `131ddfb` fix: block WeChat OCR fallback in upload page
 
 ### 遗留事项
 - 待用户微信端验证：有 Kimi Key 时识别是否正常（不再闪"下载语言包"）
-- 待用户微信端验证：无 Kimi Key 时是否显示"未检测到AI密钥"提示
+- 如需进一步核验“有 Key 正常识别”链路，需在真实微信环境提供可用 Kimi Key 继续测试
 
 ## 2026-05-04 v5.21
 
