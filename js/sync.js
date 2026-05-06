@@ -444,8 +444,6 @@ class SyncManager {
                     this.initRealtimeSubscription();
 
                     if (event === 'SIGNED_IN') {
-                        this.lastCloudSyncTime = null;
-                        SafeStorage.remove('lastCloudSyncTime');
                         this.smartSync().catch(e => console.warn('SIGNED_IN同步失败:', e));
                     } else if (event === 'INITIAL_SESSION') {
                         this.smartSync().catch(e => console.warn('INITIAL_SESSION同步失败:', e));
@@ -1694,6 +1692,11 @@ class SyncManager {
             return { success: false, message: '网络不可用，请检查网络连接', offline: true };
         }
 
+        if (this.isSyncing) {
+            return { success: false, message: '正在同步中，请稍后再试' };
+        }
+        this.isSyncing = true;
+
         try {
             if (progressCallback) progressCallback('正在准备数据...');
             const allItems = await db.getAllItems();
@@ -1755,6 +1758,8 @@ class SyncManager {
         } catch (error) {
             console.error('同步到云端失败:', error);
             return { success: false, message: '同步失败: ' + error.message };
+        } finally {
+            this.isSyncing = false;
         }
     }
 
@@ -1770,6 +1775,11 @@ class SyncManager {
         if (!this.isOnline()) {
             return { success: false, message: '网络不可用，请检查网络连接', offline: true };
         }
+
+        if (this.isSyncing) {
+            return { success: false, message: '正在同步中，请稍后再试' };
+        }
+        this.isSyncing = true;
 
         try {
             if (progressCallback) progressCallback('正在从云端获取数据...');
@@ -1860,79 +1870,80 @@ class SyncManager {
             // 同步事项数据
             const cloudItems = data.data.items || [];
 
+            if (data.data.deletedItems && typeof data.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...data.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
 
             // 先对云端数据本身去重
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
-            let replaceBackup = [];
-            if (mergeStrategy === 'replace') {
-                replaceBackup = await db.getAllItems();
-                try {
-                    await db.clearAllItems();
-                } catch (clearErr) {
-                    console.error('清空本地数据失败:', clearErr);
-                    return { success: false, message: '清空本地数据失败' };
+            const localItems = await db.getAllItems();
+
+            if (localItems.length > 0 && deduplicatedCloudItems.length < localItems.length && localItems.length >= 5) {
+                const lossRatio = deduplicatedCloudItems.length / localItems.length;
+                if (lossRatio < 0.3) {
+                    console.error(`手动同步数据丢失保护触发：本地 ${localItems.length} 条，云端仅 ${deduplicatedCloudItems.length} 条，跳过`);
+                    return { success: false, message: '数据丢失保护：云端数据量异常偏少（' + deduplicatedCloudItems.length + '/' + localItems.length + '），已阻止覆盖' };
                 }
             }
 
-            // 获取本地已有数据（用于与云端数据去重）
-            const localItems = mergeStrategy !== 'replace' ? await db.getAllItems() : [];
-            
             let importedCount = 0;
             let mergedCount = 0;
             let skippedCount = 0;
-            const importErrors = [];
-            
-            for (const item of deduplicatedCloudItems) {
+
+            if (mergeStrategy === 'replace') {
                 try {
-                    const { id, ...itemData } = item;
-                    
-                    if (mergeStrategy !== 'replace' && localItems.length > 0) {
-                        const duplicateInfo = this.checkDuplicateWithLocal(item, localItems);
-                        
-                        if (duplicateInfo.isDuplicate) {
-                            if (item.type === 'meeting' && duplicateInfo.existingItem) {
-                                const existing = duplicateInfo.existingItem;
-                                const cloudAttendees = item.attendees || [];
-                                const localAttendees = existing.attendees || [];
-                                const mergedAttendees = [...new Set([...localAttendees, ...cloudAttendees])];
-                                
-                                if (mergedAttendees.length > localAttendees.length) {
-                                    await db.updateItem(existing.id, { attendees: mergedAttendees });
-                                    mergedCount++;
-
-                                }
-                            } else {
-                                skippedCount++;
-
-                            }
-                            continue;
-                        }
-                    }
-                    
-                    await db.addItem(itemData);
-                    importedCount++;
+                    await this.syncLocalItemsToState(deduplicatedCloudItems, localItems);
+                    importedCount = deduplicatedCloudItems.length;
                 } catch (e) {
-                    console.warn('导入项目失败:', e);
-                    importErrors.push(e);
+                    console.error('replace模式同步失败:', e);
+                    return { success: false, message: '同步失败: ' + e.message };
                 }
-            }
-
-            if (mergeStrategy === 'replace' && importedCount === 0 && replaceBackup.length > 0 && importErrors.length > 0) {
-                console.warn('replace模式全部导入失败，回滚到本地数据');
-                for (const item of replaceBackup) {
+            } else {
+                const importErrors = [];
+                for (const item of deduplicatedCloudItems) {
                     try {
                         const { id, ...itemData } = item;
+
+                        if (localItems.length > 0) {
+                            const duplicateInfo = this.checkDuplicateWithLocal(item, localItems);
+
+                            if (duplicateInfo.isDuplicate) {
+                                if (item.type === 'meeting' && duplicateInfo.existingItem) {
+                                    const existing = duplicateInfo.existingItem;
+                                    const cloudAttendees = item.attendees || [];
+                                    const localAttendees = existing.attendees || [];
+                                    const mergedAttendees = [...new Set([...localAttendees, ...cloudAttendees])];
+
+                                    if (mergedAttendees.length > localAttendees.length) {
+                                        await db.updateItem(existing.id, { attendees: mergedAttendees });
+                                        mergedCount++;
+                                    }
+                                } else {
+                                    skippedCount++;
+                                }
+                                continue;
+                            }
+                        }
+
                         await db.addItem(itemData);
-                    } catch (rollbackErr) {
-                        console.error('回滚失败:', rollbackErr);
+                        importedCount++;
+                    } catch (e) {
+                        console.warn('导入项目失败:', e);
+                        importErrors.push(e);
                     }
                 }
-                return { success: false, message: '导入失败，已回滚到本地数据' };
+
+                if (importedCount === 0 && localItems.length === 0 && importErrors.length > 0) {
+                    return { success: false, message: '导入失败' };
+                }
             }
 
             this.lastSyncTime = new Date().toISOString();
             SafeStorage.set('lastSyncTime', this.lastSyncTime);
+            this.lastCloudSyncTime = this.lastSyncTime;
+            SafeStorage.set('lastCloudSyncTime', this.lastSyncTime);
             if (progressCallback) progressCallback('同步完成');
             
             let message = `从云端同步了 ${importedCount} 个事项`;
@@ -1943,6 +1954,8 @@ class SyncManager {
         } catch (error) {
             console.error('从云端同步失败:', error);
             return { success: false, message: '同步失败: ' + error.message };
+        } finally {
+            this.isSyncing = false;
         }
     }
 
