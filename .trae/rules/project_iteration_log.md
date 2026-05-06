@@ -1,3 +1,30 @@
+## 2026-05-06 v5.34
+
+### 本次目标
+- 修复电脑端 API Key 保存后刷新丢失的问题
+
+### 根因分析
+- `setKimiApiKey()` 调用 `secureStoreSecret` 后不检查返回值，直接 `SafeStorage.remove('kimiApiKey')` 删除明文备份
+- 如果加密存储失败，Kimi Key 从两个存储位置同时丢失，刷新后恢复不了
+- 和风天气 Key 加密失败直接 throw，阻断整个保存流程
+
+### 当前状态
+- ✅ setKimiApiKey 改为先检查加密返回值，成功才删 SafeStorage 明文
+- ✅ 和风天气加密失败改为 warning 提示，不阻断整个保存流程
+- ✅ 补齐和风天气 db.setSetting 记录
+- ✅ 版本号提升到 v5.34，资源版本 ocr.js?v=44、app.js?v=179
+- ✅ node --check 通过，diagnostics 0 错误
+- 🔄 待提交推送
+
+### 本轮关键改动
+- js/ocr.js：setKimiApiKey 加密返回值检查，与 setApiKey 保持一致
+- js/app.js：和风天气加密失败改 warning；版本 v5.34
+- index.html：资源版本 ocr.js?v=44、app.js?v=179
+
+### 遗留事项
+- 待线上验证电脑端三个 Key 保存后刷新不丢失
+- 待推送（v5.33 也未推送成功，网络超时）
+
 ## 2026-05-06 v5.33
 
 ### 本次目标
