@@ -2030,7 +2030,13 @@ class SyncManager {
             const exportData = {
                 version: '2.0',
                 export_time: new Date().toISOString(),
-                items: allItems
+                items: allItems,
+                memo: SafeStorage.get('office_memo_content') || '',
+                schedule: SafeStorage.get('office_schedule_content') || '',
+                links: SafeStorage.get('office_links') || '',
+                contacts: SafeStorage.get('office_contacts') || '',
+                countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
+                countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}'
             };
             let dataStr = JSON.stringify(exportData, null, 2);
             if (password) {
@@ -2090,6 +2096,13 @@ class SyncManager {
                     console.warn('导入项目失败:', e);
                 }
             }
+
+            if (data.memo !== undefined) SafeStorage.set('office_memo_content', data.memo);
+            if (data.schedule !== undefined) SafeStorage.set('office_schedule_content', data.schedule);
+            if (data.links !== undefined) SafeStorage.set('office_links', data.links);
+            if (data.contacts !== undefined) SafeStorage.set('office_contacts', data.contacts);
+            if (data.countdownEvents !== undefined) SafeStorage.set('office_countdown_events', data.countdownEvents);
+            if (data.countdownTypeColors !== undefined) SafeStorage.set('office_countdown_type_colors', data.countdownTypeColors);
 
             this.recordLocalModify();
 
