@@ -1,4 +1,9 @@
 (function () {
+    function escapeHtml(str) {
+        if (typeof str !== 'string') return str;
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
     function appendReason(parent, reason, color = '#64748b') {
         if (!reason) return;
         const div = document.createElement('div');
@@ -501,7 +506,7 @@
                 const text = document.createElement('div');
                 text.style.cssText = 'font-size:13px;line-height:1.6;color:var(--gray-800);';
                 const titleText = getSkippedTitle(item);
-                text.innerHTML = `<div><b>${index + 1}. ${SecurityUtils.escapeHtml(titleText)}</b></div>`;
+                text.innerHTML = `<div><b>${index + 1}. ${escapeHtml(titleText)}</b></div>`;
                 appendReason(text, getSkippedReason(item), '#6b7280');
                 appendMatchedExisting(text, item, '#6b7280');
                 const del = document.createElement('button');
