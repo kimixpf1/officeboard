@@ -5144,7 +5144,7 @@ class OfficeDashboard {
             }
         };
 
-        showStatus('正在解析...');
+        showStatus('🔄');
 
         // 异步处理，不阻塞UI
         (async () => {
@@ -5156,7 +5156,7 @@ class OfficeDashboard {
 
                 if (hasKimiKey) {
                     try {
-                        showStatus('正在使用AI解析...');
+                        showStatus('🔄');
                         result = await kimiAPI.parseNaturalLanguage(text);
                     } catch (error) {
                         console.warn('Kimi AI解析失败，将使用内置解析:', error.message);
@@ -5165,7 +5165,7 @@ class OfficeDashboard {
 
                 // 如果Kimi API不可用或失败，使用内置解析
                 if (!result) {
-                    showStatus('正在分析内容...');
+                    showStatus('🔄');
                     const items = await ocrManager.parseWithGroq(text);
                     if (items && items.length > 0) {
                         const firstItem = items[0];
@@ -6292,6 +6292,8 @@ class OfficeDashboard {
 
         // 设置表单值
         document.getElementById('itemId').value = item.id;
+        modal.dataset.mode = 'edit';
+        modal.dataset.itemId = String(item.id);
         document.getElementById('itemType').value = item.type;
         document.getElementById('itemTitle').value = item.title || '';
 
@@ -6938,8 +6940,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-06 v5.35';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=44', 'upload-flow.js?v=9', 'calendar.js?v=38', 'sync.js?v=62', 'app-date-view.js?v=13', 'app.js?v=180', 'db.js?v=28', 'style.css?v=64', 'crypto.js?v=17'];
+        const version = '2026-05-06 v5.36';
+        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=44', 'upload-flow.js?v=9', 'calendar.js?v=38', 'sync.js?v=62', 'app-date-view.js?v=13', 'app.js?v=181', 'db.js?v=28', 'style.css?v=64', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -6965,6 +6967,8 @@ class OfficeDashboard {
         // 重置表单
         form.reset();
         document.getElementById('itemId').value = '';
+        modal.dataset.mode = 'add';
+        modal.dataset.itemId = '';
         document.getElementById('itemType').value = type;
         
         // 清除周期性任务的隐藏字段（防止编辑后残留）
@@ -7120,6 +7124,10 @@ class OfficeDashboard {
         e.preventDefault();
 
         let id = document.getElementById('itemId').value;
+        const modal = document.getElementById('itemModal');
+        if (!id && modal?.dataset?.mode === 'edit' && modal.dataset.itemId) {
+            id = modal.dataset.itemId;
+        }
         const type = document.getElementById('itemType').value;
 
         const item = { type };

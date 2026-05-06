@@ -979,6 +979,24 @@
 - `index.html` diagnostics 0 错误
 
 ### 遗留事项
-- 待提交并推送 `P3-40` 到 `origin/main`
-- 待线上强刷验证是否已命中 `app.js?v=119`
-- 待在线上继续观察退出登录清理链路与天气缓存兼容逻辑是否稳定
+- 待提交并推送 `v5.36` 到 `origin/main`
+- 待线上强刷验证是否已命中 `app.js?v=181`
+
+---
+
+## v5.36（2026-05-06）
+
+### 修复内容
+1. **编辑待办不再误新增**：`editItem()` 写入 `modal.dataset.mode='edit'` + `modal.dataset.itemId` 双保险；`saveItem()` 兜底读取 dataset，即使隐藏字段 `#itemId` 被重置也能按原记录更新，不再悄悄走新增分支
+2. **AI 识别 loading 不挤布局**：`parseNaturalLanguage()` 和文件上传流程中的长文案（"正在使用AI解析..."、"正在分析内容..."、"正在解析..."）统一替换为短图标 `🔄`，顶部 AI 输入框和菜单栏在识别过程中不再被挤压变形
+
+### 修改文件
+- `js/app.js`：editItem 加 dataset 双保险、saveItem 兜底读 dataset、AI loading 文案替换
+- `index.html`：资源戳 app.js?v=181
+
+### 验证清单
+- [ ] 编辑已有待办事项，保存后原记录更新，不新增
+- [ ] 新增待办事项仍正常新增
+- [ ] 点击 AI 解析按钮，顶部输入框宽度不变，只显示旋转图标
+- [ ] 上传图片/PDF 识别时，顶部布局不跳动
+- [ ] 手机端和桌面端均正常
