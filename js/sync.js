@@ -652,7 +652,7 @@ class SyncManager {
     /**
      * 上传本地数据到云端
      */
-    async uploadToCloud(existingCloudData = null, preparedSyncData = null, skipCloudMerge = false) {
+    async uploadToCloud(existingCloudData = null, preparedSyncData = null) {
 
 
         try {
@@ -701,13 +701,11 @@ class SyncManager {
             const cloudItems = Array.isArray(existingRow?.data?.items) ? existingRow.data.items : [];
 
             const cloudOnlyItems = [];
-            if (!skipCloudMerge) {
-                const localKeys = new Set(normalizedLocalItems.map(item => this.getItemKey(item)));
-                for (const ci of cloudItems) {
-                    if (this.shouldKeepDeleted(ci)) continue;
-                    if (localKeys.has(this.getItemKey(ci))) continue;
-                    cloudOnlyItems.push(ci);
-                }
+            const localKeys = new Set(normalizedLocalItems.map(item => this.getItemKey(item)));
+            for (const ci of cloudItems) {
+                if (this.shouldKeepDeleted(ci)) continue;
+                if (localKeys.has(this.getItemKey(ci))) continue;
+                cloudOnlyItems.push(ci);
             }
 
             syncData.items = [...normalizedLocalItems.filter(item => !this.shouldKeepDeleted(item)), ...cloudOnlyItems];
@@ -1076,11 +1074,14 @@ class SyncManager {
     }
 
     getItemKey(item) {
-        // 用标题原文（去空格、去标点、统一小写）生成 key，不再暴力去高频词
-        const title = (item.title || '').replace(/\s+/g, '').replace(/[，。、！？：；""''【】《》（）\[\]{}]/g, '').toLowerCase();
+        const title = (item.title || '').trim().toLowerCase();
+        const extractKeywords = (t) => {
+            return t.replace(/会议|研究|工作|座谈|讨论|调研|培训|学习|协调|推进|落实/g, '').trim();
+        };
 
         if (item.type === 'meeting') {
-            return `meeting:${title}:${item.date || ''}`;
+            const keywords = extractKeywords(title);
+            return `meeting:${keywords}:${item.date || ''}`;
         } else if (item.type === 'todo') {
             if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
                 return `todo:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
@@ -1423,12 +1424,6 @@ class SyncManager {
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
             const localItems = await db.getAllItems();
-
-            // 导入保护窗口：导入后30秒内拒绝静默同步覆盖
-            if (this._importProtectUntil && Date.now() < this._importProtectUntil) {
-                console.log(`导入保护窗口中，跳过静默同步（剩余 ${Math.round((this._importProtectUntil - Date.now()) / 1000)}s）`);
-                return { success: false, protected: true };
-            }
 
             // 数据丢失保护：如果本地数据量显著大于云端，阻止静默覆盖
             if (localItems.length > 0 && deduplicatedCloudItems.length < localItems.length && localItems.length >= 5) {
@@ -2030,13 +2025,7 @@ class SyncManager {
             const exportData = {
                 version: '2.0',
                 export_time: new Date().toISOString(),
-                items: allItems,
-                memo: SafeStorage.get('office_memo_content') || '',
-                schedule: SafeStorage.get('office_schedule_content') || '',
-                links: SafeStorage.get('office_links') || '',
-                contacts: SafeStorage.get('office_contacts') || '',
-                countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
-                countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}'
+                items: allItems
             };
             let dataStr = JSON.stringify(exportData, null, 2);
             if (password) {
@@ -2097,18 +2086,11 @@ class SyncManager {
                 }
             }
 
-            if (data.memo !== undefined) SafeStorage.set('office_memo_content', data.memo);
-            if (data.schedule !== undefined) SafeStorage.set('office_schedule_content', data.schedule);
-            if (data.links !== undefined) SafeStorage.set('office_links', data.links);
-            if (data.contacts !== undefined) SafeStorage.set('office_contacts', data.contacts);
-            if (data.countdownEvents !== undefined) SafeStorage.set('office_countdown_events', data.countdownEvents);
-            if (data.countdownTypeColors !== undefined) SafeStorage.set('office_countdown_type_colors', data.countdownTypeColors);
-
             this.recordLocalModify();
 
             if (this.currentUser && importedCount > 0) {
                 try {
-                    await this.uploadToCloud(null, null, true);
+                    await this.uploadToCloud();
                 } catch (uploadErr) {
                     console.warn('导入后上传云端失败:', uploadErr);
                 }
@@ -2119,8 +2101,6 @@ class SyncManager {
             throw new Error('导入失败: ' + error.message);
         } finally {
             this.isSyncing = wasSyncing || false;
-            this._pendingRealtimeSync = false;
-            this._importProtectUntil = Date.now() + 30000;
         }
     }
 
