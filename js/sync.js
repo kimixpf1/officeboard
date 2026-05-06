@@ -553,6 +553,14 @@ class SyncManager {
                 this.persistDeletedItemsMap();
             }
 
+            // 数据丢失保护：如果本地数据量显著大于云端，以本地为准上传覆盖云端
+            if (localItems.length >= 5 && cloudItems.length < localItems.length * 0.5) {
+                console.warn(`smartSync数据丢失保护：本地 ${localItems.length} 条，云端仅 ${cloudItems.length} 条，以本地为准`);
+                await this.uploadToCloud(cloudData);
+                this.isSyncing = false;
+                return;
+            }
+
             const isFirstSync = !lastSyncTime;
 
             if (isFirstSync) {
