@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>办公室智能工作面板</title>
+    
+    <!-- 安全策略 -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh https://cdn.skypack.dev https://unpkg.com https://cdnjs.cloudflare.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com https://api.moonshot.cn https://*.qweatherapi.com https://api.qweather.com https://api.open-meteo.com https://esm.sh; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; media-src 'none'; object-src 'none';">
+    <meta name="robots" content="index, follow">
+    
+    <!-- 版权声明 -->
+    <meta name="author" content="kimixpf1">
+    <meta name="copyright" content="Copyright © 2024-2026 kimixpf1. All Rights Reserved.">
+    
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="stylesheet" href="css/style.css?v=64">
+
+</head>
+<body>
+    <div id="appSkeleton" class="app-skeleton">
+        <div class="sk-header">
+            <div class="sk-header-left">
+                <div class="sk-title"></div>
+                <div class="sk-meta">
+                    <div class="sk-clock"></div>
+                    <div class="sk-weather"></div>
+                </div>
+            </div>
+            <div class="sk-header-center">
+                <div class="sk-input"></div>
+                <div class="sk-toolbar"></div>
+            </div>
+        </div>
+        <div class="sk-body">
+            <div class="sk-column">
+                <div class="sk-section-title"></div>
+                <div class="sk-card"></div>
+                <div class="sk-card"></div>
+            </div>
+            <div class="sk-column">
+                <div class="sk-section-title"></div>
+                <div class="sk-card"></div>
+            </div>
+            <div class="sk-column">
+                <div class="sk-section-title"></div>
+                <div class="sk-card"></div>
+            </div>
+        </div>
+    </div>
+    <div id="app" style="display:none">
+        <!-- API Key 设置弹窗 -->
+        <div id="apiKeyModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>AI 与天气设置</h3>
+                    <button type="button" id="closeApiKeyModal" class="btn-close" title="关闭">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="apiKeyStatus" class="api-key-status">
+                    <span class="status-icon"></span>
+                    <span class="status-text">使用基础解析  天气使用免费服务</span>
+                </div>
+
+                <p style="color:#666;font-size:13px;margin-bottom:16px;">AI Key 可提升识别精度；和风天气 Key 为可选项，登录同账号后会自动同步恢复。</p>
+
+                <div class="form-group">
+                    <label for="kimiApiKeyInput">Kimi API Key（图片识别推荐）</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="kimiApiKeyInput" placeholder="sk-...">
+                        <button type="button" id="toggleKimiApiKeyVisibility" class="btn-toggle" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <small class="form-hint">Kimi（月之暗面）图片理解能力最强，推荐用于图片识别</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKeyInput">DeepSeek API Key（文字解析推荐）</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="apiKeyInput" placeholder="sk-...">
+                        <button type="button" id="toggleApiKeyVisibility" class="btn-toggle" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <small class="form-hint">DeepSeek文字解析能力强，免费额度充足</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="qweatherApiKeyInput">和风天气 API Key（可选，更准确天气）</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="qweatherApiKeyInput" placeholder="请输入和风天气 Key">
+                        <button type="button" id="toggleQweatherApiKeyVisibility" class="btn-toggle" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <small class="form-hint">未配置时自动使用免费天气；已配置后优先使用和风天气。</small>
+                </div>
+
+                <div class="api-key-help">
+                    <p> 获取 API Key：</p>
+                    <ol>
+                        <li><b>Kimi</b>: <a href="https://platform.moonshot.cn/console/api-keys" target="_blank">platform.moonshot.cn</a> - 图片识别推荐</li>
+                        <li><b>DeepSeek</b>: <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com</a> - 文字解析推荐</li>
+                        <li><b>和风天气</b>: <a href="https://console.qweather.com/" target="_blank">console.qweather.com</a> - 实时与 3 天天气</li>
+                    </ol>
+                    <p style="margin-top:12px;color:#888;font-size:12px;">天气默认仍定位在姑苏区三香路附近的苏州点位。</p>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" id="testApiKey" class="btn-secondary">测试连接</button>
+                    <button type="button" id="saveApiKey" class="btn-primary">保存</button>
+                </div>
+            </div>
+        </div>
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <div class="header-left">
+                <div class="brand-block">
+                    <h1 class="logo">大飞智能工作面板</h1>
+                    <div class="header-meta">
+                        <div id="headerClock" class="header-clock" title="当前时间">
+                            <span class="clock-time">--:--:--</span>
+                        </div>
+                        <button type="button" id="headerWeather" class="header-weather" title="点击切换天气城市">
+                            <span class="weather-current">
+                                <span class="weather-current-city">苏州</span>
+                                <span class="weather-current-icon">🌤️</span>
+                                <span class="weather-current-temp">22°</span>
+                            </span>
+                            <span class="weather-today">
+                                <span class="weather-today-label">今天</span>
+                                <span class="weather-today-icon">🌤️</span>
+                                <span class="weather-temp-range">18~26°</span>
+                            </span>
+                            <span class="weather-tomorrow">
+                                <span class="weather-day-label">周五</span>
+                                <span class="weather-day-icon">🌦️</span>
+                                <span class="weather-day-temp">17~24°</span>
+                            </span>
+                            <span class="weather-dayafter">
+                                <span class="weather-day-label">周六</span>
+                                <span class="weather-day-icon">☁️</span>
+                                <span class="weather-day-temp">16~22°</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="toolbar-ai">
+                    <input type="text" id="nlpInput" class="ai-input" placeholder="输入事项描述或上传图片/PDF智能识别...">
+                    <button type="button" id="parseBtn" class="btn-primary btn-sm" title="智能解析">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+                    </button>
+                    <button type="button" id="uploadBtn" class="btn-secondary btn-sm" title="上传图片/PDF">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    </button>
+                    <span id="aiStatus" class="ai-status" style="display:none;"></span>
+                    <input type="file" id="fileInput" accept="image/*,.pdf" style="display:none" multiple>
+                </div>
+                <div class="toolbar-views">
+                    <button type="button" class="view-btn active" data-view="board">日视图</button>
+                    <button type="button" class="view-btn" data-view="week">周视图</button>
+                    <button type="button" class="view-btn" data-view="month">月视图</button>
+                </div>
+                <div class="toolbar-date">
+                    <button type="button" id="prevDate" class="btn-icon btn-sm">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <input type="date" id="datePicker" class="date-picker-sm">
+                    <span id="dateWeekdayLabel" class="date-weekday-label"></span>
+                    <button type="button" id="nextDate" class="btn-icon btn-sm">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                    <button type="button" id="todayBtn" class="btn-text btn-sm">今天</button>
+                </div>
+            </div>
+            <div class="header-notice">
+                <div id="countdownNotice" class="countdown-notice" hidden>
+                    <span class="countdown-notice-badge">提醒</span>
+                    <div class="countdown-notice-content">
+                        <div class="countdown-notice-title">暂无临近倒数日</div>
+                        <div class="countdown-notice-desc">距离十天内的重要日子会显示在这里</div>
+                    </div>
+                    <button type="button" id="todoReminderCompleteBtn" class="todo-reminder-complete-btn" style="display:none" title="标记完成">✓</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="theme-switcher">
+                    <button type="button" id="themeBtn" class="btn-icon" title="切换主题">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        </svg>
+                    </button>
+                    <div id="themeMenu" class="theme-menu">
+                        <div class="theme-option" data-theme="default"><span class="theme-color" style="background: linear-gradient(135deg, #4f46e5, #7c3aed);"></span><span>靛青紫</span></div>
+                        <div class="theme-option" data-theme="blue"><span class="theme-color" style="background: linear-gradient(135deg, #0284c7, #0369a1);"></span><span>天际蓝</span></div>
+                        <div class="theme-option" data-theme="teal"><span class="theme-color" style="background: linear-gradient(135deg, #0d9488, #0f766e);"></span><span>青瓷色</span></div>
+                        <div class="theme-option" data-theme="green"><span class="theme-color" style="background: linear-gradient(135deg, #059669, #047857);"></span><span>翠竹绿</span></div>
+                        <div class="theme-option" data-theme="rose"><span class="theme-color" style="background: linear-gradient(135deg, #e11d48, #be123c);"></span><span>玫瑰红</span></div>
+                        <div class="theme-option" data-theme="red"><span class="theme-color" style="background: linear-gradient(135deg, #dc2626, #b91c1c);"></span><span>中国红</span></div>
+                        <div class="theme-option" data-theme="orange"><span class="theme-color" style="background: linear-gradient(135deg, #ea580c, #c2410c);"></span><span>琥珀橙</span></div>
+                        <div class="theme-option" data-theme="violet"><span class="theme-color" style="background: linear-gradient(135deg, #7c3aed, #6d28d9);"></span><span>幻影紫</span></div>
+                        <div class="theme-option" data-theme="dark"><span class="theme-color" style="background: linear-gradient(135deg, #374151, #1f2937);"></span><span>深色模式</span></div>
+                    </div>
+                </div>
+                <button type="button" id="syncBtn" class="btn-icon" title="登录/同步">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </button>
+                <button type="button" id="settingsBtn" class="btn-icon" title="设置">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+                <button type="button" id="reportBtn" class="btn-secondary btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    报告
+                </button>
+                <button type="button" id="undoBtn" class="btn-icon" title="撤回上一步操作 (Ctrl+Z)" disabled style="opacity:0.4;cursor:not-allowed;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 7v6h6"></path>
+                        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                    </svg>
+                </button>
+                <button type="button" id="redoBtn" class="btn-icon" title="恢复操作 (Ctrl+Y)" disabled style="opacity:0.4;cursor:not-allowed;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 7v6h-6"></path>
+                        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 日视图 -->
+        <section id="boardView" class="board-view active">
+            <div id="boardDateLabel" class="board-date-label">
+                <span class="board-date-label-date">----/--/--</span>
+                <span class="board-date-label-week">---</span>
+            </div>
+            <div class="board-container">
+                <!-- 待办事项栏 -->
+                <div class="board-column" data-type="todo">
+                    <div class="column-header">
+                        <div class="column-title">
+                            <input type="checkbox" class="select-all-checkbox" data-type="todo" title="全选">
+                            <span class="column-icon todo-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </span>
+                            <span>待办事项</span>
+                            <span class="column-count" id="todoCount">0</span>
+                        </div>
+                        <div class="column-actions">
+                            <button class="btn-batch-complete" data-type="todo" title="批量完成" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </button>
+                            <button class="btn-batch-delete" data-type="todo" title="批量删除" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                            <button class="btn-add" data-type="todo">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="column-content" id="todoList">
+                        <!-- 待办卡片将动态插入 -->
+                    </div>
+                </div>
+
+                <!-- 会议活动栏 -->
+                <div class="board-column" data-type="meeting">
+                    <div class="column-header">
+                        <div class="column-title">
+                            <input type="checkbox" class="select-all-checkbox" data-type="meeting" title="全选">
+                            <span class="column-icon meeting-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </span>
+                            <span>会议活动</span>
+                            <span class="column-count" id="meetingCount">0</span>
+                        </div>
+                        <div class="column-actions">
+                            <button class="btn-batch-complete" data-type="meeting" title="批量完成" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </button>
+                            <button class="btn-batch-delete" data-type="meeting" title="批量删除" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                            <button class="btn-add" data-type="meeting">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="column-content" id="meetingList">
+                        <!-- 会议卡片将动态插入 -->
+                    </div>
+                </div>
+
+                <!-- 办文情况栏 -->
+                <div class="board-column" data-type="document">
+                    <div class="column-header">
+                        <div class="column-title">
+                            <input type="checkbox" class="select-all-checkbox" data-type="document" title="全选">
+                            <span class="column-icon document-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                            </span>
+                            <span>办文情况</span>
+                            <span class="column-count" id="documentCount">0</span>
+                        </div>
+                        <div class="column-actions">
+                            <button class="btn-batch-complete" data-type="document" title="批量完成" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </button>
+                            <button class="btn-batch-delete" data-type="document" title="批量删除" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                            <button class="btn-add" data-type="document">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="column-content" id="documentList">
+                        <!-- 文件卡片将动态插入 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="calendarView" class="calendar-view">
+            <div id="calendarContainer"></div>
+        </section>
+    </div>
+
+    <!-- 添加/编辑弹窗 -->
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalTitle">添加事项</h3>
+            <form id="itemForm">
+                <input type="hidden" id="itemId">
+                <input type="hidden" id="itemType">
+                <input type="hidden" id="recurringGroupId">
+                <input type="hidden" id="occurrenceIndex">
+
+                <div class="form-group">
+                    <label for="itemTitle">标题</label>
+                    <input type="text" id="itemTitle" required>
+                </div>
+
+                <!-- 待办事项字段 -->
+                <div id="todoFields" class="type-fields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="todoPriority">优先级</label>
+                            <select id="todoPriority">
+                                <option value="high">高</option>
+                                <option value="medium" selected>中</option>
+                                <option value="low">低</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="todoDeadline">截止时间</label>
+                            <input type="datetime-local" id="todoDeadline">
+                        </div>
+                    </div>
+                    <!-- 周期性任务选项 -->
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="isRecurring">
+                            <span>周期性任务</span>
+                        </label>
+                    </div>
+                    <div id="recurringFields" class="recurring-fields" style="display:none;"></div>
+                </div>
+
+                <!-- 会议活动字段 -->
+                <div id="meetingFields" class="type-fields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="meetingDate">开始日期</label>
+                            <input type="date" id="meetingDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="meetingEndDate">结束日期</label>
+                            <input type="date" id="meetingEndDate" placeholder="跨天会议填写">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="meetingTime">开始时间</label>
+                            <input type="time" id="meetingTime">
+                        </div>
+                        <div class="form-group">
+                            <label for="meetingEndTime">结束时间</label>
+                            <input type="time" id="meetingEndTime">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingLocation">地点</label>
+                        <input type="text" id="meetingLocation">
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingAttendees">参会人员</label>
+                        <input type="text" id="meetingAttendees" placeholder="多个参会人用逗号分隔">
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingAgenda">议程摘要</label>
+                        <textarea id="meetingAgenda" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- 办文字段 -->
+                <div id="documentFields" class="type-fields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="docType">公文类型</label>
+                            <select id="docType">
+                                <option value="receive">收文</option>
+                                <option value="send">发文</option>
+                                <option value="transfer">流转</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="docNumber">文号</label>
+                            <input type="text" id="docNumber" placeholder="如：〔2026〕1号">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="docStartDate">开始日期</label>
+                            <input type="date" id="docStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="docEndDate">结束日期（跨天流转时填写）</label>
+                            <input type="date" id="docEndDate">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="docSkipWeekend">
+                            <span>跳过周末和节假日（仅显示工作日）</span>
+                        </label>
+                    </div>
+                    <!-- 办文周期性任务选项 -->
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="docIsRecurring">
+                            <span>周期性办文（每天/每周/每月固定办理）</span>
+                        </label>
+                    </div>
+                    <div id="docRecurringFields" class="recurring-fields" style="display:none;"></div>
+                    <div class="form-group">
+                        <label for="docSource">来文单位 / 发文单位</label>
+                        <input type="text" id="docSource" placeholder="填写来文单位或发文单位">
+                    </div>
+                    <div class="form-group">
+                        <label for="docHandler">当前处理人</label>
+                        <div class="input-with-button">
+                            <input type="text" id="docHandler" placeholder="当前文件在谁手中">
+                            <button type="button" id="transferBtn" class="btn-small">流转</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="docContent">内容摘要</label>
+                        <textarea id="docContent" rows="3" placeholder="文件主要内容摘要"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancelBtn" class="btn-secondary">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 报告生成弹窗 -->
+    <div id="reportModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>生成工作报告</h3>
+            <div class="form-group">
+                <label>报告类型</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="reportType" value="daily" checked onchange="app.toggleCustomDateRange()">
+                        <span>日报</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="reportType" value="weekly" onchange="app.toggleCustomDateRange()">
+                        <span>周报</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="reportType" value="monthly" onchange="app.toggleCustomDateRange()">
+                        <span>月报</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="reportType" value="yearly" onchange="app.toggleCustomDateRange()">
+                        <span>年报</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="reportType" value="custom" onchange="app.toggleCustomDateRange()">
+                        <span>自定义</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group" id="customDateRangeGroup" style="display: none;">
+                <label>选择时间段</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="date" id="reportStartDate" style="flex: 1;">
+                    <span>至</span>
+                    <input type="date" id="reportEndDate" style="flex: 1;">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>导出格式</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="exportFormat" value="image" checked>
+                        <span>高清长图</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="cancelReport" class="btn-secondary">取消</button>
+                <button type="button" id="generateReport" class="btn-primary">生成报告</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文件流转弹窗 -->
+    <div id="transferModal" class="modal">
+        <div class="modal-content">
+            <h3>文件流转</h3>
+            <div class="form-group">
+                <label for="transferTo">转交给</label>
+                <input type="text" id="transferTo" placeholder="请输入接手人姓名">
+            </div>
+            <div class="form-group">
+                <label for="transferNote">流转备注</label>
+                <textarea id="transferNote" rows="2" placeholder="可选：备注说明"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="cancelTransfer" class="btn-secondary">取消</button>
+                <button type="button" id="confirmTransfer" class="btn-primary">确认流转</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除弹窗 -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3>确认删除</h3>
+            <p>确定要删除这个事项吗？此操作不可撤销。</p>
+            <div class="modal-actions">
+                <button type="button" id="cancelDelete" class="btn-secondary">取消</button>
+                <button type="button" id="confirmDelete" class="btn-danger">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 登录/数据同步弹窗 -->
+    <div id="syncModal" class="modal">
+        <div class="modal-content sync-modal-content">
+            <div class="modal-header">
+                <h3 id="syncModalTitle">登录同步</h3>
+                <button type="button" id="closeSyncModal" class="btn-close" title="关闭">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 登录状态 -->
+            <div id="loginStatus" class="sync-status">
+                <div class="sync-status-icon">○</div>
+                <div class="sync-status-text">未登录</div>
+            </div>
+
+            <!-- 登录面板 -->
+            <div id="loginPanel" class="sync-panel active">
+                <div class="sync-intro">
+                    <p>使用账号密码登录，自动同步数据到云端。</p>
+                    <p class="sync-note">首次使用请注册新账号</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="loginUsername">用户名</label>
+                    <input type="text" id="loginUsername" placeholder="请输入用户名">
+                </div>
+
+                <div class="form-group">
+                    <label for="loginPassword">密码</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="loginPassword" placeholder="请输入密码">
+                        <button type="button" id="toggleLoginPassword" class="btn-toggle" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: -8px;">
+                    <input type="checkbox" id="rememberPassword" style="width: 16px; height: 16px; cursor: pointer;">
+                    <label for="rememberPassword" style="cursor: pointer; font-size: 13px; color: var(--gray-600);">记住密码（本设备免输入）</label>
+                </div>
+
+                <div class="sync-actions" style="margin-top: 20px;">
+                    <button type="button" id="loginBtn" class="btn-primary" style="flex: 1;">登录</button>
+                    <button type="button" id="registerBtn" class="btn-secondary" style="flex: 1;">注册</button>
+                </div>
+
+                <div style="text-align: center; margin-top: 10px;">
+                    <button type="button" id="showChangePasswordBtn" class="btn-text btn-sm">修改密码</button>
+                </div>
+
+                <!-- 修改密码面板 -->
+                <div id="changePasswordPanel" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 15px; font-size: 14px; color: var(--gray-700);">修改密码</h4>
+                    <div class="form-group">
+                        <label for="cpUsername">用户名</label>
+                        <input type="text" id="cpUsername" placeholder="请输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label for="cpOldPassword">原密码</label>
+                        <input type="password" id="cpOldPassword" placeholder="请输入原密码">
+                    </div>
+                    <div class="form-group">
+                        <label for="cpNewPassword">新密码</label>
+                        <input type="password" id="cpNewPassword" placeholder="请输入新密码（至少6位）">
+                    </div>
+                    <div class="form-group">
+                        <label for="cpConfirmPassword">确认新密码</label>
+                        <input type="password" id="cpConfirmPassword" placeholder="请再次输入新密码">
+                    </div>
+                    <div class="sync-actions" style="margin-top: 15px;">
+                        <button type="button" id="cancelChangePasswordBtn" class="btn-secondary" style="flex: 1;">取消</button>
+                        <button type="button" id="changePasswordBtn" class="btn-primary" style="flex: 1;">确认修改</button>
+                    </div>
+                </div>
+
+                <div class="sync-divider"></div>
+
+                <div class="sync-operations" style="grid-template-columns: 1fr 1fr;">
+                    <button type="button" id="exportDataBtn" class="btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        导出备份
+                    </button>
+                    <button type="button" id="importDataBtn" class="btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        导入备份
+                    </button>
+                </div>
+            </div>
+
+            <!-- 文件同步面板 -->
+            <div id="fileSyncPanel" class="sync-panel">
+                <div class="sync-intro">
+                    <p>导出加密文件，通过iCloud/OneDrive/百度网盘等同步。</p>
+                    <p class="sync-note">适合不想使用云服务的用户</p>
+                </div>
+
+                <div class="sync-operations">
+                    <button type="button" id="exportData" class="btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        导出备份文件
+                    </button>
+                    <button type="button" id="importData" class="btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        导入备份文件
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label for="exportPassword">加密密码（可选）</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="exportPassword" placeholder="留空则不加密">
+                        <button type="button" id="toggleExportPassword" class="btn-toggle" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <small class="form-hint">设置密码后，导入时需要输入相同密码</small>
+                </div>
+
+                <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            </div>
+
+            <!-- 已登录操作面板 -->
+            <div id="loggedInPanel" class="sync-panel" style="display: none;">
+                <div class="sync-intro">
+                    <p>已登录用户：<span id="loggedInUsername"></span></p>
+                    <p class="sync-note" id="lastSyncInfo"></p>
+                </div>
+
+                <div class="sync-operations" style="grid-template-columns: 1fr 1fr;">
+                    <button type="button" id="syncUploadBtn" class="btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        上传数据
+                    </button>
+                    <button type="button" id="syncDownloadBtn" class="btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        下载数据
+                    </button>
+                </div>
+
+                <div class="sync-divider"></div>
+
+                <div class="sync-operations" style="grid-template-columns: 1fr 1fr;">
+                    <button type="button" id="exportDataBtn2" class="btn-secondary">导出备份</button>
+                    <button type="button" id="importDataBtn2" class="btn-secondary">导入备份</button>
+                </div>
+
+                <div class="sync-divider"></div>
+
+                <div class="sync-section-title">数据安全备份</div>
+                <div id="backupListArea" class="backup-list-area">
+                    <p class="sync-note">每次同步前自动备份，最多保留 5 份</p>
+                </div>
+                <div class="sync-operations" style="grid-template-columns: 1fr 1fr;">
+                    <button type="button" id="exportBackupFileBtn" class="btn-secondary">导出备份文件</button>
+                    <button type="button" id="restoreBackupBtn" class="btn-secondary">恢复最新备份</button>
+                </div>
+
+                <div class="sync-divider"></div>
+
+                <div class="sync-operations">
+                    <button type="button" id="logoutBtn" class="btn-danger" style="width: 100%;">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载中遮罩 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <span class="loading-text">处理中...</span>
+    </div>
+
+    <!-- 右侧倒数日折叠框（最上） -->
+    <div id="countdownPanel" class="side-panel countdown-panel">
+        <div class="panel-toggle countdown-toggle" id="countdownToggle" title="倒数日">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 3"></path>
+            </svg>
+            <span class="panel-toggle-text">倒数日</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>倒数日</h3>
+                <button type="button" class="panel-close" id="countdownClose" title="收起">×</button>
+            </div>
+            <div class="panel-body countdown-body">
+                <div class="countdown-summary" id="countdownSummary"></div>
+                <div class="countdown-add-form">
+                    <input type="text" id="countdownName" placeholder="名称，如妈妈生日、考研倒计时" maxlength="30">
+                    <input type="date" id="countdownDate">
+                    <select id="countdownCalendarType" title="这里可以切换公历或农历">
+                        <option value="solar">公历</option>
+                        <option value="lunar">农历</option>
+                    </select>
+                    <select id="countdownEventType">
+                        <option value="birthday">生日</option>
+                        <option value="anniversary">纪念日</option>
+                        <option value="festival">节日</option>
+                        <option value="other">其他</option>
+                    </select>
+                    <input type="text" id="countdownCustomType" placeholder="自定义类型名称，如：考试日" maxlength="10" style="display:none;">
+                    <input type="color" id="countdownColor" value="#ec4899" title="类型底色">
+                    <button type="button" id="addCountdownBtn" class="btn-add-link">+ 添加</button>
+                </div>
+                <div class="countdown-form-tip">日期类型这里可切换“公历 / 农历”。选农历时只要挑一个对应的公历日期，系统会自动记住农历并换算成之后每年的公历日期。</div>
+                <div class="countdown-section-title">今年剩余节假日与重要日子</div>
+                <div class="countdown-list" id="countdownList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧日程折叠框 -->
+    <div id="schedulePanel" class="side-panel schedule-panel">
+        <div class="panel-toggle schedule-toggle" id="scheduleToggle" title="日程记录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+                <line x1="9" y1="14" x2="9" y2="14.01"></line>
+                <line x1="15" y1="14" x2="15" y2="14.01"></line>
+                <line x1="9" y1="18" x2="9" y2="18.01"></line>
+                <line x1="15" y1="18" x2="15" y2="18.01"></line>
+            </svg>
+            <span class="panel-toggle-text">日程</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>日程记录</h3>
+                <button type="button" class="panel-close" id="scheduleClose" title="收起">×</button>
+            </div>
+            <div class="panel-body schedule-body">
+                <textarea id="scheduleText" placeholder="记录今日日程安排、重要时间节点...&#10;&#10;此便签跨设备同步保存。"></textarea>
+            </div>
+            <div class="panel-footer">
+                <span class="panel-status" id="scheduleStatus">自动保存</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧工具折叠框 -->
+    <div id="toolsPanel" class="side-panel tools-panel">
+        <div class="panel-toggle tools-toggle" id="toolsToggle" title="常用工具">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span class="panel-toggle-text">工具</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>常用工具</h3>
+                <button type="button" class="panel-close" id="toolsClose" title="收起">×</button>
+            </div>
+            <div class="panel-body">
+                <div class="tools-grid" id="toolsGrid">
+                    <!-- 由JS动态渲染 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧网站折叠框 -->
+    <div id="linksPanel" class="side-panel links-panel">
+        <div class="panel-toggle links-toggle" id="linksToggle" title="常用网站">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span class="panel-toggle-text">网站</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>常用网站</h3>
+                <button type="button" class="panel-close" id="linksClose" title="收起">×</button>
+            </div>
+            <div class="panel-body">
+                <div class="links-list" id="linksList"></div>
+                <div class="links-add">
+                    <input type="text" id="newLinkName" placeholder="名称" maxlength="15">
+                    <input type="url" id="newLinkUrl" placeholder="网址">
+                    <button type="button" id="addLinkBtn" class="btn-add-link">+ 添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧通讯录折叠框 -->
+    <div id="contactsPanel" class="side-panel contacts-panel">
+        <div class="panel-toggle contacts-toggle" id="contactsToggle" title="通讯录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span class="panel-toggle-text">通讯录</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>通讯录</h3>
+                <button type="button" class="panel-close" id="contactsClose" title="收起">×</button>
+            </div>
+            <div class="panel-body contacts-body">
+                <!-- 搜索框 -->
+                <div class="contacts-search">
+                    <input type="text" id="contactsSearchInput" placeholder="搜索姓名或电话...">
+                    <button type="button" id="contactsSearchBtn" class="btn-search">🔍</button>
+                    <button type="button" id="contactsClearSearchBtn" class="btn-clear" style="display:none;">✕</button>
+                </div>
+                <!-- 添加联系人表单 -->
+                <div class="contacts-add-form">
+                    <input type="text" id="newContactName" placeholder="姓名" maxlength="20">
+                    <input type="tel" id="newContactPhone" placeholder="电话号码" maxlength="20">
+                    <button type="button" id="addContactBtn" class="btn-add-contact">+ 添加</button>
+                </div>
+                <!-- 导入按钮 -->
+                <div class="contacts-import">
+                    <label for="importContactsFile" class="btn-import-contacts">
+                        📥 导入Excel（姓名、电话两列）
+                    </label>
+                    <input type="file" id="importContactsFile" accept=".xlsx,.xls,.csv" style="display:none;">
+                </div>
+                <!-- 联系人列表 -->
+                <div class="contacts-list" id="contactsList">
+                    <!-- 由JS动态渲染 -->
+                </div>
+            </div>
+            <div class="panel-footer">
+                <span class="panel-status" id="contactsStatus">共 0 个联系人</span>
+                <button type="button" id="batchDeleteContactsBtn" class="btn-batch-delete" style="display:none;">删除选中</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧备忘录折叠框（下） -->
+    <div id="memoPanel" class="side-panel memo-panel">
+        <div class="panel-toggle memo-toggle" id="memoToggle" title="便签备忘录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <span class="panel-toggle-text">备忘</span>
+        </div>
+        <div class="panel-content">
+            <div class="panel-header">
+                <h3>便签备忘录</h3>
+                <button type="button" class="panel-close" id="memoClose" title="收起">×</button>
+            </div>
+            <div class="panel-body memo-body">
+                <textarea id="memoText" placeholder="记录重要事项、待确认的会议、临时想法...&#10;&#10;此便签跨日期保存，不属于任何特定日期。"></textarea>
+            </div>
+            <div class="panel-footer">
+                <span class="panel-status" id="memoStatus">自动保存</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 计算器弹窗 -->
+    <div id="calculatorModal" class="tool-modal">
+        <div class="tool-modal-content calculator-content">
+            <div class="tool-modal-header">
+                <h4>计算器</h4>
+                <button type="button" class="tool-modal-close" data-close="calculatorModal">×</button>
+            </div>
+            <div class="calculator">
+                <input type="text" id="calcDisplay" class="calc-display" readonly>
+                <div class="calc-buttons">
+                    <button type="button" class="calc-btn" data-calc="C">C</button>
+                    <button type="button" class="calc-btn" data-calc="±">±</button>
+                    <button type="button" class="calc-btn" data-calc="%">%</button>
+                    <button type="button" class="calc-btn op" data-calc="/">÷</button>
+                    <button type="button" class="calc-btn" data-calc="7">7</button>
+                    <button type="button" class="calc-btn" data-calc="8">8</button>
+                    <button type="button" class="calc-btn" data-calc="9">9</button>
+                    <button type="button" class="calc-btn op" data-calc="*">×</button>
+                    <button type="button" class="calc-btn" data-calc="4">4</button>
+                    <button type="button" class="calc-btn" data-calc="5">5</button>
+                    <button type="button" class="calc-btn" data-calc="6">6</button>
+                    <button type="button" class="calc-btn op" data-calc="-">−</button>
+                    <button type="button" class="calc-btn" data-calc="1">1</button>
+                    <button type="button" class="calc-btn" data-calc="2">2</button>
+                    <button type="button" class="calc-btn" data-calc="3">3</button>
+                    <button type="button" class="calc-btn op" data-calc="+">+</button>
+                    <button type="button" class="calc-btn zero" data-calc="0">0</button>
+                    <button type="button" class="calc-btn" data-calc=".">.</button>
+                    <button type="button" class="calc-btn eq" data-calc="=">=</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 天气弹窗 -->
+    <div id="weatherModal" class="tool-modal">
+        <div class="tool-modal-content weather-content">
+            <div class="tool-modal-header">
+                <h4>天气预报</h4>
+                <button type="button" class="tool-modal-close" data-close="weatherModal">×</button>
+            </div>
+            <div class="weather-body" id="weatherBody">
+                <div class="weather-loading">正在获取天气...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 倒计时弹窗 -->
+    <div id="timerModal" class="tool-modal">
+        <div class="tool-modal-content timer-content">
+            <div class="tool-modal-header">
+                <h4>倒计时</h4>
+                <button type="button" class="tool-modal-close" data-close="timerModal">×</button>
+            </div>
+            <div class="timer-body">
+                <div class="timer-display" id="timerDisplay">00:00:00</div>
+                <div class="timer-inputs">
+                    <input type="number" id="timerHours" placeholder="时" min="0" max="99" value="0">
+                    <span>:</span>
+                    <input type="number" id="timerMinutes" placeholder="分" min="0" max="59" value="5">
+                    <span>:</span>
+                    <input type="number" id="timerSeconds" placeholder="秒" min="0" max="59" value="0">
+                </div>
+                <div class="timer-buttons">
+                    <button type="button" id="timerStart" class="timer-btn start">开始</button>
+                    <button type="button" id="timerPause" class="timer-btn pause" disabled>暂停</button>
+                    <button type="button" id="timerReset" class="timer-btn reset">重置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 脚本引用 -->
+    <!-- Tesseract.js OCR引擎 - 改为按需加载，见ocr.js _ensureTesseractLoaded -->
+    <!-- html2canvas - 改为按需加载，见report.js -->
+
+    <!-- Supabase客户端 - 使用动态import加载ES模块 -->
+    <script type="module">
+        // 动态加载Supabase ES模块并暴露到全局
+        async function loadSupabase() {
+            const sources = [
+                'https://esm.sh/@supabase/supabase-js@2.38.4?bundle',
+                'https://cdn.skypack.dev/@supabase/supabase-js@2.38.4',
+                'https://unpkg.com/@supabase/supabase-js@2.38.4/dist/module/index.js'
+            ];
+
+            for (const src of sources) {
+                try {
+                    const module = await import(src);
+                    if (typeof module.createClient !== 'function' && typeof module.default?.createClient !== 'function') {
+                        throw new Error('Supabase模块结构异常');
+                    }
+                    try {
+                        Object.defineProperty(window, 'supabase', {
+                            value: module,
+                            writable: false,
+                            configurable: false
+                        });
+                    } catch (e) {
+                        window.supabase = module;
+                    }
+                    console.log('Supabase加载成功:', src);
+                    window.supabaseLoaded = true;
+                    window.dispatchEvent(new Event('supabase-loaded'));
+                    return;
+                } catch (e) {
+                    console.warn('加载失败:', src, e.message);
+                }
+            }
+            console.error('所有Supabase源都加载失败');
+        }
+        loadSupabase();
+    </script>
+
+    <script>
+        window.OfficeConstants = window.OfficeConstants || {
+            ITEM_TYPES: {
+                TODO: 'todo',
+                MEETING: 'meeting',
+                DOCUMENT: 'document'
+            },
+            RECURRING_TYPES: {
+                DAILY: 'daily',
+                WORKDAY_DAILY: 'workday_daily',
+                WEEKLY_DAY: 'weekly_day',
+                WEEKLY_MULTI: 'weekly_multi',
+                MONTHLY_DATE: 'monthly_date',
+                MONTHLY_WORKDAY: 'monthly_workday',
+                MONTHLY_WEEKDAY: 'monthly_weekday'
+            },
+            DOCUMENT_PROGRESS: {
+                PENDING: 'pending',
+                PROCESSING: 'processing',
+                COMPLETED: 'completed'
+            },
+            RECURRING_OPTION_GROUPS: [
+                {
+                    label: '每日',
+                    options: [
+                        { value: 'daily', label: '每天' },
+                        { value: 'workday_daily', label: '工作日每天（周一至周五）' }
+                    ]
+                },
+                {
+                    label: '每周',
+                    options: [
+                        { value: 'weekly_day', label: '每周固定星期' },
+                        { value: 'weekly_multi', label: '每周多天（如一二三）' }
+                    ]
+                },
+                {
+                    label: '每月',
+                    options: [
+                        { value: 'monthly_date', label: '每月固定日期' },
+                        { value: 'monthly_workday', label: '每月第N个工作日' },
+                        { value: 'monthly_weekday', label: '每月第N个星期X' }
+                    ]
+                }
+            ],
+            WEEKDAY_OPTIONS: [
+                { value: '1', label: '周一', shortLabel: '一' },
+                { value: '2', label: '周二', shortLabel: '二' },
+                { value: '3', label: '周三', shortLabel: '三' },
+                { value: '4', label: '周四', shortLabel: '四' },
+                { value: '5', label: '周五', shortLabel: '五' },
+                { value: '6', label: '周六', shortLabel: '六' },
+                { value: '7', label: '周日', shortLabel: '日' }
+            ],
+            NTH_WEEK_OPTIONS: [
+                { value: '1', label: '第一个' },
+                { value: '2', label: '第二个' },
+                { value: '3', label: '第三个' },
+                { value: '4', label: '第四个' },
+                { value: '5', label: '第五个' }
+            ]
+        };
+    </script>
+
+    <!-- 同步加载：核心依赖链（utils → db → sync → date-view → app） -->
+    <script src="js/utils.js?v=4"></script>
+    <script src="js/db.js?v=29"></script>
+    <script src="js/sync.js?v=65"></script>
+    <script src="js/app-date-view.js?v=13"></script>
+    <script src="js/app.js?v=184"></script>
+
+    <!-- defer 加载：首屏不需要的模块（按文档顺序执行，DOMContentLoaded 前完成） -->
+    <script defer src="js/crypto.js?v=17"></script>
+    <script defer src="js/kimi.js?v=16"></script>
+    <script defer src="js/ocr.js?v=45"></script>
+    <script defer src="js/report.js?v=16"></script>
+    <script defer src="js/calendar.js?v=39"></script>
+    <script defer src="js/upload-flow.js?v=9"></script>
+    
+    <!-- 版权声明 -->
+    <footer class="copyright-footer">
+        <p>© 2024-2026 kimixpf1. All Rights Reserved. <span id="deployVersionBadge" class="deploy-version-badge" title="当前页面部署版本"></span></p>
+        <p class="copyright-note">本软件版权归作者所有，用户可免费使用但不得用于商业用途。</p>
+    </footer>
+</body>
+</html>
+
