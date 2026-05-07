@@ -601,9 +601,15 @@ class Database {
     }
 
     async deleteItemsByHashes(keepHashes) {
+        const keepSet = keepHashes instanceof Set ? keepHashes : new Set(Array.isArray(keepHashes) ? keepHashes : []);
+        if (keepSet.size === 0) {
+            console.warn('deleteItemsByHashes收到空保留集合，跳过删除以防误删');
+            return 0;
+        }
+
         const db = await this.init();
         const allItems = await this.getAllItems();
-        const toDelete = allItems.filter(item => !keepHashes.has(item.hash));
+        const toDelete = allItems.filter(item => !keepSet.has(item.hash));
         if (toDelete.length === 0) return;
 
         return new Promise((resolve, reject) => {

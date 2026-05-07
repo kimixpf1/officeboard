@@ -1,3 +1,29 @@
+## 2026-05-06 v5.35
+
+### 本次目标
+- 修复同步误删与自动备份漏字段问题，避免空云端数据/异常缩容覆盖本地
+
+### 根因分析
+- syncLocalItemsToState 在目标列表为空时仍可能触发清库式对账
+- deleteItemsByHashes 对空保留集合缺少保护，存在全删风险
+- smartSync / silentSyncFromCloud / mergeData 对云端空数据或异常缩容缺少统一保护
+- 自动备份/导出链路未稳定补齐 sideData，导致部分本地侧信息丢失
+
+### 当前状态
+- ✅ syncLocalItemsToState 空目标列表时保留本地，不再误删
+- ✅ db.deleteItemsByHashes 空 keepHashes 时直接跳过删除
+- ✅ smartSync、silentSyncFromCloud、mergeData 增加云端空数据/异常缩容保护
+- ✅ 自动备份与导出备份补齐 sideData
+- ✅ node --check js/sync.js / js/db.js 通过，diagnostics 0 错误
+- 🔄 待提交推送
+
+### 本轮关键改动
+- js/sync.js：新增云端缩容保护函数，smartSync / silentSyncFromCloud / mergeData 前置拦截
+- js/sync.js：autoBackupBeforeSync 已包含 sideData，exportBackupAsFile 在缺失时补回 sideData
+- js/db.js：deleteItemsByHashes 增加空集合保护
+
+---
+
 ## 2026-05-06 v5.34
 
 ### 本次目标

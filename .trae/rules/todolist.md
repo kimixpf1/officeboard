@@ -1,5 +1,13 @@
 # Todolist
 
+## 已完成（v5.35 同步误删保护）
+- ✅ syncLocalItemsToState 在 targetList 为空且本地有数据时保留本地，不再清空覆盖
+- ✅ db.deleteItemsByHashes 在 keepHashes 为空时跳过删除，避免全删
+- ✅ smartSync / silentSyncFromCloud / mergeData 对云端空数据、异常缩容加保护
+- ✅ 自动备份与导出备份补齐 sideData
+- ✅ node --check js/sync.js / js/db.js 通过
+- 🔄 待提交推送
+
 ## 已完成（v5.24 微信识别修复）
 - ✅ 排查微信页面 AI 识别失败根因（Tesseract CDN 不通）
 - ✅ ocr.js 阻止微信环境 Tesseract fallback
