@@ -68,6 +68,127 @@ class SyncManager {
         SafeStorage.set(this.deletedItemsKey, JSON.stringify(this.deletedItemsMap || {}));
     }
 
+    clearDeletedItemsMap() {
+        this.deletedItemsMap = {};
+        this.persistDeletedItemsMap();
+    }
+
+    _setImportProtection(source = 'import', expiresMs = 5 * 60 * 1000) {
+        const expiresAt = new Date(Date.now() + expiresMs).toISOString();
+        const payload = { source, expiresAt, recordedAt: new Date().toISOString() };
+        SafeStorage.set('office_import_protection', JSON.stringify(payload));
+        return payload;
+    }
+
+    _getImportProtection() {
+        const payload = safeJsonParse(SafeStorage.get('office_import_protection'), null);
+        if (!payload || !payload.expiresAt) {
+            return null;
+        }
+        const expiresMs = this.getTimeMs(payload.expiresAt);
+        if (!expiresMs || expiresMs <= Date.now()) {
+            SafeStorage.remove('office_import_protection');
+            return null;
+        }
+        return payload;
+    }
+
+    _clearImportProtection() {
+        SafeStorage.remove('office_import_protection');
+    }
+
+    _resetSyncBaseline(timestamp = new Date().toISOString()) {
+        this.lastLocalModifyTime = timestamp;
+        SafeStorage.set('lastLocalModifyTime', timestamp);
+        this.lastCloudSyncTime = timestamp;
+        SafeStorage.set('lastCloudSyncTime', timestamp);
+    }
+
+    _applySideData(sideData = {}, options = {}) {
+        if (!sideData || typeof sideData !== 'object') {
+            return;
+        }
+
+        const {
+            dispatchMemo = false,
+            dispatchSchedule = false,
+            dispatchLinks = false,
+            dispatchContacts = false,
+            dispatchCountdown = false
+        } = options;
+
+        for (const [key, value] of Object.entries(sideData)) {
+            if (typeof value === 'string') {
+                SafeStorage.set(key, value);
+            }
+        }
+
+        if (dispatchMemo && sideData.office_memo_content !== undefined) {
+            document.dispatchEvent(new CustomEvent('memoSynced', {
+                detail: { content: sideData.office_memo_content || '' }
+            }));
+        }
+
+        if (dispatchSchedule && sideData.office_schedule_content !== undefined) {
+            document.dispatchEvent(new CustomEvent('scheduleSynced', {
+                detail: { content: sideData.office_schedule_content || '' }
+            }));
+        }
+
+        if (dispatchLinks && sideData.office_links !== undefined) {
+            document.dispatchEvent(new CustomEvent('linksSynced', {
+                detail: { links: safeJsonParse(sideData.office_links || '[]', []) }
+            }));
+        }
+
+        if (dispatchContacts && sideData.office_contacts !== undefined) {
+            document.dispatchEvent(new CustomEvent('contactsSynced', {
+                detail: { contacts: safeJsonParse(sideData.office_contacts || '[]', []) }
+            }));
+        }
+
+        if (dispatchCountdown) {
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(sideData.office_countdown_events || '[]', []),
+                    colors: safeJsonParse(sideData.office_countdown_type_colors || '{}', {}),
+                    sortOrder: safeJsonParse(sideData.office_countdown_sort_order || '[]', [])
+                }
+            }));
+        }
+    }
+
+    _shouldProtectImportedData(localItems, cloudItems, cloudUpdatedAt = '') {
+        const protection = this._getImportProtection();
+        if (!protection) {
+            return null;
+        }
+
+        const localCount = Array.isArray(localItems) ? localItems.length : 0;
+        if (localCount === 0) {
+            return null;
+        }
+
+        const localModifyMs = this.getTimeMs(this.lastLocalModifyTime);
+        const cloudUpdateMs = this.getTimeMs(cloudUpdatedAt);
+        if (!cloudUpdateMs || localModifyMs >= cloudUpdateMs) {
+            return {
+                protection,
+                reason: `${protection.source}保护期内，优先保留本地导入数据`
+            };
+        }
+
+        const normalizedCloudItems = Array.isArray(cloudItems) ? cloudItems : [];
+        if (normalizedCloudItems.length < localCount) {
+            return {
+                protection,
+                reason: `${protection.source}保护期内，云端事项少于本地，跳过下行覆盖`
+            };
+        }
+
+        return null;
+    }
+
     async _restoreSettingsFromCloud(settings) {
         if (!settings) return;
         const settingWrites = [];
@@ -234,6 +355,18 @@ class SyncManager {
     async syncLocalItemsToState(targetItems, currentLocalItems = null) {
         const existingLocalItems = Array.isArray(currentLocalItems) ? currentLocalItems : await db.getAllItems();
         const targetList = Array.isArray(targetItems) ? targetItems.filter(item => !this.shouldKeepDeleted(item)) : [];
+
+        if (targetList.length === 0) {
+            if (existingLocalItems.length > 0) {
+                console.warn('syncLocalItemsToState检测到空目标列表，保留本地现有数据，避免误删');
+            }
+            return { protected: true, reason: 'empty-target' };
+        }
+
+        if (existingLocalItems.length >= 5 && targetList.length < existingLocalItems.length * 0.3) {
+            console.warn(`syncLocalItemsToState触发缩量保护：本地 ${existingLocalItems.length} 条，目标仅 ${targetList.length} 条，跳过覆盖`);
+            return { protected: true, reason: 'target-shrink' };
+        }
 
         const localKeyMap = new Map();
         for (const li of existingLocalItems) {
@@ -509,6 +642,7 @@ class SyncManager {
             const cloudUpdateTime = cloudData?.updated_at ? new Date(cloudData.updated_at) : null;
             const localModifyTime = this.lastLocalModifyTime ? new Date(this.lastLocalModifyTime) : null;
             const lastSyncTime = this.lastCloudSyncTime ? new Date(this.lastCloudSyncTime) : null;
+            const importedDataProtection = this._shouldProtectImportedData(localItems, cloudData?.data?.items || [], cloudData?.updated_at);
 
 
             // 情况1: 云端无数据
@@ -530,6 +664,15 @@ class SyncManager {
 
                 // 数据丢失保护：如果本地空且云端也几乎没数据，但历史有过同步，说明数据已丢失
                 // 此时不应下载空数据，而应保留云端仅存的数据并警告
+                if (importedDataProtection) {
+                    console.warn(`smartSync导入保护生效：${importedDataProtection.reason}`);
+                    const localSyncData = await this.buildSyncData(localItems);
+                    await this.uploadToCloud(cloudData, localSyncData);
+                    this._clearImportProtection();
+                    this.isSyncing = false;
+                    return { success: true, protected: true, uploaded: true };
+                }
+
                 if (cloudItems.length === 0) {
                     console.warn('本地和云端均无事项数据，跳过同步');
                     this.isSyncing = false;
@@ -548,9 +691,26 @@ class SyncManager {
             // 情况3: 两边都有数据，需要比较时间
             const cloudItems = cloudData.data.items || [];
 
+            if (importedDataProtection) {
+                console.warn(`smartSync导入保护生效：${importedDataProtection.reason}`);
+                const localSyncData = await this.buildSyncData(localItems);
+                await this.uploadToCloud(cloudData, localSyncData);
+                this._clearImportProtection();
+                this.isSyncing = false;
+                return { success: true, protected: true, uploaded: true };
+            }
+
             if (cloudData.data.deletedItems && typeof cloudData.data.deletedItems === 'object') {
                 this.deletedItemsMap = { ...this.deletedItemsMap, ...cloudData.data.deletedItems };
                 this.persistDeletedItemsMap();
+            }
+
+            // 数据丢失保护：如果本地数据量显著大于云端，以本地为准上传覆盖云端
+            if (localItems.length >= 5 && cloudItems.length < localItems.length * 0.5) {
+                console.warn(`smartSync数据丢失保护：本地 ${localItems.length} 条，云端仅 ${cloudItems.length} 条，以本地为准`);
+                await this.uploadToCloud(cloudData);
+                this.isSyncing = false;
+                return;
             }
 
             const isFirstSync = !lastSyncTime;
@@ -578,7 +738,14 @@ class SyncManager {
                         });
 
                     if (localChanged) {
-                        await this.syncLocalItemsToState(reconciledItems, localItems);
+                        const syncResult = await this.syncLocalItemsToState(reconciledItems, localItems);
+                        if (syncResult && syncResult.protected) {
+                            if (localHasModify) {
+                                await this.uploadToCloud(cloudData);
+                            }
+                            this.isSyncing = false;
+                            return { success: false, protected: true, reason: syncResult.reason };
+                        }
                         needsUIRefresh = true;
                     }
 
@@ -620,6 +787,17 @@ class SyncManager {
                             }));
                         }
                     }
+                    // 同步通讯录
+                    if (cloudData?.data?.contacts !== undefined) {
+                        const localContacts = SafeStorage.get('office_contacts') || '';
+                        const cloudContacts = cloudData.data.contacts;
+                        if (cloudContacts !== localContacts) {
+                            SafeStorage.set('office_contacts', cloudContacts);
+                            document.dispatchEvent(new CustomEvent('contactsSynced', {
+                                detail: { contacts: safeJsonParse(cloudContacts, []) }
+                            }));
+                        }
+                    }
                     // 同步日程
                     if (cloudData?.data?.schedule !== undefined) {
                         const localSchedule = SafeStorage.get('office_schedule_content') || '';
@@ -630,6 +808,40 @@ class SyncManager {
                                 detail: { content: cloudSchedule } 
                             }));
                         }
+                    }
+                    if (cloudData?.data?.countdownEvents !== undefined) {
+                        const nextValue = cloudData.data.countdownEvents || '[]';
+                        const currentValue = SafeStorage.get('office_countdown_events') || '[]';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_countdown_events', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.countdownTypeColors !== undefined) {
+                        const nextValue = cloudData.data.countdownTypeColors || '{}';
+                        const currentValue = SafeStorage.get('office_countdown_type_colors') || '{}';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_countdown_type_colors', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.countdownSortOrder !== undefined) {
+                        const nextValue = cloudData.data.countdownSortOrder || '[]';
+                        const currentValue = SafeStorage.get('office_countdown_sort_order') || '[]';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_countdown_sort_order', nextValue);
+                        }
+                    }
+                    if (
+                        cloudData?.data?.countdownEvents !== undefined
+                        || cloudData?.data?.countdownTypeColors !== undefined
+                        || cloudData?.data?.countdownSortOrder !== undefined
+                    ) {
+                        document.dispatchEvent(new CustomEvent('countdownSynced', {
+                            detail: {
+                                events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
+                                colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {}),
+                                sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
+                            }
+                        }));
                     }
                 }
             }
@@ -877,9 +1089,38 @@ class SyncManager {
     /**
      * 智能合并本地和云端数据
      */
+    _shouldProtectAgainstCloudShrink(localItems, cloudItems, cloudData) {
+        const localCount = Array.isArray(localItems) ? localItems.length : 0;
+        const cloudCount = Array.isArray(cloudItems) ? cloudItems.length : 0;
+
+        if (localCount <= 0 || cloudCount >= localCount) {
+            return null;
+        }
+
+        if (cloudCount === 0 && localCount > 0) {
+            return { reason: `云端事项为空，跳过合并以保留本地 ${localCount} 条数据` };
+        }
+
+        if (localCount >= 5 && cloudCount < localCount * 0.3) {
+            return { reason: `云端事项仅 ${cloudCount} 条，低于本地 ${localCount} 条的安全阈值` };
+        }
+
+        if (cloudData?.data?.deletedItems && typeof cloudData.data.deletedItems === 'object' && cloudCount < localCount) {
+            return { reason: '云端包含删除标记且事项数异常偏少，跳过合并防止误删' };
+        }
+
+        return null;
+    }
+
     async mergeData(localItems, cloudData) {
 
         const cloudItems = cloudData.data.items || [];
+        const shrinkProtection = this._shouldProtectAgainstCloudShrink(localItems, cloudItems, cloudData);
+
+        if (shrinkProtection) {
+            console.warn(`合并同步触发保护：${shrinkProtection.reason}`);
+            return { success: false, protected: true };
+        }
 
 
         try {
@@ -1363,6 +1604,17 @@ class SyncManager {
                 return { success: false };
             }
 
+            const localItems = await db.getAllItems();
+            const cloudItems = data.data.items || [];
+            const importedDataProtection = this._shouldProtectImportedData(localItems, cloudItems, data.updated_at);
+            if (importedDataProtection) {
+                console.warn(`静默同步导入保护生效：${importedDataProtection.reason}`);
+                const localSyncData = await this.buildSyncData(localItems);
+                await this.uploadToCloud(data, localSyncData);
+                this._clearImportProtection();
+                return { success: true, protected: true, uploaded: true, itemCount: localItems.length };
+            }
+
             // 同步设置
             await this._restoreSettingsFromCloud(data.data.settings);
 
@@ -1406,10 +1658,15 @@ class SyncManager {
                 SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
             }
 
+            if (data.data.countdownSortOrder !== undefined) {
+                SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
+            }
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(data.data.countdownEvents || '[]', []),
-                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {})
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(data.data.countdownSortOrder || '[]', [])
                 }
             }));
 
@@ -1419,11 +1676,13 @@ class SyncManager {
             }
 
             // 同步事项 - 使用对账合并，保留本设备未上传的新增
-            const cloudItems = data.data.items || [];
-            
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
 
-            const localItems = await db.getAllItems();
+            const shrinkProtection = this._shouldProtectAgainstCloudShrink(localItems, deduplicatedCloudItems, data);
+            if (shrinkProtection) {
+                console.warn(`静默同步触发保护：${shrinkProtection.reason}`);
+                return { success: false, protected: true, reason: shrinkProtection.reason };
+            }
 
             // 数据丢失保护：如果本地数据量显著大于云端，阻止静默覆盖
             if (localItems.length > 0 && deduplicatedCloudItems.length < localItems.length && localItems.length >= 5) {
@@ -1443,8 +1702,11 @@ class SyncManager {
             let importedCount = 0;
 
             try {
-                await this.syncLocalItemsToState(reconciledItems, localItems);
-                importedCount = reconciledItems.length;
+                const syncResult = await this.syncLocalItemsToState(reconciledItems, localItems);
+            importedCount = reconciledItems.length;
+            if (syncResult && syncResult.protected) {
+                return { success: false, protected: true, reason: syncResult.reason };
+            }
             } catch (e) {
                 console.warn('静默同步导入失败:', e);
             }
@@ -2025,7 +2287,8 @@ class SyncManager {
             const exportData = {
                 version: '2.0',
                 export_time: new Date().toISOString(),
-                items: allItems
+                items: allItems,
+                sideData: this._collectSideDataForBackup()
             };
             let dataStr = JSON.stringify(exportData, null, 2);
             if (password) {
@@ -2073,12 +2336,15 @@ class SyncManager {
                 throw new Error('文件格式不正确');
             }
 
+            const importTime = new Date().toISOString();
             await db.clearAllItems();
 
             let importedCount = 0;
             for (const item of data.items) {
                 try {
                     const { id, ...itemData } = item;
+                    if (!itemData.createdAt) itemData.createdAt = importTime;
+                    itemData.updatedAt = importTime;
                     await db.addItem(itemData);
                     importedCount++;
                 } catch (e) {
@@ -2086,11 +2352,21 @@ class SyncManager {
                 }
             }
 
-            this.recordLocalModify();
+            if (data.sideData && typeof data.sideData === 'object') {
+                this._applySideData(data.sideData);
+            }
+
+            this.clearDeletedItemsMap();
+            this._resetSyncBaseline(importTime);
+            this._setImportProtection('import-file');
+            db.resetItemsCache();
 
             if (this.currentUser && importedCount > 0) {
                 try {
-                    await this.uploadToCloud();
+                    const localItems = await db.getAllItems();
+                    const localSyncData = await this.buildSyncData(localItems);
+                    await this.uploadToCloud(null, localSyncData);
+                    this._clearImportProtection();
                 } catch (uploadErr) {
                     console.warn('导入后上传云端失败:', uploadErr);
                 }
@@ -2266,7 +2542,7 @@ class SyncManager {
 
     _collectSideDataForBackup() {
         const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
-            'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
+            'office_schedule_content', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
             'office_weather_city', 'theme'];
         const result = {};
         for (const k of keys) {
@@ -2295,6 +2571,7 @@ class SyncManager {
             if (index < 0 || index >= list.length) throw new Error('备份索引无效');
             const backup = JSON.parse(list[index].data);
             if (!backup.items || backup.items.length === 0) throw new Error('备份数据为空');
+            const restoreTime = new Date().toISOString();
             const database = await db.init();
             await new Promise((resolve, reject) => {
                 const tx = database.transaction(db.STORES.ITEMS, 'readwrite');
@@ -2304,8 +2581,8 @@ class SyncManager {
                     for (const item of backup.items) {
                         const normalized = db.normalizeItemForStorage ? db.normalizeItemForStorage(item) : item;
                         if (!normalized.hash) normalized.hash = db.generateHash ? db.generateHash(normalized) : '';
-                        if (!normalized.createdAt) normalized.createdAt = new Date().toISOString();
-                        if (!normalized.updatedAt) normalized.updatedAt = normalized.createdAt;
+                        if (!normalized.createdAt) normalized.createdAt = restoreTime;
+                        normalized.updatedAt = restoreTime;
                         delete normalized.id;
                         store.add(normalized);
                     }
@@ -2315,12 +2592,20 @@ class SyncManager {
                 tx.onerror = () => reject(tx.error);
                 tx.onabort = () => reject(new Error('恢复备份事务中止'));
             });
-            if (backup.sideData) {
-                for (const [k, v] of Object.entries(backup.sideData)) {
-                    localStorage.setItem(k, v);
-                }
-            }
+            this.clearDeletedItemsMap();
+            this._applySideData(backup.sideData || {}, {
+                dispatchMemo: true,
+                dispatchSchedule: true,
+                dispatchLinks: true,
+                dispatchContacts: true,
+                dispatchCountdown: true
+            });
+            this._resetSyncBaseline(restoreTime);
+            this._setImportProtection('restore-backup');
             db.resetItemsCache();
+            document.dispatchEvent(new CustomEvent('syncDataLoaded', {
+                detail: { itemCount: backup.items.length, source: 'restore-backup' }
+            }));
             return { success: true, itemCount: backup.items.length };
         } catch (e) {
             console.error('恢复备份失败:', e);
@@ -2333,6 +2618,9 @@ class SyncManager {
             const list = JSON.parse(localStorage.getItem('dataBackups') || '[]');
             if (list.length === 0) return null;
             const latest = JSON.parse(list[list.length - 1].data);
+            if (!latest.sideData || typeof latest.sideData !== 'object') {
+                latest.sideData = this._collectSideDataForBackup();
+            }
             const blob = new Blob([JSON.stringify(latest, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

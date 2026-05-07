@@ -3084,9 +3084,12 @@ class OfficeDashboard {
         if (syncManager.isLoggedIn()) {
             if (status) status.textContent = '同步中...';
             try {
-                await syncManager.immediateSyncToCloud();
-
-                if (status) status.textContent = `共 ${this.contacts.length} 个联系人 ✓ 已同步`;
+                const syncResult = await syncManager.immediateSyncToCloud();
+                if (syncResult && syncResult.protected) {
+                    if (status) status.textContent = `共 ${this.contacts.length} 个联系人 (已保留本地)`;
+                } else if (status) {
+                    status.textContent = `共 ${this.contacts.length} 个联系人 ✓ 已同步`;
+                }
                 setTimeout(() => {
                     if (status) status.textContent = `共 ${this.contacts.length} 个联系人`;
                 }, 2000);
@@ -8602,7 +8605,8 @@ class OfficeDashboard {
                     version: '2.0',
                     export_time: new Date().toISOString(),
                     type: 'daily-auto-backup',
-                    items: allItems
+                    items: allItems,
+                    sideData: syncManager._collectSideDataForBackup()
                 };
 
                 await this.saveDailyBackupToCloud(exportData);
@@ -8637,7 +8641,7 @@ class OfficeDashboard {
 
         try {
             const todayStr = this.formatDateLocal(new Date());
-            const { items, ...meta } = exportData;
+            const { items, sideData = {}, ...meta } = exportData;
             const compressedItems = items.map(i => {
                 const { hash, ...rest } = i;
                 return rest;
@@ -8646,7 +8650,9 @@ class OfficeDashboard {
                 date: todayStr,
                 time: new Date().toISOString(),
                 count: items.length,
-                items: compressedItems
+                items: compressedItems,
+                sideData,
+                meta
             };
 
             const MAX_CLOUD_BACKUPS = 30;
@@ -8686,6 +8692,31 @@ class OfficeDashboard {
                 } catch (e) {
                     console.warn('恢复项目失败:', e);
                 }
+            }
+
+            if (backup.sideData && typeof backup.sideData === 'object') {
+                Object.entries(backup.sideData).forEach(([key, value]) => {
+                    SafeStorage.set(key, value);
+                });
+                document.dispatchEvent(new CustomEvent('memoSynced', {
+                    detail: { content: SafeStorage.get('office_memo_content') || '' }
+                }));
+                document.dispatchEvent(new CustomEvent('scheduleSynced', {
+                    detail: { content: SafeStorage.get('office_schedule_content') || '' }
+                }));
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: safeJsonParse(SafeStorage.get('office_links') || '[]', []) }
+                }));
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: safeJsonParse(SafeStorage.get('office_contacts') || '[]', []) }
+                }));
+                document.dispatchEvent(new CustomEvent('countdownSynced', {
+                    detail: {
+                        events: safeJsonParse(SafeStorage.get('office_countdown_events') || '[]', []),
+                        colors: safeJsonParse(SafeStorage.get('office_countdown_type_colors') || '{}', {}),
+                        sortOrder: safeJsonParse(SafeStorage.get('office_countdown_sort_order') || '[]', [])
+                    }
+                }));
             }
 
             await this.loadItems();
