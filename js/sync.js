@@ -301,11 +301,14 @@ class SyncManager {
         const normalizedCloudItems = Array.isArray(cloudItems) ? cloudItems : [];
         const reconciledItems = [];
         const matchedLocalKeys = new Set();
+        const matchedLocalIds = new Set();
 
         const localKeyMap = new Map();
+        const localIdMap = new Map();
         for (const li of normalizedLocalItems) {
             const k = this.getItemKey(li);
             if (!localKeyMap.has(k)) localKeyMap.set(k, li);
+            if (li.id) localIdMap.set(String(li.id), li);
         }
 
         for (const cloudItem of normalizedCloudItems) {
@@ -314,7 +317,10 @@ class SyncManager {
                 continue;
             }
 
-            const localMatch = localKeyMap.get(cloudKey) || null;
+            let localMatch = localKeyMap.get(cloudKey) || null;
+            if (!localMatch && cloudItem.id) {
+                localMatch = localIdMap.get(String(cloudItem.id)) || null;
+            }
             if (!localMatch) {
                 reconciledItems.push({ ...cloudItem });
                 matchedLocalKeys.add(cloudKey);
@@ -322,6 +328,8 @@ class SyncManager {
             }
 
             matchedLocalKeys.add(cloudKey);
+            matchedLocalKeys.add(this.getItemKey(localMatch));
+            if (localMatch.id) matchedLocalIds.add(String(localMatch.id));
             const localTime = this.getItemUpdatedTime(localMatch);
             const cloudTime = this.getItemUpdatedTime(cloudItem);
             const winner = localTime > cloudTime ? { ...localMatch } : { ...cloudItem };
@@ -336,6 +344,9 @@ class SyncManager {
         for (const localItem of normalizedLocalItems) {
             const localKey = this.getItemKey(localItem);
             if (matchedLocalKeys.has(localKey)) {
+                continue;
+            }
+            if (localItem.id && matchedLocalIds.has(String(localItem.id))) {
                 continue;
             }
 
@@ -369,9 +380,11 @@ class SyncManager {
         }
 
         const localKeyMap = new Map();
+        const localIdMap = new Map();
         for (const li of existingLocalItems) {
             const k = this.getItemKey(li);
             if (!localKeyMap.has(k)) localKeyMap.set(k, li);
+            if (li.id) localIdMap.set(String(li.id), li);
         }
 
         const keptLocalIds = new Set();
@@ -379,7 +392,10 @@ class SyncManager {
         const itemsToAdd = [];
 
         for (const targetItem of targetList) {
-            const localMatch = localKeyMap.get(this.getItemKey(targetItem));
+            let localMatch = localKeyMap.get(this.getItemKey(targetItem));
+            if (!localMatch && targetItem.id) {
+                localMatch = localIdMap.get(String(targetItem.id));
+            }
             if (localMatch) {
                 itemsToPut.push({ ...targetItem, id: localMatch.id });
                 this.clearDeletedMarker(localMatch);
@@ -478,6 +494,9 @@ class SyncManager {
             countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
             countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
             countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
+            tools: SafeStorage.get('office_tools') || '',
+            weatherCity: SafeStorage.get('office_weather_city') || '',
+            theme: SafeStorage.get('theme') || '',
             device_info: navigator.userAgent
         };
     }
@@ -830,6 +849,28 @@ class SyncManager {
                             SafeStorage.set('office_countdown_sort_order', nextValue);
                         }
                     }
+                    if (cloudData?.data?.tools !== undefined) {
+                        const nextValue = cloudData.data.tools;
+                        const currentValue = SafeStorage.get('office_tools') || '';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_tools', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.weatherCity !== undefined) {
+                        const nextValue = cloudData.data.weatherCity;
+                        const currentValue = SafeStorage.get('office_weather_city') || '';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_weather_city', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.theme !== undefined) {
+                        const nextValue = cloudData.data.theme;
+                        const currentValue = SafeStorage.get('theme') || '';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('theme', nextValue);
+                            document.documentElement.setAttribute('data-theme', nextValue);
+                        }
+                    }
                     if (
                         cloudData?.data?.countdownEvents !== undefined
                         || cloudData?.data?.countdownTypeColors !== undefined
@@ -914,9 +955,11 @@ class SyncManager {
 
             const cloudOnlyItems = [];
             const localKeys = new Set(normalizedLocalItems.map(item => this.getItemKey(item)));
+            const localIds = new Set(normalizedLocalItems.filter(item => item.id).map(item => String(item.id)));
             for (const ci of cloudItems) {
                 if (this.shouldKeepDeleted(ci)) continue;
                 if (localKeys.has(this.getItemKey(ci))) continue;
+                if (ci.id && localIds.has(String(ci.id))) continue;
                 cloudOnlyItems.push(ci);
             }
 
@@ -1018,6 +1061,34 @@ class SyncManager {
                 const currentValue = SafeStorage.get('office_countdown_sort_order') || '[]';
                 if (nextValue !== currentValue) {
                     SafeStorage.set('office_countdown_sort_order', nextValue);
+                }
+            }
+
+            if (cloudData.data.tools !== undefined) {
+                const nextValue = cloudData.data.tools;
+                const currentValue = SafeStorage.get('office_tools') || '';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_tools', nextValue);
+                    document.dispatchEvent(new CustomEvent('toolsSynced', {
+                        detail: { tools: safeJsonParse(nextValue || '[]', []) }
+                    }));
+                }
+            }
+
+            if (cloudData.data.weatherCity !== undefined) {
+                const nextValue = cloudData.data.weatherCity;
+                const currentValue = SafeStorage.get('office_weather_city') || '';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_weather_city', nextValue);
+                }
+            }
+
+            if (cloudData.data.theme !== undefined) {
+                const nextValue = cloudData.data.theme;
+                const currentValue = SafeStorage.get('theme') || '';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('theme', nextValue);
+                    document.documentElement.setAttribute('data-theme', nextValue);
                 }
             }
 
@@ -1126,34 +1197,43 @@ class SyncManager {
         try {
             // 创建合并后的数据
             const mergedMap = new Map();
+            const mergedIdMap = new Map();
             
             // 先添加云端数据
             for (const item of cloudItems) {
                 if (this.shouldKeepDeleted(item)) continue;
                 const key = this.getItemKey(item);
                 mergedMap.set(key, { ...item, source: 'cloud' });
+                if (item.id) mergedIdMap.set(String(item.id), key);
             }
             
             // 再合并本地数据
             for (const item of localItems) {
                 if (this.shouldKeepDeleted(item)) continue;
                 const key = this.getItemKey(item);
-                if (mergedMap.has(key)) {
-                    const existing = mergedMap.get(key);
-                    // 合并参会人员（如果是会议）
-                    if (item.type === 'meeting' && existing.type === 'meeting') {
+                let existingEntry = mergedMap.get(key);
+                if (!existingEntry && item.id) {
+                    const mappedKey = mergedIdMap.get(String(item.id));
+                    if (mappedKey) existingEntry = mergedMap.get(mappedKey);
+                }
+                if (existingEntry) {
+                    const existingKey = this.getItemKey(existingEntry);
+                    if (item.type === 'meeting' && existingEntry.type === 'meeting') {
                         const mergedAttendees = [...new Set([
-                            ...(existing.attendees || []),
+                            ...(existingEntry.attendees || []),
                             ...(item.attendees || [])
                         ])];
-                        existing.attendees = mergedAttendees;
+                        existingEntry.attendees = mergedAttendees;
                     }
-                    // 保留本地的新修改
-                    if (item.updatedAt && (!existing.updatedAt || item.updatedAt > existing.updatedAt)) {
+                    if (item.updatedAt && (!existingEntry.updatedAt || item.updatedAt > existingEntry.updatedAt)) {
+                        mergedMap.delete(existingKey);
+                        if (existingEntry.id) mergedIdMap.delete(String(existingEntry.id));
                         mergedMap.set(key, { ...item, source: 'local' });
+                        if (item.id) mergedIdMap.set(String(item.id), key);
                     }
                 } else {
                     mergedMap.set(key, { ...item, source: 'local' });
+                    if (item.id) mergedIdMap.set(String(item.id), key);
                 }
             }
 
@@ -1278,6 +1358,31 @@ class SyncManager {
                 const localCountdownSortOrder = SafeStorage.get('office_countdown_sort_order') || '[]';
                 if (cloudCountdownSortOrder !== localCountdownSortOrder) {
                     SafeStorage.set('office_countdown_sort_order', cloudCountdownSortOrder);
+                }
+            }
+
+            if (cloudData.data.tools !== undefined) {
+                const cloudTools = cloudData.data.tools;
+                const localTools = SafeStorage.get('office_tools') || '';
+                if (cloudTools !== localTools) {
+                    SafeStorage.set('office_tools', cloudTools);
+                }
+            }
+
+            if (cloudData.data.weatherCity !== undefined) {
+                const cloudWeatherCity = cloudData.data.weatherCity;
+                const localWeatherCity = SafeStorage.get('office_weather_city') || '';
+                if (cloudWeatherCity !== localWeatherCity) {
+                    SafeStorage.set('office_weather_city', cloudWeatherCity);
+                }
+            }
+
+            if (cloudData.data.theme !== undefined) {
+                const cloudTheme = cloudData.data.theme;
+                const localTheme = SafeStorage.get('theme') || '';
+                if (cloudTheme !== localTheme) {
+                    SafeStorage.set('theme', cloudTheme);
+                    document.documentElement.setAttribute('data-theme', cloudTheme);
                 }
             }
 
@@ -1662,6 +1767,19 @@ class SyncManager {
                 SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
             }
 
+            if (data.data.tools !== undefined) {
+                SafeStorage.set('office_tools', data.data.tools);
+            }
+
+            if (data.data.weatherCity !== undefined) {
+                SafeStorage.set('office_weather_city', data.data.weatherCity);
+            }
+
+            if (data.data.theme !== undefined) {
+                SafeStorage.set('theme', data.data.theme);
+                document.documentElement.setAttribute('data-theme', data.data.theme);
+            }
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(data.data.countdownEvents || '[]', []),
@@ -1994,6 +2112,9 @@ class SyncManager {
                 countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
                 countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
                 countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
+                tools: SafeStorage.get('office_tools') || '',
+                weatherCity: SafeStorage.get('office_weather_city') || '',
+                theme: SafeStorage.get('theme') || '',
                 device_info: navigator.userAgent
             };
             if (progressCallback) progressCallback('正在上传到云端...');
@@ -2119,6 +2240,19 @@ class SyncManager {
 
             if (data.data.countdownSortOrder !== undefined) {
                 SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
+            }
+
+            if (data.data.tools !== undefined) {
+                SafeStorage.set('office_tools', data.data.tools);
+            }
+
+            if (data.data.weatherCity !== undefined) {
+                SafeStorage.set('office_weather_city', data.data.weatherCity);
+            }
+
+            if (data.data.theme !== undefined) {
+                SafeStorage.set('theme', data.data.theme);
+                document.documentElement.setAttribute('data-theme', data.data.theme);
             }
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
