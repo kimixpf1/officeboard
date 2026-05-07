@@ -2658,7 +2658,7 @@ class SyncManager {
                     sideData: this._collectSideDataForBackup()
                 };
                 const backupJson = JSON.stringify(backup);
-                const MAX_BACKUPS = 20;
+                const MAX_BACKUPS = 10;
                 let backupList = [];
                 try {
                     backupList = JSON.parse(localStorage.getItem('dataBackups') || '[]');
@@ -2708,12 +2708,12 @@ class SyncManager {
             const restoreTime = new Date().toISOString();
             const database = await db.init();
             await new Promise((resolve, reject) => {
-                const tx = database.transaction(db.STORES.ITEMS, 'readwrite');
-                const store = tx.objectStore(db.STORES.ITEMS);
+                const tx = database.transaction('items', 'readwrite');
+                const store = tx.objectStore('items');
                 const clearReq = store.clear();
                 clearReq.onsuccess = () => {
                     for (const item of backup.items) {
-                        const normalized = db.normalizeItemForStorage ? db.normalizeItemForStorage(item) : item;
+                        const normalized = db.normalizeItemForStorage ? db.normalizeItemForStorage(item) : { ...item };
                         if (!normalized.hash) normalized.hash = db.generateHash ? db.generateHash(normalized) : '';
                         if (!normalized.createdAt) normalized.createdAt = restoreTime;
                         normalized.updatedAt = restoreTime;

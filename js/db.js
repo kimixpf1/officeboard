@@ -495,10 +495,21 @@ class Database {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => this._rejectWithLog(reject, request.error, 'exportData设置读取失败');
         });
+        const sideDataKeys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
+            'office_schedule_content', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
+            'office_weather_city', 'theme'];
+        const sideData = {};
+        for (const key of sideDataKeys) {
+            const value = localStorage.getItem(key);
+            if (value !== null) {
+                sideData[key] = value;
+            }
+        }
 
         return {
             items,
             settings,
+            sideData,
             exportDate: new Date().toISOString()
         };
     }
@@ -507,16 +518,24 @@ class Database {
      * 导入数据
      */
     async importData(data) {
-        const { items, settings } = data;
+        const { items, settings, sideData } = data;
 
         await this.clearAllData();
 
         if (items && items.length > 0) {
             const store = await this.getStore(STORES.ITEMS, 'readwrite');
             for (const item of items) {
-                delete item.id;
+                const normalizedItem = this.normalizeItemForStorage({ ...item });
+                delete normalizedItem.id;
+                if (!normalizedItem.hash) {
+                    normalizedItem.hash = this.generateHash(normalizedItem);
+                }
+                if (!normalizedItem.createdAt) {
+                    normalizedItem.createdAt = new Date().toISOString();
+                }
+                normalizedItem.updatedAt = new Date().toISOString();
                 await new Promise((resolve, reject) => {
-                    const request = store.add(item);
+                    const request = store.add(normalizedItem);
                     request.onsuccess = () => resolve();
                     request.onerror = () => this._rejectWithLog(reject, request.error, 'importData事项导入失败');
                 });
@@ -532,6 +551,16 @@ class Database {
                     request.onerror = () => this._rejectWithLog(reject, request.error, 'importData设置导入失败');
                 });
             }
+        }
+
+        if (sideData && typeof sideData === 'object') {
+            Object.entries(sideData).forEach(([key, value]) => {
+                if (value === null || value === undefined) {
+                    localStorage.removeItem(key);
+                    return;
+                }
+                localStorage.setItem(key, value);
+            });
         }
 
         this.resetItemsCache();
