@@ -247,9 +247,15 @@ class SyncManager {
 
     markItemDeleted(item, deletedAt = new Date().toISOString()) {
         const deletionKey = this.getItemDeletionKey(item);
-        if (!deletionKey) return;
-        this.deletedItemsMap[deletionKey] = deletedAt;
-        this.persistDeletedItemsMap();
+        if (deletionKey) {
+            this.deletedItemsMap[deletionKey] = deletedAt;
+        }
+        if (item?.id) {
+            this.deletedItemsMap[`id:${item.id}`] = deletedAt;
+        }
+        if (deletionKey || item?.id) {
+            this.persistDeletedItemsMap();
+        }
     }
 
     getDeletedAt(item) {
@@ -260,16 +266,30 @@ class SyncManager {
 
     clearDeletedMarker(item) {
         const deletionKey = this.getItemDeletionKey(item);
-        if (!deletionKey || !this.deletedItemsMap[deletionKey]) return;
-        delete this.deletedItemsMap[deletionKey];
-        this.persistDeletedItemsMap();
+        let changed = false;
+        if (deletionKey && this.deletedItemsMap[deletionKey]) {
+            delete this.deletedItemsMap[deletionKey];
+            changed = true;
+        }
+        if (item?.id && this.deletedItemsMap[`id:${item.id}`]) {
+            delete this.deletedItemsMap[`id:${item.id}`];
+            changed = true;
+        }
+        if (changed) this.persistDeletedItemsMap();
     }
 
     shouldKeepDeleted(item, deletedAt = '') {
         const deletionTime = this.getTimeMs(deletedAt || this.getDeletedAt(item));
-        if (!deletionTime) return false;
-        const itemTime = this.getItemUpdatedTime(item);
-        return deletionTime >= itemTime;
+        if (deletionTime) {
+            const itemTime = this.getItemUpdatedTime(item);
+            if (deletionTime >= itemTime) return true;
+        }
+        if (item?.id && this.deletedItemsMap[`id:${item.id}`]) {
+            const idDeletionTime = this.getTimeMs(this.deletedItemsMap[`id:${item.id}`]);
+            const itemTime = this.getItemUpdatedTime(item);
+            return idDeletionTime >= itemTime;
+        }
+        return false;
     }
 
     getTimeMs(value) {

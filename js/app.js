@@ -1010,25 +1010,13 @@ class OfficeDashboard {
         const builtinEvents = this.getBuiltinHolidayCountdowns();
         const normalizedCustomEvents = this.getCustomCountdownEvents()
             .map(item => this.normalizeCountdownEvent(item))
-            .filter(item => item?.name && item?.date && item.daysLeft >= 0)
+            .filter(item => item?.name && item?.date && item.daysLeft >= 0);
+
+        const allEvents = [...builtinEvents, ...normalizedCustomEvents]
+            .filter(Boolean)
             .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date) || String(a.name || '').localeCompare(String(b.name || '')));
 
-        const sortedCustomEvents = this.applyCountdownSortOrder(normalizedCustomEvents);
-
-        return [...builtinEvents, ...sortedCustomEvents]
-            .filter(Boolean)
-            .sort((a, b) => {
-                if (a.type === 'holiday' && b.type === 'holiday') {
-                    return a.daysLeft - b.daysLeft || a.date.localeCompare(b.date) || String(a.name || '').localeCompare(String(b.name || ''));
-                }
-                if (a.type === 'holiday') {
-                    return -1;
-                }
-                if (b.type === 'holiday') {
-                    return 1;
-                }
-                return 0;
-            });
+        return this.applyCountdownSortOrder(allEvents);
     }
 
     applyCountdownSortOrder(events) {
@@ -1043,24 +1031,35 @@ class OfficeDashboard {
                 return events;
             }
 
-            const indexMap = new Map(sortOrder.map((id, index) => [id, index]));
-            return events.slice().sort((a, b) => {
-                const aIndex = indexMap.get(a.id);
-                const bIndex = indexMap.get(b.id);
-                const aHasOrder = Number.isInteger(aIndex);
-                const bHasOrder = Number.isInteger(bIndex);
+            const eventMap = new Map(events.map(e => [e.id, e]));
+            const ordered = [];
+            const placed = new Set();
 
-                if (aHasOrder && bHasOrder) {
-                    return aIndex - bIndex;
+            for (const id of sortOrder) {
+                const event = eventMap.get(id);
+                if (event) {
+                    ordered.push(event);
+                    placed.add(id);
                 }
-                if (aHasOrder) {
-                    return -1;
+            }
+
+            const unplaced = events.filter(e => !placed.has(e.id));
+            if (!unplaced.length) return ordered;
+
+            const result = [];
+            let ui = 0;
+            for (const event of ordered) {
+                while (ui < unplaced.length && unplaced[ui].daysLeft < event.daysLeft) {
+                    result.push(unplaced[ui]);
+                    ui++;
                 }
-                if (bHasOrder) {
-                    return 1;
-                }
-                return 0;
-            });
+                result.push(event);
+            }
+            while (ui < unplaced.length) {
+                result.push(unplaced[ui]);
+                ui++;
+            }
+            return result;
         } catch (error) {
             console.warn('读取倒数日排序失败:', error);
             return events;
@@ -4680,7 +4679,10 @@ class OfficeDashboard {
      * 同步到云端
      */
     async syncToCloud() {
-        if (this._syncBusy) return;
+        if (this._syncBusy) {
+            this.showMessage('正在同步中，请稍后再试', 'info');
+            return;
+        }
         this._syncBusy = true;
         this.showLoading(true, '正在上传...');
 
@@ -4689,7 +4691,11 @@ class OfficeDashboard {
                 this.updateLoadingText(progress);
             });
 
-            this.showSuccess(result.message);
+            if (result?.success) {
+                this.showSuccess(result.message || '上传成功');
+            } else {
+                this.showError(result?.message || '上传失败');
+            }
             this.updateLoginUI({ isLoggedIn: true, username: syncManager.getUsername() });
         } catch (error) {
             this.showError('上传失败: ' + error.message);
@@ -4703,7 +4709,10 @@ class OfficeDashboard {
      * 从云端同步
      */
     async syncFromCloud() {
-        if (this._syncBusy) return;
+        if (this._syncBusy) {
+            this.showMessage('正在同步中，请稍后再试', 'info');
+            return;
+        }
         this._syncBusy = true;
         this.showLoading(true, '正在下载...');
 
@@ -4712,9 +4721,13 @@ class OfficeDashboard {
                 this.updateLoadingText(progress);
             });
 
-            this.showSuccess(result.message);
+            if (result?.success) {
+                this.showSuccess(result.message || '下载成功');
+                await this.loadItems();
+            } else {
+                this.showError(result?.message || '下载失败');
+            }
             this.updateLoginUI({ isLoggedIn: true, username: syncManager.getUsername() });
-            await this.loadItems();
         } catch (error) {
             this.showError('下载失败: ' + error.message);
         } finally {
