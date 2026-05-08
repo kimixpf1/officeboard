@@ -1008,35 +1008,63 @@ class OfficeDashboard {
 
     getAllCountdownEvents() {
         const builtinEvents = this.getBuiltinHolidayCountdowns();
-        const customEvents = this.getCustomCountdownEvents()
-            .slice()
-            .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
-
-        const normalizedCustomEvents = customEvents
+        const normalizedCustomEvents = this.getCustomCountdownEvents()
             .map(item => this.normalizeCountdownEvent(item))
             .filter(item => item?.name && item?.date && item.daysLeft >= 0)
-            .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.daysLeft - b.daysLeft);
+            .sort((a, b) => a.daysLeft - b.daysLeft || a.date.localeCompare(b.date) || String(a.name || '').localeCompare(String(b.name || '')));
 
-        const allEvents = [...builtinEvents, ...normalizedCustomEvents].filter(Boolean);
+        const sortedCustomEvents = this.applyCountdownSortOrder(normalizedCustomEvents);
+
+        return [...builtinEvents, ...sortedCustomEvents]
+            .filter(Boolean)
+            .sort((a, b) => {
+                if (a.type === 'holiday' && b.type === 'holiday') {
+                    return a.daysLeft - b.daysLeft || a.date.localeCompare(b.date) || String(a.name || '').localeCompare(String(b.name || ''));
+                }
+                if (a.type === 'holiday') {
+                    return -1;
+                }
+                if (b.type === 'holiday') {
+                    return 1;
+                }
+                return 0;
+            });
+    }
+
+    applyCountdownSortOrder(events) {
+        if (!Array.isArray(events) || events.length <= 1) {
+            return events;
+        }
 
         try {
             const sortOrderRaw = SafeStorage.get('office_countdown_sort_order');
-            if (sortOrderRaw) {
-                const sortOrder = JSON.parse(sortOrderRaw);
-                if (Array.isArray(sortOrder) && sortOrder.length > 0) {
-                    const orderMap = new Map(sortOrder.map((id, index) => [id, index]));
-                    const sorted = allEvents.slice().sort((a, b) => {
-                        const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 99999;
-                        const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 99999;
-                        if (aIdx !== bIdx) return aIdx - bIdx;
-                        return a.daysLeft - b.daysLeft;
-                    });
-                    return sorted;
-                }
+            const sortOrder = sortOrderRaw ? JSON.parse(sortOrderRaw) : [];
+            if (!Array.isArray(sortOrder) || !sortOrder.length) {
+                return events;
             }
-        } catch (_) { /* ignore */ }
 
-        return allEvents;
+            const indexMap = new Map(sortOrder.map((id, index) => [id, index]));
+            return events.slice().sort((a, b) => {
+                const aIndex = indexMap.get(a.id);
+                const bIndex = indexMap.get(b.id);
+                const aHasOrder = Number.isInteger(aIndex);
+                const bHasOrder = Number.isInteger(bIndex);
+
+                if (aHasOrder && bHasOrder) {
+                    return aIndex - bIndex;
+                }
+                if (aHasOrder) {
+                    return -1;
+                }
+                if (bHasOrder) {
+                    return 1;
+                }
+                return 0;
+            });
+        } catch (error) {
+            console.warn('读取倒数日排序失败:', error);
+            return events;
+        }
     }
 
     getDaysLeft(dateStr) {
@@ -1086,7 +1114,7 @@ class OfficeDashboard {
                    <button type="button" class="countdown-item-delete" data-id="${SecurityUtils.escapeHtml(item.id)}" title="删除">×</button>`
                 : '';
             return `
-                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${SecurityUtils.escapeHtml(item.id)}" draggable="true"${style}>
+                <div class="countdown-item${isSoon ? ' soon' : ''}${isCustom ? ' custom' : ' builtin'}" data-id="${SecurityUtils.escapeHtml(item.id)}"${isCustom ? ' draggable="true"' : ''}${style}>
                     <div class="countdown-item-info">
                         <div class="countdown-item-title-row">
                             <span class="countdown-item-type-dot"></span>
@@ -6940,8 +6968,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-07 v5.43';
-        const scriptVersions = ['utils.js?v=4', 'ocr.js?v=45', 'upload-flow.js?v=9', 'calendar.js?v=39', 'sync.js?v=66', 'app-date-view.js?v=13', 'app.js?v=185', 'db.js?v=29', 'style.css?v=65', 'crypto.js?v=17'];
+        const version = '2026-05-08 v5.45';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=45', 'upload-flow.js?v=9', 'calendar.js?v=39', 'sync.js?v=66', 'app-date-view.js?v=13', 'app.js?v=187', 'db.js?v=29', 'style.css?v=64', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

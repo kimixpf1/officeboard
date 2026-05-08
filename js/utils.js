@@ -44,6 +44,15 @@ const LunarCalendarUtils = {
         '腊': 12,
         '十二': 12
     },
+    formatLocalDate(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+            return '';
+        }
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    },
     parseChineseNumber(value) {
         const str = String(value || '').replace(/初|闰|月|日/g, '').trim();
         if (!str) {
@@ -104,12 +113,9 @@ const LunarCalendarUtils = {
         for (let offset = 0; offset < 420; offset += 1) {
             const candidate = new Date(start);
             candidate.setDate(start.getDate() + offset);
-            const lunar = this.getLunarMonthDay(candidate.toISOString().slice(0, 10));
+            const lunar = this.getLunarMonthDay(this.formatLocalDate(candidate));
             if (lunar?.month === Number(lunarMonth) && lunar?.day === Number(lunarDay)) {
-                const year = candidate.getFullYear();
-                const month = String(candidate.getMonth() + 1).padStart(2, '0');
-                const day = String(candidate.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
+                return this.formatLocalDate(candidate);
             }
         }
 
