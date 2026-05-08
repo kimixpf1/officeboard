@@ -8627,8 +8627,19 @@ class OfficeDashboard {
     startDailyBackupSchedule() {
         const BACKUP_HOUR = 20;
         const CHECK_KEY = 'dailyBackupLastDate';
+        const TOGGLE_KEY = 'autoBackupEnabled';
+
+        const toggle = document.getElementById('autoBackupToggle');
+        if (toggle) {
+            const saved = localStorage.getItem(TOGGLE_KEY);
+            toggle.checked = saved === null ? true : saved === 'true';
+            toggle.addEventListener('change', () => {
+                localStorage.setItem(TOGGLE_KEY, toggle.checked);
+            });
+        }
 
         const tryBackup = async () => {
+            if (localStorage.getItem(TOGGLE_KEY) === 'false') return;
             const now = new Date();
             const todayStr = this.formatDateLocal(now);
             const lastBackupDate = SafeStorage.get(CHECK_KEY);
