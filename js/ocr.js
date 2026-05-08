@@ -38,7 +38,7 @@ class OCRManager {
         // DeepSeek API配置
         this.deepseekApiKey = null;
         this.deepseekBaseUrl = 'https://api.deepseek.com';
-        this.deepseekModel = 'deepseek-chat';
+        this.deepseekModel = 'deepseek-v4-flash';
         // Kimi API配置（月之暗面，图片理解能力强）
         this.kimiApiKey = null;
         this.kimiBaseUrl = 'https://api.moonshot.cn/v1';
