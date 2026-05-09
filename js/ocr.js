@@ -397,7 +397,8 @@ class OCRManager {
                         { role: 'user', content: userPrompt }
                     ],
                     temperature: 0.1,
-                    max_tokens: 2000
+                    max_tokens: 2000,
+                    thinking: { type: 'disabled' }
                 })
             }, 3, 'OCR-DeepSeek');
 
@@ -3659,7 +3660,8 @@ ${ocrText}
                     { role: 'user', content: userPrompt }
                 ],
                 temperature: 0.1,
-                max_tokens: 3000
+                max_tokens: 3000,
+                thinking: { type: 'disabled' }
             })
         }, 3, 'OCR-DeepSeek');
 
