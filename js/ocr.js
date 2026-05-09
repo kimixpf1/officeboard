@@ -3133,7 +3133,7 @@ class OCRManager {
 
         for (const item of Array.isArray(items) ? items : []) {
             const lastRow = rows[rows.length - 1];
-            const tolerance = Math.max(2, (item.height || 0) * 0.30);
+            const tolerance = Math.max(4, (item.height || 0) * 0.55);
 
             if (!lastRow || Math.abs(lastRow.y - item.y) > tolerance) {
                 rows.push({ y: item.y, items: [item] });
@@ -3148,8 +3148,10 @@ class OCRManager {
     isLocationLikeCell(value) {
         const text = this.cleanPDFCellText(value);
         if (!text || text.length > 30) return false;
-        return /会议室|厅$|会场|号楼|酒店|宾馆|中心$|局$|院$|楼$|分会场|多功能|报告厅|礼堂|接待室|接待厅|办公室|大楼|大厦|广场|饭店|度假村|山庄/.test(text)
-            || /市.*(?:局|委|办|中心|院|馆)|^\S{1,3}(?:局|委|办)$/.test(text);
+        // 排除短人名（如"钱局""吴局"）——局前至少要有2个非姓氏字符
+        if (/^.[局委办]$/.test(text) && text.length <= 3) return false;
+        return /会议室|厅$|会场|号楼|酒店|宾馆|中心$|.{2,}局$|院$|\d楼$|分会场|多功能|报告厅|礼堂|接待室|接待厅|办公室|大楼|大厦|广场|饭店|度假村|山庄/.test(text)
+            || /市.*(?:局|委|办|中心|院|馆)|^\S{2,}(?:局|委|办)$/.test(text);
     }
 
     splitPDFRowIntoCells(items) {
@@ -3223,24 +3225,33 @@ class OCRManager {
             const hasDateOrTime = /\d{1,2}[.:：]\d{2}|\d{1,2}月\d{1,2}日|星期[一二三四五六日天]|周[一二三四五六日天]|\d{4}-\d{2}-\d{2}/.test(joined);
             const hasLocationCell = cells.some(c => this.isLocationLikeCell(c));
 
-            // 标题过长时WPS会将文字拆分到多行。不带日期、列数少的行
-            // 可能是上一行标题的后半段+地点。作为【续】条目单独输出，
-            // 由AI在语义层面判断是否合并，而非代码层面强制合并。
+            // 标题过长时WPS会将文字拆分到多行，且拆分后的文字
+            // 在不同y坐标上（WPS PDF渲染特点）。不带日期、列数少的行
+            // 作为【续】条目单独输出，由AI在语义层面判断是否合并。
             if (!hasDateOrTime && cells.length < 4) {
-                if (hasLocationCell) {
-                    // 作为独立续行输出，不尝试代码合并（避免串行）
-                    const contTitle = cells.slice(0, -1).join(' ');
-                    const contLoc = this.correctMeetingLocationText(
-                        this.cleanPDFCellText(cells[cells.length - 1])
-                    );
-                    const parts = [];
-                    if (inheritedGroup) parts.push(`分组：${inheritedGroup}`);
-                    if (inheritedAttendee) parts.push(`参会：${inheritedAttendee}`);
-                    parts.push(`续：${contTitle}`);
-                    if (contLoc) parts.push(`地点：${contLoc}`);
-                    if (parts.length >= 2) {
-                        result.push(parts.join('｜'));
-                    }
+                // 延续行可能只有标题碎片（如"专题培训班"），也可能
+                // 标题碎片+地点在不同行上。都输出，交给AI合并。
+                const contJoined = cells.join(' ');
+                const contLoc = hasLocationCell
+                    ? this.correctMeetingLocationText(this.cleanPDFCellText(cells[cells.length - 1]))
+                    : '';
+                const contTitle = hasLocationCell
+                    ? cells.slice(0, -1).join(' ')
+                    : contJoined;
+                if (!contTitle && !contLoc) {
+                    continue;
+                }
+                // 跳过孤立的短人名/处室名（被误识别为续行的参会者名字）
+                if (contTitle.length <= 5 && !contLoc && /^[一-龥]{1,5}$/.test(contTitle)) {
+                    continue;
+                }
+                const parts = [];
+                if (inheritedGroup) parts.push(`分组：${inheritedGroup}`);
+                if (inheritedAttendee) parts.push(`参会：${inheritedAttendee}`);
+                parts.push(`续：${contTitle}`);
+                if (contLoc) parts.push(`地点：${contLoc}`);
+                if (parts.length >= 2) {
+                    result.push(parts.join('｜'));
                 }
                 continue;
             }
