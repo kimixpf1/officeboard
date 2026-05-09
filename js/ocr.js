@@ -3145,6 +3145,13 @@ class OCRManager {
         return rows.map(row => row.items.sort((a, b) => a.x - b.x));
     }
 
+    isLocationLikeCell(value) {
+        const text = this.cleanPDFCellText(value);
+        if (!text || text.length > 30) return false;
+        return /会议室|厅$|会场|号楼|酒店|宾馆|中心$|局$|院$|楼$|分会场|多功能|报告厅|礼堂|接待室|接待厅|办公室|大楼|大厦|广场|饭店|度假村|山庄/.test(text)
+            || /市.*(?:局|委|办|中心|院|馆)|^\S{1,3}(?:局|委|办)$/.test(text);
+    }
+
     splitPDFRowIntoCells(items) {
         const cells = [];
         let currentCell = [];
@@ -3214,7 +3221,40 @@ class OCRManager {
             }
 
             const hasDateOrTime = /\d{1,2}[.:：]\d{2}|\d{1,2}月\d{1,2}日|星期[一二三四五六日天]|周[一二三四五六日天]|\d{4}-\d{2}-\d{2}/.test(joined);
+            const hasLocationCell = cells.some(c => this.isLocationLikeCell(c));
+
+            // 标题过长时WPS会将文字拆分到多行。不带日期时间、列数少的行
+            // 可能是上一行的延续（含标题后半段+地点），直接合并到上一个输出。
             if (!hasDateOrTime && cells.length < 4) {
+                if (hasLocationCell && result.length > 0) {
+                    const lastParts = result[result.length - 1].split('｜');
+                    // 标题延续部分（不含最后的地点cell）
+                    const titleCont = cells.slice(0, -1).join(' ');
+                    const newLoc = this.correctMeetingLocationText(
+                        this.cleanPDFCellText(cells[cells.length - 1])
+                    );
+                    // 更新事项
+                    for (let i = 0; i < lastParts.length; i++) {
+                        if (lastParts[i].startsWith('事项：')) {
+                            lastParts[i] = lastParts[i] + titleCont;
+                        }
+                    }
+                    // 更新地点（如果上一行没地点）
+                    let hasLocation = false;
+                    for (let i = 0; i < lastParts.length; i++) {
+                        if (lastParts[i].startsWith('地点：')) {
+                            const curLoc = lastParts[i].replace('地点：', '').trim();
+                            if (!curLoc && newLoc) {
+                                lastParts[i] = '地点：' + newLoc;
+                            }
+                            hasLocation = true;
+                        }
+                    }
+                    if (!hasLocation && newLoc) {
+                        lastParts.push('地点：' + newLoc);
+                    }
+                    result[result.length - 1] = lastParts.filter(Boolean).join('｜');
+                }
                 continue;
             }
 
