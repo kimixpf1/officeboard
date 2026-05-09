@@ -6981,8 +6981,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-09 v5.49';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=48', 'upload-flow.js?v=9', 'calendar.js?v=39', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=191', 'db.js?v=29', 'style.css?v=64', 'crypto.js?v=17'];
+        const version = '2026-05-09 v5.50';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=49', 'upload-flow.js?v=9', 'calendar.js?v=39', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=191', 'db.js?v=29', 'style.css?v=64', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
