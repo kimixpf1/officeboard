@@ -597,7 +597,25 @@ class CalendarView {
         titleDiv.className = 'week-title';
         titleDiv.style.gridColumn = '1 / span 7';
         titleDiv.style.textAlign = 'center';
-        titleDiv.textContent = monthLabel;
+        titleDiv.style.display = 'flex';
+        titleDiv.style.justifyContent = 'center';
+        titleDiv.style.alignItems = 'center';
+        titleDiv.style.gap = '12px';
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = monthLabel;
+        titleDiv.appendChild(titleSpan);
+        const shotBtn = document.createElement('button');
+        shotBtn.type = 'button';
+        shotBtn.className = 'btn-icon btn-sm calendar-screenshot-btn';
+        shotBtn.title = '截图分享当前视图';
+        shotBtn.innerHTML = '📷';
+        shotBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.officeDashboard?.shareCalendarScreenshot) {
+                window.officeDashboard.shareCalendarScreenshot(container, monthLabel);
+            }
+        });
+        titleDiv.appendChild(shotBtn);
         container.appendChild(titleDiv);
 
         const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -705,7 +723,25 @@ class CalendarView {
         titleDiv.className = 'month-title';
         titleDiv.style.gridColumn = '1 / span 7';
         titleDiv.style.textAlign = 'center';
-        titleDiv.textContent = `${year}年${month + 1}月`;
+        titleDiv.style.display = 'flex';
+        titleDiv.style.justifyContent = 'center';
+        titleDiv.style.alignItems = 'center';
+        titleDiv.style.gap = '12px';
+        const mTitleSpan = document.createElement('span');
+        mTitleSpan.textContent = `${year}年${month + 1}月`;
+        titleDiv.appendChild(mTitleSpan);
+        const mShotBtn = document.createElement('button');
+        mShotBtn.type = 'button';
+        mShotBtn.className = 'btn-icon btn-sm calendar-screenshot-btn';
+        mShotBtn.title = '截图分享当前视图';
+        mShotBtn.innerHTML = '📷';
+        mShotBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.officeDashboard?.shareCalendarScreenshot) {
+                window.officeDashboard.shareCalendarScreenshot(container, `${year}年${month + 1}月`);
+            }
+        });
+        titleDiv.appendChild(mShotBtn);
         container.appendChild(titleDiv);
 
         weekDays.forEach(day => {
@@ -810,6 +846,17 @@ class CalendarView {
         });
         el.addEventListener('dragstart', (e) => {
             e.stopPropagation();
+            // 设置拖拽幽灵图（半透明克隆）
+            const ghost = el.cloneNode(true);
+            ghost.style.position = 'absolute';
+            ghost.style.top = '-9999px';
+            ghost.style.opacity = '0.7';
+            ghost.style.transform = 'scale(0.95)';
+            ghost.style.pointerEvents = 'none';
+            document.body.appendChild(ghost);
+            e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
+            requestAnimationFrame(() => ghost.remove());
+
             if (window.officeDashboard?.handleDragStart) {
                 window.officeDashboard.handleDragStart(e, item);
             }
@@ -835,6 +882,77 @@ class CalendarView {
                 el.parentNode.insertBefore(window.officeDashboard.draggedElement, el);
             } else {
                 el.parentNode.insertBefore(window.officeDashboard.draggedElement, el.nextSibling);
+            }
+        });
+
+        // 移动端触摸拖拽
+        let touchClone = null;
+        let touchStartCell = null;
+        let touchStartTime = 0;
+        let touchHasMoved = false;
+
+        el.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            const touch = e.touches[0];
+            touchStartTime = Date.now();
+            touchHasMoved = false;
+            touchStartCell = el.closest('.week-cell, .month-cell');
+        }, { passive: true });
+
+        el.addEventListener('touchmove', (e) => {
+            if (e.touches.length !== 1) return;
+            const touch = e.touches[0];
+            if (!touchHasMoved && Date.now() - touchStartTime < 80) return;
+            touchHasMoved = true;
+            e.preventDefault();
+
+            if (!touchClone) {
+                touchClone = el.cloneNode(true);
+                touchClone.style.cssText = `
+                    position: fixed; z-index: 9999; pointer-events: none;
+                    opacity: 0.8; transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+                    width: ${el.offsetWidth}px;
+                `;
+                document.body.appendChild(touchClone);
+                el.style.opacity = '0.3';
+            }
+
+            touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
+            touchClone.style.top = (touch.clientY - 20) + 'px';
+
+            // 高亮目标单元格
+            document.querySelectorAll('.calendar-touch-over').forEach(c => c.classList.remove('calendar-touch-over'));
+            const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetCell = targetEl?.closest('.week-cell, .month-cell');
+            if (targetCell && targetCell !== touchStartCell) {
+                targetCell.classList.add('calendar-touch-over');
+            }
+        }, { passive: false });
+
+        el.addEventListener('touchend', (e) => {
+            document.querySelectorAll('.calendar-touch-over').forEach(c => c.classList.remove('calendar-touch-over'));
+
+            if (touchClone) {
+                touchClone.remove();
+                touchClone = null;
+            }
+            el.style.opacity = '';
+
+            if (!touchHasMoved) return;
+
+            const touch = e.changedTouches[0];
+            const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetCell = targetEl?.closest('.week-cell, .month-cell');
+
+            if (targetCell && window.officeDashboard) {
+                // 存到全局让 moveItemToDateFromCalendar 能访问
+                window.officeDashboard.draggedItem = item;
+                window.officeDashboard.draggedElement = el;
+
+                const targetDateStr = targetCell.dataset.date;
+                if (targetDateStr && targetCell !== touchStartCell) {
+                    window.officeDashboard.moveItemToDateFromCalendar(targetDateStr);
+                }
             }
         });
 

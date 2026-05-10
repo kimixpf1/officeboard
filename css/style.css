@@ -5244,3 +5244,66 @@ mark.highlight {
 [data-theme="violet"] .link-item {
     background: linear-gradient(135deg, #faf5ff, #ede9fe);
 }
+
+/* ========== 右键/长按上下文菜单 ========== */
+.context-menu {
+    position: fixed;
+    z-index: 10000;
+    min-width: 160px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    padding: 4px 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.context-menu-item {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--gray-800);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+}
+.context-menu-item:hover {
+    background: var(--bg-secondary);
+}
+.context-menu-danger {
+    color: var(--danger-color) !important;
+}
+.context-menu-danger:hover {
+    background: #fef2f2;
+}
+.context-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 8px;
+}
+[data-theme="dark"] .context-menu-item:hover {
+    background: var(--gray-800);
+}
+[data-theme="dark"] .context-menu-danger:hover {
+    background: #3b1111;
+}
+/* ========== 日历触摸拖拽高亮 ========== */
+.calendar-touch-over {
+    outline: 3px dashed var(--primary-color) !important;
+    outline-offset: -3px;
+    background: var(--primary-light) !important;
+    transition: outline 0.15s, background 0.15s;
+}
+/* ========== 日历截图分享按钮 ========== */
+.calendar-screenshot-btn {
+    margin-left: 6px;
+    font-size: 14px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    vertical-align: middle;
+}
+.calendar-screenshot-btn:hover {
+    opacity: 1;
+}
+/* ========== 右键/长按上下文菜单结束 ========== */

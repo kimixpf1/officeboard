@@ -396,6 +396,9 @@ class OfficeDashboard {
         // 拖拽功能
         this.initDragAndDrop();
 
+        // 右键/长按上下文菜单
+        this.initContextMenu();
+
         // 主题切换
         document.getElementById('themeBtn')?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -5238,6 +5241,8 @@ class OfficeDashboard {
                 // 根据操作类型执行不同的处理
                 const action = result.action || 'add';
                 
+                let addCommitted = false;
+
                 switch (action) {
                     case 'delete':
                         await this.executeAIDeleteCommand(result);
@@ -5250,20 +5255,17 @@ class OfficeDashboard {
                         break;
                     case 'add':
                     default:
-                        await this.executeAIAddCommand(result);
+                        addCommitted = (await this.executeAIAddCommand(result)) === 'committed';
                         break;
                 }
 
-                // 清空输入
-                input.value = '';
-
-                // 刷新列表
-                await this.loadItems();
-
-                // 立即同步到云端
-                if (syncManager.isLoggedIn()) {
-
-                    await syncManager.immediateSyncToCloud();
+                // 仅当实际写入时才刷新和同步（用户取消预览时不处理）
+                if (addCommitted || action !== 'add') {
+                    input.value = '';
+                    await this.loadItems();
+                    if (syncManager.isLoggedIn()) {
+                        await syncManager.immediateSyncToCloud();
+                    }
                 }
 
             } catch (error) {
@@ -5276,35 +5278,72 @@ class OfficeDashboard {
     }
 
     /**
-     * 执行AI新增命令
+     * 执行AI新增命令（v5.53：走预览确认管道，与文件上传识别一致）
+     * @returns {Promise<'committed'|'cancelled'|'skipped'>}
      */
     async executeAIAddCommand(result) {
-        // 处理周期性任务
+        const rawItem = { type: result.type, ...result.data, source: 'nlp' };
+
+        let newItems = [];
         if (result.isRecurring && result.recurringRule) {
-
-
-            const recurringItems = this.generateRecurringItems(
-                { type: result.type, ...result.data, source: 'nlp' },
-                result.recurringRule,
-                result.recurringCount || 6
-            );
-
-
-
-            for (const item of recurringItems) {
-                await db.addItem(item);
-            }
-
-            this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
+            newItems = this.generateRecurringItems(rawItem, result.recurringRule, result.recurringCount || 6);
         } else {
-            // 普通任务保存到数据库
-            await db.addItem({
-                type: result.type,
-                ...result.data,
-                source: 'nlp'
-            });
+            newItems = [rawItem];
+        }
+
+        const normalizedItems = newItems
+            .map(item => ocrManager.validateAndCleanItem(item))
+            .filter(item => item !== null);
+
+        if (normalizedItems.length === 0) {
+            this.showError('无法解析为有效事项');
+            return 'cancelled';
+        }
+
+        const existingItems = await db.getAllItems();
+        const actionPlan = ocrManager.buildRecognitionActionPlan(normalizedItems, existingItems, '自然语言输入');
+
+        if (actionPlan.createItems.length === 0 && actionPlan.mergeUpdates.length === 0) {
+            this.showSuccess(`所有 ${actionPlan.skippedItems.length} 个事项已存在，无需重复添加`);
+            return 'skipped';
+        }
+
+        const previewResult = {
+            success: true,
+            previewOnly: true,
+            actionPlan,
+            items: actionPlan.createItems,
+            mergedItems: actionPlan.mergeSummaries || [],
+            mergedCount: actionPlan.mergeUpdates.length,
+            skippedCount: actionPlan.skippedItems.length,
+            text: '自然语言输入',
+            metadata: { fileName: '自然语言输入', fileType: 'text', processedAt: new Date().toISOString(), recognitionMethod: 'NLP' }
+        };
+
+        const itemsSnapshot = await ocrManager.captureItemsSnapshot();
+        const previewDecision = await this.showRecognitionPreview('自然语言输入', previewResult);
+
+        if (!previewDecision?.confirmed) {
+            await ocrManager.restoreItemsSnapshot(itemsSnapshot);
+            return 'cancelled';
+        }
+
+        const finalResult = previewDecision.result || previewResult;
+        await ocrManager.applyRecognitionActionPlan(finalResult.actionPlan, {
+            text: finalResult.text || previewResult.text,
+            metadata: finalResult.metadata || previewResult.metadata
+        });
+
+        const addedCount = finalResult.actionPlan.createItems.length;
+        const mergedCount = finalResult.actionPlan.mergeUpdates?.length || 0;
+        const total = addedCount + mergedCount;
+        if (total > 1) {
+            this.showSuccess(`已处理 ${total} 个事项（新增 ${addedCount}，合并 ${mergedCount}）`);
+        } else {
             this.showSuccess('已添加到' + this.getTypeLabel(result.type));
         }
+
+        return 'committed';
     }
 
     /**
@@ -6981,8 +7020,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-09 v5.52';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=39', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=191', 'db.js?v=29', 'style.css?v=64', 'crypto.js?v=17'];
+        const version = '2026-05-10 v5.54';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=40', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=192', 'db.js?v=29', 'style.css?v=65', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -9838,6 +9877,222 @@ class OfficeDashboard {
      */
     showSuccess(message) {
         this.showMessage(message, 'success');
+    }
+
+    /**
+     * 初始化右键/长按上下文菜单
+     */
+    initContextMenu() {
+        this._contextMenuEl = document.getElementById('contextMenu');
+        this._contextMenuItem = null;
+
+        // 全局点击关闭菜单
+        document.addEventListener('click', (e) => {
+            if (this._contextMenuEl && !this._contextMenuEl.contains(e.target)) {
+                this.hideContextMenu();
+            }
+        });
+
+        // 桌面端右键：事项卡片和日历事项
+        document.addEventListener('contextmenu', (e) => {
+            const card = e.target.closest('.card');
+            const calItem = e.target.closest('.calendar-item');
+            const target = card || calItem;
+            if (!target) return;
+
+            e.preventDefault();
+            const itemId = target.dataset?.itemId || target.getAttribute('data-item-id');
+            if (!itemId) return;
+
+            const item = this.items?.find(i => String(i.id) === String(itemId));
+            if (!item) return;
+
+            this.showContextMenu(e.clientX, e.clientY, item);
+        });
+
+        // 移动端长按
+        let longPressTimer = null;
+        let longPressStartPos = null;
+
+        document.addEventListener('touchstart', (e) => {
+            const card = e.target.closest('.card');
+            const calItem = e.target.closest('.calendar-item');
+            const target = card || calItem;
+            if (!target) return;
+
+            const itemId = target.dataset?.itemId || target.getAttribute('data-item-id');
+            if (!itemId) return;
+
+            const item = this.items?.find(i => String(i.id) === String(itemId));
+            if (!item) return;
+
+            const touch = e.touches[0];
+            longPressStartPos = { x: touch.clientX, y: touch.clientY };
+            longPressTimer = setTimeout(() => {
+                this.showContextMenu(touch.clientX, touch.clientY, item);
+                longPressTimer = null;
+            }, 500);
+        }, { passive: false });
+
+        document.addEventListener('touchmove', () => {
+            if (longPressTimer && longPressStartPos) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        });
+    }
+
+    /**
+     * 显示上下文菜单
+     */
+    showContextMenu(x, y, item) {
+        if (!this._contextMenuEl) return;
+        this._contextMenuItem = item;
+
+        const menu = this._contextMenuEl;
+        const items = menu.querySelectorAll('.context-menu-item');
+
+        // 根据事项状态决定显示哪些菜单项
+        const isCompleted = !!item.completed;
+        const isPinned = !!item.pinned;
+        const isSunk = !!item.sunk;
+
+        items.forEach(el => {
+            const action = el.dataset.action;
+            if (action === 'complete') el.style.display = isCompleted ? 'none' : '';
+            else if (action === 'uncomplete') el.style.display = isCompleted ? '' : 'none';
+            else if (action === 'pin') el.style.display = isPinned ? 'none' : '';
+            else if (action === 'unpin') el.style.display = isPinned ? '' : 'none';
+            else if (action === 'sink') el.style.display = isSunk ? 'none' : '';
+            else if (action === 'unsink') el.style.display = isSunk ? '' : 'none';
+        });
+
+        menu.style.display = 'block';
+
+        // 定位：确保菜单不超出视口
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            let left = x;
+            let top = y;
+            if (left + rect.width > window.innerWidth) left = window.innerWidth - rect.width - 8;
+            if (top + rect.height > window.innerHeight) top = window.innerHeight - rect.height - 8;
+            if (left < 0) left = 8;
+            if (top < 0) top = 8;
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+        });
+
+        // 菜单项点击处理
+        menu.onclick = (e) => {
+            const actionEl = e.target.closest('.context-menu-item');
+            if (!actionEl) return;
+            const action = actionEl.dataset.action;
+            this.hideContextMenu();
+            this.executeContextAction(action, item);
+        };
+    }
+
+    /**
+     * 隐藏上下文菜单
+     */
+    hideContextMenu() {
+        if (this._contextMenuEl) {
+            this._contextMenuEl.style.display = 'none';
+        }
+        this._contextMenuItem = null;
+    }
+
+    /**
+     * 截图并分享当前日历视图
+     */
+    async shareCalendarScreenshot(container, title) {
+        try {
+            this.showSuccess('正在生成截图...');
+
+            let html2canvasLib = window.html2canvas;
+            if (!html2canvasLib) {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('截图库加载失败'));
+                    document.head.appendChild(script);
+                });
+                html2canvasLib = window.html2canvas;
+            }
+
+            const canvas = await html2canvasLib(container, {
+                scale: 2,
+                backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim() || '#ffffff',
+                useCORS: true,
+                logging: false
+            });
+
+            // 移动端：尝试系统分享
+            if (/Mobi|Android|iPhone/i.test(navigator.userAgent) && navigator.share) {
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    const file = new File([blob], `${title || '日程'}.png`, { type: 'image/png' });
+                    try {
+                        await navigator.share({ title, files: [file] });
+                    } catch (e) {
+                        if (e.name !== 'AbortError') this._downloadCanvas(canvas, title);
+                    }
+                }, 'image/png');
+            } else {
+                this._downloadCanvas(canvas, title);
+            }
+        } catch (error) {
+            console.error('截图失败:', error);
+            this.showError('截图失败: ' + error.message);
+        }
+    }
+
+    _downloadCanvas(canvas, title) {
+        const link = document.createElement('a');
+        link.download = `${title || '日程截图'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        this.showSuccess('截图已下载');
+    }
+
+    /**
+     * 执行上下文菜单动作
+     */
+    executeContextAction(action, item) {
+        switch (action) {
+            case 'edit':
+                this.editItem(item.id);
+                break;
+            case 'complete':
+                this.toggleItemComplete(item.id, item.type, true);
+                break;
+            case 'uncomplete':
+                this.toggleItemComplete(item.id, item.type, false);
+                break;
+            case 'pin':
+                this.toggleItemPin(item.id, item.type, true);
+                break;
+            case 'unpin':
+                this.toggleItemPin(item.id, item.type, false);
+                break;
+            case 'sink':
+                this.toggleItemSink(item.id, item.type, true);
+                break;
+            case 'unsink':
+                this.toggleItemSink(item.id, item.type, false);
+                break;
+            case 'delete':
+                this.deleteItem(item.id);
+                break;
+        }
     }
 }
 
