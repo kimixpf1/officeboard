@@ -1,3 +1,24 @@
+## 2026-05-10 v5.64 第6批拆分——周期性模块提取
+
+### 改动内容
+1. **新建 `js/core/recurring.js`**：14个方法，678行，`RecurringCore` 对象
+2. **app.js 删除对应方法**：7553 → 6925 行（-628）
+3. 提取方法：
+   - 表单渲染（6个）：`initializeRecurringFieldOptions`/`getRecurringFieldConfig`/`createRecurringFormGroup`/`createRecurringInput`/`createRecurringSelect`/`createRecurringCheckboxGroup`
+   - 模板渲染（2个）：`renderRecurringFieldTemplate`/`renderRecurringTypeSelect`
+   - 分组管理（2个）：`updateRecurringGroup`/`updateRecurringGroupStatus`
+   - 事项生成（4个）：`generateRecurringItems`/`createRecurringItem`/`getMonthlyDate`/`getDaysInMonth`
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `bffbb12`
+- 🔄 **待推送**（网络阻挡，明天继续）
+
+### 提交记录
+- `bffbb12` refactor: 第6批拆分——周期性表单+生成+分组更新提取为 js/core/recurring.js（v5.64）
+
+---
+
 ## 2026-05-10 v5.63 第5批拆分——天气模块提取+紧急修复
 
 ### 改动内容
