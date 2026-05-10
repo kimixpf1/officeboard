@@ -889,12 +889,16 @@ class CalendarView {
         let touchClone = null;
         let touchStartCell = null;
         let touchStartTime = 0;
+        let touchStartX = 0;
+        let touchStartY = 0;
         let touchHasMoved = false;
 
         el.addEventListener('touchstart', (e) => {
             if (e.touches.length !== 1) return;
             const touch = e.touches[0];
             touchStartTime = Date.now();
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
             touchHasMoved = false;
             touchStartCell = el.closest('.week-cell, .month-cell');
         }, { passive: true });
@@ -902,8 +906,14 @@ class CalendarView {
         el.addEventListener('touchmove', (e) => {
             if (e.touches.length !== 1) return;
             const touch = e.touches[0];
-            if (!touchHasMoved && Date.now() - touchStartTime < 80) return;
-            touchHasMoved = true;
+            if (!touchHasMoved) {
+                const dx = touch.clientX - touchStartX;
+                const dy = touch.clientY - touchStartY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                // 必须同时满足：按住>80ms 且 移动>10px 才激活拖拽，避免长按误触
+                if (Date.now() - touchStartTime < 80 || dist < 10) return;
+                touchHasMoved = true;
+            }
             e.preventDefault();
 
             if (!touchClone) {
