@@ -1,3 +1,21 @@
+## 2026-05-10 v5.63 第5批拆分——天气模块提取+紧急修复
+
+### 改动内容
+1. **新建 `js/weather.js`**：6个方法，449行（loadWeather/fetchWeather/renderWeatherStatus/showCitySelector/getWeatherIcon/getWeatherDesc），`WeatherPanel` 对象
+2. **紧急修复**：第4批用 sed 删除工具代码时误删了天气方法定义（loadWeather等6个方法从 app.js 中消失），线上天气功能已损坏。本轮从 `pre-split-baseline` 恢复完整天气代码并提取为独立模块
+3. **app.js**：新增 mixin 调用 `Object.assign(OfficeDashboard.prototype, WeatherPanel)`，版本升至 v5.63
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `32a5ee1`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `32a5ee1` fix: 恢复天气模块并提取为 js/weather.js（v5.63）
+
+---
+
 ## 2026-05-10 v5.62 第4批拆分——工具+日程+备忘
 
 ### 改动内容
