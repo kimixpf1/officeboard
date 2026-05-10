@@ -1,3 +1,37 @@
+## 2026-05-10 v5.53-v5.55 功能优化（Phase 1/2/3/5）
+
+### 本次目标
+- Phase 1: 自然语言解析走预览确认管道（防 AI 错误直接写入）
+- Phase 2: 通用右键菜单组件（桌面右键 + 移动端长按 500ms）
+- Phase 3: 日历拖拽 ghost 跟随 + 移动端触摸拖拽支持
+- Phase 5: 日历视图截图分享（html2canvas + 系统分享 API）
+
+### 当前状态
+- ✅ Phase 1: `executeAIAddCommand` 完整改走 `validateAndCleanItem → buildRecognitionActionPlan → showRecognitionPreview → applyRecognitionActionPlan` 管道
+- ✅ Phase 2: `initContextMenu` / `showContextMenu` / `hideContextMenu` / `executeContextAction` 完整上下文菜单
+- ✅ Phase 3: 日历拖拽 ghost 元素 + 移动端 touch 拖拽（touchstart/touchmove/touchend）
+- ✅ Phase 5: `shareCalendarScreenshot(container, title)` + `_downloadCanvas` + 周/月视图标题栏 📷 按钮
+- ✅ v5.55 修复：触摸拖拽增加 10px 距离阈值，避免长按菜单时手指微动误触发拖拽
+- ✅ 语法检查全部通过
+- ✅ 已提交推送 `055b5d3` 到 origin/main
+
+### 本轮关键改动
+- js/app.js：`executeAIAddCommand` 完整重写走预览管道；新增 `initContextMenu`/`showContextMenu`/`hideContextMenu`/`executeContextAction`；新增 `shareCalendarScreenshot`/`_downloadCanvas`；版本 v5.55
+- js/calendar.js：dragstart ghost 元素 `setDragImage`；移动端完整 touch 拖拽（含 10px 距离阈值防误触）；周/月视图标题栏新增 📷 截图按钮
+- css/style.css：上下文菜单样式 ~50 行；截图按钮样式；触摸拖拽高亮 `.calendar-touch-over`
+- index.html：contextMenu 骨架；资源版本 style.css?v=65、app.js?v=192、calendar.js?v=41
+
+### 提交记录
+- `b673552` feat: NLP预览管道 + 右键菜单 + 拖拽增强 + 截图分享 (v5.54)
+- `055b5d3` fix: 触摸拖拽增加10px距离阈值，避免长按时微动误触发拖拽 (v5.55)
+
+### 遗留事项
+- 待用户真人测试验证各 Phase 功能
+- Phase 4（桌面通知）和 Phase 6（会议-办文联动）未实施
+- 部分部门名称（"办公室""机关党委"）在 PDF 识别中仍可能被误判为地点
+
+---
+
 ## 2026-05-10 会话收尾（项目规则迁移+日志补齐）
 
 ### 本次目标
