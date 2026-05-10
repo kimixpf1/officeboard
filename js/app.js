@@ -374,7 +374,10 @@ class OfficeDashboard {
         document.getElementById('generateReport')?.addEventListener('click', () => this.generateReport());
         document.getElementById('cancelReport')?.addEventListener('click', () => this.hideModal('reportModal'));
         document.getElementById('boardScreenshotBtn')?.addEventListener('click', () => {
-            this.shareCalendarScreenshot(document.getElementById('boardView'), document.getElementById('boardDateLabel')?.textContent?.trim() || '日视图');
+            const dateSpan = document.querySelector('.board-date-label-date');
+            const weekSpan = document.querySelector('.board-date-label-week');
+            const title = (dateSpan?.textContent?.trim() || '') + ' ' + (weekSpan?.textContent?.trim() || '') || '日视图';
+            this.shareCalendarScreenshot(document.getElementById('boardView'), title);
         });
 
         // 撤回按钮
@@ -7023,8 +7026,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-10 v5.56';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=193', 'db.js?v=29', 'style.css?v=65', 'crypto.js?v=17'];
+        const version = '2026-05-10 v5.57';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=194', 'db.js?v=29', 'style.css?v=66', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -9970,10 +9973,14 @@ class OfficeDashboard {
         const menu = this._contextMenuEl;
         const items = menu.querySelectorAll('.context-menu-item');
 
-        // 根据事项状态决定显示哪些菜单项
+        // 根据事项状态和类型决定显示哪些菜单项
         const isCompleted = !!item.completed;
         const isPinned = !!item.pinned;
         const isSunk = !!item.sunk;
+        const isTodo = item.type === 'todo';
+        const isMeeting = item.type === 'meeting';
+        const isDocument = item.type === 'document';
+        const hasRecurring = !!item.recurringGroupId;
 
         items.forEach(el => {
             const action = el.dataset.action;
@@ -9983,6 +9990,9 @@ class OfficeDashboard {
             else if (action === 'unpin') el.style.display = isPinned ? '' : 'none';
             else if (action === 'sink') el.style.display = isSunk ? 'none' : '';
             else if (action === 'unsink') el.style.display = isSunk ? '' : 'none';
+            else if (action === 'move-date') el.style.display = (isMeeting || isDocument) ? '' : 'none';
+            else if (action === 'set-recurring') el.style.display = hasRecurring ? 'none' : '';
+            else if (action === 'priority') el.style.display = isTodo ? '' : 'none';
         });
 
         menu.style.display = 'block';
@@ -10100,10 +10110,249 @@ class OfficeDashboard {
             case 'unsink':
                 this.toggleItemSink(item.id, item.type, false);
                 break;
+            case 'move-date':
+                this._contextMoveToDate(item);
+                break;
+            case 'copy':
+                this._contextCopyItem(item);
+                break;
+            case 'set-recurring':
+                this._contextSetRecurring(item);
+                break;
+            case 'priority':
+                this._contextShowPriorityPicker(item);
+                break;
             case 'delete':
                 this.deleteItem(item.id);
                 break;
         }
+    }
+
+    _contextShowPriorityPicker(item) {
+        const current = item.priority || 'medium';
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.cssText = 'position:fixed;z-index:10001;display:block;';
+        menu.innerHTML = `
+            <div class="context-menu-item" data-priority="high" style="${current === 'high' ? 'font-weight:700;' : ''}">🔴 高优先级${current === 'high' ? ' ✓' : ''}</div>
+            <div class="context-menu-item" data-priority="medium" style="${current === 'medium' ? 'font-weight:700;' : ''}">🟡 中优先级${current === 'medium' ? ' ✓' : ''}</div>
+            <div class="context-menu-item" data-priority="low" style="${current === 'low' ? 'font-weight:700;' : ''}">🟢 低优先级${current === 'low' ? ' ✓' : ''}</div>
+        `;
+        document.body.appendChild(menu);
+
+        const rect = this._contextMenuEl?.getBoundingClientRect();
+        menu.style.left = (rect?.right || 100) + 'px';
+        menu.style.top = (rect?.top || 100) + 'px';
+
+        const cleanup = () => { menu.remove(); };
+        menu.onclick = (e) => {
+            const el = e.target.closest('[data-priority]');
+            if (!el) return;
+            cleanup();
+            this._contextSetPriority(item, el.dataset.priority);
+        };
+        setTimeout(() => {
+            document.addEventListener('click', function handler() {
+                cleanup();
+                document.removeEventListener('click', handler);
+            }, { once: true });
+        }, 10);
+    }
+
+    async _contextSetPriority(item, priority) {
+        try {
+            await db.updateItem(item.id, { priority, updatedAt: new Date().toISOString() });
+            this.showSuccess(`优先级已设为${priority === 'high' ? '高' : priority === 'medium' ? '中' : '低'}`);
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+        } catch (e) {
+            this.showError('修改优先级失败');
+        }
+    }
+
+    async _contextMoveToDate(item) {
+        const currentDate = item.type === 'meeting' ? item.date : (item.docStartDate || item.docDate || this.selectedDate);
+        const newDate = await this._showDatePicker('选择目标日期', currentDate);
+        if (!newDate) return;
+
+        const updates = { updatedAt: new Date().toISOString() };
+        if (item.type === 'meeting') {
+            updates.date = newDate;
+        } else if (item.type === 'document') {
+            updates.docStartDate = newDate;
+            updates.docEndDate = newDate;
+        }
+
+        try {
+            const original = await db.getItem(item.id);
+            this.saveUndoHistory('update', { item: original });
+            await db.updateItem(item.id, updates);
+            this.showSuccess('日期已修改');
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+        } catch (e) {
+            this.showError('修改日期失败');
+        }
+    }
+
+    async _contextCopyItem(item) {
+        const choice = await this._showCopyChoice(item);
+        if (!choice) return;
+
+        const targetDate = choice === 'today'
+            ? this.formatDateLocal(new Date())
+            : await this._showDatePicker('选择目标日期', this.selectedDate);
+        if (!targetDate) return;
+
+        const clone = { ...item };
+        delete clone.id;
+        delete clone.hash;
+        delete clone.createdAt;
+        delete clone.updatedAt;
+        delete clone.recurringGroupId;
+        delete clone.occurrenceIndex;
+        delete clone.pinned;
+        delete clone.sunk;
+        delete clone.manualOrder;
+        delete clone.completed;
+        clone.source = 'copy';
+
+        if (item.type === 'meeting') clone.date = targetDate;
+        else if (item.type === 'document') { clone.docStartDate = targetDate; clone.docEndDate = targetDate; }
+        else if (item.type === 'todo' && clone.deadline) {
+            const time = clone.deadline.split('T')[1] || '09:00';
+            clone.deadline = `${targetDate}T${time}`;
+        }
+
+        try {
+            await db.addItem(clone);
+            this.showSuccess(`已复制到 ${targetDate}`);
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+        } catch (e) {
+            this.showError('复制事项失败');
+        }
+    }
+
+    _showCopyChoice(item) {
+        return new Promise(resolve => {
+            const menu = document.createElement('div');
+            menu.className = 'context-menu';
+            menu.style.cssText = 'position:fixed;z-index:10001;display:block;';
+            menu.innerHTML = `
+                <div class="context-menu-item" data-choice="today">📍 复制到今天</div>
+                <div class="context-menu-item" data-choice="custom">📅 指定日期</div>
+            `;
+            document.body.appendChild(menu);
+
+            const rect = this._contextMenuEl?.getBoundingClientRect();
+            menu.style.left = (rect?.right || 100) + 'px';
+            menu.style.top = (rect?.top || 100) + 'px';
+
+            const cleanup = () => { menu.remove(); };
+            menu.onclick = (e) => {
+                const el = e.target.closest('[data-choice]');
+                if (!el) return;
+                cleanup();
+                resolve(el.dataset.choice);
+            };
+            setTimeout(() => {
+                document.addEventListener('click', function handler() {
+                    cleanup();
+                    document.removeEventListener('click', handler);
+                    resolve(null);
+                }, { once: true });
+            }, 10);
+        });
+    }
+
+    async _contextSetRecurring(item) {
+        const choice = await this._showRecurringPicker();
+        if (!choice) return;
+
+        try {
+            const groupId = 'recur_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            await db.updateItem(item.id, {
+                recurringGroupId: groupId,
+                occurrenceIndex: 0,
+                updatedAt: new Date().toISOString()
+            });
+
+            const baseItem = { ...item, recurringGroupId: groupId };
+            const recurringItems = this.generateRecurringItems(baseItem, choice.rule, choice.count || 6);
+            for (const ri of recurringItems) {
+                await db.addItem(ri);
+            }
+
+            this.showSuccess(`已生成 ${recurringItems.length + 1} 个周期事项`);
+            await this.loadItems();
+            if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+        } catch (e) {
+            this.showError('设置周期性失败');
+        }
+    }
+
+    _showRecurringPicker() {
+        return new Promise(resolve => {
+            const menu = document.createElement('div');
+            menu.className = 'context-menu';
+            menu.style.cssText = 'position:fixed;z-index:10001;display:block;';
+            menu.innerHTML = `
+                <div class="context-menu-item" data-rule="daily">📅 每天（6次）</div>
+                <div class="context-menu-item" data-rule="weekly">📆 每周（6次）</div>
+                <div class="context-menu-item" data-rule="monthly">🗓️ 每月（6次）</div>
+            `;
+            document.body.appendChild(menu);
+
+            const rect = this._contextMenuEl?.getBoundingClientRect();
+            menu.style.left = (rect?.right || 100) + 'px';
+            menu.style.top = (rect?.top || 100) + 'px';
+
+            const cleanup = () => { menu.remove(); };
+            menu.onclick = (e) => {
+                const el = e.target.closest('[data-rule]');
+                if (!el) return;
+                cleanup();
+                resolve({ rule: el.dataset.rule, count: 6 });
+            };
+            setTimeout(() => {
+                document.addEventListener('click', function handler() {
+                    cleanup();
+                    document.removeEventListener('click', handler);
+                    resolve(null);
+                }, { once: true });
+            }, 10);
+        });
+    }
+
+    _showDatePicker(title, defaultDate) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:var(--bg-primary);border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;';
+            box.innerHTML = `
+                <div style="margin-bottom:12px;font-weight:600;">${title}</div>
+                <input type="date" value="${defaultDate || ''}" style="font-size:16px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;width:100%;">
+                <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+                    <button class="btn-secondary btn-sm" data-action="cancel">取消</button>
+                    <button class="btn-primary btn-sm" data-action="confirm">确认</button>
+                </div>
+            `;
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+
+            const input = box.querySelector('input');
+            box.onclick = (e) => {
+                const btn = e.target.closest('[data-action]');
+                if (!btn) return;
+                overlay.remove();
+                resolve(btn.dataset.action === 'confirm' ? input.value : null);
+            };
+            overlay.onclick = (e) => {
+                if (e.target === overlay) { overlay.remove(); resolve(null); }
+            };
+        });
     }
 }
 

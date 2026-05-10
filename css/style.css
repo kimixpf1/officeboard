@@ -5306,4 +5306,9 @@ mark.highlight {
 .calendar-screenshot-btn:hover {
     opacity: 1;
 }
+#boardScreenshotBtn {
+    pointer-events: auto;
+    margin-left: 4px;
+    margin-top: 4px;
+}
 /* ========== 右键/长按上下文菜单结束 ========== */
