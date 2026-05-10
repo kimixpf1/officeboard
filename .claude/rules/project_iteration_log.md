@@ -1,3 +1,24 @@
+## 2026-05-10 v5.56 功能修复（右键菜单+长按+日视图截图）
+
+### 修复内容
+1. **右键菜单不弹出**：calendar.js `createCalendarItem` 用 `dataset.id`，但 `initContextMenu` 只检查 `dataset.itemId`/`data-item-id`，导致匹配失败直接 return。修复为同时检查三种来源
+2. **长按仍触发拖拽**：app.js `touchmove` 对任何移动（含 1px）就清长按计时器，与日历 touchmove（10px 阈值）不一致。修复为同步 10px 距离阈值
+3. **日视图无截图按钮**：boardDateLabel 旁新增 📷 按钮，点击截取 `#boardView` 为图片
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ 本地提交 `b3ab03d`
+- 🔄 推送被防火墙阻挡（443 端口 TCP 超时），已设置定时重试
+
+### 本轮关键改动
+- js/app.js：contextmenu 增加 `dataset.id` 回退匹配；touchmove 增加 10px 距离阈值；boardScreenshotBtn 事件绑定
+- index.html：boardDateLabel 内新增截图按钮；资源版本 app.js?v=193
+
+### 提交记录
+- `b3ab03d` fix: 右键菜单dataset匹配 + 长按距离阈值 + 日视图截图按钮 (v5.56)（待推送）
+
+---
+
 ## 2026-05-10 v5.53-v5.55 功能优化（Phase 1/2/3/5）
 
 ### 本次目标
