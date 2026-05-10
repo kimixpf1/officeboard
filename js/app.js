@@ -10011,11 +10011,18 @@ class OfficeDashboard {
         });
 
         // 菜单项点击处理
+        const submenuActions = ['move-date', 'copy', 'set-recurring', 'priority'];
         menu.onclick = (e) => {
             const actionEl = e.target.closest('.context-menu-item');
             if (!actionEl) return;
             const action = actionEl.dataset.action;
-            this.hideContextMenu();
+            // 保存菜单位置供子菜单使用
+            const menuRect = menu.getBoundingClientRect();
+            this._contextMenuPos = { left: menuRect.left, top: menuRect.top, right: menuRect.right, bottom: menuRect.bottom };
+            // 子菜单操作不立即隐藏母菜单，由子菜单方法完成后隐藏
+            if (!submenuActions.includes(action)) {
+                this.hideContextMenu();
+            }
             this.executeContextAction(action, item);
         };
     }
@@ -10090,7 +10097,7 @@ class OfficeDashboard {
     executeContextAction(action, item) {
         switch (action) {
             case 'edit':
-                this.editItem(item.id);
+                this.editItem(item);
                 break;
             case 'complete':
                 this.toggleItemComplete(item.id, item.type, true);
@@ -10140,11 +10147,11 @@ class OfficeDashboard {
         `;
         document.body.appendChild(menu);
 
-        const rect = this._contextMenuEl?.getBoundingClientRect();
-        menu.style.left = (rect?.right || 100) + 'px';
-        menu.style.top = (rect?.top || 100) + 'px';
+        const pos = this._contextMenuPos || { right: 100, top: 100 };
+        menu.style.left = pos.right + 'px';
+        menu.style.top = pos.top + 'px';
 
-        const cleanup = () => { menu.remove(); };
+        const cleanup = () => { menu.remove(); this.hideContextMenu(); };
         menu.onclick = (e) => {
             const el = e.target.closest('[data-priority]');
             if (!el) return;
@@ -10245,11 +10252,11 @@ class OfficeDashboard {
             `;
             document.body.appendChild(menu);
 
-            const rect = this._contextMenuEl?.getBoundingClientRect();
-            menu.style.left = (rect?.right || 100) + 'px';
-            menu.style.top = (rect?.top || 100) + 'px';
+            const pos = this._contextMenuPos || { right: 100, top: 100 };
+            menu.style.left = pos.right + 'px';
+            menu.style.top = pos.top + 'px';
 
-            const cleanup = () => { menu.remove(); };
+            const cleanup = () => { menu.remove(); this.hideContextMenu(); };
             menu.onclick = (e) => {
                 const el = e.target.closest('[data-choice]');
                 if (!el) return;
@@ -10267,7 +10274,7 @@ class OfficeDashboard {
     }
 
     async _contextSetRecurring(item) {
-        const choice = await this._showRecurringPicker();
+        const choice = await this._showRecurringDialog();
         if (!choice) return;
 
         try {
@@ -10292,36 +10299,42 @@ class OfficeDashboard {
         }
     }
 
-    _showRecurringPicker() {
+    _showRecurringDialog() {
         return new Promise(resolve => {
-            const menu = document.createElement('div');
-            menu.className = 'context-menu';
-            menu.style.cssText = 'position:fixed;z-index:10001;display:block;';
-            menu.innerHTML = `
-                <div class="context-menu-item" data-rule="daily">📅 每天（6次）</div>
-                <div class="context-menu-item" data-rule="weekly">📆 每周（6次）</div>
-                <div class="context-menu-item" data-rule="monthly">🗓️ 每月（6次）</div>
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div style="background:var(--bg-primary);border-radius:12px;padding:20px;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+                    <div style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text-primary);">设为周期性事项</div>
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">重复频率</label>
+                        <select id="recurringTypeSelect" style="width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:14px;background:var(--bg-primary);color:var(--text-primary);">
+                            <option value="daily">每天</option>
+                            <option value="weekly" selected>每周</option>
+                            <option value="monthly">每月</option>
+                            <option value="yearly">每年</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">生成数量（含当天）</label>
+                        <input type="number" id="recurringCountInput" value="6" min="2" max="30" style="width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:14px;background:var(--bg-primary);color:var(--text-primary);">
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                        <button id="recurringCancelBtn" style="padding:8px 16px;border:1px solid var(--border-color);border-radius:8px;background:transparent;color:var(--text-primary);cursor:pointer;">取消</button>
+                        <button id="recurringConfirmBtn" style="padding:8px 16px;border:none;border-radius:8px;background:var(--primary-color);color:#fff;cursor:pointer;">确认</button>
+                    </div>
+                </div>
             `;
-            document.body.appendChild(menu);
+            document.body.appendChild(overlay);
 
-            const rect = this._contextMenuEl?.getBoundingClientRect();
-            menu.style.left = (rect?.right || 100) + 'px';
-            menu.style.top = (rect?.top || 100) + 'px';
-
-            const cleanup = () => { menu.remove(); };
-            menu.onclick = (e) => {
-                const el = e.target.closest('[data-rule]');
-                if (!el) return;
-                cleanup();
-                resolve({ rule: el.dataset.rule, count: 6 });
+            const close = (result) => { overlay.remove(); this.hideContextMenu(); resolve(result); };
+            overlay.querySelector('#recurringCancelBtn').onclick = () => close(null);
+            overlay.querySelector('#recurringConfirmBtn').onclick = () => {
+                const rule = overlay.querySelector('#recurringTypeSelect').value;
+                const count = Math.max(2, Math.min(30, parseInt(overlay.querySelector('#recurringCountInput').value) || 6));
+                close({ rule, count });
             };
-            setTimeout(() => {
-                document.addEventListener('click', function handler() {
-                    cleanup();
-                    document.removeEventListener('click', handler);
-                    resolve(null);
-                }, { once: true });
-            }, 10);
+            overlay.onclick = (e) => { if (e.target === overlay) close(null); };
         });
     }
 
@@ -10347,10 +10360,11 @@ class OfficeDashboard {
                 const btn = e.target.closest('[data-action]');
                 if (!btn) return;
                 overlay.remove();
+                this.hideContextMenu();
                 resolve(btn.dataset.action === 'confirm' ? input.value : null);
             };
             overlay.onclick = (e) => {
-                if (e.target === overlay) { overlay.remove(); resolve(null); }
+                if (e.target === overlay) { overlay.remove(); this.hideContextMenu(); resolve(null); }
             };
         });
     }
