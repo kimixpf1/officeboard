@@ -83,9 +83,9 @@
 - 头部天气：`initHeaderWeather`/`refreshHeaderWeather`/`updateHeaderWeatherDisplay`（天气数据方法已拆分到 weather.js）
 - 主题：9 种主题（靛青紫/天际蓝/青瓷色/翠竹绿/玫瑰红/中国红/琥珀橙/幻影紫/深色模式）
 - 导入导出：JSON 备份导入导出（支持密码加密）、Excel 通讯录导入
-- 版本号：`2026-05-10 v5.63`，scriptVersions 统一管理资源版本
+- 版本号：`2026-05-11 v5.65`，scriptVersions 统一管理资源版本
 - 全局错误捕获：`window.unhandledrejection` + `window.error`
-- **拆分模式**：6 个面板模块 + 1 个天气模块已通过 mixin 模式（`Object.assign(OfficeDashboard.prototype, Module)`）提取到独立文件
+- **拆分模式**：6 个面板模块 + 1 个天气模块 + 2 个核心模块已通过 mixin 模式（`Object.assign(OfficeDashboard.prototype, Module)`）提取到独立文件
 - 依赖：db、syncManager、ocrManager、kimiAPI、cryptoManager、calendarView、reportGenerator、各面板模块
 
 ### 8. js/panels/countdown.js — 倒数日面板（v5.59 拆分）
@@ -119,6 +119,20 @@
 - 和风天气 + Open-Meteo 双数据源自动回退、城市选择器（预设+自定义坐标）、天气图标/描述映射
 - `loadWeather`/`fetchWeather`/`renderWeatherStatus`/`showCitySelector`/`getWeatherIcon`/`getWeatherDesc`
 - 依赖：cryptoManager（读加密 Key）、app.js 中的 header 天气 UI 方法
+
+### 13b. js/core/recurring.js — 周期性模块（v5.64 拆分）
+- `RecurringCore` 对象，14 个方法，678 行
+- 表单渲染（8个）、分组管理（2个）、事项生成（4个）
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 13c. js/core/cross-date.js — 跨日期模块（v5.65 拆分）
+- `CrossDateCore` 对象，15 个方法，354 行
+- 判断（isCrossDateDocument/isCrossDateMeeting）、选择框（showCrossDateDocChoice/showCrossDateDocDeleteChoice）
+- payload构建（getCrossDateDocumentUpdatePayload/getCrossDateMeetingUpdatePayload/getCrossDateDocumentDeletePayload）
+- 作用域更新（applyCrossDateDocumentScopedUpdate/applyCrossDateMeetingScopedUpdate/applyCrossDateDocumentDelete）
+- 日期视图（getDocumentItemForSelectedDate/getMeetingItemForSelectedDate/getEffectiveDocumentItemById）
+- 辅助（clearDayStatesFields/_freezeBeforeAndClearFrom）
+- 依赖：通过 mixin 混入 app.js 原型
 
 ### 14. js/calendar.js — 日历视图渲染
 - `CalendarView` 类，只负责 DOM 渲染，通过 `window.officeDashboard` 代理与 app.js 通信

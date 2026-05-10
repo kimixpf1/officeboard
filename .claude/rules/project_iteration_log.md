@@ -1,3 +1,26 @@
+## 2026-05-11 v5.65 第7批拆分——跨日期模块提取
+
+### 改动内容
+1. **新建 `js/core/cross-date.js`**：15个方法，354行，`CrossDateCore` 对象
+2. **app.js 删除对应方法**：6925 → 6610 行（-315）
+3. 提取方法：
+   - 判断（2个）：`isCrossDateDocument`/`isCrossDateMeeting`
+   - 选择框（2个）：`showCrossDateDocChoice`/`showCrossDateDocDeleteChoice`
+   - payload构建（3个）：`getCrossDateDocumentUpdatePayload`/`getCrossDateMeetingUpdatePayload`/`getCrossDateDocumentDeletePayload`
+   - 作用域更新（3个）：`applyCrossDateDocumentScopedUpdate`/`applyCrossDateMeetingScopedUpdate`/`applyCrossDateDocumentDelete`
+   - 日期视图（3个）：`getDocumentItemForSelectedDate`/`getMeetingItemForSelectedDate`/`getEffectiveDocumentItemById`
+   - 辅助（2个）：`clearDayStatesFields`/`_freezeBeforeAndClearFrom`
+
+### 当前状态
+- ✅ 语法检查通过（cross-date.js + app.js）
+- ✅ 已提交 `694e9fe`
+- 🔄 **推送重试中**（网络不稳定）
+
+### 提交记录
+- `694e9fe` refactor: 第7批拆分——跨日期办文/会议作用域更新提取为 js/core/cross-date.js（v5.65）
+
+---
+
 ## 2026-05-10 v5.64 第6批拆分——周期性模块提取
 
 ### 改动内容
