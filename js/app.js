@@ -7028,7 +7028,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-10 v5.57';
+        const version = '2026-05-10 v5.58';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=194', 'db.js?v=29', 'style.css?v=66', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
