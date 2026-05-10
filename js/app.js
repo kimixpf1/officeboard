@@ -373,6 +373,9 @@ class OfficeDashboard {
         document.getElementById('reportBtn')?.addEventListener('click', () => this.showModal('reportModal'));
         document.getElementById('generateReport')?.addEventListener('click', () => this.generateReport());
         document.getElementById('cancelReport')?.addEventListener('click', () => this.hideModal('reportModal'));
+        document.getElementById('boardScreenshotBtn')?.addEventListener('click', () => {
+            this.shareCalendarScreenshot(document.getElementById('boardView'), document.getElementById('boardDateLabel')?.textContent?.trim() || '日视图');
+        });
 
         // 撤回按钮
         document.getElementById('undoBtn')?.addEventListener('click', () => this.undoLastAction());
@@ -7020,8 +7023,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-10 v5.55';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=192', 'db.js?v=29', 'style.css?v=65', 'crypto.js?v=17'];
+        const version = '2026-05-10 v5.56';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'app.js?v=193', 'db.js?v=29', 'style.css?v=65', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -9901,7 +9904,8 @@ class OfficeDashboard {
             if (!target) return;
 
             e.preventDefault();
-            const itemId = target.dataset?.itemId || target.getAttribute('data-item-id');
+            // dataset.id (calendar.js) 或 dataset.itemId (app.js board cards) 或 data-item-id 属性
+            const itemId = target.dataset?.itemId || target.dataset?.id || target.getAttribute('data-item-id');
             if (!itemId) return;
 
             const item = this.items?.find(i => String(i.id) === String(itemId));
@@ -9920,7 +9924,7 @@ class OfficeDashboard {
             const target = card || calItem;
             if (!target) return;
 
-            const itemId = target.dataset?.itemId || target.getAttribute('data-item-id');
+            const itemId = target.dataset?.itemId || target.dataset?.id || target.getAttribute('data-item-id');
             if (!itemId) return;
 
             const item = this.items?.find(i => String(i.id) === String(itemId));
@@ -9934,10 +9938,17 @@ class OfficeDashboard {
             }, 500);
         }, { passive: false });
 
-        document.addEventListener('touchmove', () => {
-            if (longPressTimer && longPressStartPos) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
+        document.addEventListener('touchmove', (e) => {
+            if (longPressTimer && longPressStartPos && e.touches.length === 1) {
+                const touch = e.touches[0];
+                const dx = touch.clientX - longPressStartPos.x;
+                const dy = touch.clientY - longPressStartPos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                // 移动超过 10px 才取消长按，避免手指微颤误杀
+                if (dist > 10) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
             }
         }, { passive: true });
 
