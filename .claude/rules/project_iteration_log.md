@@ -1,3 +1,125 @@
+## 2026-05-10 v5.62 第4批拆分——工具+日程+备忘
+
+### 改动内容
+1. **新建 `js/panels/tools.js`**：11个方法，389行（工具列表+计算器+倒计时），`ToolsPanel` 对象
+2. **新建 `js/panels/side-panels.js`**：2个方法，235行（日程+备忘录+Escape快捷键），`SidePanels` 对象
+3. **app.js 删除对应方法**：8613 → 7552 行（-1061）
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `70771ae`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `70771ae` refactor: 第4批拆分——工具+日程+备忘提取为 tools.js 和 side-panels.js
+
+---
+
+## 2026-05-10 v5.61 第3批拆分——通讯录面板
+
+### 改动内容
+1. **新建 `js/panels/contacts.js`**：14个方法，665行，`ContactsPanel` 对象
+2. **app.js 删除对应方法**：9270 → 8613 行（-657）
+3. **index.html**：新增 `<script src="js/panels/contacts.js?v=1">`
+4. **app.js init()**：新增 `Object.assign(OfficeDashboard.prototype, ContactsPanel)`
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `91c5c17`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `91c5c17` refactor: 第3批拆分——通讯录面板提取到 js/panels/contacts.js
+
+---
+
+## 2026-05-10 v5.60 第2批拆分——链接面板
+
+### 改动内容
+1. **新建 `js/panels/links.js`**：10个方法，458行，`LinksPanel` 对象
+2. **app.js 删除对应方法**：9720 → 9270 行（-450）
+3. **index.html**：新增 `<script src="js/panels/links.js?v=1">`
+4. **app.js init()**：新增 `Object.assign(OfficeDashboard.prototype, LinksPanel)`
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `1716114`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `1716114` refactor: 第2批拆分——链接面板提取到 js/panels/links.js
+
+---
+
+## 2026-05-10 v5.59 第1批拆分——倒数日面板
+
+### 改动内容
+1. **新建 `js/panels/countdown.js`**：22个方法，760行，`CountdownPanel` 对象
+2. **app.js 删除对应方法**：10470 → 9720 行（-750）
+3. **index.html**：新增 `<script src="js/panels/countdown.js?v=1">` 在 app.js 之前
+4. **app.js init()**：新增 `Object.assign(OfficeDashboard.prototype, CountdownPanel)` mixin 调用
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `55c561d`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `55c561d` refactor: 第1批拆分——倒数日面板提取到 js/panels/countdown.js
+
+---
+
+## 2026-05-10 v5.58 周期性增强（每两周+截止日期）
+
+### 改动内容
+1. **每两周**：RECURRING_TYPES 新增 BIWEEKLY_DAY/BIWEEKLY_MULTI，生成逻辑用 14 天间隔
+2. **截止日期**：右键周期性对话框新增日期输入，支持"生成到X月X日"，优先级高于数量
+3. **修复 CRITICAL**：saveItem 未提取 BIWEEKLY 的 weekDay/weekDays 导致无限循环
+4. **rule 映射修复**：_contextSetRecurring 正确将对话框字符串映射为 generateRecurringItems 兼容的 rule 对象
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ code-reviewer 审查通过
+- ✅ 已提交 `7f6ff3b`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 本轮关键改动
+- index.html：RECURRING_TYPES + OPTION_GROUPS 新增每两周
+- js/app.js：generateRecurringItems 新增 BIWEEKLY_DAY/MULTI、saveItem 补全、对话框增强、rule 映射修复
+
+### 提交记录
+- `7f6ff3b` feat: 周期性增加每两周+截止日期——右键对话框+编辑弹窗+生成逻辑 (v5.58)
+
+---
+
+## 2026-05-10 v5.57 右键菜单增强（周期性对话框+子菜单保留母菜单）
+
+### 修复内容
+1. **编辑修复**：右键"编辑"改传 `this.editItem(item)` 而非 `this.editItem(item.id)`，editItem 需要完整对象
+2. **周期性完整对话框**：`_showRecurringPicker`（简单3选项子菜单）替换为 `_showRecurringDialog`（完整表单：频率下拉+数量输入+确认取消），用户反馈"应该弹出周期性那个框才对"
+3. **子菜单保留母菜单**：右键选"优先级/复制/周期性/改日期"时不立即隐藏母菜单，等子菜单操作完成/取消/关闭后再隐藏
+4. **子菜单定位修复**：复制子菜单从 `_contextMenuEl?.getBoundingClientRect()` 改为 `_contextMenuPos`（避免菜单隐藏后 getBoundingClientRect 返回 0）
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `b87c163`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 本轮关键改动
+- js/app.js：`_showRecurringPicker` → `_showRecurringDialog`（完整表单）；子菜单 cleanup 统一加 `this.hideContextMenu()`；menu.onclick 对 submenuActions 不立即隐藏
+- index.html：版本 v5.57
+
+### 提交记录
+- `b87c163` fix: 周期性改为完整表单对话框 + 子菜单保留母菜单直到操作完成 (v5.57)
+
+---
+
 ## 2026-05-10 v5.56 功能修复（右键菜单+长按+日视图截图）
 
 ### 修复内容

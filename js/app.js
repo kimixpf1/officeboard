@@ -253,6 +253,7 @@ class OfficeDashboard {
         Object.assign(OfficeDashboard.prototype, ContactsPanel);
         Object.assign(OfficeDashboard.prototype, ToolsPanel);
         Object.assign(OfficeDashboard.prototype, SidePanels);
+        Object.assign(OfficeDashboard.prototype, WeatherPanel);
 
         try {
             window.addEventListener('unhandledrejection', (e) => {
@@ -4110,8 +4111,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-10 v5.62';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'countdown.js?v=1', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'app.js?v=198', 'db.js?v=29', 'style.css?v=66', 'crypto.js?v=17'];
+        const version = '2026-05-10 v5.63';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=67', 'app-date-view.js?v=13', 'countdown.js?v=1', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'app.js?v=199', 'db.js?v=29', 'style.css?v=66', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
