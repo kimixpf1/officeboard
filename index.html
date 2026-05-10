@@ -1128,6 +1128,8 @@
                 WORKDAY_DAILY: 'workday_daily',
                 WEEKLY_DAY: 'weekly_day',
                 WEEKLY_MULTI: 'weekly_multi',
+                BIWEEKLY_DAY: 'biweekly_day',
+                BIWEEKLY_MULTI: 'biweekly_multi',
                 MONTHLY_DATE: 'monthly_date',
                 MONTHLY_WORKDAY: 'monthly_workday',
                 MONTHLY_WEEKDAY: 'monthly_weekday'
@@ -1150,6 +1152,13 @@
                     options: [
                         { value: 'weekly_day', label: '每周固定星期' },
                         { value: 'weekly_multi', label: '每周多天（如一二三）' }
+                    ]
+                },
+                {
+                    label: '每两周',
+                    options: [
+                        { value: 'biweekly_day', label: '每两周固定星期' },
+                        { value: 'biweekly_multi', label: '每两周多天' }
                     ]
                 },
                 {

@@ -18,6 +18,8 @@ const RECURRING_TYPES = OfficeConstants.RECURRING_TYPES || {
     WORKDAY_DAILY: 'workday_daily',
     WEEKLY_DAY: 'weekly_day',
     WEEKLY_MULTI: 'weekly_multi',
+    BIWEEKLY_DAY: 'biweekly_day',
+    BIWEEKLY_MULTI: 'biweekly_multi',
     MONTHLY_DATE: 'monthly_date',
     MONTHLY_WORKDAY: 'monthly_workday',
     MONTHLY_WEEKDAY: 'monthly_weekday'
@@ -6418,9 +6420,9 @@ class OfficeDashboard {
                             document.getElementById('recurringDay').value = item.recurringRule.day || '';
                         } else if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_WORKDAY) {
                             document.getElementById('nthWorkDay').value = item.recurringRule.nthWorkDay || '';
-                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY) {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY || item.recurringRule.type === RECURRING_TYPES.BIWEEKLY_DAY) {
                             document.getElementById('weekDay').value = item.recurringRule.weekDay || 1;
-                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_MULTI) {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_MULTI || item.recurringRule.type === RECURRING_TYPES.BIWEEKLY_MULTI) {
                             const checkboxes = document.querySelectorAll('input[name="weekDays"]');
                             checkboxes.forEach(cb => {
                                 cb.checked = (item.recurringRule.weekDays || []).includes(parseInt(cb.value));
@@ -6480,9 +6482,9 @@ class OfficeDashboard {
                             document.getElementById('docRecurringDay').value = item.recurringRule.day || '';
                         } else if (item.recurringRule.type === RECURRING_TYPES.MONTHLY_WORKDAY) {
                             document.getElementById('docNthWorkDay').value = item.recurringRule.nthWorkDay || '';
-                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY) {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_DAY || item.recurringRule.type === RECURRING_TYPES.BIWEEKLY_DAY) {
                             document.getElementById('docWeekDay').value = item.recurringRule.weekDay || 1;
-                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_MULTI) {
+                        } else if (item.recurringRule.type === RECURRING_TYPES.WEEKLY_MULTI || item.recurringRule.type === RECURRING_TYPES.BIWEEKLY_MULTI) {
                             const checkboxes = document.querySelectorAll('input[name="docWeekDays"]');
                             checkboxes.forEach(cb => {
                                 cb.checked = (item.recurringRule.weekDays || []).includes(parseInt(cb.value));
@@ -7173,9 +7175,11 @@ class OfficeDashboard {
                         if (nthWorkDayGroup) nthWorkDayGroup.style.display = 'block';
                         break;
                     case 'weekly_day':
+                    case 'biweekly_day':
                         if (weekDayGroup) weekDayGroup.style.display = 'block';
                         break;
                     case 'weekly_multi':
+                    case 'biweekly_multi':
                         if (weekMultiGroup) weekMultiGroup.style.display = 'block';
                         break;
                     case 'monthly_weekday':
@@ -7273,9 +7277,9 @@ class OfficeDashboard {
                             return;
                         }
                         rule.nthWorkDay = nthWorkDay;
-                    } else if (recurringType === RECURRING_TYPES.WEEKLY_DAY) {
+                    } else if (recurringType === RECURRING_TYPES.WEEKLY_DAY || recurringType === RECURRING_TYPES.BIWEEKLY_DAY) {
                         rule.weekDay = parseInt(document.getElementById('weekDay').value);
-                    } else if (recurringType === RECURRING_TYPES.WEEKLY_MULTI) {
+                    } else if (recurringType === RECURRING_TYPES.WEEKLY_MULTI || recurringType === RECURRING_TYPES.BIWEEKLY_MULTI) {
                         const checkedDays = Array.from(document.querySelectorAll('input[name="weekDays"]:checked')).map(cb => parseInt(cb.value));
                         if (checkedDays.length === 0) {
                             alert('请至少选择一个星期');
@@ -7346,9 +7350,9 @@ class OfficeDashboard {
                         rule.day = parseInt(document.getElementById('docRecurringDay').value) || 1;
                     } else if (docRecurringType === RECURRING_TYPES.MONTHLY_WORKDAY) {
                         rule.nthWorkDay = parseInt(document.getElementById('docNthWorkDay').value) || 1;
-                    } else if (docRecurringType === RECURRING_TYPES.WEEKLY_DAY) {
+                    } else if (docRecurringType === RECURRING_TYPES.WEEKLY_DAY || docRecurringType === RECURRING_TYPES.BIWEEKLY_DAY) {
                         rule.weekDay = parseInt(document.getElementById('docWeekDay').value) || 1;
-                    } else if (docRecurringType === RECURRING_TYPES.WEEKLY_MULTI) {
+                    } else if (docRecurringType === RECURRING_TYPES.WEEKLY_MULTI || docRecurringType === RECURRING_TYPES.BIWEEKLY_MULTI) {
                         const docWeekDays = [];
                         document.querySelectorAll('input[name="docWeekDays"]:checked').forEach(cb => {
                             docWeekDays.push(parseInt(cb.value));
@@ -8958,9 +8962,11 @@ class OfficeDashboard {
                 document.getElementById('docNthWorkDayGroup').style.display = 'block';
                 break;
             case RECURRING_TYPES.WEEKLY_DAY:
+            case RECURRING_TYPES.BIWEEKLY_DAY:
                 document.getElementById('docWeekDayGroup').style.display = 'block';
                 break;
             case RECURRING_TYPES.WEEKLY_MULTI:
+            case RECURRING_TYPES.BIWEEKLY_MULTI:
                 document.getElementById('docWeekMultiGroup').style.display = 'block';
                 break;
             case RECURRING_TYPES.MONTHLY_WEEKDAY:
@@ -9103,6 +9109,51 @@ class OfficeDashboard {
                     }
                     weekOffset++;
                     if (weekOffset === Infinity) break;
+                }
+                break;
+
+            case RECURRING_TYPES.BIWEEKLY_DAY:
+                // 每两周固定星期（14天间隔）
+                let biweekDCount = 0;
+                let biweekNum = 0;
+                while (biweekDCount < count) {
+                    const date = this.getWeeklyDay(firstDate, biweekNum * 2, rule.weekDay);
+                    if (endDate && date > endDate) break;
+                    if (date >= firstDate) {
+                        let skip = false;
+                        if (rule.skipWeekends && this.isWeekend(date)) skip = true;
+                        if (skipHolidays && this.isHoliday(date)) skip = true;
+                        if (!skip) {
+                            items.push(this.createRecurringItem(cleanItem, date, rule, groupId, items.length + 1));
+                            biweekDCount++;
+                        }
+                    }
+                    biweekNum++;
+                }
+                break;
+
+            case RECURRING_TYPES.BIWEEKLY_MULTI:
+                // 每两周多天
+                const biweekDays = rule.weekDays || [];
+                let biweekOffset = 0;
+                let biItemsGen = 0;
+                while (biItemsGen < count) {
+                    for (const day of biweekDays) {
+                        if (biItemsGen >= count) break;
+                        const date = this.getWeeklyDay(firstDate, biweekOffset * 2, day);
+                        if (endDate && date > endDate) { biweekOffset = Infinity; break; }
+                        if (date >= firstDate) {
+                            let skip = false;
+                            if (rule.skipWeekends && this.isWeekend(date)) skip = true;
+                            if (skipHolidays && this.isHoliday(date)) skip = true;
+                            if (!skip) {
+                                items.push(this.createRecurringItem(cleanItem, date, rule, groupId, biItemsGen + 1));
+                                biItemsGen++;
+                            }
+                        }
+                    }
+                    biweekOffset++;
+                    if (biweekOffset === Infinity) break;
                 }
                 break;
 
@@ -10286,7 +10337,41 @@ class OfficeDashboard {
             });
 
             const baseItem = { ...item, recurringGroupId: groupId };
-            const recurringItems = this.generateRecurringItems(baseItem, choice.rule, choice.count || 6);
+            const refDate = item.date || item.docStartDate || this.selectedDate;
+            const dow = refDate ? new Date(refDate + 'T12:00:00').getDay() : 1;
+            const dom = refDate ? new Date(refDate + 'T12:00:00').getDate() : 1;
+
+            // 将简单规则映射为 generateRecurringItems 能理解的对象
+            let ruleObj;
+            const endDate = choice.endDate || null;
+            switch (choice.rule) {
+                case 'daily': ruleObj = { type: 'daily', endDate }; break;
+                case 'workday': ruleObj = { type: 'workday_daily', endDate }; break;
+                case 'weekly': ruleObj = { type: 'weekly_day', weekDay: dow, endDate }; break;
+                case 'biweekly': ruleObj = { type: 'biweekly_day', weekDay: dow, endDate }; break;
+                case 'monthly': ruleObj = { type: 'monthly_date', monthDate: dom, endDate }; break;
+                case 'yearly': {
+                    // 每年：直接生成日期
+                    const items = [];
+                    const start = new Date(refDate + 'T12:00:00');
+                    const endD = endDate ? new Date(endDate + 'T12:00:00') : null;
+                    for (let i = 0; i < (choice.count || 6); i++) {
+                        const d = new Date(start);
+                        d.setFullYear(d.getFullYear() + i);
+                        if (endD && d > endD) break;
+                        items.push(this.createRecurringItem({ ...baseItem }, d, { type: 'monthly_date', monthDate: d.getDate() }, groupId, i + 1));
+                    }
+                    const total = items.length + 1;
+                    for (const ri of items) await db.addItem(ri);
+                    this.showSuccess(`已生成 ${total} 个周期事项（每年）`);
+                    await this.loadItems();
+                    if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+                    return;
+                }
+                default: ruleObj = { type: 'weekly_day', weekDay: dow };
+            }
+
+            const recurringItems = this.generateRecurringItems(baseItem, ruleObj, choice.count || 6);
             for (const ri of recurringItems) {
                 await db.addItem(ri);
             }
@@ -10310,14 +10395,20 @@ class OfficeDashboard {
                         <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">重复频率</label>
                         <select id="recurringTypeSelect" style="width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:14px;background:var(--bg-primary);color:var(--text-primary);">
                             <option value="daily">每天</option>
+                            <option value="workday">每工作日</option>
                             <option value="weekly" selected>每周</option>
+                            <option value="biweekly">每两周</option>
                             <option value="monthly">每月</option>
                             <option value="yearly">每年</option>
                         </select>
                     </div>
                     <div style="margin-bottom:16px;">
                         <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">生成数量（含当天）</label>
-                        <input type="number" id="recurringCountInput" value="6" min="2" max="30" style="width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:14px;background:var(--bg-primary);color:var(--text-primary);">
+                        <input type="number" id="recurringCountInput" value="6" min="2" max="50" style="width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:14px;background:var(--bg-primary);color:var(--text-primary);">
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;">截止日期（可选，优先级高于数量）</label>
+                        <input type="date" id="recurringEndDateInput" style="width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:14px;background:var(--bg-primary);color:var(--text-primary);">
                     </div>
                     <div style="display:flex;gap:8px;justify-content:flex-end;">
                         <button id="recurringCancelBtn" style="padding:8px 16px;border:1px solid var(--border-color);border-radius:8px;background:transparent;color:var(--text-primary);cursor:pointer;">取消</button>
@@ -10331,8 +10422,9 @@ class OfficeDashboard {
             overlay.querySelector('#recurringCancelBtn').onclick = () => close(null);
             overlay.querySelector('#recurringConfirmBtn').onclick = () => {
                 const rule = overlay.querySelector('#recurringTypeSelect').value;
-                const count = Math.max(2, Math.min(30, parseInt(overlay.querySelector('#recurringCountInput').value) || 6));
-                close({ rule, count });
+                const count = Math.max(2, Math.min(50, parseInt(overlay.querySelector('#recurringCountInput').value) || 6));
+                const endDate = overlay.querySelector('#recurringEndDateInput').value || null;
+                close({ rule, count, endDate });
             };
             overlay.onclick = (e) => { if (e.target === overlay) close(null); };
         });
