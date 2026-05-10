@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(bash \"E:/ccswitch/AI编程工作目录/everything-claude-code/install.sh\" --help)",
+      "Bash(bash \"E:/ccswitch/AI编程工作目录/everything-claude-code/install.sh\" --target claude --modules hooks-runtime --dry-run --json)",
+      "Bash(bash \"E:/ccswitch/AI编程工作目录/everything-claude-code/install.sh\" --target claude --profile minimal --dry-run --json)",
+      "Bash(python -)",
+      "Bash(bash \"E:/ccswitch/AI编程工作目录/everything-claude-code/install.sh\" --target claude --profile minimal)",
+      "Bash(bash \"E:/ccswitch/AI编程工作目录/everything-claude-code/install.sh\" --target claude --modules hooks-runtime)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('C:/Users/42151/.claude/settings.json','utf8'\\)\\); console.log\\('settings ok'\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('C:/Users/42151/.claude/hooks/hooks.json','utf8'\\)\\); console.log\\('hooks ok'\\)\")",
+      "Bash(node -)",
+      "Bash(python -m http.server 8000 --bind 127.0.0.1 --directory \"e:/ccswitch/AI编程工作目录/办公面板\")",
+      "Bash(node --check \"e:/ccswitch/AI编程工作目录/办公面板/js/sync.js\")",
+      "Bash(node --check \"e:/ccswitch/AI编程工作目录/办公面板/js/app.js\")",
+      "Bash(node --check \"e:/ccswitch/AI编程工作目录/办公面板/js/db.js\")",
+      "Bash(git add *)",
+      "Bash(node --check \"e:/ccswitch/AI编程工作目录/办公面板/js/ocr.js\")",
+      "Bash(node --check \"e:/ccswitch/AI编程工作目录/办公面板/js/utils.js\")",
+      "Bash(cat \"C:\\\\Users\\\\42151\\\\.claude\\\\settings.json\" 2>/dev/null | head -100)",
+      "Read(//c/Users/42151/.claude/**)",
+      "Read(//c/Users/42151/**)"
+    ]
+  }
+}

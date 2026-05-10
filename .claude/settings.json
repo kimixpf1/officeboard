@@ -1,0 +1,9 @@
+{
+  "permissionMode": "bypass",
+  "permissions": {
+    "allow": [
+      "Bash(git -c http.sslverify=false -c http.sslbackend=schannel -c http.lowspeedtime=300 push --thin origin main)",
+      "Bash(break)"
+    ]
+  }
+}

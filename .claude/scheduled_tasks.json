@@ -1,0 +1,22 @@
+{
+  "tasks": [
+    {
+      "id": "23b1f4ab",
+      "cron": "3 14 * * *",
+      "prompt": "提醒大飞：现在是下午2点，GLM 模型进入三倍消耗时段（14:00-18:00）。建议暂停使用智谱 GLM 模型，切换到其他模型或休息一下，等下午6点再恢复使用。如果当前有紧急任务在跑，可以继续完成，但尽量避免开启新的长任务。",
+      "createdAt": 1778293052313,
+      "recurring": true,
+      "createdBySessionId": "05ac31ef-0cd2-44e7-bc4b-60471b1fdef5",
+      "createdByPid": 12196
+    },
+    {
+      "id": "ee5eb79e",
+      "cron": "7 18 * * *",
+      "prompt": "提醒大飞：现在是下午6点，GLM 模型的三倍消耗时段已结束，恢复正常计费。可以继续使用智谱 GLM 模型了。",
+      "createdAt": 1778293052385,
+      "recurring": true,
+      "createdBySessionId": "05ac31ef-0cd2-44e7-bc4b-60471b1fdef5",
+      "createdByPid": 12196
+    }
+  ]
+}
