@@ -127,8 +127,8 @@ const AlarmManager = {
 
         this.hideIdleNotice();
         noticeEl.hidden = false;
-        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing', 'idle-mode');
-        noticeEl.classList.add('alarm-active');
+        noticeEl.classList.remove('todo-reminder-active', 'idle-mode');
+        noticeEl.classList.add('alarm-active', 'todo-reminder-flashing');
 
         const titleEl = noticeEl.querySelector('.countdown-notice-title');
         const descEl = noticeEl.querySelector('.countdown-notice-desc');
@@ -151,16 +151,12 @@ const AlarmManager = {
             completeBtn.title = '关闭闹钟';
             completeBtn.onclick = () => this.dismissAlarm(alarm.id);
         }
-
-        if (remaining <= 0) {
-            noticeEl.classList.add('todo-reminder-flashing');
-        }
     },
 
     hideAlarmNotice() {
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) return;
-        noticeEl.classList.remove('alarm-active');
+        noticeEl.classList.remove('alarm-active', 'todo-reminder-flashing');
         const completeBtn = document.getElementById('todoReminderCompleteBtn');
         if (completeBtn && !noticeEl.classList.contains('todo-reminder-active')) {
             completeBtn.style.display = 'none';
@@ -210,6 +206,7 @@ const AlarmManager = {
                     </div>
                 </div>
                 <button id="alarmAddBtn" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--primary-color);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:16px;">添加闹钟</button>
+                <button id="alarmCancelEditBtn" style="display:none;width:100%;padding:6px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-secondary);font-size:13px;cursor:pointer;margin-bottom:16px;">取消编辑</button>
                 <div id="alarmListContainer" style="border-top:1px solid var(--border-color);padding-top:12px;">
                     <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">已有闹钟</div>
                     <div id="alarmList"></div>
@@ -236,6 +233,9 @@ const AlarmManager = {
 
         const renderList = () => {
             const listEl = overlay.querySelector('#alarmList');
+            const addBtn = overlay.querySelector('#alarmAddBtn');
+            const cancelBtn = overlay.querySelector('#alarmCancelEditBtn');
+            const weekDaysRow = overlay.querySelector('#alarmWeekDaysRow');
             const alarms = this.getAlarms();
             if (!alarms.length) {
                 listEl.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:8px;">暂无闹钟</div>';
@@ -251,6 +251,7 @@ const AlarmManager = {
                         <div style="font-size:14px;font-weight:600;color:var(--text-primary);${a.enabled ? '' : 'opacity:0.5;'}">${safeTime} ${safeLabel}</div>
                         <div style="font-size:12px;color:var(--text-secondary);">${repeatText}</div>
                     </div>
+                    <button data-alarm-edit="${a.id}" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;padding:4px;" title="编辑">✎</button>
                     <button data-alarm-delete="${a.id}" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:4px;">×</button>
                 </div>`;
             }).join('');
@@ -269,6 +270,24 @@ const AlarmManager = {
                     renderList();
                 });
             });
+            listEl.querySelectorAll('[data-alarm-edit]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const alarm = this._alarms.find(a => a.id === btn.dataset.alarmEdit);
+                    if (!alarm) return;
+                    this._editingAlarmId = alarm.id;
+                    overlay.querySelector('#alarmLabelInput').value = alarm.label || '';
+                    overlay.querySelector('#alarmTimeInput').value = alarm.time;
+                    overlay.querySelector('#alarmRepeatSelect').value = alarm.repeatMode;
+                    weekDaysRow.style.display = alarm.repeatMode === 'weekly' ? '' : 'none';
+                    overlay.querySelectorAll('.alarm-weekday-check').forEach(cb => {
+                        cb.checked = (alarm.weekDays || []).includes(parseInt(cb.value));
+                        cb.parentElement.style.background = cb.checked ? 'var(--primary-color)' : '';
+                        cb.parentElement.style.color = cb.checked ? '#fff' : '';
+                    });
+                    addBtn.textContent = '更新闹钟';
+                    cancelBtn.style.display = '';
+                });
+            });
         };
         renderList();
 
@@ -279,13 +298,42 @@ const AlarmManager = {
             const weekDays = [...overlay.querySelectorAll('.alarm-weekday-check:checked')].map(cb => parseInt(cb.value));
 
             if (!time) { this.showError('请选择时间'); return; }
-            this.addAlarm({ label, time, repeatMode: repeat, weekDays });
+            if (this._editingAlarmId) {
+                const alarm = this._alarms.find(a => a.id === this._editingAlarmId);
+                if (alarm) {
+                    alarm.label = label;
+                    alarm.time = time;
+                    alarm.repeatMode = repeat;
+                    alarm.weekDays = weekDays;
+                    this.saveAlarms();
+                    this.showSuccess(`闹钟已更新：${time} ${label}`);
+                }
+                this._editingAlarmId = null;
+                overlay.querySelector('#alarmAddBtn').textContent = '添加闹钟';
+                overlay.querySelector('#alarmCancelEditBtn').style.display = 'none';
+            } else {
+                this.addAlarm({ label, time, repeatMode: repeat, weekDays });
+                this.showSuccess(`闹钟已添加：${time} ${label}`);
+            }
             overlay.querySelector('#alarmLabelInput').value = '';
             renderList();
-            this.showSuccess(`闹钟已添加：${time} ${label}`);
         });
 
-        const close = () => { overlay.remove(); this.hideContextMenu?.(); };
+        overlay.querySelector('#alarmCancelEditBtn').addEventListener('click', () => {
+            this._editingAlarmId = null;
+            overlay.querySelector('#alarmLabelInput').value = '';
+            overlay.querySelector('#alarmAddBtn').textContent = '添加闹钟';
+            overlay.querySelector('#alarmCancelEditBtn').style.display = 'none';
+            const weekDaysRow = overlay.querySelector('#alarmWeekDaysRow');
+            weekDaysRow.style.display = 'none';
+            overlay.querySelectorAll('.alarm-weekday-check').forEach(cb => {
+                cb.checked = false;
+                cb.parentElement.style.background = '';
+                cb.parentElement.style.color = '';
+            });
+        });
+
+        const close = () => { this._editingAlarmId = null; overlay.remove(); this.hideContextMenu?.(); };
         overlay.querySelector('#alarmSettingsClose').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     }
