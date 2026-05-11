@@ -404,6 +404,12 @@ body {
     background: linear-gradient(135deg, color-mix(in srgb, #818cf8 10%, var(--bg-primary)), color-mix(in srgb, #a78bfa 18%, var(--bg-primary)));
     box-shadow: 0 4px 12px rgba(129, 140, 248, 0.08);
     cursor: pointer;
+    min-height: 56px;
+}
+
+.countdown-notice.idle-mode.with-pet {
+    min-height: 100px;
+    padding: 6px 14px;
 }
 
 .countdown-notice.idle-mode .countdown-notice-badge {

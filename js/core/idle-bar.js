@@ -114,9 +114,9 @@ const IdleBarManager = {
         if (!this._petCanvas) {
             this._petCanvas = document.createElement('canvas');
             this._petCanvas.className = 'idle-pet-canvas';
-            this._petCanvas.width = 64;
-            this._petCanvas.height = 64;
-            this._petCanvas.style.cssText = 'display:none;width:36px;height:36px;vertical-align:middle;margin-right:4px;border-radius:50%;';
+            this._petCanvas.width = 120;
+            this._petCanvas.height = 100;
+            this._petCanvas.style.cssText = 'display:none;width:96px;height:80px;vertical-align:middle;margin-right:6px;border-radius:12px;flex-shrink:0;';
             this._petRenderer = null;
         }
 
@@ -175,8 +175,9 @@ const IdleBarManager = {
     hideIdleNotice() {
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) return;
-        noticeEl.classList.remove('idle-mode');
+        noticeEl.classList.remove('idle-mode', 'with-pet');
         this._stopIdleRotation();
+        this._stopInteraction();
         if (this._petCanvas) this._petCanvas.style.display = 'none';
     },
 
@@ -272,6 +273,7 @@ const IdleBarManager = {
 
         const sel = this._idleDisplay;
         if (sel && sel.type === 'pet') {
+            noticeEl.classList.add('with-pet');
             const allPets = this._getAllPets();
             const pet = allPets[sel.index];
             if (pet) {
@@ -330,6 +332,7 @@ const IdleBarManager = {
                 }
             }
         } else if (sel && sel.type === 'quote') {
+            noticeEl.classList.remove('with-pet');
             const quotes = this._getAllQuotes(sel.period || this._getPeriodForHour(hour));
             const quote = quotes[sel.index];
             if (quote) {
@@ -337,6 +340,7 @@ const IdleBarManager = {
                 if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击选句 · 右键闹钟';
             }
         } else {
+            noticeEl.classList.remove('with-pet');
             if (titleEl) titleEl.textContent = '🐾 点击选择宠物或句子';
             if (descEl) descEl.textContent = '挑选一个陪伴你 · 右键闹钟';
         }
@@ -611,9 +615,13 @@ const IdleBarManager = {
             clearInterval(this._idleTimer);
             this._idleTimer = null;
         }
+    },
+
+    _stopInteraction() {
         if (this._interactTimer) {
             clearTimeout(this._interactTimer);
             this._interactTimer = null;
         }
+        if (this._petRenderer) this._petRenderer.setAction('idle');
     }
 };
