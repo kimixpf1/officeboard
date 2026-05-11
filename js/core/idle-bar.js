@@ -302,18 +302,20 @@ const IdleBarManager = {
 
                     // 初始化或更换 PetRenderer
                     const petColorMap = {
-                        '点点': { body: '#F0C060', bodyLight: '#F5D080', bodyDark: '#D4A040', belly: '#FBE8B0', ear: '#C4883C', earInner: '#D4A050', eye: '#2C1810', nose: '#4A2810', paw: '#FBE8B0', blush: 'rgba(255,150,150,0.35)' },
-                        '小橘': { body: '#F8A850', bodyLight: '#FAC880', bodyDark: '#D48830', belly: '#FDE0B8', ear: '#E88830', earInner: '#F0A850', eye: '#2C1810', nose: '#D47850', paw: '#FDE0B8', blush: 'rgba(255,150,150,0.35)' },
-                        '旺财': { body: '#D4B060', bodyLight: '#E8C880', bodyDark: '#B89040', belly: '#F0D8A0', ear: '#A07030', earInner: '#C89850', eye: '#2C1810', nose: '#4A2810', paw: '#F0D8A0', blush: 'rgba(255,150,150,0.35)' },
-                        '滚滚': { body: '#EAEAEA', bodyLight: '#F8F8F8', bodyDark: '#C0C0C0', belly: '#FEFEFE', ear: '#333333', earInner: '#555555', eye: '#1A1A1A', nose: '#333333', paw: '#EEEEEE', blush: 'rgba(255,180,180,0.3)' },
-                        '小灵': { body: '#F08040', bodyLight: '#F0A070', bodyDark: '#D06030', belly: '#FDE0C8', ear: '#D86830', earInner: '#E89060', eye: '#2C1810', nose: '#3A2010', paw: '#FDE0C8', blush: 'rgba(255,150,150,0.35)' },
-                        '团团': { body: '#FAFAFA', bodyLight: '#FFFFFF', bodyDark: '#E0E0E0', belly: '#FFFFFF', ear: '#E8C8D8', earInner: '#F0D8E8', eye: '#CC3355', nose: '#FF8899', paw: '#FFFFFF', blush: 'rgba(255,180,200,0.4)' },
-                        '波波': { body: '#3A3A50', bodyLight: '#505068', bodyDark: '#2A2A3A', belly: '#F8F8F8', ear: '#3A3A50', earInner: '#505068', eye: '#111122', nose: '#FF8833', paw: '#3A3A50', blush: 'rgba(255,150,150,0.3)' },
+                        '点点': { species: 'dog', body: '#F0C060', bodyLight: '#F5D080', bodyDark: '#D4A040', belly: '#FBE8B0', ear: '#C4883C', earInner: '#D4A050', eye: '#2C1810', nose: '#4A2810', paw: '#FBE8B0', blush: 'rgba(255,150,150,0.35)' },
+                        '小橘': { species: 'cat', body: '#F8A850', bodyLight: '#FAC880', bodyDark: '#D48830', belly: '#FDE0B8', ear: '#E88830', earInner: '#F0A850', eye: '#2C1810', nose: '#D47850', paw: '#FDE0B8', blush: 'rgba(255,150,150,0.35)' },
+                        '旺财': { species: 'dog', body: '#D4B060', bodyLight: '#E8C880', bodyDark: '#B89040', belly: '#F0D8A0', ear: '#A07030', earInner: '#C89850', eye: '#2C1810', nose: '#4A2810', paw: '#F0D8A0', blush: 'rgba(255,150,150,0.35)' },
+                        '滚滚': { species: 'panda', body: '#EAEAEA', bodyLight: '#F8F8F8', bodyDark: '#C0C0C0', belly: '#FEFEFE', ear: '#333333', earInner: '#555555', eye: '#1A1A1A', nose: '#333333', paw: '#EEEEEE', blush: 'rgba(255,180,180,0.3)' },
+                        '小灵': { species: 'fox', body: '#F08040', bodyLight: '#F0A070', bodyDark: '#D06030', belly: '#FDE0C8', ear: '#D86830', earInner: '#E89060', eye: '#2C1810', nose: '#3A2010', paw: '#FDE0C8', blush: 'rgba(255,150,150,0.35)' },
+                        '团团': { species: 'rabbit', body: '#FAFAFA', bodyLight: '#FFFFFF', bodyDark: '#E0E0E0', belly: '#FFFFFF', ear: '#E8C8D8', earInner: '#F0D8E8', eye: '#CC3355', nose: '#FF8899', paw: '#FFFFFF', blush: 'rgba(255,180,200,0.4)' },
+                        '波波': { species: 'penguin', body: '#3A3A50', bodyLight: '#505068', bodyDark: '#2A2A3A', belly: '#F8F8F8', ear: '#3A3A50', earInner: '#505068', eye: '#111122', nose: '#FF8833', paw: '#3A3A50', blush: 'rgba(255,150,150,0.3)' },
                     };
-                    const colors = petColorMap[pet.name] || petColorMap['点点'];
+                    const info = petColorMap[pet.name] || petColorMap['点点'];
+                    const species = info.species || 'dog';
+                    const { species: _, ...colors } = info;
                     if (!this._petRenderer || this._petRenderer._petName !== pet.name) {
                         if (this._petRenderer) this._petRenderer.destroy();
-                        this._petRenderer = new PetRenderer(this._petCanvas, { colors: colors });
+                        this._petRenderer = new PetRenderer(this._petCanvas, { species: species, colors: colors });
                         this._petRenderer._petName = pet.name;
                         this._petRenderer.start();
                     }
