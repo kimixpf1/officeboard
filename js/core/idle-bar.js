@@ -74,6 +74,13 @@ const IdleBarManager = {
             }
         });
 
+        noticeEl.addEventListener('contextmenu', (e) => {
+            if (noticeEl.classList.contains('idle-mode')) {
+                e.preventDefault();
+                if (typeof this.showAlarmSettings === 'function') this.showAlarmSettings();
+            }
+        });
+
         let longPressTimer = null;
         noticeEl.addEventListener('touchstart', (e) => {
             if (!noticeEl.classList.contains('idle-mode')) return;
@@ -84,12 +91,6 @@ const IdleBarManager = {
         }, { passive: true });
         noticeEl.addEventListener('touchmove', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }, { passive: true });
         noticeEl.addEventListener('touchend', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } });
-
-        noticeEl.addEventListener('dblclick', (e) => {
-            if (noticeEl.classList.contains('idle-mode') && typeof this.showAlarmSettings === 'function') {
-                this.showAlarmSettings();
-            }
-        });
     },
 
     showIdleNotice() {
@@ -172,19 +173,19 @@ const IdleBarManager = {
                 const actions = pet.actions[period];
                 const action = actions[this._idleActionIndex % actions.length];
                 if (titleEl) titleEl.textContent = `${pet.emoji} ${pet.name} ${action}`;
-                if (descEl) descEl.textContent = '点击换宠 · 双击闹钟';
+                if (descEl) descEl.textContent = '点击选宠 · 右键闹钟';
             }
         } else if (sel && sel.type === 'quote') {
             const quotes = sel.period ? this['IDLE_QUOTES_' + sel.period.toUpperCase()] || this._getQuotesForHour(hour) : this._getQuotesForHour(hour);
             const quote = quotes[sel.index];
             if (quote) {
                 if (titleEl) titleEl.textContent = quote.text;
-                if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击换句 · 双击闹钟';
+                if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击选句 · 右键闹钟';
             }
         } else {
             // 随机模式：首次进入固定内容
             if (titleEl) titleEl.textContent = '🐾 点击选择宠物或句子';
-            if (descEl) descEl.textContent = '挑选一个陪伴你 · 双击闹钟';
+            if (descEl) descEl.textContent = '挑选一个陪伴你 · 右键闹钟';
         }
         if (badgeEl) badgeEl.textContent = '闲';
     },
