@@ -275,7 +275,9 @@ const ContextMenuCore = {
     },
 
     async _contextMoveToDate(item) {
-        const currentDate = item.type === 'meeting' ? item.date : (item.docStartDate || item.docDate || this.selectedDate);
+        const currentDate = item.type === 'meeting' ? item.date
+            : item.type === 'document' ? (item.docStartDate || item.docDate || this.selectedDate)
+            : (item.deadline ? item.deadline.split('T')[0] : this.selectedDate);
         const newDate = await this._showDatePicker('选择目标日期', currentDate);
         if (!newDate) return;
 
@@ -285,6 +287,9 @@ const ContextMenuCore = {
         } else if (item.type === 'document') {
             updates.docStartDate = newDate;
             updates.docEndDate = newDate;
+        } else if (item.type === 'todo') {
+            const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
+            updates.deadline = `${newDate}T${time}`;
         }
 
         try {
@@ -387,8 +392,8 @@ const ContextMenuCore = {
             } else if (item.type === 'document') {
                 updates.docStartDate = dateVal;
                 updates.docEndDate = dateVal;
-            } else if (item.type === 'todo' && item.deadline) {
-                const time = item.deadline.split('T')[1] || '09:00';
+            } else if (item.type === 'todo') {
+                const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
                 updates.deadline = `${dateVal}T${time}`;
             }
 
@@ -590,9 +595,23 @@ const ContextMenuCore = {
     _showDatePicker(title, defaultDate) {
         return new Promise(resolve => {
             const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,0.3);';
             const box = document.createElement('div');
-            box.style.cssText = 'background:var(--bg-primary);border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;';
+            box.style.cssText = 'position:fixed;z-index:10003;background:var(--bg-primary);border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;min-width:220px;';
+
+            const pos = this._contextMenuPos;
+            if (pos) {
+                let left = pos.right + 4;
+                let top = pos.top;
+                if (left + 240 > window.innerWidth) left = Math.max(8, pos.left - 244);
+                if (top + 180 > window.innerHeight) top = Math.max(8, window.innerHeight - 180);
+                box.style.left = left + 'px';
+                box.style.top = top + 'px';
+            } else {
+                box.style.left = '50%';
+                box.style.top = '50%';
+                box.style.transform = 'translate(-50%, -50%)';
+            }
             box.innerHTML = `
                 <div style="margin-bottom:12px;font-weight:600;">${title}</div>
                 <input type="date" value="${defaultDate || ''}" style="font-size:16px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;width:100%;">
