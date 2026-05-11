@@ -398,6 +398,39 @@ body {
     background: color-mix(in srgb, #ef4444 20%, var(--bg-primary));
 }
 
+/* 空闲态通知栏 */
+.countdown-notice.idle-mode {
+    border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
+    background: linear-gradient(135deg, color-mix(in srgb, #818cf8 10%, var(--bg-primary)), color-mix(in srgb, #a78bfa 18%, var(--bg-primary)));
+    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.08);
+    cursor: pointer;
+}
+
+.countdown-notice.idle-mode .countdown-notice-badge {
+    background: color-mix(in srgb, #818cf8 14%, transparent);
+    color: color-mix(in srgb, #818cf8 78%, var(--gray-800));
+}
+
+.countdown-notice.idle-mode .countdown-notice-title {
+    color: color-mix(in srgb, var(--gray-700), var(--gray-800));
+}
+
+.countdown-notice.idle-mode .countdown-notice-desc {
+    color: var(--gray-500);
+    font-size: 11px;
+}
+
+/* 闹钟提醒态 */
+.countdown-notice.alarm-active {
+    border-color: color-mix(in srgb, #f59e0b 40%, var(--border-color));
+    background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 12%, var(--bg-primary)), color-mix(in srgb, #f97316 20%, var(--bg-primary)));
+}
+
+.countdown-notice.alarm-active .countdown-notice-badge {
+    background: color-mix(in srgb, #f59e0b 16%, transparent);
+    color: color-mix(in srgb, #f59e0b 78%, var(--gray-800));
+}
+
 .todo-deadline {
     color: color-mix(in srgb, #ef4444 72%, var(--gray-700));
     font-weight: 600;

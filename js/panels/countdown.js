@@ -499,13 +499,19 @@ const CountdownPanel = {
             this.countdownNoticeTimer = null;
         }
 
-        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing');
+        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing', 'idle-mode', 'alarm-active');
 
         if (!upcoming.length) {
-            noticeEl.hidden = true;
             this.countdownNoticeIndex = 0;
+            if (typeof this.showIdleNotice === 'function') {
+                this.showIdleNotice();
+            } else {
+                noticeEl.hidden = true;
+            }
             return;
         }
+
+        this.hideIdleNotice?.();
 
         const titleEl = noticeEl.querySelector('.countdown-notice-title');
         const descEl = noticeEl.querySelector('.countdown-notice-desc');

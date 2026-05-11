@@ -156,6 +156,12 @@ class SyncManager {
                 }
             }));
         }
+
+        if (sideData.office_alarms !== undefined) {
+            document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                detail: { alarms: safeJsonParse(sideData.office_alarms || '[]', []) }
+            }));
+        }
     }
 
     _shouldProtectImportedData(localItems, cloudItems, cloudUpdatedAt = '') {
@@ -516,6 +522,7 @@ class SyncManager {
             countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
             tools: SafeStorage.get('office_tools') || '',
             weatherCity: SafeStorage.get('office_weather_city') || '',
+            alarms: SafeStorage.get('office_alarms') || '[]',
             theme: SafeStorage.get('theme') || '',
             device_info: navigator.userAgent
         };
@@ -883,6 +890,16 @@ class SyncManager {
                             SafeStorage.set('office_weather_city', nextValue);
                         }
                     }
+                    if (cloudData?.data?.alarms !== undefined) {
+                        const nextValue = cloudData.data.alarms;
+                        const currentValue = SafeStorage.get('office_alarms') || '[]';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_alarms', nextValue);
+                            document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                                detail: { alarms: safeJsonParse(nextValue || '[]', []) }
+                            }));
+                        }
+                    }
                     if (cloudData?.data?.theme !== undefined) {
                         const nextValue = cloudData.data.theme;
                         const currentValue = SafeStorage.get('theme') || '';
@@ -1100,6 +1117,17 @@ class SyncManager {
                 const currentValue = SafeStorage.get('office_weather_city') || '';
                 if (nextValue !== currentValue) {
                     SafeStorage.set('office_weather_city', nextValue);
+                }
+            }
+
+            if (cloudData.data.alarms !== undefined) {
+                const nextValue = cloudData.data.alarms;
+                const currentValue = SafeStorage.get('office_alarms') || '[]';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_alarms', nextValue);
+                    document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                        detail: { alarms: safeJsonParse(nextValue || '[]', []) }
+                    }));
                 }
             }
 
@@ -1394,6 +1422,17 @@ class SyncManager {
                 const localWeatherCity = SafeStorage.get('office_weather_city') || '';
                 if (cloudWeatherCity !== localWeatherCity) {
                     SafeStorage.set('office_weather_city', cloudWeatherCity);
+                }
+            }
+
+            if (cloudData.data.alarms !== undefined) {
+                const cloudAlarms = cloudData.data.alarms;
+                const localAlarms = SafeStorage.get('office_alarms') || '[]';
+                if (cloudAlarms !== localAlarms) {
+                    SafeStorage.set('office_alarms', cloudAlarms);
+                    document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                        detail: { alarms: safeJsonParse(cloudAlarms || '[]', []) }
+                    }));
                 }
             }
 
@@ -1795,6 +1834,13 @@ class SyncManager {
                 SafeStorage.set('office_weather_city', data.data.weatherCity);
             }
 
+            if (data.data.alarms !== undefined) {
+                SafeStorage.set('office_alarms', data.data.alarms);
+                document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                    detail: { alarms: safeJsonParse(data.data.alarms || '[]', []) }
+                }));
+            }
+
             if (data.data.theme !== undefined) {
                 SafeStorage.set('theme', data.data.theme);
                 document.documentElement.setAttribute('data-theme', data.data.theme);
@@ -2134,6 +2180,7 @@ class SyncManager {
                 countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
                 tools: SafeStorage.get('office_tools') || '',
                 weatherCity: SafeStorage.get('office_weather_city') || '',
+                alarms: SafeStorage.get('office_alarms') || '[]',
                 theme: SafeStorage.get('theme') || '',
                 device_info: navigator.userAgent
             };
@@ -2268,6 +2315,13 @@ class SyncManager {
 
             if (data.data.weatherCity !== undefined) {
                 SafeStorage.set('office_weather_city', data.data.weatherCity);
+            }
+
+            if (data.data.alarms !== undefined) {
+                SafeStorage.set('office_alarms', data.data.alarms);
+                document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                    detail: { alarms: safeJsonParse(data.data.alarms || '[]', []) }
+                }));
             }
 
             if (data.data.theme !== undefined) {
@@ -2697,7 +2751,7 @@ class SyncManager {
     _collectSideDataForBackup() {
         const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
             'office_schedule_content', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
-            'office_weather_city', 'theme'];
+            'office_weather_city', 'office_alarms', 'theme'];
         const result = {};
         for (const k of keys) {
             const v = localStorage.getItem(k);
