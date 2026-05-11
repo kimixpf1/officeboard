@@ -134,22 +134,17 @@ const IdleBarManager = {
             const actions = pet.actions[period];
             const action = actions[Math.floor(Math.random() * actions.length)];
             if (titleEl) titleEl.textContent = `${pet.emoji} ${pet.name} ${action}`;
-            if (descEl) descEl.textContent = '点击切换内容';
+            if (descEl) descEl.textContent = '点击切换 · 双击闹钟';
         } else {
             const quotes = this._getQuotesForHour(hour);
             const quote = quotes[this._idleQuoteIndex % quotes.length];
             if (titleEl) titleEl.textContent = `${quote.text}`;
-            if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击切换内容';
+            if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击切换 · 双击闹钟';
         }
         if (badgeEl) badgeEl.textContent = '闲';
     },
 
     _startIdleRotation() {
-        this._stopIdleRotation();
-        this._idleTimer = setInterval(() => {
-            if (document.hidden) return;
-            this.rotateIdleContent();
-        }, 15000);
     },
 
     _stopIdleRotation() {
