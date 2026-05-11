@@ -110,6 +110,16 @@ const IdleBarManager = {
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) return;
 
+        // 创建宠物 Canvas
+        if (!this._petCanvas) {
+            this._petCanvas = document.createElement('canvas');
+            this._petCanvas.className = 'idle-pet-canvas';
+            this._petCanvas.width = 64;
+            this._petCanvas.height = 64;
+            this._petCanvas.style.cssText = 'display:none;width:36px;height:36px;vertical-align:middle;margin-right:4px;border-radius:50%;';
+            this._petRenderer = null;
+        }
+
         noticeEl.addEventListener('click', (e) => {
             if (!noticeEl.classList.contains('idle-mode')) return;
             if (e.target.closest('.idle-interact-btn')) return;
@@ -167,6 +177,7 @@ const IdleBarManager = {
         if (!noticeEl) return;
         noticeEl.classList.remove('idle-mode');
         this._stopIdleRotation();
+        if (this._petCanvas) this._petCanvas.style.display = 'none';
     },
 
     _cycleActions() {
@@ -195,14 +206,27 @@ const IdleBarManager = {
         if (!reactions) return;
 
         const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+
+        // 宠物动画切换
+        if (this._petRenderer) {
+            this._petRenderer.setAction(action);
+        }
+
+        // 更新文字（隐藏 canvas 期间的文字不受影响）
         const titleEl = document.querySelector('#countdownNotice .countdown-notice-title');
         if (titleEl) {
-            titleEl.textContent = `${pet.emoji} ${pet.name} ${reaction}`;
+            const textNode = titleEl.lastChild;
+            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                textNode.textContent = `${pet.name} ${reaction}`;
+            } else {
+                titleEl.textContent = `${pet.name} ${reaction}`;
+            }
         }
 
         if (this._interactTimer) clearTimeout(this._interactTimer);
         this._interactTimer = setTimeout(() => {
             this._interactTimer = null;
+            if (this._petRenderer) this._petRenderer.setAction('idle');
             this._renderIdleContent();
         }, 3000);
     },
@@ -246,7 +270,47 @@ const IdleBarManager = {
                 const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
                 const actions = pet.actions[period] || ['在玩耍'];
                 const action = actions[this._idleActionIndex % actions.length];
-                if (titleEl) titleEl.textContent = `${pet.emoji} ${pet.name} ${action}`;
+
+                // Canvas 宠物动画
+                if (this._petCanvas && titleEl) {
+                    this._petCanvas.style.display = 'inline-block';
+                    if (!titleEl.contains(this._petCanvas)) {
+                        titleEl.innerHTML = '';
+                        titleEl.appendChild(this._petCanvas);
+                    }
+                    // 确保文字节点在 Canvas 后
+                    if (!titleEl.dataset.petTextNode) {
+                        const textNode = document.createTextNode('');
+                        titleEl.appendChild(textNode);
+                        titleEl.dataset.petTextNode = '1';
+                    }
+                    const textNode = titleEl.lastChild;
+                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                        textNode.textContent = `${pet.name} ${action}`;
+                    }
+
+                    // 初始化或更换 PetRenderer
+                    const petColorMap = {
+                        '点点': { body: '#F0C060', bodyLight: '#F5D080', bodyDark: '#D4A040', belly: '#FBE8B0', ear: '#C4883C', earInner: '#D4A050', eye: '#2C1810', nose: '#4A2810', paw: '#FBE8B0', blush: 'rgba(255,150,150,0.35)' },
+                        '小橘': { body: '#F8A850', bodyLight: '#FAC880', bodyDark: '#D48830', belly: '#FDE0B8', ear: '#E88830', earInner: '#F0A850', eye: '#2C1810', nose: '#D47850', paw: '#FDE0B8', blush: 'rgba(255,150,150,0.35)' },
+                        '旺财': { body: '#D4B060', bodyLight: '#E8C880', bodyDark: '#B89040', belly: '#F0D8A0', ear: '#A07030', earInner: '#C89850', eye: '#2C1810', nose: '#4A2810', paw: '#F0D8A0', blush: 'rgba(255,150,150,0.35)' },
+                        '滚滚': { body: '#EAEAEA', bodyLight: '#F8F8F8', bodyDark: '#C0C0C0', belly: '#FEFEFE', ear: '#333333', earInner: '#555555', eye: '#1A1A1A', nose: '#333333', paw: '#EEEEEE', blush: 'rgba(255,180,180,0.3)' },
+                        '小灵': { body: '#F08040', bodyLight: '#F0A070', bodyDark: '#D06030', belly: '#FDE0C8', ear: '#D86830', earInner: '#E89060', eye: '#2C1810', nose: '#3A2010', paw: '#FDE0C8', blush: 'rgba(255,150,150,0.35)' },
+                        '团团': { body: '#FAFAFA', bodyLight: '#FFFFFF', bodyDark: '#E0E0E0', belly: '#FFFFFF', ear: '#E8C8D8', earInner: '#F0D8E8', eye: '#CC3355', nose: '#FF8899', paw: '#FFFFFF', blush: 'rgba(255,180,200,0.4)' },
+                        '波波': { body: '#3A3A50', bodyLight: '#505068', bodyDark: '#2A2A3A', belly: '#F8F8F8', ear: '#3A3A50', earInner: '#505068', eye: '#111122', nose: '#FF8833', paw: '#3A3A50', blush: 'rgba(255,150,150,0.3)' },
+                    };
+                    const colors = petColorMap[pet.name] || petColorMap['点点'];
+                    if (!this._petRenderer || this._petRenderer._petName !== pet.name) {
+                        if (this._petRenderer) this._petRenderer.destroy();
+                        this._petRenderer = new PetRenderer(this._petCanvas, { colors: colors });
+                        this._petRenderer._petName = pet.name;
+                        this._petRenderer.start();
+                    }
+                    // 保持 idle 动作（非 interact 期间）
+                    if (!this._interactTimer) {
+                        this._petRenderer.setAction('idle');
+                    }
+                }
                 if (descEl) {
                     descEl.innerHTML = '<span class="idle-interact-btn" data-action="feed" style="cursor:pointer;margin-right:2px;" title="喂食">🍖</span><span class="idle-interact-btn" data-action="water" style="cursor:pointer;margin-right:2px;" title="喝水">🚰</span><span class="idle-interact-btn" data-action="walk" style="cursor:pointer;margin-right:2px;" title="遛弯">🦮</span><span class="idle-interact-btn" data-action="snack" style="cursor:pointer;margin-right:2px;" title="零食">🍪</span>';
                     descEl.querySelectorAll('.idle-interact-btn').forEach(btn => {

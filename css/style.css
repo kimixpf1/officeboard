@@ -420,6 +420,12 @@ body {
     font-size: 11px;
 }
 
+.idle-pet-canvas {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
 /* 闹钟提醒态 */
 .countdown-notice.alarm-active {
     border-color: color-mix(in srgb, #f59e0b 40%, var(--border-color));
