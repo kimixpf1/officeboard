@@ -116,7 +116,7 @@ const IdleBarManager = {
             this._petCanvas.className = 'idle-pet-canvas';
             this._petCanvas.width = 120;
             this._petCanvas.height = 100;
-            this._petCanvas.style.cssText = 'display:none;width:96px;height:80px;vertical-align:middle;margin-right:6px;border-radius:12px;flex-shrink:0;';
+            this._petCanvas.style.cssText = 'display:none;width:60px;height:50px;vertical-align:middle;margin-right:4px;border-radius:10px;flex-shrink:0;';
             this._petRenderer = null;
         }
 
@@ -323,7 +323,7 @@ const IdleBarManager = {
                     }
                 }
                 if (descEl) {
-                    descEl.innerHTML = '<span class="idle-interact-btn" data-action="feed" style="cursor:pointer;margin-right:2px;" title="喂食">🍖</span><span class="idle-interact-btn" data-action="water" style="cursor:pointer;margin-right:2px;" title="喝水">🚰</span><span class="idle-interact-btn" data-action="walk" style="cursor:pointer;margin-right:2px;" title="遛弯">🦮</span><span class="idle-interact-btn" data-action="snack" style="cursor:pointer;margin-right:2px;" title="零食">🍪</span>';
+                    descEl.innerHTML = '<span class="idle-interact-btns"><span class="idle-interact-btn" data-action="feed" title="喂食">🍖 喂食</span><span class="idle-interact-btn" data-action="water" title="喝水">🚰 喝水</span><span class="idle-interact-btn" data-action="walk" title="遛弯">🦮 遛弯</span><span class="idle-interact-btn" data-action="snack" title="零食">🍪 零食</span></span>';
                     descEl.querySelectorAll('.idle-interact-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();

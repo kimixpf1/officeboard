@@ -404,12 +404,34 @@ body {
     background: linear-gradient(135deg, color-mix(in srgb, #818cf8 10%, var(--bg-primary)), color-mix(in srgb, #a78bfa 18%, var(--bg-primary)));
     box-shadow: 0 4px 12px rgba(129, 140, 248, 0.08);
     cursor: pointer;
-    min-height: 56px;
 }
 
 .countdown-notice.idle-mode.with-pet {
-    min-height: 100px;
-    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.countdown-notice.idle-mode .idle-interact-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.countdown-notice.idle-mode .idle-interact-btn {
+    cursor: pointer;
+    font-size: 13px;
+    padding: 1px 3px;
+    border-radius: 4px;
+    line-height: 1.2;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+
+.countdown-notice.idle-mode .idle-interact-btn:hover {
+    background: rgba(129, 140, 248, 0.12);
 }
 
 .countdown-notice.idle-mode .countdown-notice-badge {
