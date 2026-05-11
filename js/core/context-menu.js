@@ -418,75 +418,132 @@ const ContextMenuCore = {
     },
 
     async _contextCopyItem(item) {
-        const choice = await this._showCopyChoice(item);
-        if (!choice) return;
-
-        const targetDate = choice === 'today'
-            ? this.formatDateLocal(new Date())
-            : await this._showDatePicker('选择目标日期', this.selectedDate);
-        if (!targetDate) return;
-
-        const clone = { ...item };
-        delete clone.id;
-        delete clone.hash;
-        delete clone.createdAt;
-        delete clone.updatedAt;
-        delete clone.recurringGroupId;
-        delete clone.occurrenceIndex;
-        delete clone.pinned;
-        delete clone.sunk;
-        delete clone.manualOrder;
-        delete clone.completed;
-        clone.source = 'copy';
-
-        if (item.type === 'meeting') clone.date = targetDate;
-        else if (item.type === 'document') { clone.docStartDate = targetDate; clone.docEndDate = targetDate; }
-        else if (item.type === 'todo' && clone.deadline) {
-            const time = clone.deadline.split('T')[1] || '09:00';
-            clone.deadline = `${targetDate}T${time}`;
-        }
-
-        try {
-            await db.addItem(clone);
-            this.showSuccess(`已复制到 ${targetDate}`);
-            await this.loadItems();
-            if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
-        } catch (e) {
-            this.showError('复制事项失败');
-        }
+        this._contextCopyTo(item);
     },
 
-    _showCopyChoice(item) {
-        return new Promise(resolve => {
-            const menu = document.createElement('div');
-            menu.className = 'context-menu';
-            menu.style.cssText = 'position:fixed;z-index:10001;display:block;';
-            menu.innerHTML = `
-                <div class="context-menu-item" data-choice="today">📍 复制到今天</div>
-                <div class="context-menu-item" data-choice="custom">📅 指定日期</div>
-            `;
-            document.body.appendChild(menu);
+    _contextCopyTo(item) {
+        const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const today = new Date();
+        today.setHours(12, 0, 0, 0);
 
-            const pos = this._contextMenuPos || { right: 100, top: 100 };
-            menu.style.left = pos.right + 'px';
-            menu.style.top = pos.top + 'px';
+        const mondayOffset = 1 - today.getDay();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + (mondayOffset >= 0 ? mondayOffset : mondayOffset + 7));
 
-            const cleanup = () => { menu.remove(); this.hideContextMenu(); };
-            menu.onclick = (e) => {
-                const el = e.target.closest('[data-choice]');
-                if (!el) return;
-                cleanup();
-                resolve(el.dataset.choice);
-            };
-            setTimeout(() => {
-                document.addEventListener('click', function handler() {
-                    cleanup();
-                    document.removeEventListener('click', handler);
-                    resolve(null);
-                }, { once: true });
-            }, 10);
+        const rows = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            const wd = weekNames[d.getDay()];
+            const isToday = d.toDateString() === today.toDateString();
+            const dateStr = `${d.getFullYear()}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            rows.push({ dateStr, label: `${wd} ${m}/${day}`, isToday });
+        }
+
+        const nextMonday = new Date(monday);
+        nextMonday.setDate(monday.getDate() + 7);
+        const nextRows = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(nextMonday);
+            d.setDate(nextMonday.getDate() + i);
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            const wd = weekNames[d.getDay()];
+            const dateStr = `${d.getFullYear()}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            nextRows.push({ dateStr, label: `${wd} ${m}/${day}`, isToday: false });
+        }
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.cssText = 'position:fixed;z-index:10001;display:block;max-height:80vh;overflow-y:auto;';
+
+        const itemsHtml = [
+            '<div style="padding:6px 12px;font-size:12px;color:var(--text-secondary);font-weight:600;">📋 复制到本周</div>',
+            ...rows.map(r =>
+                `<div class="context-menu-item" data-copy-date="${r.dateStr}" style="${r.isToday ? 'color:var(--primary-color);font-weight:600;' : ''}">${r.isToday ? '📍 ' : ''}${r.label}</div>`
+            ),
+            '<div class="context-menu-divider"></div>',
+            '<div style="padding:6px 12px;font-size:12px;color:var(--text-secondary);font-weight:600;">📋 复制到下周</div>',
+            ...nextRows.map(r =>
+                `<div class="context-menu-item" data-copy-date="${r.dateStr}">${r.label}</div>`
+            ),
+            '<div class="context-menu-divider"></div>',
+            '<div class="context-menu-item" data-copy-date="custom">📅 选择其他日期…</div>'
+        ].join('');
+        menu.innerHTML = itemsHtml;
+
+        document.body.appendChild(menu);
+
+        const pos = this._contextMenuPos || { left: 100, top: 100 };
+        menu.style.left = pos.right ? pos.right + 'px' : pos.left + 'px';
+        menu.style.top = pos.top + 'px';
+
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.top + rect.height > window.innerHeight) {
+                menu.style.top = Math.max(8, window.innerHeight - rect.height - 8) + 'px';
+            }
+            if (rect.left + rect.width > window.innerWidth) {
+                menu.style.left = Math.max(8, window.innerWidth - rect.width - 8) + 'px';
+            }
         });
+
+        const cleanup = () => { menu.remove(); this.hideContextMenu(); };
+
+        menu.onclick = async (e) => {
+            const el = e.target.closest('[data-copy-date]');
+            if (!el) return;
+            const dateVal = el.dataset.copyDate;
+            cleanup();
+
+            let targetDate;
+            if (dateVal === 'custom') {
+                targetDate = await this._showDatePicker('选择目标日期', this.selectedDate);
+                if (!targetDate) return;
+            } else {
+                targetDate = dateVal;
+            }
+
+            const clone = { ...item };
+            delete clone.id;
+            delete clone.hash;
+            delete clone.createdAt;
+            delete clone.updatedAt;
+            delete clone.recurringGroupId;
+            delete clone.occurrenceIndex;
+            delete clone.pinned;
+            delete clone.sunk;
+            delete clone.manualOrder;
+            delete clone.completed;
+            clone.source = 'copy';
+
+            if (item.type === 'meeting') clone.date = targetDate;
+            else if (item.type === 'document') { clone.docStartDate = targetDate; clone.docEndDate = targetDate; }
+            else if (item.type === 'todo') {
+                const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
+                clone.deadline = `${targetDate}T${time}`;
+            }
+
+            try {
+                await db.addItem(clone);
+                this.showSuccess(`已复制到 ${targetDate}`);
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+            } catch (e) {
+                this.showError('复制事项失败');
+            }
+        };
+
+        setTimeout(() => {
+            document.addEventListener('click', function handler() {
+                cleanup();
+                document.removeEventListener('click', handler);
+            }, { once: true });
+        }, 10);
     },
+
 
     async _contextSetRecurring(item) {
         const choice = await this._showRecurringDialog();
