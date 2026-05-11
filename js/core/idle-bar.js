@@ -116,7 +116,7 @@ const IdleBarManager = {
             this._petCanvas.className = 'idle-pet-canvas';
             this._petCanvas.width = 120;
             this._petCanvas.height = 100;
-            this._petCanvas.style.cssText = 'display:none;width:60px;height:50px;vertical-align:middle;margin-right:4px;border-radius:10px;flex-shrink:0;';
+            this._petCanvas.style.cssText = 'display:none;width:40px;height:33px;vertical-align:middle;margin-right:4px;border-radius:8px;flex-shrink:0;';
             this._petRenderer = null;
         }
 
@@ -175,7 +175,7 @@ const IdleBarManager = {
     hideIdleNotice() {
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) return;
-        noticeEl.classList.remove('idle-mode', 'with-pet');
+        noticeEl.classList.remove('idle-mode');
         this._stopIdleRotation();
         this._stopInteraction();
         if (this._petCanvas) this._petCanvas.style.display = 'none';
@@ -274,7 +274,6 @@ const IdleBarManager = {
 
         const sel = this._idleDisplay;
         if (sel && sel.type === 'pet') {
-            noticeEl.classList.add('with-pet');
             const allPets = this._getAllPets();
             const pet = allPets[sel.index];
             if (pet) {
@@ -325,7 +324,7 @@ const IdleBarManager = {
                     }
                 }
                 if (descEl) {
-                    descEl.innerHTML = '<span class="idle-interact-btns"><span class="idle-interact-btn" data-action="feed" title="喂食">🍖 喂食</span><span class="idle-interact-btn" data-action="water" title="喝水">🚰 喝水</span><span class="idle-interact-btn" data-action="walk" title="遛弯">🦮 遛弯</span><span class="idle-interact-btn" data-action="snack" title="零食">🍪 零食</span></span>';
+                    descEl.innerHTML = '<span class="idle-interact-btn" data-action="feed" title="喂食">🍖喂食</span> <span class="idle-interact-btn" data-action="water" title="喝水">🚰喝水</span> <span class="idle-interact-btn" data-action="walk" title="遛弯">🦮遛弯</span> <span class="idle-interact-btn" data-action="snack" title="零食">🍪零食</span>';
                     descEl.querySelectorAll('.idle-interact-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
@@ -335,7 +334,6 @@ const IdleBarManager = {
                 }
             }
         } else if (sel && sel.type === 'quote') {
-            noticeEl.classList.remove('with-pet');
             const quotes = this._getAllQuotes(sel.period || this._getPeriodForHour(hour));
             const quote = quotes[sel.index];
             if (quote) {
@@ -343,7 +341,6 @@ const IdleBarManager = {
                 if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击选句 · 右键闹钟';
             }
         } else {
-            noticeEl.classList.remove('with-pet');
             if (titleEl) titleEl.textContent = '🐾 点击选择宠物或句子';
             if (descEl) descEl.textContent = '挑选一个陪伴你 · 右键闹钟';
         }

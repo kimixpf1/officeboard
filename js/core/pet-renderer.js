@@ -3,7 +3,7 @@
  * 120x100 画布，6种物种独立造型：dog/cat/panda/fox/rabbit/penguin
  */
 const SPECIES_PROFILES = {
-    dog: { bodyRx: 20, bodyRy: 24, headR: 16, headY: -18, earType: 'floppy', earW: 7, earH: 13, earY: -30, tailType: 'wag', tailLen: 16, snout: 0, cheekFluff: true },
+    dog: { bodyRx: 19, bodyRy: 23, headR: 17, headY: -19, earType: 'teddy', earW: 9, earH: 9, earY: -29, tailType: 'wag', tailLen: 14, snout: 0, cheekFluff: true, fluffy: true },
     cat: { bodyRx: 18, bodyRy: 22, headR: 15, headY: -17, earType: 'pointed', earW: 7, earH: 14, earY: -29, tailType: 'curl', tailLen: 20, snout: 0, cheekFluff: false, whiskers: true },
     panda: { bodyRx: 22, bodyRy: 26, headR: 18, headY: -20, earType: 'round', earR: 7, earY: -27, tailType: 'tiny', tailR: 5, snout: 0, cheekFluff: true, eyePatch: true },
     fox: { bodyRx: 16, bodyRy: 22, headR: 14, headY: -16, earType: 'pointedLarge', earW: 8, earH: 18, earY: -30, tailType: 'bushy', tailLen: 26, snout: 5, cheekFluff: false, whiskers: true },
@@ -287,6 +287,19 @@ PetRenderer.prototype = {
             }
 
             // ── body ──
+            // Fluffy fur outline (teddy dog)
+            if (sp.fluffy) {
+                ctx.fillStyle = c.bodyDark;
+                ctx.beginPath(); ctx.ellipse(0, 1, sp.bodyRx + 2, sp.bodyRy + 2, 0, 0, Math.PI*2); ctx.fill();
+                // Fur tufts
+                const tufts = 7;
+                for (let i = 0; i < tufts; i++) {
+                    const angle = (i / tufts) * Math.PI * 2;
+                    const tx = Math.cos(angle) * (sp.bodyRx + 1);
+                    const ty = Math.sin(angle) * (sp.bodyRy + 1);
+                    ctx.beginPath(); ctx.arc(tx, ty, 3, 0, Math.PI*2); ctx.fill();
+                }
+            }
             const bodyGrad = ctx.createLinearGradient(0, -sp.bodyRy, 0, sp.bodyRy);
             bodyGrad.addColorStop(0, c.bodyLight);
             bodyGrad.addColorStop(0.45, c.body);
@@ -418,6 +431,22 @@ PetRenderer.prototype = {
                     ctx.moveTo(0, -eh); ctx.lineTo(-ew, eh * 0.3); ctx.lineTo(ew, eh * 0.3); ctx.closePath(); ctx.fill();
                     ctx.fillStyle = c.earInner;
                     ctx.moveTo(0, -eh * 0.5); ctx.lineTo(-ew * 0.55, eh * 0.15); ctx.lineTo(ew * 0.55, eh * 0.15); ctx.closePath(); ctx.fill();
+                    ctx.restore();
+                } else if (sp.earType === 'teddy') {
+                    // Teddy dog: wide round droopy ears
+                    ctx.fillStyle = c.ear;
+                    ctx.beginPath(); ctx.save();
+                    ctx.translate(-sp.headR * 0.5, earBaseY + 4); ctx.rotate(-0.15 + ears[0]);
+                    ctx.beginPath(); ctx.ellipse(0, 0, sp.earW, sp.earH, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = c.earInner;
+                    ctx.beginPath(); ctx.ellipse(0, 1, sp.earW * 0.6, sp.earH * 0.55, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.restore();
+                    ctx.fillStyle = c.ear;
+                    ctx.beginPath(); ctx.save();
+                    ctx.translate(sp.headR * 0.5, earBaseY + 4); ctx.rotate(0.15 + ears[1]);
+                    ctx.beginPath(); ctx.ellipse(0, 0, sp.earW, sp.earH, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = c.earInner;
+                    ctx.beginPath(); ctx.ellipse(0, 1, sp.earW * 0.6, sp.earH * 0.55, 0, 0, Math.PI*2); ctx.fill();
                     ctx.restore();
                 } else {
                     // Floppy / long: ellipse ears

@@ -406,28 +406,12 @@ body {
     cursor: pointer;
 }
 
-.countdown-notice.idle-mode.with-pet {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.countdown-notice.idle-mode .idle-interact-btns {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    flex-shrink: 0;
-    margin-left: auto;
-}
-
 .countdown-notice.idle-mode .idle-interact-btn {
     cursor: pointer;
-    font-size: 13px;
-    padding: 1px 3px;
-    border-radius: 4px;
-    line-height: 1.2;
+    font-size: 12px;
+    padding: 1px 2px;
+    border-radius: 3px;
     transition: background 0.15s;
-    white-space: nowrap;
 }
 
 .countdown-notice.idle-mode .idle-interact-btn:hover {
