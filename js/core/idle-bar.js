@@ -1,6 +1,7 @@
 /**
  * 空闲态通知栏模块
  * 无倒数日和待办提醒时，通知栏展示鸡汤/宠物内容
+ * 点击弹出选择面板，选哪个就固定显示哪个
  * 通过 Object.assign(OfficeDashboard.prototype, IdleBarManager) 混入
  */
 const IdleBarManager = {
@@ -45,17 +46,31 @@ const IdleBarManager = {
     ],
 
     _idleTimer: null,
-    _idlePetIndex: 0,
-    _idleQuoteIndex: 0,
-    _idleShowPet: false,
+    _idleActionIndex: 0,
+    _idleSelection: null,
+    _idleDisplay: null,
+
+    _loadIdleSelection() {
+        try {
+            const raw = SafeStorage.get('office_idle_selection');
+            this._idleSelection = raw ? JSON.parse(raw) : { type: 'random' };
+        } catch (e) {
+            this._idleSelection = { type: 'random' };
+        }
+    },
+
+    _saveIdleSelection() {
+        SafeStorage.set('office_idle_selection', JSON.stringify(this._idleSelection));
+    },
 
     initIdleBar() {
+        this._loadIdleSelection();
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) return;
 
         noticeEl.addEventListener('click', (e) => {
             if (noticeEl.classList.contains('idle-mode') && !e.target.closest('.todo-reminder-complete-btn')) {
-                this.rotateIdleContent();
+                this.showIdlePicker();
             }
         });
 
@@ -88,12 +103,16 @@ const IdleBarManager = {
         noticeEl.classList.add('idle-mode');
 
         if (!wasIdle) {
-            this._idlePetIndex = Math.floor(Math.random() * this.IDLE_PETS.length);
-            const hour = new Date().getHours();
-            const quotes = this._getQuotesForHour(hour);
-            this._idleQuoteIndex = Math.floor(Math.random() * quotes.length);
-            this._idleShowPet = Math.random() < 0.4;
-            this._startIdleRotation();
+            this._idleActionIndex = 0;
+            if (!this._idleSelection || this._idleSelection.type === 'random') {
+                this._randomPickContent();
+                this._startIdleRotation();
+            } else if (this._idleSelection.type === 'pet') {
+                this._idleDisplay = this._idleSelection;
+                this._startIdleRotation();
+            } else {
+                this._idleDisplay = this._idleSelection;
+            }
         }
 
         this._renderIdleContent();
@@ -106,16 +125,28 @@ const IdleBarManager = {
         this._stopIdleRotation();
     },
 
-    rotateIdleContent() {
-        const hour = new Date().getHours();
-        const quotes = this._getQuotesForHour(hour);
-        this._idleQuoteIndex = (this._idleQuoteIndex + 1) % quotes.length;
-        this._idleShowPet = !this._idleShowPet;
-        if (this._idleShowPet) {
-            this._idlePetIndex = (this._idlePetIndex + 1) % this.IDLE_PETS.length;
+    _cycleActions() {
+        if (!this._idleSelection || this._idleSelection.type === 'random') {
+            this._randomPickContent();
+        } else if (this._idleSelection.type === 'pet') {
+            const pet = this.IDLE_PETS[this._idleSelection.index];
+            if (!pet) return;
+            const hour = new Date().getHours();
+            const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+            const actions = pet.actions[period];
+            this._idleActionIndex = (this._idleActionIndex + 1) % actions.length;
         }
         this._renderIdleContent();
-        this._resetIdleRotation();
+    },
+
+    _randomPickContent() {
+        if (Math.random() < 0.45) {
+            this._idleDisplay = { type: 'pet', index: Math.floor(Math.random() * this.IDLE_PETS.length) };
+        } else {
+            const hour = new Date().getHours();
+            const quotes = this._getQuotesForHour(hour);
+            this._idleDisplay = { type: 'quote', period: this._getPeriodForHour(hour), index: Math.floor(Math.random() * quotes.length) };
+        }
     },
 
     _getQuotesForHour(hour) {
@@ -133,34 +164,136 @@ const IdleBarManager = {
         const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
         const hour = new Date().getHours();
 
-        if (this._idleShowPet) {
-            const pet = this.IDLE_PETS[this._idlePetIndex];
-            const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-            const actions = pet.actions[period];
-            const action = actions[this._idlePetIndex % actions.length];
-            if (titleEl) titleEl.textContent = `${pet.emoji} ${pet.name} ${action}`;
-            if (descEl) descEl.textContent = '点击切换 · 双击闹钟';
+        const sel = this._idleDisplay;
+        if (sel && sel.type === 'pet') {
+            const pet = this.IDLE_PETS[sel.index];
+            if (pet) {
+                const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+                const actions = pet.actions[period];
+                const action = actions[this._idleActionIndex % actions.length];
+                if (titleEl) titleEl.textContent = `${pet.emoji} ${pet.name} ${action}`;
+                if (descEl) descEl.textContent = '点击换宠 · 双击闹钟';
+            }
+        } else if (sel && sel.type === 'quote') {
+            const quotes = sel.period ? this['IDLE_QUOTES_' + sel.period.toUpperCase()] || this._getQuotesForHour(hour) : this._getQuotesForHour(hour);
+            const quote = quotes[sel.index];
+            if (quote) {
+                if (titleEl) titleEl.textContent = quote.text;
+                if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击换句 · 双击闹钟';
+            }
         } else {
-            const quotes = this._getQuotesForHour(hour);
-            const quote = quotes[this._idleQuoteIndex % quotes.length];
-            if (titleEl) titleEl.textContent = `${quote.text}`;
-            if (descEl) descEl.textContent = quote.author ? `—— ${quote.author}` : '点击切换 · 双击闹钟';
+            // 随机模式：首次进入固定内容
+            if (titleEl) titleEl.textContent = '🐾 点击选择宠物或句子';
+            if (descEl) descEl.textContent = '挑选一个陪伴你 · 双击闹钟';
         }
         if (badgeEl) badgeEl.textContent = '闲';
+    },
+
+    showIdlePicker() {
+        let overlay = document.getElementById('idlePickerOverlay');
+        if (overlay) { overlay.remove(); return; }
+
+        overlay = document.createElement('div');
+        overlay.id = 'idlePickerOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;';
+
+        const petCards = this.IDLE_PETS.map((p, i) => {
+            const isActive = this._idleSelection && this._idleSelection.type === 'pet' && this._idleSelection.index === i;
+            return `<div data-pet-idx="${i}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;border-radius:10px;cursor:pointer;border:2px solid ${isActive ? 'var(--primary-color)' : 'var(--border-color)'};background:${isActive ? 'rgba(99,102,241,0.08)' : 'var(--bg-secondary)'};min-width:70px;transition:all 0.15s;">
+                <span style="font-size:28px;">${p.emoji}</span>
+                <span style="font-size:12px;color:var(--text-primary);font-weight:500;">${p.name}</span>
+            </div>`;
+        }).join('');
+
+        overlay.innerHTML = `
+            <div style="background:var(--bg-primary);border-radius:14px;padding:20px;width:380px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                    <div style="font-size:16px;font-weight:600;color:var(--text-primary);">🎨 选择通知栏内容</div>
+                    <button id="idlePickerClose" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">×</button>
+                </div>
+                <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--text-secondary);">🐾 选择宠物</div>
+                <div id="idlePetGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+                    ${petCards}
+                </div>
+                <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--text-secondary);">📝 选择句子</div>
+                <div id="idleQuoteList" style="margin-bottom:12px;max-height:200px;overflow-y:auto;"></div>
+                <button id="idleRandomBtn" style="width:100%;padding:8px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;">🔄 随机轮播</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const renderQuotes = (period) => {
+            const listEl = overlay.querySelector('#idleQuoteList');
+            if (!listEl) return;
+            const key = period === 'morning' ? 'IDLE_QUOTES_MORNING' : period === 'afternoon' ? 'IDLE_QUOTES_AFTERNOON' : 'IDLE_QUOTES_EVENING';
+            const quotes = this[key];
+            const isActive = this._idleSelection && this._idleSelection.type === 'quote' && this._idleSelection.period === period;
+            listEl.innerHTML = '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">' +
+                ['morning','afternoon','evening'].map(p => {
+                    const label = p === 'morning' ? '早' : p === 'afternoon' ? '午' : '晚';
+                    return `<button data-period="${p}" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border-color);background:${period===p?'var(--primary-color)':'var(--bg-secondary)'};color:${period===p?'#fff':'var(--text-secondary)'};font-size:12px;cursor:pointer;">${label}</button>`;
+                }).join('') +
+            '</div>' +
+            quotes.map((q, i) => {
+                const active = isActive && this._idleSelection.index === i;
+                return `<div data-quote-idx="${i}" data-period="${period}" style="padding:8px 10px;border-radius:8px;cursor:pointer;margin-bottom:4px;border:1px solid ${active ? 'var(--primary-color)' : 'transparent'};background:${active ? 'rgba(99,102,241,0.08)' : 'var(--bg-secondary)'};font-size:13px;color:var(--text-primary);">${q.text}${q.author ? '<span style="font-size:11px;color:var(--text-secondary);margin-left:4px;">——' + q.author + '</span>' : ''}</div>`;
+            }).join('');
+
+            listEl.querySelectorAll('[data-period]').forEach(btn => {
+                btn.addEventListener('click', () => renderQuotes(btn.dataset.period));
+            });
+
+            listEl.querySelectorAll('[data-quote-idx]').forEach(el => {
+                el.addEventListener('click', () => {
+                    this._idleSelection = { type: 'quote', period: period, index: parseInt(el.dataset.quoteIdx) };
+                    this._idleDisplay = this._idleSelection;
+                    this._saveIdleSelection();
+                    this._stopIdleRotation();
+                    this._renderIdleContent();
+                    overlay.remove();
+                });
+            });
+        };
+        renderQuotes(this._getPeriodForHour(new Date().getHours()));
+
+        overlay.querySelector('#idlePetGrid').addEventListener('click', (e) => {
+            const card = e.target.closest('[data-pet-idx]');
+            if (!card) return;
+            const idx = parseInt(card.dataset.petIdx);
+            this._idleSelection = { type: 'pet', index: idx };
+            this._idleDisplay = this._idleSelection;
+            this._saveIdleSelection();
+            this._idleActionIndex = 0;
+            this._startIdleRotation();
+            this._renderIdleContent();
+            overlay.remove();
+        });
+
+        overlay.querySelector('#idleRandomBtn').addEventListener('click', () => {
+            this._idleSelection = { type: 'random' };
+            this._saveIdleSelection();
+            this._randomPickContent();
+            this._startIdleRotation();
+            this._renderIdleContent();
+            overlay.remove();
+        });
+
+        const close = () => { overlay.remove(); this.hideContextMenu?.(); };
+        overlay.querySelector('#idlePickerClose').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    },
+
+    _getPeriodForHour(hour) {
+        if (hour < 12) return 'morning';
+        if (hour < 18) return 'afternoon';
+        return 'evening';
     },
 
     _startIdleRotation() {
         this._stopIdleRotation();
         this._idleTimer = setInterval(() => {
-            this.rotateIdleContent();
-        }, 8000);
-    },
-
-    _resetIdleRotation() {
-        this._stopIdleRotation();
-        this._idleTimer = setInterval(() => {
-            this.rotateIdleContent();
-        }, 8000);
+            this._cycleActions();
+        }, 10000);
     },
 
     _stopIdleRotation() {
