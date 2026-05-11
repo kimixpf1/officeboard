@@ -82,17 +82,19 @@ const IdleBarManager = {
 
         noticeEl.hidden = false;
         noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing');
+
+        const wasIdle = noticeEl.classList.contains('idle-mode');
         noticeEl.classList.add('idle-mode');
 
-        this._idlePetIndex = Math.floor(Math.random() * this.IDLE_PETS.length);
-        const hour = new Date().getHours();
-        const quotes = this._getQuotesForHour(hour);
-        this._idleQuoteIndex = Math.floor(Math.random() * quotes.length);
-        this._idleShowPet = Math.random() < 0.4;
+        if (!wasIdle) {
+            this._idlePetIndex = Math.floor(Math.random() * this.IDLE_PETS.length);
+            const hour = new Date().getHours();
+            const quotes = this._getQuotesForHour(hour);
+            this._idleQuoteIndex = Math.floor(Math.random() * quotes.length);
+            this._idleShowPet = Math.random() < 0.4;
+        }
 
         this._renderIdleContent();
-
-        this._startIdleRotation();
     },
 
     hideIdleNotice() {
@@ -132,7 +134,7 @@ const IdleBarManager = {
             const pet = this.IDLE_PETS[this._idlePetIndex];
             const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
             const actions = pet.actions[period];
-            const action = actions[Math.floor(Math.random() * actions.length)];
+            const action = actions[this._idlePetIndex % actions.length];
             if (titleEl) titleEl.textContent = `${pet.emoji} ${pet.name} ${action}`;
             if (descEl) descEl.textContent = '点击切换 · 双击闹钟';
         } else {
