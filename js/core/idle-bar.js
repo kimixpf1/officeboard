@@ -212,14 +212,22 @@ const IdleBarManager = {
             this._petRenderer.setAction(action);
         }
 
-        // 更新文字（隐藏 canvas 期间的文字不受影响）
+        // 更新文字，同时保护 Canvas 不被清除
         const titleEl = document.querySelector('#countdownNotice .countdown-notice-title');
         if (titleEl) {
-            const textNode = titleEl.lastChild;
-            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+            // 确保 Canvas 在 DOM 中
+            if (this._petCanvas && !titleEl.contains(this._petCanvas)) {
+                titleEl.insertBefore(this._petCanvas, titleEl.firstChild);
+            }
+            // 查找或创建文字节点（绝不用 textContent，那会销毁 Canvas）
+            let textNode = null;
+            for (const child of titleEl.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) { textNode = child; break; }
+            }
+            if (textNode) {
                 textNode.textContent = `${pet.name} ${reaction}`;
             } else {
-                titleEl.textContent = `${pet.name} ${reaction}`;
+                titleEl.appendChild(document.createTextNode(`${pet.name} ${reaction}`));
             }
         }
 
@@ -278,16 +286,16 @@ const IdleBarManager = {
                         titleEl.innerHTML = '';
                         titleEl.appendChild(this._petCanvas);
                     }
-                    // 确保文字节点在 Canvas 后
-                    if (!titleEl.dataset.petTextNode) {
-                        const textNode = document.createTextNode('');
+                    // 确保文字节点在 Canvas 后（遍历查找，不用脆弱标记）
+                    let textNode = null;
+                    for (const child of titleEl.childNodes) {
+                        if (child.nodeType === Node.TEXT_NODE) { textNode = child; break; }
+                    }
+                    if (!textNode) {
+                        textNode = document.createTextNode('');
                         titleEl.appendChild(textNode);
-                        titleEl.dataset.petTextNode = '1';
                     }
-                    const textNode = titleEl.lastChild;
-                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                        textNode.textContent = `${pet.name} ${action}`;
-                    }
+                    textNode.textContent = `${pet.name} ${action}`;
 
                     // 初始化或更换 PetRenderer
                     const petColorMap = {
