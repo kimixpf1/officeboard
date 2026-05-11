@@ -98,6 +98,7 @@ const ContextMenuCore = {
             else if (action === 'sink') el.style.display = isSunk ? 'none' : '';
             else if (action === 'unsink') el.style.display = isSunk ? '' : 'none';
             else if (action === 'move-date') el.style.display = (isMeeting || isDocument) ? '' : 'none';
+            else if (action === 'move-to') el.style.display = '';
             else if (action === 'set-recurring') el.style.display = hasRecurring ? 'none' : '';
             else if (action === 'priority') el.style.display = isTodo ? '' : 'none';
         });
@@ -116,7 +117,7 @@ const ContextMenuCore = {
             menu.style.top = top + 'px';
         });
 
-        const submenuActions = ['move-date', 'copy', 'set-recurring', 'priority'];
+        const submenuActions = ['move-date', 'move-to', 'copy', 'set-recurring', 'priority'];
         menu.onclick = (e) => {
             const actionEl = e.target.closest('.context-menu-item');
             if (!actionEl) return;
@@ -213,6 +214,9 @@ const ContextMenuCore = {
             case 'move-date':
                 this._contextMoveToDate(item);
                 break;
+            case 'move-to':
+                this._contextMoveTo(item);
+                break;
             case 'copy':
                 this._contextCopyItem(item);
                 break;
@@ -293,6 +297,119 @@ const ContextMenuCore = {
         } catch (e) {
             this.showError('修改日期失败');
         }
+    },
+
+    _contextMoveTo(item) {
+        const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const today = new Date();
+        today.setHours(12, 0, 0, 0);
+
+        const mondayOffset = 1 - today.getDay();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + (mondayOffset >= 0 ? mondayOffset : mondayOffset + 7));
+
+        const rows = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            const wd = weekNames[d.getDay()];
+            const isToday = d.toDateString() === today.toDateString();
+            const dateStr = `${d.getFullYear()}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            rows.push({ dateStr, label: `${wd} ${m}/${day}`, isToday });
+        }
+
+        const nextMonday = new Date(monday);
+        nextMonday.setDate(monday.getDate() + 7);
+        const nextRows = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(nextMonday);
+            d.setDate(nextMonday.getDate() + i);
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            const wd = weekNames[d.getDay()];
+            const dateStr = `${d.getFullYear()}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            nextRows.push({ dateStr, label: `${wd} ${m}/${day}`, isToday: false });
+        }
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.cssText = 'position:fixed;z-index:10001;display:block;max-height:80vh;overflow-y:auto;';
+
+        const itemsHtml = [
+            '<div style="padding:6px 12px;font-size:12px;color:var(--text-secondary);font-weight:600;">本周</div>',
+            ...rows.map(r =>
+                `<div class="context-menu-item" data-move-date="${r.dateStr}" style="${r.isToday ? 'color:var(--primary-color);font-weight:600;' : ''}">${r.isToday ? '📍 ' : ''}${r.label}</div>`
+            ),
+            '<div class="context-menu-divider"></div>',
+            '<div style="padding:6px 12px;font-size:12px;color:var(--text-secondary);font-weight:600;">下周</div>',
+            ...nextRows.map(r =>
+                `<div class="context-menu-item" data-move-date="${r.dateStr}">${r.label}</div>`
+            ),
+            '<div class="context-menu-divider"></div>',
+            '<div class="context-menu-item" data-move-date="custom">📅 选择其他日期…</div>'
+        ].join('');
+        menu.innerHTML = itemsHtml;
+
+        document.body.appendChild(menu);
+
+        const pos = this._contextMenuPos || { right: 100, top: 100 };
+        menu.style.left = pos.right + 'px';
+        menu.style.top = pos.top + 'px';
+
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.top + rect.height > window.innerHeight) {
+                menu.style.top = Math.max(8, window.innerHeight - rect.height - 8) + 'px';
+            }
+            if (rect.left + rect.width > window.innerWidth) {
+                menu.style.left = Math.max(8, window.innerWidth - rect.width - 8) + 'px';
+            }
+        });
+
+        const cleanup = () => { menu.remove(); this.hideContextMenu(); };
+
+        menu.onclick = async (e) => {
+            const el = e.target.closest('[data-move-date]');
+            if (!el) return;
+            const dateVal = el.dataset.moveDate;
+            cleanup();
+
+            if (dateVal === 'custom') {
+                this._contextMoveToDate(item);
+                return;
+            }
+
+            const updates = { updatedAt: new Date().toISOString() };
+            if (item.type === 'meeting') {
+                updates.date = dateVal;
+            } else if (item.type === 'document') {
+                updates.docStartDate = dateVal;
+                updates.docEndDate = dateVal;
+            } else if (item.type === 'todo' && item.deadline) {
+                const time = item.deadline.split('T')[1] || '09:00';
+                updates.deadline = `${dateVal}T${time}`;
+            }
+
+            try {
+                const original = await db.getItem(item.id);
+                this.saveUndoHistory('update', { item: original });
+                await db.updateItem(item.id, updates);
+                this.showSuccess(`已移动到 ${dateVal}`);
+                await this.loadItems();
+                if (syncManager.isLoggedIn()) syncManager.immediateSyncToCloud().catch(() => {});
+            } catch (err) {
+                this.showError('移动失败');
+            }
+        };
+
+        setTimeout(() => {
+            document.addEventListener('click', function handler() {
+                cleanup();
+                document.removeEventListener('click', handler);
+            }, { once: true });
+        }, 10);
     },
 
     async _contextCopyItem(item) {
