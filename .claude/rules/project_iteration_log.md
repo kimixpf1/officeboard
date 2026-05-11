@@ -1,3 +1,104 @@
+## 2026-05-11 v5.2.69 通知栏常驻+空闲态鸡汤宠物+自定义闹钟提醒
+
+### 改动内容
+1. **新建 `js/core/idle-bar.js`**：空闲态通知栏模块（IdleBarManager）
+   - 30 条鸡汤语录（按早/午/晚分类），6 种宠物（动作随时间段变化）
+   - 15 秒自动轮换，点击手动切换，双击/长按打开闹钟设置
+2. **新建 `js/core/alarm.js`**：闹钟管理模块（AlarmManager）
+   - 支持每天/工作日/每周几 + 时间设置，提前 3 分钟闪烁提醒
+   - 支持添加/删除/启用/禁用，闹钟数据存 localStorage（SafeStorage 封装）
+3. **countdown.js**：无倒数日时不再隐藏通知栏，改为调用 `showIdleNotice()`
+4. **app.js**：tick 中增加 `checkAlarms()` 调用，优先级：待办截止 > 闹钟 > 倒数日 > 空闲态
+5. **sync.js**：闹钟数据纳入 sideData 同步 + 备份（buildSyncData + 6 处恢复路径全覆盖）
+6. **style.css**：空闲态淡蓝紫渐变 + 闹钟橙黄渐变样式
+7. **v5.1.68**：修复移动到功能两个 bug（日期选择器定位 + 待办类型支持）
+
+### 当前状态
+- ✅ 语法检查全部通过（idle-bar.js / alarm.js / countdown.js / app.js / sync.js）
+- ✅ 已提交推送 `36f58ab` v5.2.70
+- ✅ E2E 验证 7/7 PASS
+
+### 提交记录
+- `36f58ab` fix: 空闲态内容每秒闪烁——首次进入空闲态固定随机内容，后续tick不再重新随机（v5.2.70）
+- `0765aa5` fix: 移除空闲态15秒自动轮换，改为仅点击切换，选定后固定不再闪烁
+- `8763975` feat: 通知栏常驻+空闲态鸡汤宠物+自定义闹钟提醒（v5.2.69）
+- `bea3276` fix: 移动到功能两个bug修复——日期选择器定位+待办类型支持（v5.1.68）
+
+### 线上验证清单（Ctrl+Shift+R 强刷）
+1. 版本号显示 `2026-05-11 v5.2.70`
+2. 通知栏始终可见，空闲态显示鸡汤或宠物，内容固定不闪烁
+3. 点击通知栏切换下一条，内容稳定不变
+4. 双击通知栏弹出闹钟设置
+5. 右键菜单正常（编辑/移动到/删除/复制等）
+6. 移动到子菜单正常（本周/下周/自定义日期）
+7. 控制台无 JS 错误
+
+---
+
+## 2026-05-11 v5.1.67 右键菜单增加"移动到"双模式子菜单 + 版本号三段式
+
+### 改动内容
+1. **新增 `_contextMoveTo` 方法**：右键菜单新增"移动到…"子菜单
+   - 上半：本周7天快捷选择（周一~周日，标注日期，今天高亮）
+   - 中间：下周7天快捷选择
+   - 底部："选择其他日期…"走原有日期选择器
+2. **所有事项类型支持**：会议改date、办文改docStartDate/docEndDate、待办改deadline（保留时间）
+3. **版本号格式升级**：从 `v5.xx` 改为三段式 `v{月份}.{大版本}.{改动号}`
+   - 大版本：app拆分、新功能模块、架构重构
+   - 小版本：Bug修复、UI调整、小功能
+4. **index.html**：新增 `data-action="move-to"` 菜单项
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `bc8fefc`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `bc8fefc` feat: 右键菜单增加"移动到"双模式子菜单 + 版本号三段式 v5.1.67
+
+### 遗留事项
+- 待线上验证：版本号 v5.1.67、"移动到"子菜单全操作、既有右键功能回归
+
+---
+
+## 2026-05-11 v5.66 第8批拆分——上下文菜单+备份恢复（最终批次）
+
+### 改动内容
+1. **新建 `js/core/context-menu.js`**：14个方法，503行，`ContextMenuCore` 对象
+   - 右键/长按菜单：initContextMenu/showContextMenu/hideContextMenu
+   - 截图分享：shareCalendarScreenshot/_downloadCanvas
+   - 菜单动作分发：executeContextAction
+   - 优先级：_contextShowPriorityPicker/_contextSetPriority
+   - 改日期：_contextMoveToDate/_showDatePicker
+   - 复制：_contextCopyItem/_showCopyChoice
+   - 周期性：_contextSetRecurring/_showRecurringDialog
+2. **新建 `js/core/backup.js`**：7个方法，228行，`BackupCore` 对象
+   - 导出导入：exportData/importData/handleExportBackupFile/handleRestoreBackup
+   - 每日备份：startDailyBackupSchedule/saveDailyBackupToCloud/restoreCloudBackup
+3. **Bug修复**：右键删除 `this.deleteItem(item.id)` → `this.showDeleteConfirm(item.id)`（executeContextAction 中）
+4. **app.js**：6537→5858行（-679），新增 BackupCore + ContextMenuCore 两个 mixin 调用，版本 v5.66
+
+### 当前状态
+- ✅ 语法检查通过（backup.js + context-menu.js + app.js）
+- ✅ 安全审查完成（2个HIGH为遗留问题，不阻塞）
+- ✅ 已提交 `c92adfb`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `c92adfb` refactor: 第8批拆分——上下文菜单+备份恢复提取为独立模块（v5.66）
+
+### 拆分总结
+- app.js 从 10470→5858 行（减少 44.1%）
+- 已提取 9 个独立模块，共 4719 行
+- **不再继续拆分**：剩余核心 CRUD 耦合极高，拆分收益递减
+
+### 遗留事项
+- 待线上验证：右键菜单全操作 + 备份导出/导入/恢复 + 版本号 v5.66
+
+---
+
 ## 2026-05-11 v5.65 第7批拆分——跨日期模块提取
 
 ### 改动内容
