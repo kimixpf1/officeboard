@@ -147,10 +147,6 @@ class OCRManager {
             const ssKimi = SafeStorage.get('kimiApiKey');
             if (ssKimi) this.kimiApiKey = ssKimi;
         }
-        console.log('[OCR] Key restore:', {
-            kimi: this.kimiApiKey ? this.kimiApiKey.substring(0, 8) + '...' : 'NONE',
-            deepseek: this.deepseekApiKey ? this.deepseekApiKey.substring(0, 8) + '...' : 'NONE'
-        });
     }
 
     /**
@@ -3346,7 +3342,6 @@ class OCRManager {
         if (!apiKey) {
             throw new Error('请先设置Kimi API Key');
         }
-        console.log('[OCR] Kimi Key prefix:', apiKey.substring(0, 10) + '..., length:', apiKey.length);
 
         if (progressCallback) progressCallback('正在使用Kimi AI识别图片...');
 

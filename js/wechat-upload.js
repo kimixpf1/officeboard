@@ -1,6 +1,13 @@
 (function () {
     const params = new URLSearchParams(window.location.search);
-    const returnUrl = params.get('return') || 'index.html';
+    const rawReturn = params.get('return');
+    let returnUrl = 'index.html';
+    if (rawReturn) {
+        // 只允许相对路径，拒绝绝对URL防开放重定向
+        if (rawReturn.startsWith('/') || rawReturn.startsWith('./') || rawReturn === 'index.html') {
+            returnUrl = rawReturn;
+        }
+    }
     const fileInput = document.getElementById('wechatFileInput');
     const chooseBtn = document.getElementById('chooseImageBtn');
     const backBtn = document.getElementById('backBtn');

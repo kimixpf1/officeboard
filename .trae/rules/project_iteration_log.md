@@ -1,3 +1,343 @@
+## 2026-05-11 v5.2.69 通知栏常驻+空闲态鸡汤宠物+自定义闹钟提醒
+
+### 改动内容
+1. **新建 `js/core/idle-bar.js`**：空闲态通知栏模块（IdleBarManager）
+   - 30 条鸡汤语录（按早/午/晚分类），6 种宠物（动作随时间段变化）
+   - 15 秒自动轮换，点击手动切换，双击/长按打开闹钟设置
+2. **新建 `js/core/alarm.js`**：闹钟管理模块（AlarmManager）
+   - 支持每天/工作日/每周几 + 时间设置，提前 3 分钟闪烁提醒
+   - 支持添加/删除/启用/禁用，闹钟数据存 localStorage（SafeStorage 封装）
+3. **countdown.js**：无倒数日时不再隐藏通知栏，改为调用 `showIdleNotice()`
+4. **app.js**：tick 中增加 `checkAlarms()` 调用，优先级：待办截止 > 闹钟 > 倒数日 > 空闲态
+5. **sync.js**：闹钟数据纳入 sideData 同步 + 备份（buildSyncData + 6 处恢复路径全覆盖）
+6. **style.css**：空闲态淡蓝紫渐变 + 闹钟橙黄渐变样式
+7. **v5.1.68**：修复移动到功能两个 bug（日期选择器定位 + 待办类型支持）
+
+### 当前状态
+- ✅ 语法检查全部通过（idle-bar.js / alarm.js / countdown.js / app.js / sync.js）
+- ✅ 已提交推送 `36f58ab` v5.2.70
+- ✅ E2E 验证 7/7 PASS
+
+### 提交记录
+- `36f58ab` fix: 空闲态内容每秒闪烁——首次进入空闲态固定随机内容，后续tick不再重新随机（v5.2.70）
+- `0765aa5` fix: 移除空闲态15秒自动轮换，改为仅点击切换，选定后固定不再闪烁
+- `8763975` feat: 通知栏常驻+空闲态鸡汤宠物+自定义闹钟提醒（v5.2.69）
+- `bea3276` fix: 移动到功能两个bug修复——日期选择器定位+待办类型支持（v5.1.68）
+
+### 线上验证清单（Ctrl+Shift+R 强刷）
+1. 版本号显示 `2026-05-11 v5.2.70`
+2. 通知栏始终可见，空闲态显示鸡汤或宠物，内容固定不闪烁
+3. 点击通知栏切换下一条，内容稳定不变
+4. 双击通知栏弹出闹钟设置
+5. 右键菜单正常（编辑/移动到/删除/复制等）
+6. 移动到子菜单正常（本周/下周/自定义日期）
+7. 控制台无 JS 错误
+
+---
+
+## 2026-05-11 v5.1.67 右键菜单增加"移动到"双模式子菜单 + 版本号三段式
+
+### 改动内容
+1. **新增 `_contextMoveTo` 方法**：右键菜单新增"移动到…"子菜单
+   - 上半：本周7天快捷选择（周一~周日，标注日期，今天高亮）
+   - 中间：下周7天快捷选择
+   - 底部："选择其他日期…"走原有日期选择器
+2. **所有事项类型支持**：会议改date、办文改docStartDate/docEndDate、待办改deadline（保留时间）
+3. **版本号格式升级**：从 `v5.xx` 改为三段式 `v{月份}.{大版本}.{改动号}`
+   - 大版本：app拆分、新功能模块、架构重构
+   - 小版本：Bug修复、UI调整、小功能
+4. **index.html**：新增 `data-action="move-to"` 菜单项
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `bc8fefc`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `bc8fefc` feat: 右键菜单增加"移动到"双模式子菜单 + 版本号三段式 v5.1.67
+
+### 遗留事项
+- 待线上验证：版本号 v5.1.67、"移动到"子菜单全操作、既有右键功能回归
+
+---
+
+## 2026-05-11 v5.66 第8批拆分——上下文菜单+备份恢复（最终批次）
+
+### 改动内容
+1. **新建 `js/core/context-menu.js`**：14个方法，503行，`ContextMenuCore` 对象
+   - 右键/长按菜单：initContextMenu/showContextMenu/hideContextMenu
+   - 截图分享：shareCalendarScreenshot/_downloadCanvas
+   - 菜单动作分发：executeContextAction
+   - 优先级：_contextShowPriorityPicker/_contextSetPriority
+   - 改日期：_contextMoveToDate/_showDatePicker
+   - 复制：_contextCopyItem/_showCopyChoice
+   - 周期性：_contextSetRecurring/_showRecurringDialog
+2. **新建 `js/core/backup.js`**：7个方法，228行，`BackupCore` 对象
+   - 导出导入：exportData/importData/handleExportBackupFile/handleRestoreBackup
+   - 每日备份：startDailyBackupSchedule/saveDailyBackupToCloud/restoreCloudBackup
+3. **Bug修复**：右键删除 `this.deleteItem(item.id)` → `this.showDeleteConfirm(item.id)`（executeContextAction 中）
+4. **app.js**：6537→5858行（-679），新增 BackupCore + ContextMenuCore 两个 mixin 调用，版本 v5.66
+
+### 当前状态
+- ✅ 语法检查通过（backup.js + context-menu.js + app.js）
+- ✅ 安全审查完成（2个HIGH为遗留问题，不阻塞）
+- ✅ 已提交 `c92adfb`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `c92adfb` refactor: 第8批拆分——上下文菜单+备份恢复提取为独立模块（v5.66）
+
+### 拆分总结
+- app.js 从 10470→5858 行（减少 44.1%）
+- 已提取 9 个独立模块，共 4719 行
+- **不再继续拆分**：剩余核心 CRUD 耦合极高，拆分收益递减
+
+### 遗留事项
+- 待线上验证：右键菜单全操作 + 备份导出/导入/恢复 + 版本号 v5.66
+
+---
+
+## 2026-05-11 v5.65 第7批拆分——跨日期模块提取
+
+### 改动内容
+1. **新建 `js/core/cross-date.js`**：15个方法，354行，`CrossDateCore` 对象
+2. **app.js 删除对应方法**：6925 → 6610 行（-315）
+3. 提取方法：
+   - 判断（2个）：`isCrossDateDocument`/`isCrossDateMeeting`
+   - 选择框（2个）：`showCrossDateDocChoice`/`showCrossDateDocDeleteChoice`
+   - payload构建（3个）：`getCrossDateDocumentUpdatePayload`/`getCrossDateMeetingUpdatePayload`/`getCrossDateDocumentDeletePayload`
+   - 作用域更新（3个）：`applyCrossDateDocumentScopedUpdate`/`applyCrossDateMeetingScopedUpdate`/`applyCrossDateDocumentDelete`
+   - 日期视图（3个）：`getDocumentItemForSelectedDate`/`getMeetingItemForSelectedDate`/`getEffectiveDocumentItemById`
+   - 辅助（2个）：`clearDayStatesFields`/`_freezeBeforeAndClearFrom`
+
+### 当前状态
+- ✅ 语法检查通过（cross-date.js + app.js）
+- ✅ 已提交 `694e9fe`
+- 🔄 **推送重试中**（网络不稳定）
+
+### 提交记录
+- `694e9fe` refactor: 第7批拆分——跨日期办文/会议作用域更新提取为 js/core/cross-date.js（v5.65）
+
+---
+
+## 2026-05-10 v5.64 第6批拆分——周期性模块提取
+
+### 改动内容
+1. **新建 `js/core/recurring.js`**：14个方法，678行，`RecurringCore` 对象
+2. **app.js 删除对应方法**：7553 → 6925 行（-628）
+3. 提取方法：
+   - 表单渲染（6个）：`initializeRecurringFieldOptions`/`getRecurringFieldConfig`/`createRecurringFormGroup`/`createRecurringInput`/`createRecurringSelect`/`createRecurringCheckboxGroup`
+   - 模板渲染（2个）：`renderRecurringFieldTemplate`/`renderRecurringTypeSelect`
+   - 分组管理（2个）：`updateRecurringGroup`/`updateRecurringGroupStatus`
+   - 事项生成（4个）：`generateRecurringItems`/`createRecurringItem`/`getMonthlyDate`/`getDaysInMonth`
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `bffbb12`
+- 🔄 **待推送**（网络阻挡，明天继续）
+
+### 提交记录
+- `bffbb12` refactor: 第6批拆分——周期性表单+生成+分组更新提取为 js/core/recurring.js（v5.64）
+
+---
+
+## 2026-05-10 v5.63 第5批拆分——天气模块提取+紧急修复
+
+### 改动内容
+1. **新建 `js/weather.js`**：6个方法，449行（loadWeather/fetchWeather/renderWeatherStatus/showCitySelector/getWeatherIcon/getWeatherDesc），`WeatherPanel` 对象
+2. **紧急修复**：第4批用 sed 删除工具代码时误删了天气方法定义（loadWeather等6个方法从 app.js 中消失），线上天气功能已损坏。本轮从 `pre-split-baseline` 恢复完整天气代码并提取为独立模块
+3. **app.js**：新增 mixin 调用 `Object.assign(OfficeDashboard.prototype, WeatherPanel)`，版本升至 v5.63
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `32a5ee1`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `32a5ee1` fix: 恢复天气模块并提取为 js/weather.js（v5.63）
+
+---
+
+## 2026-05-10 v5.62 第4批拆分——工具+日程+备忘
+
+### 改动内容
+1. **新建 `js/panels/tools.js`**：11个方法，389行（工具列表+计算器+倒计时），`ToolsPanel` 对象
+2. **新建 `js/panels/side-panels.js`**：2个方法，235行（日程+备忘录+Escape快捷键），`SidePanels` 对象
+3. **app.js 删除对应方法**：8613 → 7552 行（-1061）
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `70771ae`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `70771ae` refactor: 第4批拆分——工具+日程+备忘提取为 tools.js 和 side-panels.js
+
+---
+
+## 2026-05-10 v5.61 第3批拆分——通讯录面板
+
+### 改动内容
+1. **新建 `js/panels/contacts.js`**：14个方法，665行，`ContactsPanel` 对象
+2. **app.js 删除对应方法**：9270 → 8613 行（-657）
+3. **index.html**：新增 `<script src="js/panels/contacts.js?v=1">`
+4. **app.js init()**：新增 `Object.assign(OfficeDashboard.prototype, ContactsPanel)`
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `91c5c17`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `91c5c17` refactor: 第3批拆分——通讯录面板提取到 js/panels/contacts.js
+
+---
+
+## 2026-05-10 v5.60 第2批拆分——链接面板
+
+### 改动内容
+1. **新建 `js/panels/links.js`**：10个方法，458行，`LinksPanel` 对象
+2. **app.js 删除对应方法**：9720 → 9270 行（-450）
+3. **index.html**：新增 `<script src="js/panels/links.js?v=1">`
+4. **app.js init()**：新增 `Object.assign(OfficeDashboard.prototype, LinksPanel)`
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `1716114`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `1716114` refactor: 第2批拆分——链接面板提取到 js/panels/links.js
+
+---
+
+## 2026-05-10 v5.59 第1批拆分——倒数日面板
+
+### 改动内容
+1. **新建 `js/panels/countdown.js`**：22个方法，760行，`CountdownPanel` 对象
+2. **app.js 删除对应方法**：10470 → 9720 行（-750）
+3. **index.html**：新增 `<script src="js/panels/countdown.js?v=1">` 在 app.js 之前
+4. **app.js init()**：新增 `Object.assign(OfficeDashboard.prototype, CountdownPanel)` mixin 调用
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `55c561d`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 提交记录
+- `55c561d` refactor: 第1批拆分——倒数日面板提取到 js/panels/countdown.js
+
+---
+
+## 2026-05-10 v5.58 周期性增强（每两周+截止日期）
+
+### 改动内容
+1. **每两周**：RECURRING_TYPES 新增 BIWEEKLY_DAY/BIWEEKLY_MULTI，生成逻辑用 14 天间隔
+2. **截止日期**：右键周期性对话框新增日期输入，支持"生成到X月X日"，优先级高于数量
+3. **修复 CRITICAL**：saveItem 未提取 BIWEEKLY 的 weekDay/weekDays 导致无限循环
+4. **rule 映射修复**：_contextSetRecurring 正确将对话框字符串映射为 generateRecurringItems 兼容的 rule 对象
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ code-reviewer 审查通过
+- ✅ 已提交 `7f6ff3b`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 本轮关键改动
+- index.html：RECURRING_TYPES + OPTION_GROUPS 新增每两周
+- js/app.js：generateRecurringItems 新增 BIWEEKLY_DAY/MULTI、saveItem 补全、对话框增强、rule 映射修复
+
+### 提交记录
+- `7f6ff3b` feat: 周期性增加每两周+截止日期——右键对话框+编辑弹窗+生成逻辑 (v5.58)
+
+---
+
+## 2026-05-10 v5.57 右键菜单增强（周期性对话框+子菜单保留母菜单）
+
+### 修复内容
+1. **编辑修复**：右键"编辑"改传 `this.editItem(item)` 而非 `this.editItem(item.id)`，editItem 需要完整对象
+2. **周期性完整对话框**：`_showRecurringPicker`（简单3选项子菜单）替换为 `_showRecurringDialog`（完整表单：频率下拉+数量输入+确认取消），用户反馈"应该弹出周期性那个框才对"
+3. **子菜单保留母菜单**：右键选"优先级/复制/周期性/改日期"时不立即隐藏母菜单，等子菜单操作完成/取消/关闭后再隐藏
+4. **子菜单定位修复**：复制子菜单从 `_contextMenuEl?.getBoundingClientRect()` 改为 `_contextMenuPos`（避免菜单隐藏后 getBoundingClientRect 返回 0）
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ 已提交 `b87c163`
+- ✅ 已推送到 origin/main
+- 🔄 待线上验证
+
+### 本轮关键改动
+- js/app.js：`_showRecurringPicker` → `_showRecurringDialog`（完整表单）；子菜单 cleanup 统一加 `this.hideContextMenu()`；menu.onclick 对 submenuActions 不立即隐藏
+- index.html：版本 v5.57
+
+### 提交记录
+- `b87c163` fix: 周期性改为完整表单对话框 + 子菜单保留母菜单直到操作完成 (v5.57)
+
+---
+
+## 2026-05-10 v5.56 功能修复（右键菜单+长按+日视图截图）
+
+### 修复内容
+1. **右键菜单不弹出**：calendar.js `createCalendarItem` 用 `dataset.id`，但 `initContextMenu` 只检查 `dataset.itemId`/`data-item-id`，导致匹配失败直接 return。修复为同时检查三种来源
+2. **长按仍触发拖拽**：app.js `touchmove` 对任何移动（含 1px）就清长按计时器，与日历 touchmove（10px 阈值）不一致。修复为同步 10px 距离阈值
+3. **日视图无截图按钮**：boardDateLabel 旁新增 📷 按钮，点击截取 `#boardView` 为图片
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ 本地提交 `b3ab03d`
+- 🔄 推送被防火墙阻挡（443 端口 TCP 超时），已设置定时重试
+
+### 本轮关键改动
+- js/app.js：contextmenu 增加 `dataset.id` 回退匹配；touchmove 增加 10px 距离阈值；boardScreenshotBtn 事件绑定
+- index.html：boardDateLabel 内新增截图按钮；资源版本 app.js?v=193
+
+### 提交记录
+- `b3ab03d` fix: 右键菜单dataset匹配 + 长按距离阈值 + 日视图截图按钮 (v5.56)（待推送）
+
+---
+
+## 2026-05-10 v5.53-v5.55 功能优化（Phase 1/2/3/5）
+
+### 本次目标
+- Phase 1: 自然语言解析走预览确认管道（防 AI 错误直接写入）
+- Phase 2: 通用右键菜单组件（桌面右键 + 移动端长按 500ms）
+- Phase 3: 日历拖拽 ghost 跟随 + 移动端触摸拖拽支持
+- Phase 5: 日历视图截图分享（html2canvas + 系统分享 API）
+
+### 当前状态
+- ✅ Phase 1: `executeAIAddCommand` 完整改走 `validateAndCleanItem → buildRecognitionActionPlan → showRecognitionPreview → applyRecognitionActionPlan` 管道
+- ✅ Phase 2: `initContextMenu` / `showContextMenu` / `hideContextMenu` / `executeContextAction` 完整上下文菜单
+- ✅ Phase 3: 日历拖拽 ghost 元素 + 移动端 touch 拖拽（touchstart/touchmove/touchend）
+- ✅ Phase 5: `shareCalendarScreenshot(container, title)` + `_downloadCanvas` + 周/月视图标题栏 📷 按钮
+- ✅ v5.55 修复：触摸拖拽增加 10px 距离阈值，避免长按菜单时手指微动误触发拖拽
+- ✅ 语法检查全部通过
+- ✅ 已提交推送 `055b5d3` 到 origin/main
+
+### 本轮关键改动
+- js/app.js：`executeAIAddCommand` 完整重写走预览管道；新增 `initContextMenu`/`showContextMenu`/`hideContextMenu`/`executeContextAction`；新增 `shareCalendarScreenshot`/`_downloadCanvas`；版本 v5.55
+- js/calendar.js：dragstart ghost 元素 `setDragImage`；移动端完整 touch 拖拽（含 10px 距离阈值防误触）；周/月视图标题栏新增 📷 截图按钮
+- css/style.css：上下文菜单样式 ~50 行；截图按钮样式；触摸拖拽高亮 `.calendar-touch-over`
+- index.html：contextMenu 骨架；资源版本 style.css?v=65、app.js?v=192、calendar.js?v=41
+
+### 提交记录
+- `b673552` feat: NLP预览管道 + 右键菜单 + 拖拽增强 + 截图分享 (v5.54)
+- `055b5d3` fix: 触摸拖拽增加10px距离阈值，避免长按时微动误触发拖拽 (v5.55)
+
+### 遗留事项
+- 待用户真人测试验证各 Phase 功能
+- Phase 4（桌面通知）和 Phase 6（会议-办文联动）未实施
+- 部分部门名称（"办公室""机关党委"）在 PDF 识别中仍可能被误判为地点
+
+---
+
 ## 2026-05-10 会话收尾（项目规则迁移+日志补齐）
 
 ### 本次目标

@@ -123,7 +123,6 @@ const BackupCore = {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                console.log(`每日双轨备份完成：${allItems.length} 条事项`);
             } catch (e) {
                 console.warn('每日备份失败:', e);
             }
@@ -168,7 +167,6 @@ const BackupCore = {
             }
 
             await syncManager.saveCloudBackupList(backups);
-            console.log(`云端每日备份已保存：第 ${backups.length} 份，${items.length} 条事项`);
         } catch (e) {
             console.warn('云端备份失败:', e);
         }

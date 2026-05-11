@@ -76,16 +76,16 @@
 ### 7. js/app.js — 主界面控制器
 - 视图切换：日视图(board)/周视图(week)/月视图(month) — 通过代理 switchView 方法
 - 事项 CRUD：`saveItem`/`editItem`/`deleteItem`/`toggleItemComplete`/`toggleItemPin`/`toggleItemSink`
-- 周期性/跨日期/拖拽/撤销 等核心业务逻辑仍在本文件（待后续批次拆分）
+- 拖拽/撤销等核心业务逻辑仍在本文件
 - AI 交互：`parseNaturalLanguage`(文本)/`handleFileUpload`(图片/PDF)
 - 通知提醒：`updateCountdownNotice`(倒数日+待办截止)、`startTodoReminderLoop`(1 秒轮询闪烁)
 - 排序：领导优先级（钱→吴→盛→房→陈→其他领导→处室→其他）+ 四桶分桶（置顶/正常/沉底/已完成）
 - 头部天气：`initHeaderWeather`/`refreshHeaderWeather`/`updateHeaderWeatherDisplay`（天气数据方法已拆分到 weather.js）
 - 主题：9 种主题（靛青紫/天际蓝/青瓷色/翠竹绿/玫瑰红/中国红/琥珀橙/幻影紫/深色模式）
-- 导入导出：JSON 备份导入导出（支持密码加密）、Excel 通讯录导入
-- 版本号：`2026-05-11 v5.65`，scriptVersions 统一管理资源版本
+- 版本号：`2026-05-11 v5.2.69`，~5920 行（从 10470 减至 5920，减少 43.4%）
 - 全局错误捕获：`window.unhandledrejection` + `window.error`
-- **拆分模式**：6 个面板模块 + 1 个天气模块 + 2 个核心模块已通过 mixin 模式（`Object.assign(OfficeDashboard.prototype, Module)`）提取到独立文件
+- **拆分模式**：6 个面板模块 + 1 个天气模块 + 4 个核心模块已通过 mixin 模式（`Object.assign(OfficeDashboard.prototype, Module)`）提取到独立文件
+- **不再继续拆分**：剩余核心 CRUD 耦合极高，拆分收益递减。新功能请放到独立模块文件中
 - 依赖：db、syncManager、ocrManager、kimiAPI、cryptoManager、calendarView、reportGenerator、各面板模块
 
 ### 8. js/panels/countdown.js — 倒数日面板（v5.59 拆分）
@@ -133,6 +133,38 @@
 - 日期视图（getDocumentItemForSelectedDate/getMeetingItemForSelectedDate/getEffectiveDocumentItemById）
 - 辅助（clearDayStatesFields/_freezeBeforeAndClearFrom）
 - 依赖：通过 mixin 混入 app.js 原型
+
+### 13d. js/core/backup.js — 备份恢复模块（v5.66 拆分）
+- `BackupCore` 对象，7 个方法，228 行
+- 导出导入（exportData/importData/handleExportBackupFile/handleRestoreBackup）
+- 每日备份（startDailyBackupSchedule/saveDailyBackupToCloud/restoreCloudBackup）
+- 依赖：syncManager、db、SafeStorage、safeJsonParse，通过 mixin 混入 app.js 原型
+
+### 13e. js/core/context-menu.js — 上下文菜单模块（v5.66 拆分）
+- `ContextMenuCore` 对象，14 个方法，503 行
+- 右键/长按菜单（initContextMenu/showContextMenu/hideContextMenu）
+- 截图分享（shareCalendarScreenshot/_downloadCanvas）
+- 菜单动作分发（executeContextAction）
+- 优先级（_contextShowPriorityPicker/_contextSetPriority）
+- 改日期（_contextMoveToDate/_showDatePicker）
+- 复制（_contextCopyItem/_showCopyChoice）
+- 周期性（_contextSetRecurring/_showRecurringDialog）
+- 依赖：db、syncManager、html2canvas，通过 mixin 混入 app.js 原型
+
+### 13f. js/core/idle-bar.js — 空闲态通知栏（v5.2.69 新增）
+- `IdleBarManager` 对象，鸡汤语录 + 宠物状态
+- 鸡汤按时间段分类（早/午/晚共 30 条），宠物 6 种（动作随时间变化）
+- `showIdleNotice`/`hideIdleNotice`/`rotateIdleContent`/`initIdleBar`
+- 15 秒自动轮换 + 点击手动切换，双击/长按打开闹钟设置
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 13g. js/core/alarm.js — 闹钟提醒（v5.2.69 新增）
+- `AlarmManager` 对象，自定义闹钟管理
+- 存储：localStorage（`office_alarms`），通过 SafeStorage 封装，已纳入 sync.js sideData 同步
+- 支持每天/工作日/每周几三种重复模式，提前 3 分钟闪烁提醒
+- `initAlarmSystem`/`loadAlarms`/`saveAlarms`/`addAlarm`/`removeAlarm`/`toggleAlarm`
+- `checkAlarms`/`showAlarmNotice`/`dismissAlarm`/`showAlarmSettings`
+- 依赖：SafeStorage，通过 mixin 混入 app.js 原型
 
 ### 14. js/calendar.js — 日历视图渲染
 - `CalendarView` 类，只负责 DOM 渲染，通过 `window.officeDashboard` 代理与 app.js 通信

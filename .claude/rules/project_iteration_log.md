@@ -1,3 +1,113 @@
+## 2026-05-11 v5.2.80 宠物物种差异化造型重设计
+
+### 改动内容
+1. **pet-renderer.js v3**：SPECIES_PROFILES 定义6种物种独立造型参数
+   - dog(点点/旺财)：垂耳+摇尾巴+腮帮毛
+   - cat(小橘)：三角尖耳+卷尾巴+脸部胡须
+   - panda(滚滚)：圆耳+黑眼圈+胖身体+小圆尾
+   - fox(小灵)：大三角耳+超蓬松尾巴+尖吻部+胡须
+   - rabbit(团团)：超长耳朵(22px)+棉花球尾巴
+   - penguin(波波)：无耳+鸟喙+鳍状肢+白肚皮+橙足
+   - 各物种独立身体比例(bodyRx/Ry)、头大小(headR)、腿/鳍状肢
+2. **idle-bar.js**：petColorMap 每个宠物新增 species 字段，解构传入 PetRenderer
+3. **渲染逻辑**：耳朵/尾巴/眼睛/鼻子/嘴全部按物种参数绘制
+4. **版本号**：v5.2.79 → v5.2.80
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ 已提交推送 `d9f8315`
+- ✅ E2E 验证用户确认通过
+
+### 提交记录
+- `d9f8315` feat: 宠物物种差异化造型——6种动物独立设计（v5.2.80）
+- `2bff8fd` fix: 宠物通知栏布局——Canvas左置+按钮竖排，恢复原宽度
+- `8a4b234` fix: interactPet action映射——feed/water/walk映射为eat/drink/leash动画
+- `61378df` feat: Canvas宠物动画大幅增强——120x100画布+道具可见+大范围动作+翻转修复（v5.2.79）
+
+### E2E 验证清单
+- 🔄 🐶 点点/旺财：垂耳+摇尾巴+腮帮毛
+- 🔄 🐱 小橘：三角尖耳+卷尾巴+胡须
+- 🔄 🐼 滚滚：圆耳+黑眼圈+胖身体+小尾巴
+- 🔄 🦊 小灵：大三角耳+蓬松大尾+尖脸
+- 🔄 🐰 团团：超长耳朵+棉花球尾巴
+- 🔄 🐧 波波：无耳+喙+鳍状肢+白肚皮
+- 🔄 交互动作正常
+- 🔄 控制台无JS错误
+
+---
+
+## 2026-05-11 v5.2.79 Canvas宠物动画大幅增强（120x100画布+道具可见+动作映射修复）
+
+### 改动内容
+1. **pet-renderer.js v2 重写**：120x100 画布，动画幅度大幅增加
+   - walk: ±18px 左右走动，leash: ±24px 大范围走动，snack: 跳起6px
+   - 道具可见：食物碗(含颗粒)、水碗(蓝色)、骨头(可旋转)、牵引绳(红色虚线)
+   - tail/ears 摆动幅度增大，sleep 侧躺+Zzz气泡
+   - **Bug修复**：`bodySx` 未声明导致 ctx.scale(undefined,...) 渲染异常
+   - **Bug修复**：walk/leash 补充 `bodySx = this._petFlip` 翻转方向
+2. **idle-bar.js**：Canvas 64x64→120x100（CSS 36px→96x80px）
+   - **Bug修复**：`_stopIdleRotation` 不再清除 `_interactTimer`，新增 `_stopInteraction`
+   - **Bug修复**：`interactPet` action 映射 feed→eat/water→drink/walk→leash（`8a4b234`）
+   - `.with-pet` class 管理大Canvas通知栏
+3. **style.css**：idle-mode min-height:56px，.with-pet min-height:100px
+4. **版本号**：v5.2.78 → v5.2.79
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ E2E 验证 14/14 PASS
+- ✅ 已提交推送 `61378df` + `8a4b234`
+
+### 提交记录
+- `61378df` feat: Canvas宠物动画大幅增强——120x100画布+道具可见+大范围动作+翻转修复（v5.2.79）
+- `8a4b234` fix: interactPet action映射——feed/water/walk映射为eat/drink/leash动画
+
+### 遗留事项
+- 可考虑进一步优化：宠物上下跳动范围、更丰富的道具动画、宠物拖拽互动
+
+---
+
+## 2026-05-11 v5.2.75 宠物交互按钮+自定义宠物/句子+XSS修复
+
+### 改动内容
+1. **宠物交互按钮**：通知栏显示宠物时，desc区渲染4个交互emoji按钮
+   - 🍖喂食 🚰喝水 🦮遛弯 🍪零食，各4种随机反应
+   - 点击→标题区显示宠物反应→3秒后自动恢复轮播
+   - `_interactTimer` 与 `_idleTimer` 互斥，防止交互期间轮播打断
+2. **自定义宠物**：选择面板底部"➕ 自定义宠物"按钮
+   - 表情符号选择器（20种常用宠物emoji）
+   - 宠物名输入+自动生成动作文案
+   - 存储：SafeStorage → `office_custom_pets`
+3. **自定义句子**：选择面板底部"➕ 自定义句子"按钮
+   - 文本+作者+时段（早/午/晚/不限）
+   - 存储：SafeStorage → `office_custom_quotes`
+4. **XSS修复**（code-reviewer+security-reviewer发现2个CRITICAL）
+   - `showIdlePicker()` 中 `p.name`/`p.emoji`/`q.text`/`q.author` 加 `SecurityUtils.escapeHtml()`
+   - 通知栏主体渲染已正确使用 `textContent`（无风险）
+
+### 当前状态
+- ✅ 语法检查全部通过（idle-bar.js / app.js / index.html）
+- ✅ 代码审查通过（2 HIGH → 已修复为0）
+- ✅ 安全审查通过（2 CRITICAL → 已修复为0）
+- ✅ 已提交推送 `48b552a` v5.2.75
+- 🔄 待线上验证
+
+### 提交记录
+- `48b552a` feat: 宠物交互按钮+自定义宠物/句子，XSS修复（v5.2.75）
+
+### 线上验证清单（Ctrl+Shift+R 强刷）
+1. 版本号显示 `2026-05-11 v5.2.75`
+2. 选宠物后通知栏显示4个交互按钮（🍖🚰🦮🍪）
+3. 点击🍖喂食 → 宠物显示吃食反应 → 3秒后恢复自动轮播
+4. 点击🚰/🦮/🍪都有不同反应
+5. 选择面板底部有"自定义宠物"按钮 → 弹出表单 → 添加后可选
+6. 选择面板底部有"自定义句子"按钮 → 弹出表单 → 添加后可选
+7. 刷新后自定义内容保持
+8. 右键通知栏可打开闹钟设置
+9. 手机端交互按钮不溢出
+10. 控制台无 JS 错误
+
+---
+
 ## 2026-05-11 v5.2.69 通知栏常驻+空闲态鸡汤宠物+自定义闹钟提醒
 
 ### 改动内容

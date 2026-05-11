@@ -11,7 +11,7 @@
 - index.html：桌面完整工作台入口，加载主面板、右侧折叠面板、视图切换、弹窗等全部能力
 - wechat-upload.html：微信轻量上传入口，只保留上传识别与确认链路（精简 6 个 JS 依赖）
 - css/style.css：全局样式 5247 行，9 种主题 + 暗色模式 + 4 断点响应式
-- js/：13 个核心业务脚本（详见下文）
+- js/：19 个核心业务脚本（详见下文）
 - vendor/：本地优先静态依赖资源
 - .claude/rules/：项目规则、框架、待办与迭代记录（规范目录，同步到 .trae/rules/）
 
@@ -73,23 +73,100 @@
 - 哈希：`calculateFileHash(file)` SHA-256 / `calculateTextHash(text)` SHA-256
 - 依赖：db（读写 settings 表）
 
-### 7. js/app.js — 主界面控制器（最大模块）
+### 7. js/app.js — 主界面控制器
 - 视图切换：日视图(board)/周视图(week)/月视图(month) — 通过代理 switchView 方法
 - 事项 CRUD：`saveItem`/`editItem`/`deleteItem`/`toggleItemComplete`/`toggleItemPin`/`toggleItemSink`
-- 周期性/跨日期：`applyCrossDateMeetingScopedUpdate`/`applyCrossDateDocumentScopedUpdate` — 支持"仅当天/今天及之后/全部"三种作用范围
-- 看板拖拽：`initDragAndDrop` + `handleDragStart/DragOver/Drop/DragEnd` — 同列排序+跨列移动
+- 拖拽/撤销等核心业务逻辑仍在本文件
 - AI 交互：`parseNaturalLanguage`(文本)/`handleFileUpload`(图片/PDF)
 - 通知提醒：`updateCountdownNotice`(倒数日+待办截止)、`startTodoReminderLoop`(1 秒轮询闪烁)
-- 右侧面板：倒数日/日程/工具/链接/通讯录/备忘录 6 个折叠面板
 - 排序：领导优先级（钱→吴→盛→房→陈→其他领导→处室→其他）+ 四桶分桶（置顶/正常/沉底/已完成）
-- 天气：和风天气 API，9 个预设城市，当前+3 天预报
+- 头部天气：`initHeaderWeather`/`refreshHeaderWeather`/`updateHeaderWeatherDisplay`（天气数据方法已拆分到 weather.js）
 - 主题：9 种主题（靛青紫/天际蓝/青瓷色/翠竹绿/玫瑰红/中国红/琥珀橙/幻影紫/深色模式）
-- 导入导出：JSON 备份导入导出（支持密码加密）、Excel 通讯录导入
-- 版本号：`2026-05-09 v5.52`，scriptVersions 统一管理资源版本
+- 版本号：`2026-05-11 v5.2.69`，~5920 行（从 10470 减至 5920，减少 43.4%）
 - 全局错误捕获：`window.unhandledrejection` + `window.error`
-- 依赖：db、syncManager、ocrManager、kimiAPI、cryptoManager、calendarView、reportGenerator
+- **拆分模式**：6 个面板模块 + 1 个天气模块 + 4 个核心模块已通过 mixin 模式（`Object.assign(OfficeDashboard.prototype, Module)`）提取到独立文件
+- **不再继续拆分**：剩余核心 CRUD 耦合极高，拆分收益递减。新功能请放到独立模块文件中
+- 依赖：db、syncManager、ocrManager、kimiAPI、cryptoManager、calendarView、reportGenerator、各面板模块
 
-### 8. js/calendar.js — 日历视图渲染
+### 8. js/panels/countdown.js — 倒数日面板（v5.59 拆分）
+- `CountdownPanel` 对象，22 个方法，760 行
+- 农历/公历倒数日、节假日倒数、自定义事件、拖拽排序、类型颜色标签
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 9. js/panels/links.js — 链接面板（v5.60 拆分）
+- `LinksPanel` 对象，10 个方法，458 行
+- 快捷链接列表、拖拽排序、添加/删除、自动图标、云端同步
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 10. js/panels/contacts.js — 通讯录面板（v5.61 拆分）
+- `ContactsPanel` 对象，14 个方法，665 行
+- 联系人列表、搜索高亮、Excel 导入、批量删除、云端同步
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 11. js/panels/tools.js — 工具面板（v5.62 拆分）
+- `ToolsPanel` 对象，11 个方法，389 行
+- 工具列表（计算器/倒计时/天气）、拖拽排序、计算器安全 eval、倒计时控制
+- `openTool('weather')` 委托给 `WeatherPanel.loadWeather()`
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 12. js/panels/side-panels.js — 侧边面板（v5.62 拆分）
+- `SidePanels` 对象，2 个方法，235 行
+- 日程便签面板（自动保存+云端同步）、备忘录面板（自动保存+云端同步）、Escape 全局快捷键
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 13. js/weather.js — 天气模块（v5.63 拆分+修复）
+- `WeatherPanel` 对象，6 个方法，449 行
+- 和风天气 + Open-Meteo 双数据源自动回退、城市选择器（预设+自定义坐标）、天气图标/描述映射
+- `loadWeather`/`fetchWeather`/`renderWeatherStatus`/`showCitySelector`/`getWeatherIcon`/`getWeatherDesc`
+- 依赖：cryptoManager（读加密 Key）、app.js 中的 header 天气 UI 方法
+
+### 13b. js/core/recurring.js — 周期性模块（v5.64 拆分）
+- `RecurringCore` 对象，14 个方法，678 行
+- 表单渲染（8个）、分组管理（2个）、事项生成（4个）
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 13c. js/core/cross-date.js — 跨日期模块（v5.65 拆分）
+- `CrossDateCore` 对象，15 个方法，354 行
+- 判断（isCrossDateDocument/isCrossDateMeeting）、选择框（showCrossDateDocChoice/showCrossDateDocDeleteChoice）
+- payload构建（getCrossDateDocumentUpdatePayload/getCrossDateMeetingUpdatePayload/getCrossDateDocumentDeletePayload）
+- 作用域更新（applyCrossDateDocumentScopedUpdate/applyCrossDateMeetingScopedUpdate/applyCrossDateDocumentDelete）
+- 日期视图（getDocumentItemForSelectedDate/getMeetingItemForSelectedDate/getEffectiveDocumentItemById）
+- 辅助（clearDayStatesFields/_freezeBeforeAndClearFrom）
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 13d. js/core/backup.js — 备份恢复模块（v5.66 拆分）
+- `BackupCore` 对象，7 个方法，228 行
+- 导出导入（exportData/importData/handleExportBackupFile/handleRestoreBackup）
+- 每日备份（startDailyBackupSchedule/saveDailyBackupToCloud/restoreCloudBackup）
+- 依赖：syncManager、db、SafeStorage、safeJsonParse，通过 mixin 混入 app.js 原型
+
+### 13e. js/core/context-menu.js — 上下文菜单模块（v5.66 拆分）
+- `ContextMenuCore` 对象，14 个方法，503 行
+- 右键/长按菜单（initContextMenu/showContextMenu/hideContextMenu）
+- 截图分享（shareCalendarScreenshot/_downloadCanvas）
+- 菜单动作分发（executeContextAction）
+- 优先级（_contextShowPriorityPicker/_contextSetPriority）
+- 改日期（_contextMoveToDate/_showDatePicker）
+- 复制（_contextCopyItem/_showCopyChoice）
+- 周期性（_contextSetRecurring/_showRecurringDialog）
+- 依赖：db、syncManager、html2canvas，通过 mixin 混入 app.js 原型
+
+### 13f. js/core/idle-bar.js — 空闲态通知栏（v5.2.69 新增）
+- `IdleBarManager` 对象，鸡汤语录 + 宠物状态
+- 鸡汤按时间段分类（早/午/晚共 30 条），宠物 6 种（动作随时间变化）
+- `showIdleNotice`/`hideIdleNotice`/`rotateIdleContent`/`initIdleBar`
+- 15 秒自动轮换 + 点击手动切换，双击/长按打开闹钟设置
+- 依赖：通过 mixin 混入 app.js 原型
+
+### 13g. js/core/alarm.js — 闹钟提醒（v5.2.69 新增）
+- `AlarmManager` 对象，自定义闹钟管理
+- 存储：localStorage（`office_alarms`），通过 SafeStorage 封装，已纳入 sync.js sideData 同步
+- 支持每天/工作日/每周几三种重复模式，提前 3 分钟闪烁提醒
+- `initAlarmSystem`/`loadAlarms`/`saveAlarms`/`addAlarm`/`removeAlarm`/`toggleAlarm`
+- `checkAlarms`/`showAlarmNotice`/`dismissAlarm`/`showAlarmSettings`
+- 依赖：SafeStorage，通过 mixin 混入 app.js 原型
+
+### 14. js/calendar.js — 日历视图渲染
 - `CalendarView` 类，只负责 DOM 渲染，通过 `window.officeDashboard` 代理与 app.js 通信
 - `renderWeekView(items, date)`：周一至周日 7 列网格，每列含事项卡片 + "新增"按钮
 - `renderMonthView(items, date)`：月网格，前后月补齐，空单元格显示提示
@@ -98,13 +175,13 @@
 - 性能：`skippableRender` 优化（120ms 内相同签名跳过渲染）
 - 依赖：无外部文件依赖，通过全局 `officeDashboard` 通信
 
-### 9. js/app-date-view.js — 日视图数据层
+### 15. js/app-date-view.js — 日视图数据层
 - `DateView` 类，管理日视图的事项数据加载与排序
 - `loadItems(date)`：按日期过滤事项，回填 `app.items` 确保提醒逻辑拿到最新数据
 - 委托给 app.js 的 `renderColumn()` 渲染三列看板
 - 依赖：app.js（通过 `this.app` 引用）
 
-### 10. js/upload-flow.js — 识别预览确认流程
+### 16. js/upload-flow.js — 识别预览确认流程
 - 三列表格预览：新增/合并/跳过，可逐条删除编辑
 - `showRecognitionPreviewModal(fileName, result)`：模态弹窗
 - `renderEditablePreview`：可编辑字段（标题/日期/时间/地点/参会人）
@@ -112,21 +189,21 @@
 - `compressImageIfNeeded`：微信环境用更激进压缩参数（1MB/1600px/0.6）
 - 依赖：app.js（通过全局 UploadFlowUtils）
 
-### 11. js/report.js — 报告生成
+### 17. js/report.js — 报告生成
 - `ReportGenerator` 类
 - `generateReportContent(items, reportType, startDate, endDate)`：按类型筛选+统计
 - `exportToImage()`：html2canvas 渲染为 2x PNG，`<a download>` 触发下载
 - 支持日报/周报/月报/年报/自定义日期范围
 - 依赖：html2canvas（动态 CDN 加载）、db
 
-### 12. js/wechat-upload.js — 微信轻量页
+### 18. js/wechat-upload.js — 微信轻量页
 - 微信环境专用，不加载 app.js/sync.js/calendar.js
 - 精简流程：选择文件→AI 识别→预览确认→保存→1 秒后自动返回
 - 微信 UA 检测阻止 Tesseract OCR fallback（CDN 在微信内不通）
 - 无 Key 时禁用上传按钮并显示提示
 - 依赖：db、ocrManager、cryptoManager、UploadFlowUtils
 
-### 13. 已删除的文件
+### 19. 已删除的文件
 - `js/templates.js`：v5.20 已删除（53KB 死代码，完全未被引用）
 
 ---
