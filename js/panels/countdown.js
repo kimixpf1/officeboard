@@ -499,7 +499,7 @@ const CountdownPanel = {
             this.countdownNoticeTimer = null;
         }
 
-        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing', 'idle-mode', 'alarm-active');
+        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing', 'alarm-active');
 
         if (!upcoming.length) {
             this.countdownNoticeIndex = 0;

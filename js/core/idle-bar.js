@@ -35,6 +35,7 @@ const IdleBarManager = {
     ],
 
     IDLE_PETS: [
+        { emoji: '🐶', name: '点点', actions: { morning: ['摇着尾巴等你喂食', '在院子里跑圈等你'], afternoon: ['趴在你脚边看你工作', '开心地啃小零食'], evening: ['蜷在你腿上睡着了', '梦里还在摇尾巴'] } },
         { emoji: '🐱', name: '小橘', actions: { morning: ['正在伸懒腰', '追着阳光跑'], afternoon: ['趴着打盹', '在舔爪子'], evening: ['蜷成一团', '在打呼噜'] } },
         { emoji: '🐶', name: '旺财', actions: { morning: ['摇着尾巴等你', '在院子里跑圈'], afternoon: ['趴在脚边发呆', '在啃骨头'], evening: ['打着哈欠', '趴着打盹'] } },
         { emoji: '🐼', name: '滚滚', actions: { morning: ['在啃竹子', '翻了个滚'], afternoon: ['懒洋洋躺着', '抱着竹子打盹'], evening: ['靠在石头上', '闭着眼啃竹子'] } },
@@ -92,6 +93,7 @@ const IdleBarManager = {
             const quotes = this._getQuotesForHour(hour);
             this._idleQuoteIndex = Math.floor(Math.random() * quotes.length);
             this._idleShowPet = Math.random() < 0.4;
+            this._startIdleRotation();
         }
 
         this._renderIdleContent();
@@ -113,6 +115,7 @@ const IdleBarManager = {
             this._idlePetIndex = (this._idlePetIndex + 1) % this.IDLE_PETS.length;
         }
         this._renderIdleContent();
+        this._resetIdleRotation();
     },
 
     _getQuotesForHour(hour) {
@@ -147,6 +150,17 @@ const IdleBarManager = {
     },
 
     _startIdleRotation() {
+        this._stopIdleRotation();
+        this._idleTimer = setInterval(() => {
+            this.rotateIdleContent();
+        }, 8000);
+    },
+
+    _resetIdleRotation() {
+        this._stopIdleRotation();
+        this._idleTimer = setInterval(() => {
+            this.rotateIdleContent();
+        }, 8000);
     },
 
     _stopIdleRotation() {

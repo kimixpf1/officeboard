@@ -242,11 +242,13 @@ const AlarmManager = {
                 return;
             }
             listEl.innerHTML = alarms.map(a => {
+                const safeLabel = typeof SecurityUtils !== 'undefined' ? SecurityUtils.escapeHtml(a.label || '') : (a.label || '');
+                const safeTime = typeof SecurityUtils !== 'undefined' ? SecurityUtils.escapeHtml(a.time) : a.time;
                 const repeatText = a.repeatMode === 'daily' ? '每天' : a.repeatMode === 'weekday' ? '工作日' : `每周${(a.weekDays||[]).map(d => ['日','一','二','三','四','五','六'][d]).join('、')}`;
                 return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-color);">
                     <label style="cursor:pointer;flex-shrink:0;"><input type="checkbox" ${a.enabled ? 'checked' : ''} data-alarm-toggle="${a.id}" style="display:none;"><span style="display:inline-block;width:36px;height:20px;border-radius:10px;background:${a.enabled ? 'var(--primary-color)' : 'var(--gray-300)'};position:relative;transition:background 0.2s;"><span style="position:absolute;top:2px;left:${a.enabled ? '18px' : '2px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.2s;"></span></span></label>
                     <div style="flex:1;min-width:0;">
-                        <div style="font-size:14px;font-weight:600;color:var(--text-primary);${a.enabled ? '' : 'opacity:0.5;'}">${a.time} ${a.label || ''}</div>
+                        <div style="font-size:14px;font-weight:600;color:var(--text-primary);${a.enabled ? '' : 'opacity:0.5;'}">${safeTime} ${safeLabel}</div>
                         <div style="font-size:12px;color:var(--text-secondary);">${repeatText}</div>
                     </div>
                     <button data-alarm-delete="${a.id}" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:4px;">×</button>

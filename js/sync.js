@@ -164,6 +164,24 @@ class SyncManager {
         }
     }
 
+    _mergeAlarms(localValue, cloudValue) {
+        const localAlarms = safeJsonParse(localValue || '[]', []);
+        const cloudAlarms = safeJsonParse(cloudValue || '[]', []);
+        if (!cloudAlarms.length) return localValue;
+        if (!localAlarms.length) return cloudValue;
+        const merged = [...localAlarms];
+        const localIds = new Set(localAlarms.map(a => a.id));
+        for (const alarm of cloudAlarms) {
+            if (localIds.has(alarm.id)) {
+                const idx = merged.findIndex(a => a.id === alarm.id);
+                if (idx >= 0) merged[idx] = alarm;
+            } else {
+                merged.push(alarm);
+            }
+        }
+        return JSON.stringify(merged);
+    }
+
     _shouldProtectImportedData(localItems, cloudItems, cloudUpdatedAt = '') {
         const protection = this._getImportProtection();
         if (!protection) {
@@ -894,9 +912,10 @@ class SyncManager {
                         const nextValue = cloudData.data.alarms;
                         const currentValue = SafeStorage.get('office_alarms') || '[]';
                         if (nextValue !== currentValue) {
-                            SafeStorage.set('office_alarms', nextValue);
+                            const merged = this._mergeAlarms(currentValue, nextValue);
+                            SafeStorage.set('office_alarms', merged);
                             document.dispatchEvent(new CustomEvent('alarmsSynced', {
-                                detail: { alarms: safeJsonParse(nextValue || '[]', []) }
+                                detail: { alarms: safeJsonParse(merged || '[]', []) }
                             }));
                         }
                     }
@@ -1124,9 +1143,10 @@ class SyncManager {
                 const nextValue = cloudData.data.alarms;
                 const currentValue = SafeStorage.get('office_alarms') || '[]';
                 if (nextValue !== currentValue) {
-                    SafeStorage.set('office_alarms', nextValue);
+                    const merged = this._mergeAlarms(currentValue, nextValue);
+                    SafeStorage.set('office_alarms', merged);
                     document.dispatchEvent(new CustomEvent('alarmsSynced', {
-                        detail: { alarms: safeJsonParse(nextValue || '[]', []) }
+                        detail: { alarms: safeJsonParse(merged || '[]', []) }
                     }));
                 }
             }
@@ -1429,9 +1449,10 @@ class SyncManager {
                 const cloudAlarms = cloudData.data.alarms;
                 const localAlarms = SafeStorage.get('office_alarms') || '[]';
                 if (cloudAlarms !== localAlarms) {
-                    SafeStorage.set('office_alarms', cloudAlarms);
+                    const merged = this._mergeAlarms(localAlarms, cloudAlarms);
+                    SafeStorage.set('office_alarms', merged);
                     document.dispatchEvent(new CustomEvent('alarmsSynced', {
-                        detail: { alarms: safeJsonParse(cloudAlarms || '[]', []) }
+                        detail: { alarms: safeJsonParse(merged || '[]', []) }
                     }));
                 }
             }
@@ -1835,9 +1856,10 @@ class SyncManager {
             }
 
             if (data.data.alarms !== undefined) {
-                SafeStorage.set('office_alarms', data.data.alarms);
+                const mergedAlarms = this._mergeAlarms(SafeStorage.get('office_alarms') || '[]', data.data.alarms);
+                SafeStorage.set('office_alarms', mergedAlarms);
                 document.dispatchEvent(new CustomEvent('alarmsSynced', {
-                    detail: { alarms: safeJsonParse(data.data.alarms || '[]', []) }
+                    detail: { alarms: safeJsonParse(mergedAlarms || '[]', []) }
                 }));
             }
 
@@ -2318,9 +2340,10 @@ class SyncManager {
             }
 
             if (data.data.alarms !== undefined) {
-                SafeStorage.set('office_alarms', data.data.alarms);
+                const mergedAlarms = this._mergeAlarms(SafeStorage.get('office_alarms') || '[]', data.data.alarms);
+                SafeStorage.set('office_alarms', mergedAlarms);
                 document.dispatchEvent(new CustomEvent('alarmsSynced', {
-                    detail: { alarms: safeJsonParse(data.data.alarms || '[]', []) }
+                    detail: { alarms: safeJsonParse(mergedAlarms || '[]', []) }
                 }));
             }
 
