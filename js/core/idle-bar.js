@@ -208,9 +208,10 @@ const IdleBarManager = {
 
         const reaction = reactions[Math.floor(Math.random() * reactions.length)];
 
-        // 宠物动画切换
+        // 宠物动画切换 (UI action name -> renderer action name)
         if (this._petRenderer) {
-            this._petRenderer.setAction(action);
+            const actionMap = { feed: 'eat', water: 'drink', walk: 'leash', snack: 'snack' };
+            this._petRenderer.setAction(actionMap[action] || action);
         }
 
         // 更新文字，同时保护 Canvas 不被清除
