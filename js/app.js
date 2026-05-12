@@ -2982,6 +2982,12 @@ class OfficeDashboard {
                     deadlineEl.textContent = deadlineText;
                     cardMain.appendChild(deadlineEl);
                 }
+                if (!effectiveCompleted && item.reminderDismissedAt) {
+                    const remindedEl = document.createElement('div');
+                    remindedEl.className = 'card-time todo-reminded';
+                    remindedEl.textContent = '🔔 已提前提醒';
+                    cardMain.appendChild(remindedEl);
+                }
                 if (statusText) {
                     const timeEl = document.createElement('div');
                     timeEl.className = 'card-time';
@@ -3318,7 +3324,7 @@ class OfficeDashboard {
     getTodoReminderItems(items = []) {
         const now = Date.now();
         return items
-            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && !item.reminderDismissedAt && (item.deadlineManuallySet || item.reminderManuallySet))
+            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && !item.reminderDismissedAt && !(this._dismissedTodoReminderIds && this._dismissedTodoReminderIds.has(item.id)) && (item.deadlineManuallySet || item.reminderManuallySet))
             .map(item => {
                 const deadlineDate = new Date(item.deadline);
                 if (Number.isNaN(deadlineDate.getTime())) {
@@ -3476,7 +3482,9 @@ class OfficeDashboard {
             btn.style.pointerEvents = 'none';
 
             try {
-                // 关闭提醒≠完成待办：标记已提醒，不再闪烁，但待办保持未完成
+                // 关闭提醒≠完成待办：内存+DB双重标记，防sync覆盖后复活
+                this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
+                this._dismissedTodoReminderIds.add(itemId);
                 const item = await db.getItem(itemId);
                 if (item) {
                     item.reminderDismissedAt = new Date().toISOString();
@@ -3839,7 +3847,7 @@ class OfficeDashboard {
         }
 
         const version = '2026-05-12 v5.2.85';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=220', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=221', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4081,6 +4089,9 @@ class OfficeDashboard {
                 // 编辑时清除已提醒标记，让提醒重新生效
                 if (id) {
                     delete item.reminderDismissedAt;
+                    if (this._dismissedTodoReminderIds) {
+                        this._dismissedTodoReminderIds.delete(parseInt(id));
+                    }
                 }
                 item.completed = false;
 

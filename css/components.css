@@ -998,6 +998,11 @@
     margin-top: 6px;
 }
 
+.todo-reminded {
+    color: #f59e0b;
+    font-weight: 500;
+}
+
 .card-date {
     font-size: 11px;
     color: var(--gray-400);
