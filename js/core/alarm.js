@@ -11,6 +11,7 @@ const AlarmManager = {
 
     initAlarmSystem() {
         this._activeAlarm = null;
+        this._shownAlarmId = null;
         this._loadAlarmDismissed();
         this.loadAlarms();
 
@@ -169,13 +170,29 @@ const AlarmManager = {
             this.countdownNoticeTimer = null;
         }
         noticeEl.hidden = false;
-        noticeEl.classList.remove('todo-reminder-active', 'idle-mode');
-        noticeEl.classList.add('alarm-active', 'todo-reminder-flashing');
 
+        // 首次激活或闹钟切换时才改静态属性，避免每秒重设导致按钮区闪烁
+        const sameAlarm = this._shownAlarmId === alarm.id && noticeEl.classList.contains('alarm-active');
+        if (!sameAlarm) {
+            this._shownAlarmId = alarm.id;
+            noticeEl.classList.remove('todo-reminder-active', 'idle-mode');
+            noticeEl.classList.add('alarm-active', 'todo-reminder-flashing');
+
+            const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
+            if (badgeEl) badgeEl.textContent = '闹钟';
+
+            const completeBtn = document.getElementById('todoReminderCompleteBtn');
+            if (completeBtn) {
+                completeBtn.style.display = '';
+                completeBtn.textContent = '✓';
+                completeBtn.title = '关闭闹钟';
+                completeBtn.onclick = (e) => { e.stopPropagation(); this.dismissAlarm(alarm.id); };
+            }
+        }
+
+        // 每 tick 更新倒计时文字（remaining 每分钟变化）
         const titleEl = noticeEl.querySelector('.countdown-notice-title');
         const descEl = noticeEl.querySelector('.countdown-notice-desc');
-        const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
-        const completeBtn = document.getElementById('todoReminderCompleteBtn');
 
         const now = new Date();
         const [h, m] = alarm.time.split(':').map(Number);
@@ -185,14 +202,6 @@ const AlarmManager = {
 
         if (titleEl) titleEl.textContent = `⏰ ${alarm.label || '闹钟提醒'}`;
         if (descEl) descEl.textContent = remaining > 0 ? `还有 ${remaining} 分钟 (${alarm.time})` : `时间到！(${alarm.time})`;
-        if (badgeEl) badgeEl.textContent = '闹钟';
-
-        if (completeBtn) {
-            completeBtn.style.display = '';
-            completeBtn.textContent = '✓';
-            completeBtn.title = '关闭闹钟';
-            completeBtn.onclick = (e) => { e.stopPropagation(); this.dismissAlarm(alarm.id); };
-        }
 
         // 右键通知栏打开闹钟设置
         if (!noticeEl._alarmCtxBound) {
@@ -207,6 +216,7 @@ const AlarmManager = {
     },
 
     hideAlarmNotice() {
+        this._shownAlarmId = null;
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) return;
         noticeEl.classList.remove('alarm-active', 'todo-reminder-flashing');
@@ -219,6 +229,7 @@ const AlarmManager = {
 
     dismissAlarm(id) {
         this._activeAlarm = null;
+        this._shownAlarmId = null;
         this._alarmDismissedAt = Date.now();
         this._dismissedAlarmId = id;
         this._saveAlarmDismissed();

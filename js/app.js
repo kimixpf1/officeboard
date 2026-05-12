@@ -3399,6 +3399,11 @@ class OfficeDashboard {
             return false;
         }
 
+        // 闹钟激活时不干扰——避免 toggle('todo-reminder-flashing', false) 覆盖掉 showAlarmNotice 刚加的 class
+        if (noticeEl.classList.contains('alarm-active')) {
+            return false;
+        }
+
         const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
         const titleEl = noticeEl.querySelector('.countdown-notice-title');
         const descEl = noticeEl.querySelector('.countdown-notice-desc');
@@ -3887,7 +3892,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-12 v5.2.87';
+        const version = '2026-05-12 v5.2.88';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=70', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=9', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=224', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=2', 'themes.css?v=4', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
