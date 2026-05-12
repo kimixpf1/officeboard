@@ -523,9 +523,7 @@ class SyncManager {
             if (settingValues[i]) settings[settingKeys[i][1]] = settingValues[i];
         }
 
-        const cryptoMasterKey = SafeStorage.get('crypto_master_key');
-        if (cryptoMasterKey) settings.crypto_master_key = cryptoMasterKey;
-
+        // crypto_master_key 不再同步到云端（方案A：每设备独立密钥）
         return {
             sync_time: new Date().toISOString(),
             items: Array.isArray(items) ? items : [],
@@ -2179,15 +2177,13 @@ class SyncManager {
             db.getSetting('qweather_api_key_encrypted'),
             db.getSetting('qweather_api_key_set')
         ]);
-        const cryptoMasterKey = SafeStorage.get('crypto_master_key');
-
+        // crypto_master_key 不再同步到云端（方案A：每设备独立密钥）
         if (kimiKeyEnc) settings.kimi_api_key_encrypted = kimiKeyEnc;
         if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
         if (deepseekKeyEnc) settings.deepseek_api_key_encrypted = deepseekKeyEnc;
         if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
         if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
         if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
-        if (cryptoMasterKey) settings.crypto_master_key = cryptoMasterKey;
 
             const syncData = {
                 sync_time: new Date().toISOString(),

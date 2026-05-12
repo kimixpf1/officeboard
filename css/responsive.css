@@ -1,0 +1,658 @@
+/* 响应式布局 */
+@media (max-width: 1024px) {
+    .board-view {
+        height: auto;
+        min-height: calc(100vh - 200px);
+        overflow: visible;
+    }
+
+    .header {
+        flex-wrap: wrap;
+        gap: var(--spacing-2);
+    }
+
+    .header-left,
+    .header-center,
+    .header-notice,
+    .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .header-notice {
+        flex: 0 0 auto;
+        max-width: 100%;
+    }
+
+    .header-center {
+        flex-wrap: wrap;
+    }
+
+    .toolbar-ai {
+        flex: 1 1 240px;
+        max-width: 300px;
+    }
+
+    .header-weather {
+        width: 220px;
+        max-width: 220px;
+    }
+
+    .board-container {
+        grid-template-columns: 1fr;
+        height: auto;
+        gap: var(--spacing-4);
+    }
+
+    .board-column {
+        min-height: auto;
+        max-height: none;
+    }
+
+    .column-content {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .view-controls {
+        flex-direction: column;
+        gap: var(--spacing-3);
+    }
+
+    .week-view {
+        grid-template-columns: 40px repeat(7, 1fr);
+        font-size: var(--font-size-xs);
+    }
+
+    .month-view {
+        font-size: var(--font-size-xs);
+    }
+}
+@media (max-width: 640px) {
+    .header {
+        gap: var(--spacing-1);
+        padding: var(--spacing-1) var(--spacing-2);
+    }
+
+    .header-left {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .brand-block {
+        flex-direction: column;
+        justify-content: center;
+        gap: var(--spacing-1);
+        width: 100%;
+    }
+
+    .logo {
+        font-size: var(--font-size-lg);
+    }
+
+    .header-meta {
+        width: 100%;
+        justify-content: center;
+        gap: 4px;
+    }
+
+    .header-clock {
+        padding: 4px 8px;
+        gap: 0;
+    }
+
+    .clock-date {
+        font-size: 9px;
+    }
+
+    .clock-time {
+        font-size: 10px;
+    }
+
+    .header-weather {
+        width: auto;
+        max-width: 160px;
+        padding: 4px 7px;
+        gap: 3px;
+    }
+
+    .header-weather-icon-today {
+        font-size: 14px;
+    }
+
+    .header-weather-line-main {
+        font-size: 9px;
+    }
+
+    .header-weather-line-sub {
+        font-size: 8px;
+    }
+
+    .header-notice {
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        justify-content: flex-start;
+    }
+
+    .countdown-notice {
+        width: 100%;
+        max-width: 320px;
+        justify-content: flex-start;
+    }
+
+    .countdown-notice[hidden] {
+        display: none !important;
+        visibility: visible !important;
+    }
+
+    .header-center {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: var(--spacing-1);
+        width: 100%;
+        justify-content: center;
+    }
+
+    .toolbar-ai {
+        width: 100%;
+        max-width: none;
+    }
+
+    .toolbar-views {
+        order: 1;
+    }
+
+    .toolbar-date {
+        order: 2;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: center;
+        gap: 4px;
+    }
+
+    /* AI输入框优化 */
+    .toolbar-ai {
+        width: 100%;
+        max-width: none;
+    }
+
+    .ai-input {
+        font-size: 13px;
+        padding: var(--spacing-2);
+    }
+
+    /* 视图切换按钮优化 */
+    .toolbar-views {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .view-btn {
+        padding: var(--spacing-1) var(--spacing-3);
+        font-size: 12px;
+    }
+
+    /* 日期导航优化 */
+    .toolbar-date {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .date-picker-sm {
+        width: 120px;
+        font-size: 12px;
+    }
+
+    .btn-text.btn-sm {
+        font-size: 12px;
+        padding: var(--spacing-1) var(--spacing-2);
+    }
+
+    .countdown-add-form {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            'name'
+            'date'
+            'calendar'
+            'type'
+            'customtype'
+            'color'
+            'submit';
+    }
+
+    /* 日视图优化 */
+    .board-view {
+        padding: var(--spacing-2);
+    }
+
+    .board-view.active {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .board-header {
+        margin-bottom: var(--spacing-2);
+    }
+
+    .board-header h2 {
+        font-size: 1rem;
+    }
+
+    .board-date-label {
+        position: static;
+        flex-direction: row;
+        justify-content: center;
+        gap: var(--spacing-2);
+        padding: var(--spacing-1) 0;
+        margin-bottom: var(--spacing-1);
+        pointer-events: auto;
+        flex-shrink: 0;
+    }
+
+    .board-date-label-date {
+        font-size: 15px;
+    }
+
+    .board-date-label-week {
+        font-size: 15px;
+    }
+
+    .board-container {
+        flex: 1;
+        min-height: 0;
+        padding: var(--spacing-1);
+        gap: var(--spacing-2);
+    }
+
+    .board-column {
+        border-radius: var(--border-radius);
+    }
+
+    .column-header {
+        padding: var(--spacing-2);
+    }
+
+    .column-title {
+        font-size: 13px;
+    }
+
+    .column-content {
+        padding: var(--spacing-2);
+    }
+
+    /* 卡片在手机端更紧凑 */
+    .card {
+        padding: var(--spacing-2);
+    }
+
+    .card-title {
+        font-size: 13px;
+    }
+
+    .card-header-row {
+        margin-bottom: 4px;
+    }
+
+    .priority-tag {
+        font-size: 10px;
+        padding: 1px 6px;
+    }
+
+    /* 表单优化 */
+    .input-container {
+        flex-direction: column;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .view-switcher {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .date-navigation {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* 按钮优化 */
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .btn-secondary.btn-sm {
+        font-size: 12px;
+        padding: var(--spacing-1) var(--spacing-2);
+    }
+
+    /* 确保所有内容可见 */
+    .board-column {
+        flex-shrink: 0;
+    }
+
+    /* 隐藏报告按钮节省空间 */
+    #reportBtn {
+        display: none;
+    }
+
+    /* 周视图手机端 - 改为垂直列表 */
+    .calendar-view {
+        height: auto;
+        max-height: none;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .week-view {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: auto;
+        gap: var(--spacing-2);
+        background: transparent;
+        border: none;
+        padding: var(--spacing-2);
+    }
+
+    .week-title {
+        font-size: 14px;
+        padding: var(--spacing-2) var(--spacing-3);
+        border-radius: var(--border-radius);
+    }
+
+    .week-header {
+        display: none;
+    }
+
+    .week-cell {
+        min-height: auto;
+        padding: var(--spacing-3);
+        margin-bottom: var(--spacing-2);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .week-cell::before {
+        content: attr(data-date);
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-2);
+        padding-bottom: var(--spacing-2);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .week-cell.today {
+        background: var(--primary-light);
+        border-color: var(--primary-color);
+    }
+
+    .week-cell.today::before {
+        color: var(--primary-color);
+    }
+
+    /* 周视图内卡片样式 */
+    .week-cell .calendar-item {
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+        margin: 4px 0 !important;
+        white-space: normal !important;
+        line-height: 1.4;
+    }
+
+    .week-cell .calendar-item.completed,
+    .month-cell .calendar-item.completed {
+        opacity: 0.65;
+        text-decoration: line-through;
+    }
+
+    .week-cell.drag-over,
+    .month-cell.drag-over {
+        outline: 2px dashed var(--primary-color);
+        outline-offset: -2px;
+    }
+
+    .week-cell .calendar-item.dragging,
+    .month-cell .calendar-item.dragging {
+        opacity: 0.4;
+    }
+
+    /* 月视图手机端 - 改为垂直列表 */
+    .month-view {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        gap: var(--spacing-2);
+        background: transparent;
+        border: none;
+        padding: var(--spacing-2);
+    }
+
+    .month-header {
+        display: none;
+    }
+
+    .month-cell {
+        min-height: auto;
+        padding: var(--spacing-3);
+        margin-bottom: var(--spacing-2);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .month-cell.other-month {
+        display: none;
+    }
+
+    .month-cell.empty-cell {
+        min-height: 60px;
+        background: var(--gray-50);
+    }
+
+    .month-cell.today {
+        background: var(--primary-light);
+        border-color: var(--primary-color);
+    }
+
+    .month-cell-date {
+        display: none;
+    }
+
+    .month-cell::before {
+        content: attr(data-date);
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-2);
+        padding-bottom: var(--spacing-2);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .month-cell.today::before {
+        color: var(--primary-color);
+    }
+
+    /* 月视图内的卡片 */
+    .month-cell .calendar-item {
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+        margin: 4px 0 !important;
+        white-space: normal !important;
+        line-height: 1.4;
+    }
+
+    /* 弹窗优化 */
+    .modal-content {
+        width: 95% !important;
+        max-height: 90vh;
+        margin: var(--spacing-2);
+    }
+
+    .sync-modal-content {
+        width: 95% !important;
+        max-height: 90vh;
+    }
+}
+/* 响应式 */
+@media (max-width: 640px) {
+    .sync-operations {
+        grid-template-columns: 1fr;
+    }
+
+    .sync-tabs {
+        justify-content: center;
+    }
+}
+@media (max-width: 768px) {
+    .sk-body { grid-template-columns: 1fr; }
+    .sk-header-center { display: none; }
+    .sk-title { width: 140px; }
+    .sk-weather { width: 140px; }
+}
+/* 手机端适配 */
+@media (max-width: 640px) {
+    .header {
+        flex-direction: column;
+        gap: var(--spacing-2);
+        text-align: center;
+        padding: var(--spacing-2);
+    }
+
+    .header-left,
+    .brand-block,
+    .header-meta,
+    .header-notice,
+    .header-center,
+    .header-right {
+        width: 100%;
+    }
+
+    .brand-block {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-2);
+    }
+
+    .header-meta {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .header-clock,
+    .header-weather {
+        max-width: 100%;
+    }
+
+    .side-panel.expanded .panel-content {
+        width: 100vw;
+        position: fixed;
+        right: 0;
+        top: 0;
+        height: 100vh !important;
+        border-radius: 0;
+    }
+
+    .side-panel.expanded .panel-toggle {
+        right: 100vw;
+        opacity: 0;
+    }
+
+    .panel-toggle {
+        width: 24px;
+        height: 60px;
+        padding: 4px 0;
+    }
+
+    .panel-toggle-text {
+        font-size: 10px;
+        letter-spacing: 2px;
+    }
+
+    .countdown-toggle {
+        top: calc(50% - 210px);
+        right: 0;
+    }
+
+    .schedule-toggle {
+        top: calc(50% - 140px);
+        right: 0;
+    }
+
+    .tools-toggle {
+        top: calc(50% - 70px);
+        right: 0;
+    }
+
+    .links-toggle {
+        top: calc(50% + 0px);
+        right: 0;
+    }
+
+    .memo-toggle {
+        top: calc(50% + 70px);
+        right: 0;
+    }
+
+    .contacts-toggle {
+        top: calc(50% + 140px);
+        right: 0;
+    }
+
+    .countdown-panel.expanded .panel-toggle,
+    .schedule-panel.expanded .panel-toggle,
+    .links-panel.expanded .panel-toggle,
+    .memo-panel.expanded .panel-toggle,
+    .contacts-panel.expanded .panel-toggle {
+        right: 100vw;
+    }
+
+    .tools-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .links-list {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .links-add {
+        flex-wrap: wrap;
+    }
+
+    .links-add input {
+        flex: 1 1 40%;
+    }
+
+    .btn-add-link {
+        flex: 1 1 100%;
+    }
+
+    /* 手机端面板主体撑满 */
+    .side-panel.expanded .panel-body {
+        flex: 1;
+        min-height: 0;
+    }
+}
+@media (max-width: 768px) {
+    .copyright-footer {
+        display: block;
+        padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+        font-size: 10px;
+        opacity: 0.9;
+    }
+
+    .copyright-note,
+    .deploy-version-badge {
+        font-size: 9px;
+    }
+}

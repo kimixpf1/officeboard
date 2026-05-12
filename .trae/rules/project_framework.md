@@ -11,7 +11,7 @@
 - index.html：桌面完整工作台入口，加载主面板、右侧折叠面板、视图切换、弹窗等全部能力
 - wechat-upload.html：微信轻量上传入口，只保留上传识别与确认链路（精简 6 个 JS 依赖）
 - css/style.css：全局样式 5247 行，9 种主题 + 暗色模式 + 4 断点响应式
-- js/：19 个核心业务脚本（详见下文）
+- js/：20 个核心业务脚本（详见下文）
 - vendor/：本地优先静态依赖资源
 - .claude/rules/：项目规则、框架、待办与迭代记录（规范目录，同步到 .trae/rules/）
 
@@ -152,11 +152,23 @@
 - 依赖：db、syncManager、html2canvas，通过 mixin 混入 app.js 原型
 
 ### 13f. js/core/idle-bar.js — 空闲态通知栏（v5.2.69 新增）
-- `IdleBarManager` 对象，鸡汤语录 + 宠物状态
-- 鸡汤按时间段分类（早/午/晚共 30 条），宠物 6 种（动作随时间变化）
+- `IdleBarManager` 对象，鸡汤语录 + Canvas 宠物动画
+- 鸡汤按时间段分类（早/午/晚共 30 条），宠物 7 种（6 物种，点点/旺财同为狗）
 - `showIdleNotice`/`hideIdleNotice`/`rotateIdleContent`/`initIdleBar`
-- 15 秒自动轮换 + 点击手动切换，双击/长按打开闹钟设置
-- 依赖：通过 mixin 混入 app.js 原型
+- 点击手动切换语录/宠物，双击/长按打开闹钟设置
+- 交互按钮：喂食/喝水/遛弯/零食 → 触发宠物对应动画
+- 依赖：PetRenderer（pet-renderer.js），通过 mixin 混入 app.js 原型
+
+### 13f2. js/core/pet-renderer.js — Canvas 宠物动画引擎（v5.2.79 新增，v5.2.80 物种差异化）
+- `PetRenderer` 类，120x100 Canvas 2D 动画，requestAnimationFrame 驱动
+- `SPECIES_PROFILES` 定义 6 种物种独立造型参数（身体比例/耳朵类型/尾巴类型/特殊标记）
+- 物种：dog(泰迪)/cat(尖耳+胡须)/panda(圆耳+黑眼圈)/fox(大耳+蓬尾)/rabbit(长耳+棉尾)/penguin(喙+鳍状肢)
+- 动作系统：idle/walk/eat/drink/leash/snack/sleep，每种有独立动画帧
+- 耳朵渲染：6 种类型（teddy/pointed/pointedLarge/round/long/none）
+- 尾巴渲染：6 种类型（wag/curl/bushy/cotton/tiny/none）
+- 道具可见：食物碗(含颗粒)/水碗/骨头/牵引绳(红色虚线)/Zzz 气泡
+- `setSpecies(species, colors)` 运行时切换物种
+- 依赖：无外部依赖，纯 Canvas 2D API
 
 ### 13g. js/core/alarm.js — 闹钟提醒（v5.2.69 新增）
 - `AlarmManager` 对象，自定义闹钟管理

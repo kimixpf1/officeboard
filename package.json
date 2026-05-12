@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "pdfjs-dist": "^3.11.174"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "happy-dom": "^20.9.0",
+    "puppeteer-core": "^24.43.0",
+    "vitest": "^4.1.6"
+  }
+}
