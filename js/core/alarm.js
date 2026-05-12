@@ -115,6 +115,11 @@ const AlarmManager = {
                 this.showAlarmNotice(alarm, false);
                 return true;
             }
+            // 闹钟激活后持续闪烁直到手动关闭，到点不自动停
+            if (diff < 0 && this._activeAlarm && this._activeAlarm.id === alarm.id) {
+                this.showAlarmNotice(alarm, false);
+                return true;
+            }
         }
         if (this._activeAlarm) {
             this._activeAlarm = null;
