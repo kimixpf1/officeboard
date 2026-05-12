@@ -7,10 +7,11 @@
 const AlarmManager = {
 
     ALARMS_KEY: 'office_alarms',
+    DISMISSED_KEY: 'office_alarm_dismissed',
 
     initAlarmSystem() {
         this._activeAlarm = null;
-        this._alarmDismissedAt = null;
+        this._loadAlarmDismissed();
         this.loadAlarms();
 
         document.addEventListener('alarmsSynced', (e) => {
@@ -19,6 +20,30 @@ const AlarmManager = {
         document.addEventListener('syncDataLoaded', () => {
             this.loadAlarms();
         });
+    },
+
+    _loadAlarmDismissed() {
+        try {
+            const raw = SafeStorage.get(this.DISMISSED_KEY);
+            if (raw) {
+                const d = JSON.parse(raw);
+                this._alarmDismissedAt = d.at || null;
+                this._dismissedAlarmId = d.id || null;
+            } else {
+                this._alarmDismissedAt = null;
+                this._dismissedAlarmId = null;
+            }
+        } catch (e) {
+            this._alarmDismissedAt = null;
+            this._dismissedAlarmId = null;
+        }
+    },
+
+    _saveAlarmDismissed() {
+        SafeStorage.set(this.DISMISSED_KEY, JSON.stringify({
+            at: this._alarmDismissedAt,
+            id: this._dismissedAlarmId
+        }));
     },
 
     loadAlarms() {
@@ -32,6 +57,7 @@ const AlarmManager = {
 
     saveAlarms() {
         SafeStorage.set(this.ALARMS_KEY, JSON.stringify(this._alarms));
+        this._alarmsChangedAt = Date.now();
         // 立即推送云端防sync拉旧数据覆盖闹钟编辑
         if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
             syncManager.immediateSyncToCloud().catch(() => {});
@@ -94,6 +120,7 @@ const AlarmManager = {
             if (elapsed < 180000) return false;
             this._alarmDismissedAt = null;
             this._dismissedAlarmId = null;
+            this._saveAlarmDismissed();
         }
 
         const now = new Date();
@@ -194,6 +221,7 @@ const AlarmManager = {
         this._activeAlarm = null;
         this._alarmDismissedAt = Date.now();
         this._dismissedAlarmId = id;
+        this._saveAlarmDismissed();
         this.hideAlarmNotice();
         this.updateCountdownNotice();
     },

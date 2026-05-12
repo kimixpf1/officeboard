@@ -285,7 +285,9 @@ class OfficeDashboard {
 
             const _ric = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (fn) => setTimeout(fn, 0);
             _ric(() => {
-                this.startTodoReminderLoop();
+                this._loadDismissedReminderIds().then(() => {
+                    this.startTodoReminderLoop();
+                });
                 this.bindTodoReminderComplete();
                 this.initHeaderClock();
                 this.initHeaderWeather();
@@ -1685,7 +1687,11 @@ class OfficeDashboard {
      * 加载保存的主题
      */
     loadTheme() {
-        const savedTheme = SecurityUtils.safeGetStorage('theme') || 'default';
+        let savedTheme = SecurityUtils.safeGetStorage('theme') || 'default';
+        // 兼容旧版多主题 → 现在只有 default 和 dark
+        if (savedTheme !== 'default' && savedTheme !== 'dark') {
+            savedTheme = 'default';
+        }
         this.setTheme(savedTheme, { sync: false });
     }
 
@@ -3442,6 +3448,35 @@ class OfficeDashboard {
         return true;
     }
 
+    /**
+     * 从 DB 回填已关闭的待办提醒 ID（防刷新后复活）
+     */
+    async _loadDismissedReminderIds() {
+        this._dismissedTodoReminderIds = new Set();
+        try {
+            // 优先从 SafeStorage 恢复（比 DB 更可靠，不会被 sync 覆盖）
+            const raw = SecurityUtils.safeGetStorage('office_dismissed_reminders');
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) arr.forEach(id => this._dismissedTodoReminderIds.add(id));
+            }
+            // 同时从 DB 补充（有些可能是 sync 带回来的已提醒标记）
+            const allItems = await db.getAllItems();
+            for (const item of allItems) {
+                if (item.reminderDismissedAt) {
+                    this._dismissedTodoReminderIds.add(item.id);
+                }
+            }
+            this._persistDismissedReminderIds();
+        } catch (e) { /* 非关键路径 */ }
+    }
+
+    _persistDismissedReminderIds() {
+        if (!this._dismissedTodoReminderIds) return;
+        SecurityUtils.safeSetStorage('office_dismissed_reminders',
+            JSON.stringify([...this._dismissedTodoReminderIds]));
+    }
+
     startTodoReminderLoop() {
         if (this.todoReminderRefreshTimer) {
             clearInterval(this.todoReminderRefreshTimer);
@@ -3486,6 +3521,7 @@ class OfficeDashboard {
                 // 关闭提醒≠完成待办：内存+DB双重标记，防sync覆盖后复活
                 this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
                 this._dismissedTodoReminderIds.add(itemId);
+                this._persistDismissedReminderIds();
                 const item = await db.getItem(itemId);
                 if (item) {
                     item.reminderDismissedAt = new Date().toISOString();
@@ -3851,8 +3887,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-12 v5.2.86';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=69', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=8', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=223', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const version = '2026-05-12 v5.2.87';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=70', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=9', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=224', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=2', 'themes.css?v=4', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

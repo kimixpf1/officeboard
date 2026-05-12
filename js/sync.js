@@ -174,7 +174,19 @@ class SyncManager {
         for (const alarm of cloudAlarms) {
             if (localIds.has(alarm.id)) {
                 const idx = merged.findIndex(a => a.id === alarm.id);
-                if (idx >= 0) merged[idx] = alarm;
+                if (idx >= 0) {
+                    // 本地刚编辑过（5秒内），保留本地版本
+                    const app = window.officeDashboard;
+                    if (app?._alarmsChangedAt && Date.now() - app._alarmsChangedAt < 5000) {
+                        continue;
+                    }
+                    // 否则比较 createdAt，保留较新版本
+                    const localCreatedAt = new Date(merged[idx].createdAt || 0).getTime();
+                    const cloudCreatedAt = new Date(alarm.createdAt || 0).getTime();
+                    if (cloudCreatedAt > localCreatedAt || (!merged[idx].enabled && alarm.enabled)) {
+                        merged[idx] = alarm;
+                    }
+                }
             } else {
                 merged.push(alarm);
             }
