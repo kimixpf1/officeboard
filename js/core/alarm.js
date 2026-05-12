@@ -87,8 +87,9 @@ const AlarmManager = {
     checkAlarms() {
         if (this._alarmDismissedAt) {
             const elapsed = Date.now() - this._alarmDismissedAt;
-            if (elapsed < 120000) return false;
+            if (elapsed < 180000) return false;
             this._alarmDismissedAt = null;
+            this._dismissedAlarmId = null;
         }
 
         const now = new Date();
@@ -97,6 +98,7 @@ const AlarmManager = {
 
         for (const alarm of this._alarms) {
             if (!this.shouldAlarmTrigger(alarm)) continue;
+            if (this._dismissedAlarmId && alarm.id === this._dismissedAlarmId) continue;
             const [h, m] = alarm.time.split(':').map(Number);
             const alarmMinutes = h * 60 + m;
             const diff = alarmMinutes - nowMinutes;
@@ -167,6 +169,7 @@ const AlarmManager = {
     dismissAlarm(id) {
         this._activeAlarm = null;
         this._alarmDismissedAt = Date.now();
+        this._dismissedAlarmId = id;
         this.hideAlarmNotice();
         this.updateCountdownNotice();
     },
