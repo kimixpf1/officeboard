@@ -3318,7 +3318,7 @@ class OfficeDashboard {
     getTodoReminderItems(items = []) {
         const now = Date.now();
         return items
-            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && item.deadlineManuallySet)
+            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && (item.deadlineManuallySet || item.reminderManuallySet))
             .map(item => {
                 const deadlineDate = new Date(item.deadline);
                 if (Number.isNaN(deadlineDate.getTime())) {
@@ -3833,7 +3833,7 @@ class OfficeDashboard {
         }
 
         const version = '2026-05-12 v5.2.84';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=218', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=219', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4043,25 +4043,34 @@ class OfficeDashboard {
             case ITEM_TYPES.TODO:
                 item.priority = document.getElementById('todoPriority').value;
                 const newDeadline = document.getElementById('todoDeadline').value;
+                item.deadline = newDeadline;
+                const newReminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
+                const reminderTimeVal = document.getElementById('todoReminderTime').value;
+                item.reminderAdvance = newReminderAdvance;
+                if (item.reminderAdvance >= 1440 && reminderTimeVal) {
+                    item.reminderTime = reminderTimeVal;
+                } else {
+                    item.reminderTime = null;
+                }
                 if (id) {
                     const originalItem = await db.getItem(parseInt(id));
-                    if (originalItem && originalItem.deadline !== newDeadline) {
-                        item.deadlineManuallySet = true;
-                    } else if (originalItem) {
-                        item.deadlineManuallySet = originalItem.deadlineManuallySet || false;
+                    if (originalItem) {
+                        // 截止时间手动改过
+                        if (originalItem.deadline !== newDeadline) {
+                            item.deadlineManuallySet = true;
+                        } else {
+                            item.deadlineManuallySet = originalItem.deadlineManuallySet || false;
+                        }
+                        // 提醒时间手动改过
+                        const reminderChanged = originalItem.reminderAdvance !== newReminderAdvance
+                            || (originalItem.reminderTime || null) !== (item.reminderTime || null);
+                        item.reminderManuallySet = originalItem.reminderManuallySet || reminderChanged || false;
                     }
                 } else {
                     if (this._todoDeadlineInitial && this._todoDeadlineInitial !== newDeadline) {
                         item.deadlineManuallySet = true;
                     }
-                }
-                item.deadline = newDeadline;
-                item.reminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
-                const reminderTimeVal = document.getElementById('todoReminderTime').value;
-                if (item.reminderAdvance >= 1440 && reminderTimeVal) {
-                    item.reminderTime = reminderTimeVal;
-                } else {
-                    item.reminderTime = null;
+                    item.reminderManuallySet = newReminderAdvance !== 3 || !!item.reminderTime;
                 }
                 item.completed = false;
 

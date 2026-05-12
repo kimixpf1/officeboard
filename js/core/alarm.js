@@ -128,6 +128,10 @@ const AlarmManager = {
         if (!noticeEl) return;
 
         this.hideIdleNotice();
+        if (this.countdownNoticeTimer) {
+            clearInterval(this.countdownNoticeTimer);
+            this.countdownNoticeTimer = null;
+        }
         noticeEl.hidden = false;
         noticeEl.classList.remove('todo-reminder-active', 'idle-mode');
         noticeEl.classList.add('alarm-active', 'todo-reminder-flashing');
