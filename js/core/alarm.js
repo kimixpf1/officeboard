@@ -32,6 +32,10 @@ const AlarmManager = {
 
     saveAlarms() {
         SafeStorage.set(this.ALARMS_KEY, JSON.stringify(this._alarms));
+        // 立即推送云端防sync拉旧数据覆盖闹钟编辑
+        if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
+            syncManager.immediateSyncToCloud().catch(() => {});
+        }
     },
 
     getAlarms() {

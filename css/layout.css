@@ -304,11 +304,6 @@
     background: color-mix(in srgb, #ef4444 20%, var(--bg-primary));
 }
 
-/* 闪烁时✓按钮保持常亮可见 */
-.countdown-notice.todo-reminder-flashing .todo-reminder-complete-btn {
-    animation: none;
-    opacity: 1 !important;
-}
 
 /* 空闲态通知栏 */
 .countdown-notice.idle-mode {

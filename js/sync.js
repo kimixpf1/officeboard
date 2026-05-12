@@ -264,6 +264,25 @@ class SyncManager {
         if (changed) this.persistDeletedItemsMap();
     }
 
+    /**
+     * 云端主题恢复到本地，带本地最近修改保护
+     * 如果用户在 5 秒内刚改过主题，优先保留本地值并上传覆盖云端
+     */
+    _applyCloudTheme(cloudTheme) {
+        if (cloudTheme === undefined) return;
+        const currentValue = SafeStorage.get('theme') || '';
+        if (cloudTheme === currentValue) return;
+
+        const app = window.officeDashboard;
+        if (app?._themeChangedAt && Date.now() - app._themeChangedAt < 5000) {
+            // 用户刚切过主题，上传本地值覆盖云端旧值
+            this.immediateSyncToCloud?.().catch(() => {});
+            return;
+        }
+        SafeStorage.set('theme', cloudTheme);
+        document.documentElement.setAttribute('data-theme', cloudTheme);
+    }
+
     getItemDeletionKey(item) {
         if (!item) return '';
         return `key:${this.getItemKey(item)}`;
@@ -917,14 +936,7 @@ class SyncManager {
                             }));
                         }
                     }
-                    if (cloudData?.data?.theme !== undefined) {
-                        const nextValue = cloudData.data.theme;
-                        const currentValue = SafeStorage.get('theme') || '';
-                        if (nextValue !== currentValue) {
-                            SafeStorage.set('theme', nextValue);
-                            document.documentElement.setAttribute('data-theme', nextValue);
-                        }
-                    }
+                    this._applyCloudTheme(cloudData?.data?.theme);
                     if (
                         cloudData?.data?.countdownEvents !== undefined
                         || cloudData?.data?.countdownTypeColors !== undefined
@@ -1149,14 +1161,7 @@ class SyncManager {
                 }
             }
 
-            if (cloudData.data.theme !== undefined) {
-                const nextValue = cloudData.data.theme;
-                const currentValue = SafeStorage.get('theme') || '';
-                if (nextValue !== currentValue) {
-                    SafeStorage.set('theme', nextValue);
-                    document.documentElement.setAttribute('data-theme', nextValue);
-                }
-            }
+            this._applyCloudTheme(cloudData.data.theme);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
@@ -1455,14 +1460,7 @@ class SyncManager {
                 }
             }
 
-            if (cloudData.data.theme !== undefined) {
-                const cloudTheme = cloudData.data.theme;
-                const localTheme = SafeStorage.get('theme') || '';
-                if (cloudTheme !== localTheme) {
-                    SafeStorage.set('theme', cloudTheme);
-                    document.documentElement.setAttribute('data-theme', cloudTheme);
-                }
-            }
+            this._applyCloudTheme(cloudData.data.theme);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
@@ -1861,10 +1859,7 @@ class SyncManager {
                 }));
             }
 
-            if (data.data.theme !== undefined) {
-                SafeStorage.set('theme', data.data.theme);
-                document.documentElement.setAttribute('data-theme', data.data.theme);
-            }
+            this._applyCloudTheme(data.data.theme);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
@@ -2343,10 +2338,7 @@ class SyncManager {
                 }));
             }
 
-            if (data.data.theme !== undefined) {
-                SafeStorage.set('theme', data.data.theme);
-                document.documentElement.setAttribute('data-theme', data.data.theme);
-            }
+            this._applyCloudTheme(data.data.theme);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {

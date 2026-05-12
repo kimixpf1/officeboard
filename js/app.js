@@ -1662,6 +1662,7 @@ class OfficeDashboard {
      * 设置主题
      */
     setTheme(theme, { sync = true } = {}) {
+        this._themeChangedAt = Date.now();
         document.documentElement.setAttribute('data-theme', theme);
         SecurityUtils.safeSetStorage('theme', theme);
 
@@ -3490,6 +3491,10 @@ class OfficeDashboard {
                     item.reminderDismissedAt = new Date().toISOString();
                     await db.putItem(item);
                     this.items = await db.getAllItems();
+                    // 立即推送云端防sync拉旧数据覆盖
+                    if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
+                        syncManager.immediateSyncToCloud().catch(() => {});
+                    }
                 }
                 await this.loadItems(); // 重渲染卡片显示已提醒标记+更新通知栏
             } catch (err) {
@@ -3846,8 +3851,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-12 v5.2.85';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=222', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const version = '2026-05-12 v5.2.86';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=69', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=8', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=223', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

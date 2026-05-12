@@ -513,6 +513,10 @@ const ContextMenuCore = {
             delete clone.updatedAt;
             delete clone.recurringGroupId;
             delete clone.occurrenceIndex;
+            delete clone.isRecurring;
+            delete clone.recurringRule;
+            delete clone.recurringCount;
+            delete clone.dayStates;
             delete clone.pinned;
             delete clone.sunk;
             delete clone.manualOrder;
@@ -669,9 +673,10 @@ const ContextMenuCore = {
                 box.style.top = '50%';
                 box.style.transform = 'translate(-50%, -50%)';
             }
+            const esc = (s) => (typeof SecurityUtils !== 'undefined' ? SecurityUtils.escapeHtml(String(s)) : String(s));
             box.innerHTML = `
-                <div style="margin-bottom:12px;font-weight:600;">${title}</div>
-                <input type="date" value="${defaultDate || ''}" style="font-size:16px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;width:100%;">
+                <div style="margin-bottom:12px;font-weight:600;">${esc(title)}</div>
+                <input type="date" value="${esc(defaultDate || '')}" style="font-size:16px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;width:100%;">
                 <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
                     <button class="btn-secondary btn-sm" data-action="cancel">取消</button>
                     <button class="btn-primary btn-sm" data-action="confirm">确认</button>

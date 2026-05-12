@@ -33,6 +33,10 @@
     --gray-700: #374151;
     --gray-800: #1f2937;
     --gray-900: #111827;
+
+    /* 文字色（跟随灰度自动适配亮/暗主题） */
+    --text-primary: var(--gray-800);
+    --text-secondary: var(--gray-500);
     
     /* 背景色 */
     --bg-primary: #ffffff;
@@ -83,7 +87,9 @@ body {
     100% { transform: translateX(-100%); }
 }
 
-.countdown-notice.todo-reminder-flashing {
+/* 闪烁动画只作用于内容区，不包含✓按钮（opacity子元素乘性无法override） */
+.countdown-notice.todo-reminder-flashing .countdown-notice-content,
+.countdown-notice.todo-reminder-flashing .countdown-notice-badge {
     animation: todoFlash 1.4s ease-in-out infinite;
 }
 
