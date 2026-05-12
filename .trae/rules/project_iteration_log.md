@@ -1,3 +1,22 @@
+## 2026-05-12 v5.2.82 主题配色重设计+切换被覆盖修复
+
+### 改动内容
+1. **主题切换修复**：`setTheme()` 新增云端同步，避免切主题几秒后被云端旧值覆盖；`loadTheme()` 传入 `{sync:false}` 避免启动时无效请求
+2. **8套浅色主题重设计**：每套有独立 `--bg-primary/secondary/tertiary`（~2%饱和度淡色）+ `--border-color` + card/panel 白色底
+3. index.html app.js 版本号 v=215→v=216 对齐
+4. CSS 拆分为 5 模块：base / layout / themes / components / responsive
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ Code review 通过
+- ✅ 已提交推送 `ac7f869`
+
+### 提交记录
+- `ac7f869` fix: loadTheme跳过云同步+app.js版本号对齐
+- `0232366` fix: 主题切换被云端覆盖+主题配色重设计（v5.2.82）
+
+---
+
 ## 2026-05-12 v5.2.81 通知栏颜色区分+待办自定义提前提醒
 
 ### 改动内容
