@@ -158,21 +158,14 @@ const AlarmManager = {
             completeBtn.onclick = (e) => { e.stopPropagation(); this.dismissAlarm(alarm.id); };
         }
 
-        // 点击通知栏任意处关闭闹钟，右键打开闹钟设置
-        if (!noticeEl._alarmClickBound) {
-            noticeEl._alarmClickBound = true;
-            noticeEl._alarmClickHandler = (e) => {
-                if (!noticeEl.classList.contains('alarm-active')) return;
-                if (e.target.closest('.todo-reminder-complete-btn')) return;
-                e.preventDefault();
-                this.dismissAlarm(this._activeAlarm?.id);
-            };
+        // 右键通知栏打开闹钟设置
+        if (!noticeEl._alarmCtxBound) {
+            noticeEl._alarmCtxBound = true;
             noticeEl._alarmCtxHandler = (e) => {
                 if (!noticeEl.classList.contains('alarm-active')) return;
                 e.preventDefault();
                 if (typeof this.showAlarmSettings === 'function') this.showAlarmSettings();
             };
-            noticeEl.addEventListener('click', noticeEl._alarmClickHandler);
             noticeEl.addEventListener('contextmenu', noticeEl._alarmCtxHandler);
         }
     },
