@@ -3318,7 +3318,7 @@ class OfficeDashboard {
     getTodoReminderItems(items = []) {
         const now = Date.now();
         return items
-            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && (item.deadlineManuallySet || item.reminderManuallySet))
+            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && !item.reminderDismissedAt && (item.deadlineManuallySet || item.reminderManuallySet))
             .map(item => {
                 const deadlineDate = new Date(item.deadline);
                 if (Number.isNaN(deadlineDate.getTime())) {
@@ -3476,10 +3476,16 @@ class OfficeDashboard {
             btn.style.pointerEvents = 'none';
 
             try {
-                await this.toggleTodoComplete(itemId, true);
+                // 关闭提醒≠完成待办：标记已提醒，不再闪烁，但待办保持未完成
+                const item = await db.getItem(itemId);
+                if (item) {
+                    item.reminderDismissedAt = new Date().toISOString();
+                    await db.putItem(item);
+                    this.items = await db.getAllItems();
+                }
                 this.updateCountdownNotice();
             } catch (err) {
-                console.warn('通知栏完成待办失败:', err);
+                console.warn('关闭待办提醒失败:', err);
             } finally {
                 completing = false;
                 btn.textContent = '✓';
@@ -3832,8 +3838,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-12 v5.2.84';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=219', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const version = '2026-05-12 v5.2.85';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=220', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4071,6 +4077,10 @@ class OfficeDashboard {
                         item.deadlineManuallySet = true;
                     }
                     item.reminderManuallySet = newReminderAdvance !== 3 || !!item.reminderTime;
+                }
+                // 编辑时清除已提醒标记，让提醒重新生效
+                if (id) {
+                    delete item.reminderDismissedAt;
                 }
                 item.completed = false;
 
