@@ -493,13 +493,18 @@ const CountdownPanel = {
             return;
         }
 
+        // 闹钟/待办激活时不被外部调用覆盖
+        if (noticeEl.classList.contains('alarm-active')) {
+            return;
+        }
+
         const upcoming = this.getAllCountdownEvents().filter(item => item.daysLeft >= 0 && item.daysLeft <= 10);
         if (this.countdownNoticeTimer) {
             clearInterval(this.countdownNoticeTimer);
             this.countdownNoticeTimer = null;
         }
 
-        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing', 'alarm-active');
+        noticeEl.classList.remove('todo-reminder-active', 'todo-reminder-flashing');
 
         if (!upcoming.length) {
             this.countdownNoticeIndex = 0;

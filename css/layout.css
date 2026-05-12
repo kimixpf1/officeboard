@@ -346,8 +346,13 @@
 
 /* 闹钟提醒态 */
 .countdown-notice.alarm-active {
+    position: relative;
     border-color: color-mix(in srgb, #f59e0b 40%, var(--border-color));
     background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 12%, var(--bg-primary)), color-mix(in srgb, #f97316 20%, var(--bg-primary)));
+}
+
+.countdown-notice.alarm-active .countdown-notice-content {
+    padding-right: 30px;
 }
 
 .countdown-notice.alarm-active .countdown-notice-badge {
