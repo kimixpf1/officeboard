@@ -1,6 +1,25 @@
 # Todolist
 
-## 已完成（v5.2.79 → v5.2.82）
+## 已完成
+
+### v5.2.88 闹钟通知栏✓按钮闪烁修复
+- [x] `updateTodoReminderNotice()` alarm-active守卫防toggle移除class
+- [x] `showAlarmNotice()` `_shownAlarmId` 去冗余DOM写入
+- [x] `initAlarmSystem()` 显式初始化 `_shownAlarmId = null`（code-reviewer MEDIUM）
+
+### v5.2.87 闹钟/待办提醒持久化+主题简化+mergeAlarms修复
+- [x] 闹钟关闭持久化（SafeStorage）
+- [x] 待办提醒关闭持久化（SafeStorage + DB双重恢复）
+- [x] mergeAlarms 5秒本地保护 + createdAt时间戳
+- [x] 主题简化：8→2种（浅色靛青+深色）
+
+### v5.2.84 闹钟关闭交互修复+提醒时间手动标记
+- [x] `.alarm-active` 补 `position: relative` 使✓按钮可见
+- [x] `updateCountdownNotice()` alarm-active 守卫防闲时覆盖
+- [x] 通知栏 click 关闭闹钟 / contextmenu 打开设置
+- [x] `showAlarmNotice()` 清除倒计时定时器防文字闪烁
+- [x] `reminderManuallySet` 标记：只改提醒时间也触发通知栏
+- [x] `saveItem()` 重构合并重复 `db.getItem`
 
 ### v5.2.83 主题FOUC+白字可读性+闹钟关闭修复
 - [x] 阻塞脚本预置data-theme消除主题加载闪烁

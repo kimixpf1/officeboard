@@ -1,3 +1,114 @@
+## 2026-05-12 v5.2.88 闹钟通知栏✓按钮闪烁修复
+
+### 改动内容
+1. **闹钟✓按钮闪烁根因**：每秒 tick 中 `showAlarmNotice()` 加 `todo-reminder-flashing` class → `updateTodoReminderNotice()` 因无待办将其 toggle 移除 → 闪烁动画每秒启停
+2. **修复1**：`updateTodoReminderNotice()` 开头加 `alarm-active` 守卫，闹钟激活时直接返回 false，不碰任何 class
+3. **修复2**：`showAlarmNotice()` 加 `_shownAlarmId` 跟踪，同闹钟重复 tick 只更新倒计时文字，跳过 classList/按钮/badge 的冗余 DOM 写入
+4. **修复3**（code-reviewer MEDIUM）：`initAlarmSystem()` 显式初始化 `_shownAlarmId = null`
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ Code review APPROVED（0C / 0H / 1M已修复 / 1L）
+- ✅ 模拟测试 6/6 PASS
+- ✅ 已提交推送 `869eb27`
+
+### 提交记录
+- `869eb27` fix: 闹钟通知栏✓按钮闪烁——updateTodoReminderNotice alarm-active守卫+showAlarmNotice去冗余写入 (v5.2.88)
+
+### 验证清单
+- [ ] 闹钟触发时✓按钮不再闪烁
+- [ ] 闹钟激活时待办提醒不会覆盖闹钟状态
+- [ ] 闹钟切换时正常更新显示
+- [ ] 关闭闹钟后状态正确清理
+- [ ] 控制台无 JS 错误
+
+---
+
+## 2026-05-12 v5.2.87 闹钟/待办提醒持久化+主题简化+mergeAlarms修复
+
+### 改动内容
+1. **闹钟关闭后复活**：`_alarmDismissedAt`/`_dismissedAlarmId` 从内存改为 SafeStorage 持久化，刷新后不再丢失；过期后自动清理
+2. **待办提醒关闭复活**：`_dismissedTodoReminderIds` 从 SafeStorage + DB `reminderDismissedAt` 双重恢复，刷新后不复活；关闭时同步持久化
+3. **编辑闹钟刷新变回旧值**：`_mergeAlarms` 同 ID 冲突时加 5 秒本地保护 + `createdAt` 时间戳比较，替代旧"云端无条件赢"逻辑；`saveAlarms` 设 `_alarmsChangedAt` 时间戳
+4. **主题简化**：移除 7 套浅色主题（天际蓝/青瓷/翠竹/玫瑰/中国红/琥珀/幻影紫），只保留浅色(靛青)+深色两种；themes.css 精简 171 行；深色完全不动
+5. **loadTheme 兼容**：旧主题名自动回退 'default'
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ Code review 通过（0C / 0H / 3M，1个M已修复）
+- ✅ 已提交推送 `2e9256d`
+
+### 提交记录
+- `2e9256d` fix: 闹钟/待办提醒持久化+主题简化为2种+mergeAlarms时间戳+v5.2.87
+
+### 验证清单
+- [ ] 闹钟关闭后刷新页面 → 不再复活闪烁
+- [ ] 待办提醒✓关闭后刷新 → 不复活，"已提前提醒"标记保留
+- [ ] 编辑闹钟后刷新 → 不自动变回旧值
+- [ ] 深色模式所有样式不变
+- [ ] 浅色模式下所有文字（标题/按钮/输入框/弹窗）清晰可读
+- [ ] 旧用户如果之前存了非 default/dark 主题 → 自动回退 default
+- [ ] 控制台无 JS 错误
+
+---
+
+## 2026-05-12 v5.2.86 浅色主题可读性+主题切换sync竞争+复制周期性残留修复
+
+### 改动内容
+1. **浅色主题字看不清**：base.css `:root` 新增 `--text-primary: var(--gray-800)` / `--text-secondary: var(--gray-500)`，修复全项目大量使用的这两个变量从未定义的问题（暗色主题通过 gray 重映射自动适配）
+2. **切换主题跳回旧配色**：sync.js 提取 `_applyCloudTheme()` 统一 5 处主题恢复逻辑，加 5 秒本地修改保护；app.js `setTheme()` 设 `_themeChangedAt` 时间戳，防止 sync 在 upload 完成前拉回旧值覆盖
+3. **复制/移动事项变周期**：`_contextCopyTo()` 补删 `isRecurring`/`recurringRule`/`recurringCount`/`dayStates`，防止复制品继承原事项的周期性标记
+4. **`_showDatePicker` innerHTML 安全加固**（MEDIUM）：title/defaultDate 加 `SecurityUtils.escapeHtml()` 防 XSS
+5. **`saveAlarms()` 补 immediateSyncToCloud**（alarm.js）：防编辑闹钟后被 sync 拉旧数据覆盖
+6. **layout.css 清理**：移除不再需要的 workaround CSS 规则
+7. **scriptVersions 数组补全**：新增遗漏的 context-menu.js/alarm.js/idle-bar.js/pet-renderer.js 版本记录
+
+### 当前状态
+- ✅ 语法检查全部通过
+- ✅ Code review 通过（0 CRITICAL / 0 HIGH / 1 MEDIUM已修复）
+- ✅ 已提交推送 `7a8ee7e`
+
+### 提交记录
+- `7a8ee7e` fix: CSS变量修复+主题sync竞争+复制周期性残留+v5.2.86
+
+### 验证清单
+- [ ] 各浅色主题下按钮/弹窗/输入框文字清晰可读
+- [ ] 切换主题后不跳回旧配色（等 5 秒观察）
+- [ ] 复制非周期性事项到新日期 → 不显示 🔄 徽章
+- [ ] 移动事项到新日期 → 类型不变
+- [ ] 闹钟编辑后不自动变回旧值
+- [ ] 控制台无 JS 错误
+
+---
+
+## 2026-05-12 v5.2.84 闹钟关闭交互修复+提醒时间手动标记
+
+### 改动内容
+1. **闹钟✓按钮不可见**：`.alarm-active` 补 `position: relative`，使绝对定位的✓按钮正确定位在通知栏内
+2. **闹钟与闲时交替闪烁**：`updateCountdownNotice()` 开头加 `alarm-active` 守卫，外部数据事件不再覆盖闹钟状态
+3. **闹钟通知栏点击无效**：`showAlarmNotice()` 绑定 click（关闭闹钟）/contextmenu（打开设置）处理器，✓按钮加 `stopPropagation`
+4. **倒计时定时器覆盖闹钟文字**（code-reviewer MEDIUM）：`showAlarmNotice()` 清除 `countdownNoticeTimer`，避免每3秒被倒数日文字覆盖
+5. **只改提醒时间不提醒**：新增 `reminderManuallySet` 标记，只改提醒时间（不改截止时间）也触发通知栏提醒；`saveItem()` 重构合并两次 `db.getItem` 为一次
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ Code review 通过（0 CRITICAL / 0 HIGH / MEDIUM已修复）
+- ✅ 已提交推送 `6d20c3a` + `d912cca`
+
+### 提交记录
+- `6d20c3a` fix: 闹钟✓按钮可见+点击关闭+闲时不交替闪烁 (v5.2.84)
+- `d912cca` fix: 闹钟激活时清除倒计时定时器+提醒时间手动改过也触发通知栏 (v5.2.84)
+
+### 验证清单
+- [ ] 闹钟闪烁时✓按钮可见可点击
+- [ ] 点击通知栏任意处关闭闹钟
+- [ ] 右键通知栏打开闹钟设置
+- [ ] 闹钟激活时闲时蓝框不出现
+- [ ] 只改提醒时间（不改截止时间）也触发通知栏提醒
+- [ ] 新增事项默认截止时间+默认提醒不触发提醒
+
+---
+
 ## 2026-05-12 v5.2.83 主题FOUC+白字可读性+闹钟关闭修复
 
 ### 改动内容
