@@ -3160,6 +3160,19 @@ class OfficeDashboard {
             case ITEM_TYPES.TODO:
                 document.getElementById('todoPriority').value = item.priority || 'medium';
                 document.getElementById('todoDeadline').value = item.deadline || '';
+                document.getElementById('todoReminderAdvance').value = item.reminderAdvance || 3;
+                const reminderTimeEl = document.getElementById('todoReminderTime');
+                const reminderTimeGroup = document.getElementById('reminderTimeGroup');
+                if (item.reminderTime) {
+                    reminderTimeEl.value = item.reminderTime;
+                } else {
+                    reminderTimeEl.value = '09:00';
+                }
+                if (parseInt(document.getElementById('todoReminderAdvance').value) >= 1440) {
+                    reminderTimeGroup.style.display = '';
+                } else {
+                    reminderTimeGroup.style.display = 'none';
+                }
                 
                 // 周期性任务设置
                 const isRecurringCheckbox = document.getElementById('isRecurring');
@@ -3306,14 +3319,27 @@ class OfficeDashboard {
                 if (Number.isNaN(deadlineDate.getTime())) {
                     return null;
                 }
+                const advanceMin = item.reminderAdvance || 3;
+                let windowMs = advanceMin * 60000;
+                if (item.reminderTime && advanceMin >= 1440) {
+                    const advanceDays = Math.floor(advanceMin / 1440);
+                    const [h, m] = item.reminderTime.split(':').map(Number);
+                    const remindDate = new Date(deadlineDate);
+                    remindDate.setDate(remindDate.getDate() - advanceDays);
+                    remindDate.setHours(h, m, 0, 0);
+                    if (!Number.isNaN(remindDate.getTime())) {
+                        windowMs = deadlineDate.getTime() - remindDate.getTime();
+                    }
+                }
                 return {
                     item,
                     deadlineDate,
-                    overdueMs: now - deadlineDate.getTime()
+                    overdueMs: now - deadlineDate.getTime(),
+                    windowMs
                 };
             })
             .filter(Boolean)
-            .filter(entry => entry.overdueMs >= -180000)
+            .filter(entry => entry.overdueMs >= -entry.windowMs)
             .sort((a, b) => a.deadlineDate - b.deadlineDate);
     }
 
@@ -3363,6 +3389,10 @@ class OfficeDashboard {
 
         noticeEl.classList.toggle('todo-reminder-active', state.active);
         noticeEl.classList.toggle('todo-reminder-flashing', state.active && state.flashing);
+
+        if (state.active) {
+            noticeEl.classList.remove('idle-mode', 'alarm-active');
+        }
 
         if (!state.active) {
             this.todoReminderNoticeIndex = 0;
@@ -3797,8 +3827,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-11 v5.2.80';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=214', 'db.js?v=29', 'style.css?v=67', 'crypto.js?v=17'];
+        const version = '2026-05-12 v5.2.81';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=215', 'db.js?v=29', 'style.css?v=67', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -3974,6 +4004,15 @@ class OfficeDashboard {
                 this.updateDocRecurringFieldsVisibility(e.target.value);
             };
         }
+
+        // === 待办提前提醒 → 条件显示提醒时刻 ===
+        const todoReminderAdvance = document.getElementById('todoReminderAdvance');
+        const reminderTimeGroup = document.getElementById('reminderTimeGroup');
+        if (todoReminderAdvance && reminderTimeGroup) {
+            todoReminderAdvance.onchange = (e) => {
+                reminderTimeGroup.style.display = parseInt(e.target.value) >= 1440 ? '' : 'none';
+            };
+        }
     }
 
     /**
@@ -4012,6 +4051,13 @@ class OfficeDashboard {
                     }
                 }
                 item.deadline = newDeadline;
+                item.reminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
+                const reminderTimeVal = document.getElementById('todoReminderTime').value;
+                if (item.reminderAdvance >= 1440 && reminderTimeVal) {
+                    item.reminderTime = reminderTimeVal;
+                } else {
+                    item.reminderTime = null;
+                }
                 item.completed = false;
 
                 // 周期性任务处理
