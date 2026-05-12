@@ -1661,7 +1661,7 @@ class OfficeDashboard {
     /**
      * 设置主题
      */
-    setTheme(theme) {
+    setTheme(theme, { sync = true } = {}) {
         document.documentElement.setAttribute('data-theme', theme);
         SecurityUtils.safeSetStorage('theme', theme);
 
@@ -1674,8 +1674,8 @@ class OfficeDashboard {
         const menu = document.getElementById('themeMenu');
         if (menu) menu.classList.remove('active');
 
-        // 立即同步到云端，避免云端旧值覆盖本地新主题
-        if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
+        // 用户主动切换时同步云端，避免旧值覆盖；加载时跳过
+        if (sync && typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
             syncManager.immediateSyncToCloud?.();
         }
     }
@@ -1685,7 +1685,7 @@ class OfficeDashboard {
      */
     loadTheme() {
         const savedTheme = SecurityUtils.safeGetStorage('theme') || 'default';
-        this.setTheme(savedTheme);
+        this.setTheme(savedTheme, { sync: false });
     }
 
     /**
