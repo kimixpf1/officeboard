@@ -309,9 +309,9 @@ const ContextMenuCore = {
         const today = new Date();
         today.setHours(12, 0, 0, 0);
 
-        const mondayOffset = 1 - today.getDay();
+        const mondayOffset = 1 - today.getDay(); // getDay: 0=周日, 1=周一… mondayOffset≤0表示周一已过
         const monday = new Date(today);
-        monday.setDate(today.getDate() + (mondayOffset >= 0 ? mondayOffset : mondayOffset + 7));
+        monday.setDate(today.getDate() + mondayOffset);
 
         const rows = [];
         for (let i = 0; i < 7; i++) {
@@ -426,9 +426,9 @@ const ContextMenuCore = {
         const today = new Date();
         today.setHours(12, 0, 0, 0);
 
-        const mondayOffset = 1 - today.getDay();
+        const mondayOffset = 1 - today.getDay(); // getDay: 0=周日, 1=周一… mondayOffset≤0表示周一已过
         const monday = new Date(today);
-        monday.setDate(today.getDate() + (mondayOffset >= 0 ? mondayOffset : mondayOffset + 7));
+        monday.setDate(today.getDate() + mondayOffset);
 
         const rows = [];
         for (let i = 0; i < 7; i++) {

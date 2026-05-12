@@ -3491,7 +3491,7 @@ class OfficeDashboard {
                     await db.putItem(item);
                     this.items = await db.getAllItems();
                 }
-                this.updateCountdownNotice();
+                await this.loadItems(); // 重渲染卡片显示已提醒标记+更新通知栏
             } catch (err) {
                 console.warn('关闭待办提醒失败:', err);
             } finally {
@@ -3847,7 +3847,7 @@ class OfficeDashboard {
         }
 
         const version = '2026-05-12 v5.2.85';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=221', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=222', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
