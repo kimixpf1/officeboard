@@ -1673,6 +1673,11 @@ class OfficeDashboard {
         // 关闭菜单
         const menu = document.getElementById('themeMenu');
         if (menu) menu.classList.remove('active');
+
+        // 立即同步到云端，避免云端旧值覆盖本地新主题
+        if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
+            syncManager.immediateSyncToCloud?.();
+        }
     }
 
     /**
@@ -3827,8 +3832,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-12 v5.2.81';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=216', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=1', 'themes.css?v=1', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
+        const version = '2026-05-12 v5.2.82';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=216', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=1', 'themes.css?v=2', 'components.css?v=1', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
