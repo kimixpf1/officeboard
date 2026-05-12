@@ -1,6 +1,12 @@
 # Todolist
 
-## 已完成（v5.2.79 → v5.2.80）
+## 已完成（v5.2.79 → v5.2.81）
+
+### v5.2.81 通知栏颜色区分+待办自定义提前提醒
+- [x] 通知栏颜色修复：待办提醒激活时移除 idle-mode/alarm-active
+- [x] 待办新增 reminderAdvance（提前分钟）+ reminderTime（指定时刻）
+- [x] 支持 3 分钟~3 天前提醒，≥1 天可指定时刻
+- [x] 历史待办默认 3 分钟前，向后兼容
 
 ### v5.2.80 宠物物种差异化造型重设计
 - [x] pet-renderer.js v3：SPECIES_PROFILES 定义6种物种独立造型参数
