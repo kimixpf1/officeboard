@@ -4,8 +4,7 @@
         height: auto;
         min-height: calc(100vh - 200px);
         overflow: visible;
-        padding-left: var(--spacing-4);
-        padding-right: var(--spacing-4);
+        padding: var(--spacing-4);
     }
 
     .board-date-label {

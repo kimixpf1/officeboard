@@ -478,7 +478,7 @@
 /* 日视图 */
 .board-view {
     display: none;
-    padding: var(--spacing-3) var(--spacing-5) var(--spacing-2) 185px;
+    padding: var(--spacing-3) var(--spacing-5) var(--spacing-2) 180px;
     min-height: calc(100vh - 148px);
     height: calc(100vh - 130px);
     overflow: hidden;
@@ -504,8 +504,8 @@
 /* 日期标签 — 方形卡片，浮于最左边 padding 区，后续可堆叠更多卡片 */
 .board-date-label {
     position: absolute;
-    top: 6px;
-    left: 8px;
+    top: var(--spacing-3);
+    left: 5px;
     display: flex;
     flex-direction: column;
     align-items: center;
