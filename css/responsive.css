@@ -243,14 +243,17 @@
 
     .board-date-label {
         position: static;
+        transform: none;
         flex-direction: row;
         flex-wrap: wrap;
         justify-content: center;
         gap: 4px 8px;
-        padding: var(--spacing-1) 0;
+        padding: 4px 10px;
         margin-bottom: var(--spacing-1);
         pointer-events: auto;
         flex-shrink: 0;
+        max-width: 100%;
+        border-radius: 10px;
     }
 
     .board-date-label-date {
@@ -275,6 +278,8 @@
         font-size: 10px;
         width: 100%;
         text-align: center;
+        max-width: 100%;
+        -webkit-line-clamp: 2;
     }
 
     .board-container {

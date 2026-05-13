@@ -8,9 +8,64 @@
 /* ========== 浅色：靛青紫（indigo）— 专业稳重，默认 ========== */
 /* 颜色变量已在 base.css :root 中定义，此处仅补 header 与面板按钮 */
 
+/* 浅色主题 — header 深紫渐变底 + 白色文字（专业稳重） */
 [data-theme="default"] .header {
     background: linear-gradient(135deg, #4f46e5, #4338ca);
 }
+/* logo 改白色（原紫色渐变在紫色底上不可见） */
+[data-theme="default"] .logo {
+    color: #ffffff;
+    background: none;
+    -webkit-text-fill-color: #ffffff;
+}
+/* 时钟 / 天气 半透白底+白字 */
+[data-theme="default"] .header-clock {
+    color: #ffffff;
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.25);
+}
+[data-theme="default"] .clock-time { color: #ffffff; }
+[data-theme="default"] .header-weather {
+    color: #ffffff;
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.22);
+}
+[data-theme="default"] .header-weather:hover {
+    border-color: rgba(255,255,255,0.45);
+    background: rgba(255,255,255,0.16);
+}
+/* 天气文字全白 */
+[data-theme="default"] .weather-current-city,
+[data-theme="default"] .weather-today-label,
+[data-theme="default"] .weather-day-label { color: rgba(255,255,255,0.9); }
+[data-theme="default"] .weather-current-temp { color: #ffffff; }
+[data-theme="default"] .weather-today .weather-temp-range,
+[data-theme="default"] .weather-day-temp { color: rgba(255,255,255,0.8); }
+[data-theme="default"] .weather-current,
+[data-theme="default"] .weather-today { border-color: rgba(255,255,255,0.15); }
+/* 日期标签白字 */
+[data-theme="default"] .date-weekday-label { color: rgba(255,255,255,0.9); }
+/* header 中图标按钮白底 */
+[data-theme="default"] .header-right .btn-icon {
+    color: rgba(255,255,255,0.85);
+    border-color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.08);
+}
+[data-theme="default"] .header-right .btn-icon:hover {
+    color: #ffffff;
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.5);
+}
+/* 今天按钮白字 */
+[data-theme="default"] .btn-text { color: rgba(255,255,255,0.9); }
+[data-theme="default"] .btn-text:hover { color: #ffffff; }
+/* 报告按钮（btn-secondary）保持白底可读 */
+[data-theme="default"] .header-right .btn-secondary {
+    background: rgba(255,255,255,0.9);
+    color: #4f46e5;
+    border-color: rgba(255,255,255,0.3);
+}
+/* 面板按钮保持原色 */
 [data-theme="default"] .tools-toggle { background: linear-gradient(180deg, #818cf8, #4f46e5); }
 [data-theme="default"] .tools-toggle:hover { background: linear-gradient(180deg, #a5b4fc, #6366f1); }
 [data-theme="default"] .links-toggle { background: linear-gradient(180deg, #6366f1, #4f46e5); }
