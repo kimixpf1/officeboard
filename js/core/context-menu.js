@@ -521,6 +521,7 @@ const ContextMenuCore = {
             delete clone.sunk;
             delete clone.manualOrder;
             delete clone.completed;
+            delete clone.reminderDismissedAt;
             clone.source = 'copy';
 
             if (item.type === 'meeting') clone.date = targetDate;
@@ -528,6 +529,11 @@ const ContextMenuCore = {
             else if (item.type === 'todo') {
                 const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
                 clone.deadline = `${targetDate}T${time}`;
+                // 副本提醒属性与原事项完全一致：原事项没有手动设过提醒/截止，副本也不应有
+                if (!item.reminderManuallySet && !item.deadlineManuallySet) {
+                    clone.deadlineManuallySet = false;
+                    clone.reminderManuallySet = false;
+                }
             }
 
             try {
