@@ -4,7 +4,8 @@
         height: auto;
         min-height: calc(100vh - 200px);
         overflow: visible;
-        padding-left: var(--spacing-3);
+        padding-left: var(--spacing-4);
+        padding-right: var(--spacing-4);
     }
 
     .board-date-label {
@@ -15,14 +16,14 @@
         gap: 4px 8px;
         width: auto;
         max-width: 100%;
-        padding: 6px 14px;
+        padding: 8px 16px;
         margin-bottom: var(--spacing-2);
         border-radius: 12px;
     }
     .board-date-label-date { font-size: 16px; }
     .board-date-label-week { font-size: 15px; }
     .board-date-label-summary { font-size: 12px; white-space: nowrap; }
-    .board-date-label-next-meeting { font-size: 11px; max-width: 360px; }
+    .board-date-label-next-meeting { font-size: 11px; max-width: 360px; -webkit-line-clamp: 2; }
     .board-screenshot-inline-btn { width: 18px; height: 18px; font-size: 12px; }
 
     .header {
@@ -307,6 +308,12 @@
         text-align: center;
         max-width: 100%;
         -webkit-line-clamp: 2;
+    }
+
+    .board-screenshot-inline-btn {
+        width: 16px;
+        height: 16px;
+        font-size: 12px;
     }
 
     .board-container {
