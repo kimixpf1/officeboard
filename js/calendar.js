@@ -515,6 +515,33 @@ class CalendarView {
         return emptyHint;
     }
 
+    /**
+     * 根据事项类型生成彩色圆点标记
+     */
+    createDateDots(sortedItems) {
+        if (!Array.isArray(sortedItems) || sortedItems.length === 0) return null;
+
+        const typeFlags = { todo: false, meeting: false, document: false };
+        sortedItems.forEach(item => {
+            if (item && item.type && typeFlags.hasOwnProperty(item.type)) {
+                typeFlags[item.type] = true;
+            }
+        });
+
+        const activeTypes = Object.keys(typeFlags).filter(t => typeFlags[t]);
+        if (activeTypes.length === 0) return null;
+
+        const dotsContainer = document.createElement('span');
+        dotsContainer.className = 'calendar-date-dots';
+        activeTypes.forEach(type => {
+            const dot = document.createElement('span');
+            dot.className = `calendar-date-dot ${type}`;
+            dotsContainer.appendChild(dot);
+        });
+
+        return dotsContainer;
+    }
+
     bindQuickAddEvents(cellDiv, dateStr) {
         cellDiv.addEventListener('click', (e) => {
             if (e.target.closest('.calendar-item') || e.target.closest('.calendar-cell-add-btn')) {
@@ -644,6 +671,9 @@ class CalendarView {
             cellDiv.appendChild(this.createCellTopBar(dateStr, '左键进日视图'));
 
             if (sortedItems.length > 0) {
+                const weekDots = this.createDateDots(sortedItems);
+                const topBarLabel = cellDiv.querySelector('.calendar-cell-topbar-label');
+                if (weekDots && topBarLabel) topBarLabel.after(weekDots);
                 sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));
             } else {
                 cellDiv.appendChild(this.createEmptyHint());
@@ -772,6 +802,10 @@ class CalendarView {
 
             if (sortedItems.length === 0) {
                 cellDiv.appendChild(this.createEmptyHint());
+            } else {
+                const monthDots = this.createDateDots(sortedItems);
+                const topBarLabel = cellDiv.querySelector('.calendar-cell-topbar-label');
+                if (monthDots && topBarLabel) topBarLabel.after(monthDots);
             }
 
             sortedItems.forEach(item => cellDiv.appendChild(this.createCalendarItem(item, true)));

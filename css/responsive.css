@@ -244,8 +244,9 @@
     .board-date-label {
         position: static;
         flex-direction: row;
+        flex-wrap: wrap;
         justify-content: center;
-        gap: var(--spacing-2);
+        gap: 4px 8px;
         padding: var(--spacing-1) 0;
         margin-bottom: var(--spacing-1);
         pointer-events: auto;
@@ -257,7 +258,23 @@
     }
 
     .board-date-label-week {
-        font-size: 15px;
+        font-size: 14px;
+    }
+
+    .board-date-label-week-row {
+        gap: 2px;
+    }
+
+    .board-date-label-summary {
+        font-size: 11px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .board-date-label-next-meeting {
+        font-size: 10px;
+        width: 100%;
+        text-align: center;
     }
 
     .board-container {

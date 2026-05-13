@@ -2689,6 +2689,24 @@ class OfficeDashboard {
         return result;
     }
 
+    _refreshNextMeeting() {
+        if (this.currentView !== 'board') return;
+        const el = document.querySelector('.board-date-label-next-meeting');
+        if (!el) return;
+        if (!Array.isArray(this.items)) return;
+
+        const now = new Date();
+        const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const upcoming = this.items
+            .filter(item => item.type === 'meeting' && !item.completed && item.time && item.time > nowTime)
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+        const nextText = upcoming.length > 0 ? `⏰ ${upcoming[0].time} ${upcoming[0].title}` : '';
+        if (el.textContent !== nextText) {
+            el.textContent = nextText;
+        }
+    }
+
     /**
      * 获取会议级别（用于排序）
      * 钱局 = 1（最高优先级）
@@ -3499,6 +3517,7 @@ class OfficeDashboard {
                 this.todoReminderNoticeIndex = 0;
             }
             this.updateCountdownNotice();
+            this._refreshNextMeeting();
         };
 
         this.updateCountdownNotice();
@@ -3892,7 +3911,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-12 v5.2.88';
+        const version = '2026-05-13 v5.2.89';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=70', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=9', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=224', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=2', 'themes.css?v=4', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;

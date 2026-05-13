@@ -228,8 +228,56 @@ class OfficeDateViewController {
         this.app.renderColumn(ITEM_TYPES.MEETING, grouped[ITEM_TYPES.MEETING]);
         this.app.renderColumn(ITEM_TYPES.DOCUMENT, grouped[ITEM_TYPES.DOCUMENT]);
 
+        // 更新日视图今日概览
+        if (this.app.currentView === 'board') {
+            this.updateBoardSummary(items);
+        }
+
         if (window.calendarView && this.app.currentView !== 'board') {
             await window.calendarView.render();
+        }
+    }
+
+    updateBoardSummary(items) {
+        const summaryEl = document.querySelector('.board-date-label-summary');
+        const nextMeetingEl = document.querySelector('.board-date-label-next-meeting');
+        if (!summaryEl && !nextMeetingEl) return;
+
+        let todoCount = 0, meetingCount = 0, docCount = 0;
+
+        items.forEach(item => {
+            if (!item || item.type === undefined) return;
+            const isCompleted = item.type === 'document'
+                ? item.progress === 'completed'
+                : item.completed;
+            if (isCompleted) return;
+
+            if (item.type === ITEM_TYPES.TODO) todoCount++;
+            else if (item.type === ITEM_TYPES.MEETING) meetingCount++;
+            else if (item.type === ITEM_TYPES.DOCUMENT) docCount++;
+        });
+
+        if (summaryEl) {
+            const parts = [];
+            if (todoCount > 0) parts.push(`${todoCount}待办`);
+            if (meetingCount > 0) parts.push(`${meetingCount}会议`);
+            if (docCount > 0) parts.push(`${docCount}办文`);
+            summaryEl.textContent = parts.length > 0 ? parts.join(' · ') : '今日暂无安排';
+        }
+
+        if (nextMeetingEl) {
+            const now = new Date();
+            const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            const upcomingMeetings = items
+                .filter(item => item.type === ITEM_TYPES.MEETING && !item.completed && item.time && item.time > nowTime)
+                .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+            if (upcomingMeetings.length > 0) {
+                const next = upcomingMeetings[0];
+                nextMeetingEl.textContent = `⏰ ${next.time} ${next.title}`;
+            } else {
+                nextMeetingEl.textContent = '';
+            }
         }
     }
 }

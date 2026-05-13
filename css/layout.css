@@ -529,6 +529,62 @@
     line-height: 1.3;
 }
 
+.board-date-label-week-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    pointer-events: auto;
+}
+
+.board-screenshot-inline-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.45;
+    transition: opacity 0.2s;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.board-screenshot-inline-btn:hover {
+    opacity: 1;
+}
+
+.board-date-label-summary {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-500);
+    white-space: nowrap;
+    line-height: 1.4;
+    letter-spacing: 0.3px;
+}
+
+.board-date-label-summary:empty {
+    display: none;
+}
+
+.board-date-label-next-meeting {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gray-400);
+    white-space: nowrap;
+    line-height: 1.4;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.board-date-label-next-meeting:empty {
+    display: none;
+}
+
 .board-container {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1102,7 +1158,29 @@
 
 .week-cell.today {
     background: var(--primary-light);
+    border-top: 3px solid var(--primary-color);
 }
+
+/* 日历日期活性圆点 */
+.calendar-date-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.calendar-date-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    opacity: 0.75;
+}
+
+.calendar-date-dot.todo { background: #ef4444; }
+.calendar-date-dot.meeting { background: #3b82f6; }
+.calendar-date-dot.document { background: #22c55e; }
 
 /* 月视图 */
 .month-view {

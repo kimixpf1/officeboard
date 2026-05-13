@@ -20,10 +20,10 @@
     
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="css/base.css?v=2">
-    <link rel="stylesheet" href="css/layout.css?v=2">
+    <link rel="stylesheet" href="css/layout.css?v=3">
     <link rel="stylesheet" href="css/themes.css?v=4">
     <link rel="stylesheet" href="css/components.css?v=2">
-    <link rel="stylesheet" href="css/responsive.css?v=1">
+    <link rel="stylesheet" href="css/responsive.css?v=2">
 
 </head>
 <body>
@@ -257,8 +257,12 @@
         <section id="boardView" class="board-view active">
             <div id="boardDateLabel" class="board-date-label">
                 <span class="board-date-label-date">----/--/--</span>
-                <span class="board-date-label-week">---</span>
-                <button type="button" id="boardScreenshotBtn" class="btn-icon btn-sm calendar-screenshot-btn" title="截图分享日视图" style="margin-left:8px;">📷</button>
+                <span class="board-date-label-week-row">
+                    <span class="board-date-label-week">---</span>
+                    <button type="button" id="boardScreenshotBtn" class="board-screenshot-inline-btn" title="截图分享日视图">📷</button>
+                </span>
+                <span class="board-date-label-summary"></span>
+                <span class="board-date-label-next-meeting"></span>
             </div>
             <div class="board-container">
                 <!-- 待办事项栏 -->
@@ -1212,7 +1216,7 @@
     <script src="js/utils.js?v=5"></script>
     <script src="js/db.js?v=29"></script>
     <script src="js/sync.js?v=70"></script>
-    <script src="js/app-date-view.js?v=13"></script>
+    <script src="js/app-date-view.js?v=14"></script>
     <script src="js/panels/countdown.js?v=3"></script>
     <script src="js/panels/links.js?v=1"></script>
     <script src="js/panels/contacts.js?v=1"></script>
@@ -1226,14 +1230,14 @@
     <script src="js/core/idle-bar.js?v=8"></script>
     <script src="js/core/alarm.js?v=10"></script>
     <script src="js/core/pet-renderer.js?v=3"></script>
-    <script src="js/app.js?v=225"></script>
+    <script src="js/app.js?v=226"></script>
 
     <!-- defer 加载：首屏不需要的模块（按文档顺序执行，DOMContentLoaded 前完成） -->
     <script defer src="js/crypto.js?v=17"></script>
     <script defer src="js/kimi.js?v=16"></script>
     <script defer src="js/ocr.js?v=51"></script>
     <script defer src="js/report.js?v=16"></script>
-    <script defer src="js/calendar.js?v=41"></script>
+    <script defer src="js/calendar.js?v=42"></script>
     <script defer src="js/upload-flow.js?v=9"></script>
 
     <!-- 右键/长按上下文菜单 -->
