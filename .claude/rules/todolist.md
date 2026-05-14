@@ -2,6 +2,19 @@
 
 ## 已完成
 
+### v5.2.102 截止时间默认带入+便签卡片
+- [x] datetime-local 修复为 YYYY-MM-DDTHH:MM 格式，日期正确预填
+- [x] 新增便签卡片（boardDateLabel下方，170px，黄底横线便签样式）
+- [x] contenteditable 自动保存（800ms防抖SafeStorage）+云端同步
+- [x] sync.js 全部7个路径补 office_sticky_note（含syncFromCloud遗漏）
+- [x] 暗色模式+响应式适配
+- [x] Code review CRITICAL+HIGH+MEDIUM全部修复
+- [x] 版本号 v5.2.102
+
+### v5.2.101 PDF OCR人名识别Fix-E（另一会话）
+- [x] extractPDFTableRows Fix E：短人名参会者识别+双向y距离查找
+- [x] 缓存版本 ocr.js?v=52→v=53
+
 ### v5.2.100 修复无截止时间待办日视图不显示+日期锚定
 - [x] matchItemDateRange 放宽条件：deadline → item.date → createdAt → true
 - [x] saveItem 中 todo 设 item.date = newDeadline || selectedDate 锚定日期

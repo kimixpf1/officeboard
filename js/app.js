@@ -2715,6 +2715,8 @@ class OfficeDashboard {
 
         linesEl.textContent = SafeStorage.get('office_sticky_note') || '';
 
+        this._repositionStickyNote();
+
         let saveTimer = null;
         const save = () => {
             clearTimeout(saveTimer);
@@ -2726,6 +2728,18 @@ class OfficeDashboard {
             }, 800);
         };
         linesEl.addEventListener('input', save);
+    }
+
+    _repositionStickyNote() {
+        const card = document.getElementById('stickyNoteCard');
+        const dateLabel = document.getElementById('boardDateLabel');
+        if (!card || !dateLabel) return;
+        if (this.currentView !== 'board') {
+            card.style.display = 'none';
+            return;
+        }
+        card.style.display = '';
+        card.style.top = (dateLabel.offsetTop + dateLabel.offsetHeight + 16) + 'px';
     }
 
     /**

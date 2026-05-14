@@ -593,12 +593,12 @@
     display: none;
 }
 
-/* 便签卡片 — 位于日期标签卡片下方，用于记录周/月任务 */
+/* 便签卡片 — 正方形，与日期标签同宽170px，位于其下方 */
 .sticky-note-card {
     position: absolute;
-    top: 260px;
     left: 5px;
     width: 170px;
+    min-height: 170px;
     z-index: 5;
     background: #fff9c4;
     border: 1px solid #e6d88a;
@@ -606,23 +606,24 @@
     padding: 10px 12px;
     box-shadow: 2px 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
     transform: rotate(-0.5deg);
+    display: flex;
+    flex-direction: column;
 }
 
 .sticky-note-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: #8d6e00;
-    margin-bottom: 6px;
+    font-size: 16px;
+    text-align: center;
     user-select: none;
     pointer-events: none;
+    flex-shrink: 0;
+    margin-bottom: 8px;
 }
 
 .sticky-note-lines {
     font-size: 12px;
-    line-height: 1.8;
+    line-height: 1.9;
     color: #5d4e37;
-    min-height: 120px;
-    max-height: 300px;
+    flex: 1;
     overflow-y: auto;
     outline: none;
     cursor: text;
@@ -630,11 +631,9 @@
     word-break: break-word;
     font-family: 'KaiTi', 'STKaiti', '楷体', serif;
     background: repeating-linear-gradient(
-        transparent, transparent 20px,
-        #e6d88a 20px, #e6d88a 21px
+        transparent, transparent 22px,
+        #e6d88a 22px, #e6d88a 23px
     );
-    background-attachment: local;
-    padding: 2px 0;
 }
 
 .sticky-note-lines:empty::before {
@@ -645,10 +644,9 @@
 
 .sticky-note-lines:focus {
     background: repeating-linear-gradient(
-        transparent, transparent 20px,
-        #d4c678 20px, #d4c678 21px
+        transparent, transparent 22px,
+        #d4c678 22px, #d4c678 23px
     );
-    background-attachment: local;
 }
 
 .board-container {
