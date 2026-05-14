@@ -593,6 +593,64 @@
     display: none;
 }
 
+/* 便签卡片 — 位于日期标签卡片下方，用于记录周/月任务 */
+.sticky-note-card {
+    position: absolute;
+    top: 260px;
+    left: 5px;
+    width: 170px;
+    z-index: 5;
+    background: #fff9c4;
+    border: 1px solid #e6d88a;
+    border-radius: 4px;
+    padding: 10px 12px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+    transform: rotate(-0.5deg);
+}
+
+.sticky-note-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #8d6e00;
+    margin-bottom: 6px;
+    user-select: none;
+    pointer-events: none;
+}
+
+.sticky-note-lines {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #5d4e37;
+    min-height: 120px;
+    max-height: 300px;
+    overflow-y: auto;
+    outline: none;
+    cursor: text;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'KaiTi', 'STKaiti', '楷体', serif;
+    background: repeating-linear-gradient(
+        transparent, transparent 20px,
+        #e6d88a 20px, #e6d88a 21px
+    );
+    background-attachment: local;
+    padding: 2px 0;
+}
+
+.sticky-note-lines:empty::before {
+    content: attr(placeholder);
+    color: #b8a85a;
+    font-style: italic;
+}
+
+.sticky-note-lines:focus {
+    background: repeating-linear-gradient(
+        transparent, transparent 20px,
+        #d4c678 20px, #d4c678 21px
+    );
+    background-attachment: local;
+}
+
 .board-container {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -295,6 +295,7 @@ class OfficeDashboard {
                 this.startMeetingAutoCompleteCheck();
                 this.startDailyBackupSchedule();
                 this.updateDeployVersionBadge();
+                this.initStickyNote();
             });
 
             syncManager.waitForInit().then(async () => {
@@ -2707,6 +2708,26 @@ class OfficeDashboard {
         }
     }
 
+    initStickyNote() {
+        const card = document.getElementById('stickyNoteCard');
+        const linesEl = document.querySelector('.sticky-note-lines');
+        if (!card || !linesEl) return;
+
+        linesEl.textContent = SafeStorage.get('office_sticky_note') || '';
+
+        let saveTimer = null;
+        const save = () => {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                SafeStorage.set('office_sticky_note', linesEl.textContent || '');
+                if (syncManager && syncManager.isLoggedIn()) {
+                    syncManager.immediateSyncToCloud().catch(() => {});
+                }
+            }, 800);
+        };
+        linesEl.addEventListener('input', save);
+    }
+
     /**
      * 获取会议级别（用于排序）
      * 钱局 = 1（最高优先级）
@@ -3984,8 +4005,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-14 v5.2.100';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=70', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=9', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=227', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=4', 'themes.css?v=5', 'components.css?v=2', 'responsive.css?v=3', 'crypto.js?v=17'];
+        const version = '2026-05-14 v5.2.102';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=233', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=5', 'themes.css?v=6', 'components.css?v=3', 'responsive.css?v=4', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4035,16 +4056,16 @@ class OfficeDashboard {
         const timeStr = now.toTimeString().slice(0, 5);
 
         if (type === ITEM_TYPES.TODO) {
-            // 截止时间默认留空，让用户自己填
+            // 截止时间默认带入查看日期的年月日（datetime-local 必须含时间，默认 00:00）
             const deadlineEl = document.getElementById('todoDeadline');
-            if (deadlineEl) deadlineEl.value = '';
-            this._todoDeadlineInitial = '';
+            if (deadlineEl) deadlineEl.value = dateStr + 'T00:00';
+            this._todoDeadlineInitial = dateStr + 'T00:00';
 
-            // 默认显示绝对提醒（无截止时间）
+            // 有截止时间 → 显示相对提醒
             const reminderRelative = document.getElementById('reminderRelative');
             const reminderAbsolute = document.getElementById('reminderAbsolute');
-            if (reminderRelative) reminderRelative.style.display = 'none';
-            if (reminderAbsolute) reminderAbsolute.style.display = '';
+            if (reminderRelative) reminderRelative.style.display = '';
+            if (reminderAbsolute) reminderAbsolute.style.display = 'none';
 
             // 重置绝对提醒字段默认值
             const reminderMode = document.getElementById('todoReminderMode');

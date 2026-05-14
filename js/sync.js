@@ -129,6 +129,14 @@ class SyncManager {
             }));
         }
 
+        if (sideData.office_sticky_note !== undefined) {
+            SafeStorage.set('office_sticky_note', sideData.office_sticky_note || '');
+            const stickyEl = document.querySelector('.sticky-note-lines');
+            if (stickyEl && document.activeElement !== stickyEl && stickyEl.textContent !== (sideData.office_sticky_note || '')) {
+                stickyEl.textContent = sideData.office_sticky_note || '';
+            }
+        }
+
         if (dispatchSchedule && sideData.office_schedule_content !== undefined) {
             document.dispatchEvent(new CustomEvent('scheduleSynced', {
                 detail: { content: sideData.office_schedule_content || '' }
@@ -528,6 +536,7 @@ class SyncManager {
 
         return hasNonEmptyString('office_memo_content')
             || hasNonEmptyString('office_schedule_content')
+            || hasNonEmptyString('office_sticky_note')
             || hasNonEmptyString('office_links')
             || hasNonEmptyString('office_contacts')
             || hasNonEmptyJson('office_countdown_events', [])
@@ -562,6 +571,7 @@ class SyncManager {
             settings,
             memo: SafeStorage.get('office_memo_content') || '',
             schedule: SafeStorage.get('office_schedule_content') || '',
+            stickyNote: SafeStorage.get('office_sticky_note') || '',
             links: SafeStorage.get('office_links') || '',
             contacts: SafeStorage.get('office_contacts') || '',
             countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
@@ -864,9 +874,18 @@ class SyncManager {
                         const cloudMemo = cloudData.data.memo;
                         if (cloudMemo !== localMemo) {
                             SafeStorage.set('office_memo_content', cloudMemo);
-                            document.dispatchEvent(new CustomEvent('memoSynced', { 
-                                detail: { content: cloudMemo } 
+                            document.dispatchEvent(new CustomEvent('memoSynced', {
+                                detail: { content: cloudMemo }
                             }));
+                        }
+                    }
+                    // 同步便签
+                    if (cloudData?.data?.stickyNote !== undefined) {
+                        const localSticky = SafeStorage.get('office_sticky_note') || '';
+                        if (cloudData.data.stickyNote !== localSticky) {
+                            SafeStorage.set('office_sticky_note', cloudData.data.stickyNote);
+                            const stickyEl = document.querySelector('.sticky-note-lines');
+                            if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = cloudData.data.stickyNote;
                         }
                     }
                     // 同步网站
@@ -1089,9 +1108,15 @@ class SyncManager {
             // 同步备忘录
             if (cloudData.data.memo !== undefined) {
                 SafeStorage.set('office_memo_content', cloudData.data.memo);
-                document.dispatchEvent(new CustomEvent('memoSynced', { 
-                    detail: { content: cloudData.data.memo } 
+                document.dispatchEvent(new CustomEvent('memoSynced', {
+                    detail: { content: cloudData.data.memo }
                 }));
+            }
+            // 同步便签
+            if (cloudData.data.stickyNote !== undefined) {
+                SafeStorage.set('office_sticky_note', cloudData.data.stickyNote);
+                const stickyEl = document.querySelector('.sticky-note-lines');
+                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = cloudData.data.stickyNote;
             }
 
             // 同步日程
@@ -1376,9 +1401,19 @@ class SyncManager {
                 if (cloudMemo !== localMemo) {
 
                     SafeStorage.set('office_memo_content', cloudMemo);
-                    document.dispatchEvent(new CustomEvent('memoSynced', { 
-                        detail: { content: cloudMemo } 
+                    document.dispatchEvent(new CustomEvent('memoSynced', {
+                        detail: { content: cloudMemo }
                     }));
+                }
+            }
+
+            // 同步便签（云端优先）
+            if (cloudData.data.stickyNote !== undefined) {
+                const localSticky = SafeStorage.get('office_sticky_note') || '';
+                if (cloudData.data.stickyNote !== localSticky) {
+                    SafeStorage.set('office_sticky_note', cloudData.data.stickyNote);
+                    const stickyEl = document.querySelector('.sticky-note-lines');
+                    if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = cloudData.data.stickyNote;
                 }
             }
 
@@ -1814,9 +1849,15 @@ class SyncManager {
             // 同步备忘录
             if (data.data.memo !== undefined) {
                 SafeStorage.set('office_memo_content', data.data.memo);
-                document.dispatchEvent(new CustomEvent('memoSynced', { 
-                    detail: { content: data.data.memo } 
+                document.dispatchEvent(new CustomEvent('memoSynced', {
+                    detail: { content: data.data.memo }
                 }));
+            }
+            // 同步便签
+            if (data.data.stickyNote !== undefined) {
+                SafeStorage.set('office_sticky_note', data.data.stickyNote);
+                const stickyEl = document.querySelector('.sticky-note-lines');
+                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = data.data.stickyNote;
             }
 
             // 同步日程
@@ -2198,6 +2239,7 @@ class SyncManager {
                 settings: settings,
                 memo: SafeStorage.get('office_memo_content') || '',
                 schedule: SafeStorage.get('office_schedule_content') || '',
+                stickyNote: SafeStorage.get('office_sticky_note') || '',
                 links: SafeStorage.get('office_links') || '',
                 contacts: SafeStorage.get('office_contacts') || '',
                 countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
@@ -2289,17 +2331,24 @@ class SyncManager {
             // 同步备忘录
             if (data.data.memo !== undefined) {
                 SafeStorage.set('office_memo_content', data.data.memo);
-                document.dispatchEvent(new CustomEvent('memoSynced', { 
-                    detail: { content: data.data.memo } 
+                document.dispatchEvent(new CustomEvent('memoSynced', {
+                    detail: { content: data.data.memo }
                 }));
 
+            }
+
+            // 同步便签
+            if (data.data.stickyNote !== undefined) {
+                SafeStorage.set('office_sticky_note', data.data.stickyNote);
+                const stickyEl = document.querySelector('.sticky-note-lines');
+                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = data.data.stickyNote;
             }
 
             // 同步日程
             if (data.data.schedule !== undefined) {
                 SafeStorage.set('office_schedule_content', data.data.schedule);
-                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
-                    detail: { content: data.data.schedule } 
+                document.dispatchEvent(new CustomEvent('scheduleSynced', {
+                    detail: { content: data.data.schedule }
                 }));
             }
 
@@ -2773,7 +2822,7 @@ class SyncManager {
 
     _collectSideDataForBackup() {
         const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
-            'office_schedule_content', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
+            'office_schedule_content', 'office_sticky_note', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
             'office_weather_city', 'office_alarms', 'theme'];
         const result = {};
         for (const k of keys) {

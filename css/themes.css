@@ -153,3 +153,8 @@
 [data-theme="dark"] .copyright-note { color: var(--gray-500); }
 [data-theme="dark"] .context-menu-item:hover { background: var(--gray-800); }
 [data-theme="dark"] .context-menu-danger:hover { background: #3b1111; }
+[data-theme="dark"] .sticky-note-card { background: #3e3a28; border-color: #5c5535; }
+[data-theme="dark"] .sticky-note-title { color: #c9b44a; }
+[data-theme="dark"] .sticky-note-lines { color: #b8b09a; background: repeating-linear-gradient(transparent, transparent 20px, #5c5535 20px, #5c5535 21px); }
+[data-theme="dark"] .sticky-note-lines:focus { background: repeating-linear-gradient(transparent, transparent 20px, #70673d 20px, #70673d 21px); }
+[data-theme="dark"] .sticky-note-lines:empty::before { color: #706a48; }
