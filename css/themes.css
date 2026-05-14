@@ -153,13 +153,13 @@
 [data-theme="dark"] .copyright-note { color: var(--gray-500); }
 [data-theme="dark"] .context-menu-item:hover { background: var(--gray-800); }
 [data-theme="dark"] .context-menu-danger:hover { background: #3b1111; }
-[data-theme="dark"] .sticky-note-card { background: var(--sticky-bg, #3e3a28); border-color: var(--sticky-border, #5c5535); }
-[data-theme="dark"] .sticky-note-card[data-color="yellow"] { --sticky-bg: #3e3a28; --sticky-border: #5c5535; }
-[data-theme="dark"] .sticky-note-card[data-color="pink"] { --sticky-bg: #3d2a2e; --sticky-border: #6e4a50; }
-[data-theme="dark"] .sticky-note-card[data-color="blue"] { --sticky-bg: #25303d; --sticky-border: #4a6078; }
-[data-theme="dark"] .sticky-note-card[data-color="green"] { --sticky-bg: #25382a; --sticky-border: #4a6e50; }
-[data-theme="dark"] .sticky-note-card[data-color="white"] { --sticky-bg: #2a2a2a; --sticky-border: #555; }
-[data-theme="dark"] .sticky-note-lines { color: #b8b09a; background: repeating-linear-gradient(transparent, transparent 27px, #5c5535 27px, #5c5535 28px); }
-[data-theme="dark"] .sticky-note-lines:focus { background: repeating-linear-gradient(transparent, transparent 27px, #70673d 27px, #70673d 28px); }
-[data-theme="dark"] .sticky-note-lines:empty::before { color: #706a48; }
-[data-theme="dark"] .sticky-note-color-picker { background: #333; border-color: #555; }
+[data-theme="dark"] .sticky-note-card { background: var(--sticky-bg, #5a5440); border-color: var(--sticky-border, #7a7348); }
+[data-theme="dark"] .sticky-note-card[data-color="yellow"] { --sticky-bg: #5a5440; --sticky-border: #7a7348; }
+[data-theme="dark"] .sticky-note-card[data-color="pink"] { --sticky-bg: #5a4048; --sticky-border: #7a5a62; }
+[data-theme="dark"] .sticky-note-card[data-color="blue"] { --sticky-bg: #3d4858; --sticky-border: #5a6a7a; }
+[data-theme="dark"] .sticky-note-card[data-color="green"] { --sticky-bg: #3d4e40; --sticky-border: #5a6e5a; }
+[data-theme="dark"] .sticky-note-card[data-color="white"] { --sticky-bg: #444; --sticky-border: #666; }
+[data-theme="dark"] .sticky-note-lines { color: #c8c0a8; background: repeating-linear-gradient(transparent, transparent 31px, #7a7348 31px, #7a7348 32px); }
+[data-theme="dark"] .sticky-note-lines:focus { background: repeating-linear-gradient(transparent, transparent 31px, #8a8350 31px, #8a8350 32px); }
+[data-theme="dark"] .sticky-note-lines:empty::before { color: #908a68; }
+[data-theme="dark"] .sticky-note-color-picker { background: #444; border-color: #666; }

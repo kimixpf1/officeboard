@@ -509,6 +509,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     z-index: 5;
     pointer-events: none;
@@ -518,6 +519,7 @@
     padding: 10px 12px;
     box-shadow: var(--shadow);
     width: 190px;
+    min-height: 190px;
 }
 
 .board-date-label-date {
@@ -663,7 +665,7 @@
 .sticky-note-color-dot.active { border-color: var(--gray-600, #666); }
 
 .sticky-note-lines {
-    font-size: 14px;
+    font-size: 16px;
     line-height: 2;
     color: #5d4e37;
     flex: 1;
@@ -674,8 +676,8 @@
     word-break: break-word;
     font-family: 'KaiTi', 'STKaiti', '楷体', serif;
     background: repeating-linear-gradient(
-        transparent, transparent 27px,
-        #e6d88a 27px, #e6d88a 28px
+        transparent, transparent 31px,
+        #e6d88a 31px, #e6d88a 32px
     );
 }
 
@@ -687,8 +689,8 @@
 
 .sticky-note-lines:focus {
     background: repeating-linear-gradient(
-        transparent, transparent 27px,
-        #d4c678 27px, #d4c678 28px
+        transparent, transparent 31px,
+        #d4c678 31px, #d4c678 32px
     );
 }
 

@@ -4068,8 +4068,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-14 v5.2.104';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=235', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=6', 'themes.css?v=7', 'components.css?v=3', 'responsive.css?v=5', 'crypto.js?v=17'];
+        const version = '2026-05-14 v5.2.105';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=236', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=7', 'themes.css?v=8', 'components.css?v=3', 'responsive.css?v=5', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4124,11 +4124,12 @@ class OfficeDashboard {
             if (deadlineEl) deadlineEl.value = '';
             this._todoDeadlineInitial = '';
 
-            // 有截止时间 → 显示相对提醒
+            // 截止时间为空→显示绝对提醒；有截止时间→显示相对提醒
             const reminderRelative = document.getElementById('reminderRelative');
             const reminderAbsolute = document.getElementById('reminderAbsolute');
-            if (reminderRelative) reminderRelative.style.display = '';
-            if (reminderAbsolute) reminderAbsolute.style.display = 'none';
+            const hasDeadlineInit = !!document.getElementById('todoDeadline')?.value;
+            if (reminderRelative) reminderRelative.style.display = hasDeadlineInit ? '' : 'none';
+            if (reminderAbsolute) reminderAbsolute.style.display = hasDeadlineInit ? 'none' : '';
 
             // 重置绝对提醒字段默认值
             const reminderMode = document.getElementById('todoReminderMode');
