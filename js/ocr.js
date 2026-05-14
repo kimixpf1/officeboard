@@ -3209,6 +3209,46 @@ class OCRManager {
         const result = [];
         let inheritedGroup = '';
         let inheritedAttendee = '';
+        let attendeeY = 0; // 记录inheritedAttendee来源行的y坐标，用于距离比较
+
+        // 预扫描：收集所有name-only行的(y坐标, 名字, 行索引)
+        const nameOnlyRows = [];
+        for (let i = 0; i < rows.length; i++) {
+            const cells = this.splitPDFRowIntoCells(rows[i]);
+            if (!cells.length) continue;
+            const joined = cells.join(' ');
+            const hasDateOrTime = /\d{1,2}[.:：]\d{2}|\d{1,2}月\d{1,2}日|星期[一二三四五六日天]|周[一二三四五六日天]|\d{4}-\d{2}-\d{2}/.test(joined);
+            if (!hasDateOrTime && cells.length < 4) {
+                const shortNamePattern = /^[一-龥、·]{1,10}$/;
+                const attendeeSuffixPattern = /[局委办主任处科长组院]$/;
+                if (cells.join(' ').length <= 10 && shortNamePattern.test(cells.join(' '))) {
+                    const nameCore = cells.join(' ').replace(/[、·].*$/, '');
+                    if (attendeeSuffixPattern.test(nameCore) && !/(?:局领导|^处室$)/.test(cells.join(' '))) {
+                        nameOnlyRows.push({ y: rows[i].y, name: cells.join(' '), index: i });
+                    }
+                }
+            }
+        }
+
+        // 辅助函数：查找给定y坐标最近的name行（上方或下方，±40单位内）
+        const findClosestName = (meetingY, currentAttendeeY) => {
+            let best = null;
+            let bestDist = Infinity;
+            for (const nr of nameOnlyRows) {
+                const dist = Math.abs(nr.y - meetingY);
+                if (dist > 40) continue; // 超过40单位不考虑
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = nr;
+                }
+            }
+            // 最近名字比继承链的名字更近（至少更近15%）才切换
+            if (best && currentAttendeeY > 0) {
+                const inheritDist = Math.abs(currentAttendeeY - meetingY);
+                if (bestDist >= inheritDist * 0.85) return null; // 不够近，保持继承
+            }
+            return best;
+        };
 
         for (const row of Array.isArray(rows) ? rows : []) {
             const cells = this.splitPDFRowIntoCells(row);
@@ -3246,7 +3286,15 @@ class OCRManager {
                     continue;
                 }
                 // 跳过孤立的短人名/处室名（被误识别为续行的参会者名字）
-                if (contTitle.length <= 5 && !contLoc && /^[一-龥]{1,5}$/.test(contTitle)) {
+                // 但先检查是否为参会者名字（如"陈局""盛局""吴局""工业处、服"），如果是则用于继承
+                const shortNamePattern = /^[一-龥、·]{1,10}$/;
+                const attendeeSuffixPattern = /[局委办主任处科长组院]$/;
+                if (contTitle.length <= 10 && !contLoc && shortNamePattern.test(contTitle)) {
+                    const nameCore = contTitle.replace(/[、·].*$/, '');
+                    if (attendeeSuffixPattern.test(nameCore) && !/(?:局领导|^处室$)/.test(contTitle)) {
+                        inheritedAttendee = contTitle;
+                        attendeeY = row.y;
+                    }
                     continue;
                 }
                 const parts = [];
@@ -3288,7 +3336,18 @@ class OCRManager {
             }
 
             group = this.cleanPDFCellText(group) || inheritedGroup;
-            attendee = this.cleanPDFCellText(attendee) || inheritedAttendee;
+            let resolvedAttendee = this.cleanPDFCellText(attendee) || inheritedAttendee;
+            // 双向查找：如果继承链上的名字距离较远，尝试在附近找到更近的名字行
+            if (!this.cleanPDFCellText(attendee) && inheritedAttendee && attendeeY > 0) {
+                const closer = findClosestName(row.y, attendeeY);
+                if (closer && closer.name !== inheritedAttendee) {
+                    resolvedAttendee = closer.name;
+                    // 用新找到的更近名字更新继承链，后续行继续使用
+                    inheritedAttendee = closer.name;
+                    attendeeY = closer.y;
+                }
+            }
+            attendee = resolvedAttendee;
             title = this.cleanPDFMeetingTitle(title);
             location = this.correctMeetingLocationText(this.cleanPDFCellText(location));
 
