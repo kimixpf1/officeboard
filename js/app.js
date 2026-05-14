@@ -3462,7 +3462,8 @@ class OfficeDashboard {
     }
 
     getTodoReminderNoticeState() {
-        const reminderItems = this.getTodoReminderItems(this.items || []);
+        const allItems = this._allItemsForReminders || this.items || [];
+        const reminderItems = this.getTodoReminderItems(allItems);
         return {
             active: reminderItems.length > 0,
             items: reminderItems,
@@ -3614,7 +3615,26 @@ class OfficeDashboard {
             this.todoReminderRefreshTimer = null;
         }
 
-        const tick = () => {
+        this._allItemsForReminders = this.items || [];
+        // 首次立即从DB加载全量数据用于提醒
+        if (typeof db !== 'undefined') {
+            db.getAllItems().then(items => {
+                this._allItemsForReminders = items || [];
+                this._lastReminderCacheRefresh = Date.now();
+            }).catch(() => {});
+        }
+
+        const tick = async () => {
+            // 每30秒从DB刷新全量数据，确保跨日期提醒不遗漏
+            if (!this._lastReminderCacheRefresh || Date.now() - this._lastReminderCacheRefresh > 30000) {
+                if (typeof db !== 'undefined') {
+                    try {
+                        this._allItemsForReminders = await db.getAllItems();
+                        this._lastReminderCacheRefresh = Date.now();
+                    } catch (e) { /* 静默失败，继续用上次缓存 */ }
+                }
+            }
+
             if (this.checkAlarms && this.checkAlarms()) {
                 return;
             }
@@ -3626,6 +3646,7 @@ class OfficeDashboard {
             }
             this.updateCountdownNotice();
             this._refreshNextMeeting();
+            if (this._repositionStickyNote) this._repositionStickyNote();
         };
 
         this.updateCountdownNotice();
@@ -4019,7 +4040,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-14 v5.2.102';
+        const version = '2026-05-14 v5.2.103';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=233', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=5', 'themes.css?v=6', 'components.css?v=3', 'responsive.css?v=4', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
@@ -4070,10 +4091,10 @@ class OfficeDashboard {
         const timeStr = now.toTimeString().slice(0, 5);
 
         if (type === ITEM_TYPES.TODO) {
-            // 截止时间默认带入查看日期的年月日（datetime-local 必须含时间，默认 00:00）
+            // 截止时间选填，默认留空（datetime-local无法实现日期填入+时间留空）
             const deadlineEl = document.getElementById('todoDeadline');
-            if (deadlineEl) deadlineEl.value = dateStr + 'T00:00';
-            this._todoDeadlineInitial = dateStr + 'T00:00';
+            if (deadlineEl) deadlineEl.value = '';
+            this._todoDeadlineInitial = '';
 
             // 有截止时间 → 显示相对提醒
             const reminderRelative = document.getElementById('reminderRelative');
