@@ -2686,6 +2686,7 @@ class OfficeDashboard {
      */
     async loadItems() {
         const result = await this.dateViewController.loadItems();
+        this._remindersNeedRefresh = true;
         this.updateCountdownNotice();
         return result;
     }
@@ -2713,9 +2714,36 @@ class OfficeDashboard {
         const linesEl = document.querySelector('.sticky-note-lines');
         if (!card || !linesEl) return;
 
+        // 恢复保存的颜色
+        const savedColor = SafeStorage.get('office_sticky_note_color') || 'yellow';
+        card.setAttribute('data-color', savedColor);
+        const colorBtn = document.getElementById('stickyColorBtn');
+        if (colorBtn) colorBtn.style.background = getComputedStyle(card).getPropertyValue('--sticky-bg').trim();
+
         linesEl.textContent = SafeStorage.get('office_sticky_note') || '';
 
         this._repositionStickyNote();
+
+        // 颜色选择
+        const picker = document.getElementById('stickyColorPicker');
+        if (colorBtn && picker) {
+            colorBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                picker.classList.toggle('show');
+            });
+            picker.querySelectorAll('.sticky-note-color-dot').forEach(dot => {
+                dot.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const color = dot.dataset.color;
+                    card.setAttribute('data-color', color);
+                    SafeStorage.set('office_sticky_note_color', color);
+                    colorBtn.style.background = getComputedStyle(card).getPropertyValue('--sticky-bg').trim();
+                    picker.classList.remove('show');
+                });
+            });
+        }
+        // 点击空白关闭颜色选择器
+        document.addEventListener('click', () => { if (picker) picker.classList.remove('show'); });
 
         let saveTimer = null;
         const save = () => {
@@ -3625,14 +3653,14 @@ class OfficeDashboard {
         }
 
         const tick = async () => {
-            // 每30秒从DB刷新全量数据，确保跨日期提醒不遗漏
-            if (!this._lastReminderCacheRefresh || Date.now() - this._lastReminderCacheRefresh > 30000) {
-                if (typeof db !== 'undefined') {
-                    try {
-                        this._allItemsForReminders = await db.getAllItems();
-                        this._lastReminderCacheRefresh = Date.now();
-                    } catch (e) { /* 静默失败，继续用上次缓存 */ }
-                }
+            // 保存后立即刷新 + 每30秒定期刷新全量数据
+            const needRefresh = this._remindersNeedRefresh || !this._lastReminderCacheRefresh || Date.now() - this._lastReminderCacheRefresh > 30000;
+            if (needRefresh && typeof db !== 'undefined') {
+                try {
+                    this._allItemsForReminders = await db.getAllItems();
+                    this._lastReminderCacheRefresh = Date.now();
+                    this._remindersNeedRefresh = false;
+                } catch (e) { /* 静默失败 */ }
             }
 
             if (this.checkAlarms && this.checkAlarms()) {
@@ -4040,8 +4068,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-14 v5.2.103';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=233', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=5', 'themes.css?v=6', 'components.css?v=3', 'responsive.css?v=4', 'crypto.js?v=17'];
+        const version = '2026-05-14 v5.2.104';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=235', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=6', 'themes.css?v=7', 'components.css?v=3', 'responsive.css?v=5', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

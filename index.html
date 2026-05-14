@@ -20,10 +20,10 @@
     
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="css/base.css?v=2">
-    <link rel="stylesheet" href="css/layout.css?v=5">
-    <link rel="stylesheet" href="css/themes.css?v=6">
+    <link rel="stylesheet" href="css/layout.css?v=6">
+    <link rel="stylesheet" href="css/themes.css?v=7">
     <link rel="stylesheet" href="css/components.css?v=3">
-    <link rel="stylesheet" href="css/responsive.css?v=4">
+    <link rel="stylesheet" href="css/responsive.css?v=5">
 
 </head>
 <body>
@@ -264,8 +264,18 @@
                 <span class="board-date-label-summary"></span>
                 <span class="board-date-label-next-meeting"></span>
             </div>
-            <div id="stickyNoteCard" class="sticky-note-card">
-                <div class="sticky-note-title">📌</div>
+            <div id="stickyNoteCard" class="sticky-note-card" data-color="yellow">
+                <div class="sticky-note-top">
+                    <span class="sticky-note-title">📌</span>
+                    <button class="sticky-note-color-btn" id="stickyColorBtn" title="换底色"></button>
+                </div>
+                <div class="sticky-note-color-picker" id="stickyColorPicker">
+                    <span class="sticky-note-color-dot" data-color="yellow" style="background:#fff9c4" title="黄色"></span>
+                    <span class="sticky-note-color-dot" data-color="pink" style="background:#fce4ec" title="粉色"></span>
+                    <span class="sticky-note-color-dot" data-color="blue" style="background:#e3f2fd" title="蓝色"></span>
+                    <span class="sticky-note-color-dot" data-color="green" style="background:#e8f5e9" title="绿色"></span>
+                    <span class="sticky-note-color-dot" data-color="white" style="background:#fafafa" title="白色"></span>
+                </div>
                 <div class="sticky-note-lines" contenteditable="true" placeholder="记录周/月任务..."></div>
             </div>
             <div class="board-container">
@@ -1246,7 +1256,7 @@
     <script src="js/core/idle-bar.js?v=8"></script>
     <script src="js/core/alarm.js?v=10"></script>
     <script src="js/core/pet-renderer.js?v=3"></script>
-    <script src="js/app.js?v=234"></script>
+    <script src="js/app.js?v=235"></script>
 
     <!-- defer 加载：首屏不需要的模块（按文档顺序执行，DOMContentLoaded 前完成） -->
     <script defer src="js/crypto.js?v=17"></script>
