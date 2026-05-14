@@ -1,3 +1,14 @@
+## 2026-05-14 v5.2.97 修复待办提醒不触发——_todoDeadlineInitial空字符串falsy
+
+### 改动内容
+1. **根因**：`_todoDeadlineInitial = ''`（空字符串falsy）→ `if (this._todoDeadlineInitial && ...)` 短路 → 新建待办 `deadlineManuallySet` 永不为 true → baseFilter 不通过 → 提醒永不触发
+2. **修复**：改用 `!== undefined` 显式判断；`_todoReminderInitial.date` 对齐为 `null`
+
+### 提交记录
+- `f960e3f` fix: _todoDeadlineInitial 空字符串falsy导致 deadlineManuallySet 永不为 true (v5.2.97)
+
+---
+
 ## 2026-05-14 v5.2.96 待办提醒系统重构——截止时间选填+无截止时间绝对提醒
 
 ### 改动内容
