@@ -2,6 +2,15 @@
 
 ## 已完成
 
+### v5.2.100 修复无截止时间待办日视图不显示+日期锚定
+- [x] matchItemDateRange 放宽条件：deadline → item.date → createdAt → true
+- [x] saveItem 中 todo 设 item.date = newDeadline || selectedDate 锚定日期
+- [x] 版本号 v5.2.100（v5.2.99 被另一会话用于 PDF 识别优化）
+
+### v5.2.99 PDF识别管道优化——参会人员合并精度+跨天会议识别+延续行误判修复（另一会话）
+- [x] Fix A-D：日期匹配放宽+AI prompt增强+二次合并+延续行检测
+- [x] ocr.js?v=51→v=52
+
 ### v5.2.96 待办提醒系统重构——截止时间选填+无截止时间绝对提醒
 - [x] 新建待办截止时间不再自动填入，选填
 - [x] 有截止时间：相对提醒"截止前N分钟"（默认3分钟）
@@ -107,6 +116,17 @@
 - [x] v5.1.68 移动到功能两个bug修复
 
 ---
+
+### v5.2.99 PDF识别管道优化——参会人员合并精度+跨天会议识别+延续行误判修复
+- [x] Fix A: isSameMeetingForMerge日期匹配放宽（endDate不同但无双方显式endDate时不强制匹配）
+- [x] Fix B: AI prompt核心规则9→10条，新增"严禁跨行混入参会人"+"同名会议各输出各的"
+- [x] Fix C: 新增secondaryMergeRecognizedItems二次合并（半天vs跨天同一会议）
+- [x] Fix D: extractPDFTableRows延续行判断增加hasStandaloneDateTime检测
+- [x] 缓存版本v=51→v=52
+- [x] 语法检查通过
+- [x] Code review: HIGH#1已修复
+- [x] 已提交推送 5ae1e85
+- [ ] 用户上传【5.13】近期主要会议活动安排表.pdf进行线上验证
 
 ## 当前待办
 - **[中优先]** 月视图日期点标记：彩色小圆点+点击弹出当天列表

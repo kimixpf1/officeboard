@@ -1,3 +1,50 @@
+## 2026-05-14 v5.2.100 修复无截止时间待办日视图不显示
+
+### 改动内容
+1. **根因**：`matchItemDateRange` 要求 `item.type === 'todo' && item.deadline` 同时满足才匹配日期，无截止时间待办直接 `return false`
+2. **修复 A**：`matchItemDateRange` 放款条件，支持三级 fallback：`item.deadline` → `item.date` → `item.createdAt` → `true`
+3. **修复 B**：`saveItem` 中 todo 新增 `item.date = newDeadline || this.selectedDate`，无截止时间待办锚定到查看日期（非 createdAt 本地时间）
+
+### 当前状态
+- ✅ 语法检查通过
+- ✅ Code review 通过（0C/0H）
+- ✅ 已提交推送 `006d552`
+
+### 提交记录
+- `006d552` fix: 无截止时间待办用selectedDate锚定日期+matchItemDateRange优先用item.date (v5.2.100)
+- `2b19108` fix: matchItemDateRange无截止时间待办不显示——按createdAt日期匹配(v5.2.98)
+
+### 验证清单
+- [ ] 明天视图创建无截止时间待办 → 显示在明天
+- [ ] 今天视图创建无截止时间待办 → 显示在今天
+- [ ] 设置截止时间的待办 → 按截止日期显示
+- [ ] 无截止时间+绝对提醒的待办 → 到点通知栏闪烁
+
+---
+
+## 2026-05-14 v5.2.99 PDF识别管道优化——参会人员合并精度+跨天会议识别+延续行误判修复
+
+### 改动内容
+1. **Fix A - 日期匹配放宽**：`isSameMeetingForMerge`和`hasConflictingMeetingSchedule`中，双方都有显式endDate且不同时才严格要求endDate一致，解决钱局(半天)与吴局/盛局(跨天)同一会议无法合并
+2. **Fix B - AI prompt核心规则增强**：9条→10条，新增"严禁跨行混入参会人"和"同名会议各输出各的"规则，明确分组标签不跨分组继承
+3. **Fix C - 新增secondaryMergeRecognizedItems**：二次合并处理半天vs跨天同一会议，预排序避免顺序依赖（code-reviewer HIGH#1已修复）
+4. **Fix D - 延续行判断增强**：`hasStandaloneDateTime`检测避免正常行被误判为延续行导致丢失
+5. 缓存版本: v=51→v=52
+
+### 当前状态
+- ✅ 语法检查通过 (`node --check`)
+- ✅ Code review: 1H+2M+2L → HIGH#1已修复
+- ✅ 已提交推送 `5ae1e85`
+
+### 提交记录
+- `5ae1e85` fix: PDF识别管道优化——参会人员合并精度+跨天会议识别+延续行误判修复 (v5.2.99)
+
+### 遗留事项
+- 需要用户上传【5.13】近期主要会议活动安排表.pdf进行线上验证
+- 验证清单：吴局是否出现在"陪同省局周国强副局长"中、行业协会商会乱象专项整顿是否只有综合处、"儋州市统计局来苏调研座谈会"是否出现
+
+---
+
 ## 2026-05-14 v5.2.97 修复待办提醒不触发——_todoDeadlineInitial空字符串falsy
 
 ### 改动内容
