@@ -68,6 +68,15 @@
 - 任何涉及账号、密码、API Key、云端配置的内容，不得明文写入代码、日志或无保护存储
 - 任何涉及跨日期、周期性、批量作用范围的操作，必须验证边界日期和历史数据兼容性，不能只测新建数据
 
+## 新功能数据铁律（2026-05-14 起实施）
+
+- **凡新增功能涉及数据存储（localStorage/IndexedDB/任何持久化），必须同步考虑：**
+  1. **跨设备同步**：数据需纳入 sync.js 的 sideData 同步（含 buildSyncData 打包 + 全部恢复路径）
+  2. **离线可用**：不依赖登录态，本地有缓存就能用，避免 isLoggedIn() 阻断本地数据读取
+  3. **数据格式兼容**：新旧格式平滑迁移，旧数据不清空不丢失
+  4. **备份覆盖**：自动备份和云端每日备份需纳入新数据字段
+- **检查清单**：sync.js 的 buildSyncData / smartSync / downloadFromCloud / silentSyncFromCloud / syncFromCloud / mergeData / backup / restore 共 8 条路径全部覆盖
+
 ## 数据安全铁律（P3-31 事故教训）
 
 ### 绝对禁止
