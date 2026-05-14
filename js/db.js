@@ -61,9 +61,18 @@ class Database {
             return meetingStart <= endDate && meetingEnd >= startDate;
         }
 
-        if (item.type === 'todo' && item.deadline) {
-            const deadlineDate = item.deadline.split('T')[0];
-            return deadlineDate >= startDate && deadlineDate <= endDate;
+        if (item.type === 'todo') {
+            if (item.deadline) {
+                const deadlineDate = item.deadline.split('T')[0];
+                return deadlineDate >= startDate && deadlineDate <= endDate;
+            }
+            // 无截止时间的待办按创建日期匹配
+            if (item.createdAt) {
+                const createdDate = item.createdAt.split('T')[0];
+                return createdDate >= startDate && createdDate <= endDate;
+            }
+            // 无创建日期时始终显示在日视图中
+            return true;
         }
 
         if (item.type === 'document') {
@@ -159,7 +168,6 @@ class Database {
         const normalizedItem = this.normalizeItemForStorage(item);
 
         normalizedItem.hash = this.generateHash(normalizedItem);
-        console.log('[db.addItem] 开始添加, hash:', normalizedItem.hash, 'type:', normalizedItem.type, 'title:', (normalizedItem.title || '').slice(0, 20));
         if (!normalizedItem.createdAt) {
             normalizedItem.createdAt = new Date().toISOString();
         }
