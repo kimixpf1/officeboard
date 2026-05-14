@@ -66,12 +66,11 @@ class Database {
                 const deadlineDate = item.deadline.split('T')[0];
                 return deadlineDate >= startDate && deadlineDate <= endDate;
             }
-            // 无截止时间的待办按创建日期匹配
-            if (item.createdAt) {
-                const createdDate = item.createdAt.split('T')[0];
-                return createdDate >= startDate && createdDate <= endDate;
+            // 无截止时间 → 用锚定日期或创建日期匹配
+            const anchorDate = item.date || (item.createdAt ? item.createdAt.split('T')[0] : null);
+            if (anchorDate) {
+                return anchorDate >= startDate && anchorDate <= endDate;
             }
-            // 无创建日期时始终显示在日视图中
             return true;
         }
 
