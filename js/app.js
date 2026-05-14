@@ -3984,7 +3984,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-14 v5.2.97';
+        const version = '2026-05-14 v5.2.98-debug';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=70', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=9', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=227', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=4', 'themes.css?v=5', 'components.css?v=2', 'responsive.css?v=3', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
@@ -4683,10 +4683,19 @@ class OfficeDashboard {
                         return;
                     }
                 } else {
-                    const addedItem = await db.addItem(item);
-                    // 保存历史用于撤回
-                    if (addedItem && addedItem.id) {
-                        this.saveUndoHistory('add', { id: addedItem.id });
+                    const debugItem = { ...item };
+                    console.log('[saveItem] 即将 db.addItem，item 快照:', JSON.stringify(debugItem, null, 2));
+                    try {
+                        const addedItem = await db.addItem(item);
+                        console.log('[saveItem] db.addItem 成功, 返回:', addedItem);
+                        // 保存历史用于撤回
+                        if (addedItem && addedItem.id) {
+                            this.saveUndoHistory('add', { id: addedItem.id });
+                        }
+                    } catch (addErr) {
+                        console.error('[saveItem] db.addItem 失败, item:', JSON.stringify(debugItem, null, 2));
+                        console.error('[saveItem] db.addItem 错误详情:', addErr);
+                        throw addErr;
                     }
                 }
             }
@@ -4699,7 +4708,9 @@ class OfficeDashboard {
             }
 
         } catch (error) {
-            console.error('保存失败:', error);
+            console.error('[saveItem] 保存失败, 完整错误:', error);
+            console.error('[saveItem] 错误类型:', error.name, '错误消息:', error.message);
+            console.error('[saveItem] 错误堆栈:', error.stack);
             alert('保存失败: ' + error.message);
         }
     }

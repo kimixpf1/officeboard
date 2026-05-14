@@ -159,6 +159,7 @@ class Database {
         const normalizedItem = this.normalizeItemForStorage(item);
 
         normalizedItem.hash = this.generateHash(normalizedItem);
+        console.log('[db.addItem] 开始添加, hash:', normalizedItem.hash, 'type:', normalizedItem.type, 'title:', (normalizedItem.title || '').slice(0, 20));
         if (!normalizedItem.createdAt) {
             normalizedItem.createdAt = new Date().toISOString();
         }
