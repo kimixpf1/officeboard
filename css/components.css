@@ -571,6 +571,25 @@
     display: block;
 }
 
+.reminder-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.reminder-row select {
+    width: auto;
+    min-width: 80px;
+}
+
+.reminder-row input[type="date"],
+.reminder-row input[type="time"] {
+    width: auto;
+}
+
 .radio-group {
     display: flex;
     gap: var(--spacing-4);

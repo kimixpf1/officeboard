@@ -3195,19 +3195,36 @@ class OfficeDashboard {
         switch (item.type) {
             case ITEM_TYPES.TODO:
                 document.getElementById('todoPriority').value = item.priority || 'medium';
-                document.getElementById('todoDeadline').value = item.deadline || '';
-                document.getElementById('todoReminderAdvance').value = item.reminderAdvance || 3;
-                const reminderTimeEl = document.getElementById('todoReminderTime');
-                const reminderTimeGroup = document.getElementById('reminderTimeGroup');
-                if (item.reminderTime) {
-                    reminderTimeEl.value = item.reminderTime;
-                } else {
-                    reminderTimeEl.value = '09:00';
+                const todoDeadline = document.getElementById('todoDeadline');
+                todoDeadline.value = item.deadline || '';
+                const hasDeadline = !!item.deadline;
+
+                // 切换提醒模式
+                const reminderRelative = document.getElementById('reminderRelative');
+                const reminderAbsolute = document.getElementById('reminderAbsolute');
+                if (reminderRelative && reminderAbsolute) {
+                    reminderRelative.style.display = hasDeadline ? '' : 'none';
+                    reminderAbsolute.style.display = hasDeadline ? 'none' : '';
                 }
-                if (parseInt(document.getElementById('todoReminderAdvance').value) >= 1440) {
-                    reminderTimeGroup.style.display = '';
+
+                if (hasDeadline) {
+                    // 相对提醒回填
+                    document.getElementById('todoReminderAdvance').value = item.reminderAdvance || 3;
+                    const reminderTimeEl = document.getElementById('todoReminderTime');
+                    const reminderTimeGroup = document.getElementById('reminderTimeGroup');
+                    reminderTimeEl.value = item.reminderTime || '09:00';
+                    reminderTimeGroup.style.display = (item.reminderAdvance || 3) >= 1440 ? '' : 'none';
                 } else {
-                    reminderTimeGroup.style.display = 'none';
+                    // 绝对提醒回填：仅当原事项有提醒配置时才回填，避免污染无提醒旧事项
+                    const absMode = document.getElementById('todoReminderMode');
+                    const absDate = document.getElementById('todoReminderDate');
+                    const absTime = document.getElementById('todoReminderTimeAbs');
+                    if (absMode) absMode.value = item.reminderMode || '';
+                    if (absDate) {
+                        absDate.value = item.reminderDate || '';
+                        absDate.style.display = (item.reminderMode === 'once') ? '' : 'none';
+                    }
+                    if (absTime) absTime.value = item.reminderTimeAbs || '';
                 }
                 
                 // 周期性任务设置
@@ -3348,13 +3365,14 @@ class OfficeDashboard {
 
     getTodoReminderItems(items = []) {
         const now = Date.now();
-        return items
-            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && !item.reminderDismissedAt && !(this._dismissedTodoReminderIds && this._dismissedTodoReminderIds.has(item.id)) && (item.deadlineManuallySet || item.reminderManuallySet))
+        const baseFilter = item => item?.type === ITEM_TYPES.TODO && !item.completed && !item.reminderDismissedAt && !(this._dismissedTodoReminderIds && this._dismissedTodoReminderIds.has(item.id)) && (item.deadlineManuallySet || item.reminderManuallySet);
+
+        // 相对提醒：有截止时间
+        const relativeItems = items
+            .filter(item => baseFilter(item) && item.deadline)
             .map(item => {
                 const deadlineDate = new Date(item.deadline);
-                if (Number.isNaN(deadlineDate.getTime())) {
-                    return null;
-                }
+                if (Number.isNaN(deadlineDate.getTime())) return null;
                 const advanceMin = item.reminderAdvance || 3;
                 let windowMs = advanceMin * 60000;
                 if (item.reminderTime && advanceMin >= 1440) {
@@ -3371,11 +3389,40 @@ class OfficeDashboard {
                     item,
                     deadlineDate,
                     overdueMs: now - deadlineDate.getTime(),
-                    windowMs
+                    windowMs,
+                    isAbsolute: false
                 };
             })
             .filter(Boolean)
-            .filter(entry => entry.overdueMs >= -entry.windowMs)
+            .filter(entry => entry.overdueMs >= -entry.windowMs);
+
+        // 绝对提醒：无截止时间，用 reminderMode + reminderTimeAbs
+        const absoluteItems = items
+            .filter(item => baseFilter(item) && !item.deadline && item.reminderMode && item.reminderTimeAbs)
+            .map(item => {
+                let targetDate;
+                if (item.reminderMode === 'once') {
+                    if (!item.reminderDate) return null;
+                    targetDate = new Date(`${item.reminderDate}T${item.reminderTimeAbs}`);
+                } else {
+                    const today = new Date();
+                    const [h, m] = item.reminderTimeAbs.split(':').map(Number);
+                    targetDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, 0, 0);
+                }
+                if (Number.isNaN(targetDate.getTime())) return null;
+                const windowMs = 3 * 60000;
+                return {
+                    item,
+                    deadlineDate: targetDate,
+                    overdueMs: now - targetDate.getTime(),
+                    windowMs,
+                    isAbsolute: true
+                };
+            })
+            .filter(Boolean)
+            .filter(entry => entry.overdueMs >= -entry.windowMs);
+
+        return [...relativeItems, ...absoluteItems]
             .sort((a, b) => a.deadlineDate - b.deadlineDate);
     }
 
@@ -3409,6 +3456,21 @@ class OfficeDashboard {
             return `已超时 ${hours}小时${minutes}分钟`;
         }
         return `已超时 ${minutes}分钟`;
+    }
+
+    formatTodoReminderAbsolute(targetDate) {
+        if (!(targetDate instanceof Date) || Number.isNaN(targetDate.getTime())) {
+            return '';
+        }
+        const now = new Date();
+        const timeStr = targetDate.toTimeString().slice(0, 5);
+        const isToday = targetDate.toDateString() === now.toDateString();
+        if (isToday) {
+            return `今天 ${timeStr}`;
+        }
+        const month = targetDate.getMonth() + 1;
+        const day = targetDate.getDate();
+        return `${month}月${day}日 ${timeStr}`;
     }
 
     updateTodoReminderNotice() {
@@ -3452,15 +3514,26 @@ class OfficeDashboard {
         }
         if (titleEl) {
             const title = current.item.title || '';
-            const overdue = current.overdueMs >= 0;
-            const label = overdue ? '已到期' : '即将到期';
-            titleEl.textContent = `${title} ${label}`;
-            titleEl.title = `${title} ${label}`;
+            if (current.isAbsolute) {
+                titleEl.textContent = `${title} [提醒]`;
+                titleEl.title = `${title} [提醒]`;
+            } else {
+                const overdue = current.overdueMs >= 0;
+                const label = overdue ? '已到期' : '即将到期';
+                titleEl.textContent = `${title} ${label}`;
+                titleEl.title = `${title} ${label}`;
+            }
         }
         if (descEl) {
-            const relative = this.formatTodoReminderRelative(current.deadlineDate);
-            descEl.textContent = relative;
-            descEl.title = relative;
+            if (current.isAbsolute) {
+                const absText = this.formatTodoReminderAbsolute(current.deadlineDate);
+                descEl.textContent = absText;
+                descEl.title = absText;
+            } else {
+                const relative = this.formatTodoReminderRelative(current.deadlineDate);
+                descEl.textContent = relative;
+                descEl.title = relative;
+            }
         }
         if (completeBtn) {
             completeBtn.style.display = '';
@@ -3911,7 +3984,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-13 v5.2.94';
+        const version = '2026-05-14 v5.2.96';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=70', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=5', 'backup.js?v=1', 'alarm.js?v=9', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=227', 'db.js?v=29', 'base.css?v=2', 'layout.css?v=4', 'themes.css?v=5', 'components.css?v=2', 'responsive.css?v=3', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
@@ -3962,10 +4035,36 @@ class OfficeDashboard {
         const timeStr = now.toTimeString().slice(0, 5);
 
         if (type === ITEM_TYPES.TODO) {
+            // 截止时间默认留空，让用户自己填
             const deadlineEl = document.getElementById('todoDeadline');
+            if (deadlineEl) deadlineEl.value = '';
+            this._todoDeadlineInitial = '';
 
-            if (deadlineEl) deadlineEl.value = `${dateStr}T${timeStr}`;
-            this._todoDeadlineInitial = `${dateStr}T${timeStr}`;
+            // 默认显示绝对提醒（无截止时间）
+            const reminderRelative = document.getElementById('reminderRelative');
+            const reminderAbsolute = document.getElementById('reminderAbsolute');
+            if (reminderRelative) reminderRelative.style.display = 'none';
+            if (reminderAbsolute) reminderAbsolute.style.display = '';
+
+            // 重置绝对提醒字段默认值
+            const reminderMode = document.getElementById('todoReminderMode');
+            const reminderDate = document.getElementById('todoReminderDate');
+            const reminderTimeAbs = document.getElementById('todoReminderTimeAbs');
+            if (reminderMode) reminderMode.value = 'once';
+            if (reminderDate) reminderDate.value = '';
+            if (reminderTimeAbs) reminderTimeAbs.value = '09:00';
+            // 记录初始状态，保存时对比判断是否手动改过
+            this._todoReminderInitial = { mode: 'once', date: '', timeAbs: '09:00' };
+            // 单次模式默认显示日期选择器
+            if (reminderDate) reminderDate.style.display = '';
+
+            // 重置相对提醒默认值
+            const reminderAdvance = document.getElementById('todoReminderAdvance');
+            const reminderTime = document.getElementById('todoReminderTime');
+            const reminderTimeGroup = document.getElementById('reminderTimeGroup');
+            if (reminderAdvance) reminderAdvance.value = '3';
+            if (reminderTime) reminderTime.value = '09:00';
+            if (reminderTimeGroup) reminderTimeGroup.style.display = 'none';
 
             // 重置周期性选项
             const recurringFields = document.getElementById('recurringFields');
@@ -4009,7 +4108,7 @@ class OfficeDashboard {
             description: `${dateStr} 要新增什么类型的事项？`,
             maxWidth: '420px',
             buttons: [
-                { label: '待办事项', subLabel: '默认带入该日期和当前时间', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: ITEM_TYPES.TODO },
+                { label: '待办事项', subLabel: '截止时间留空，可设提醒', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: ITEM_TYPES.TODO },
                 { label: '会议活动', subLabel: '默认带入该日期和当前时间', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: ITEM_TYPES.MEETING },
                 { label: '办文情况', subLabel: '默认带入该日期作为开始日期', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: ITEM_TYPES.DOCUMENT },
                 { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
@@ -4097,6 +4196,28 @@ class OfficeDashboard {
                 reminderTimeGroup.style.display = parseInt(e.target.value) >= 1440 ? '' : 'none';
             };
         }
+
+        // === 截止时间变化 → 切换相对/绝对提醒模式 ===
+        const todoDeadline = document.getElementById('todoDeadline');
+        const reminderRelative = document.getElementById('reminderRelative');
+        const reminderAbsolute = document.getElementById('reminderAbsolute');
+        if (todoDeadline && reminderRelative && reminderAbsolute) {
+            todoDeadline.onchange = () => {
+                const hasDeadline = !!todoDeadline.value;
+                reminderRelative.style.display = hasDeadline ? '' : 'none';
+                reminderAbsolute.style.display = hasDeadline ? 'none' : '';
+            };
+            todoDeadline.oninput = todoDeadline.onchange;
+        }
+
+        // === 绝对提醒模式切换 → 单次显示日期，每天隐藏日期 ===
+        const todoReminderMode = document.getElementById('todoReminderMode');
+        const todoReminderDate = document.getElementById('todoReminderDate');
+        if (todoReminderMode && todoReminderDate) {
+            todoReminderMode.onchange = (e) => {
+                todoReminderDate.style.display = e.target.value === 'once' ? '' : 'none';
+            };
+        }
     }
 
     /**
@@ -4122,34 +4243,71 @@ class OfficeDashboard {
             case ITEM_TYPES.TODO:
                 item.priority = document.getElementById('todoPriority').value;
                 const newDeadline = document.getElementById('todoDeadline').value;
-                item.deadline = newDeadline;
-                const newReminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
-                const reminderTimeVal = document.getElementById('todoReminderTime').value;
-                item.reminderAdvance = newReminderAdvance;
-                if (item.reminderAdvance >= 1440 && reminderTimeVal) {
-                    item.reminderTime = reminderTimeVal;
+                item.deadline = newDeadline || null;
+                const hasDeadline = !!newDeadline;
+
+                if (hasDeadline) {
+                    // 相对提醒：截止前 N 分钟
+                    const newReminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
+                    const reminderTimeVal = document.getElementById('todoReminderTime').value;
+                    item.reminderAdvance = newReminderAdvance;
+                    if (newReminderAdvance >= 1440 && reminderTimeVal) {
+                        item.reminderTime = reminderTimeVal;
+                    } else {
+                        item.reminderTime = null;
+                    }
+                    // 清除绝对提醒字段
+                    item.reminderMode = null;
+                    item.reminderDate = null;
+                    item.reminderTimeAbs = null;
                 } else {
+                    // 绝对提醒：无截止时间，在指定日期/时间提醒
+                    item.reminderAdvance = 0;
                     item.reminderTime = null;
+                    const absMode = document.getElementById('todoReminderMode')?.value || '';
+                    const absDate = document.getElementById('todoReminderDate')?.value || '';
+                    const absTime = document.getElementById('todoReminderTimeAbs')?.value || '';
+                    if (absMode && absTime) {
+                        item.reminderMode = absMode;
+                        item.reminderDate = (absMode === 'once' && absDate) ? absDate : null;
+                        item.reminderTimeAbs = absTime;
+                    } else {
+                        item.reminderMode = null;
+                        item.reminderDate = null;
+                        item.reminderTimeAbs = null;
+                    }
                 }
+
                 if (id) {
                     const originalItem = await db.getItem(parseInt(id));
                     if (originalItem) {
                         // 截止时间手动改过
-                        if (originalItem.deadline !== newDeadline) {
+                        if ((originalItem.deadline || null) !== (newDeadline || null)) {
                             item.deadlineManuallySet = true;
                         } else {
                             item.deadlineManuallySet = originalItem.deadlineManuallySet || false;
                         }
                         // 提醒时间手动改过
-                        const reminderChanged = originalItem.reminderAdvance !== newReminderAdvance
-                            || (originalItem.reminderTime || null) !== (item.reminderTime || null);
-                        item.reminderManuallySet = originalItem.reminderManuallySet || reminderChanged || false;
+                        const hasReminderChanged = hasDeadline
+                            ? (originalItem.reminderAdvance !== item.reminderAdvance
+                                || (originalItem.reminderTime || null) !== (item.reminderTime || null))
+                            : (originalItem.reminderMode !== item.reminderMode
+                                || (originalItem.reminderDate || null) !== (item.reminderDate || null)
+                                || (originalItem.reminderTimeAbs || null) !== (item.reminderTimeAbs || null));
+                        item.reminderManuallySet = originalItem.reminderManuallySet || hasReminderChanged || false;
                     }
                 } else {
                     if (this._todoDeadlineInitial && this._todoDeadlineInitial !== newDeadline) {
                         item.deadlineManuallySet = true;
                     }
-                    item.reminderManuallySet = newReminderAdvance !== 3 || !!item.reminderTime;
+                    // 只有用户主动改了提醒表单才标记为手动设置
+                    const initial = this._todoReminderInitial || {};
+                    const reminderChanged = hasDeadline
+                        ? (item.reminderAdvance !== 3 || !!item.reminderTime)
+                        : (item.reminderMode !== (initial.mode || '')
+                            || item.reminderTimeAbs !== (initial.timeAbs || '')
+                            || (item.reminderDate || null) !== (initial.date || null));
+                    item.reminderManuallySet = reminderChanged;
                 }
                 // 编辑时清除已提醒标记，让提醒重新生效
                 if (id) {
