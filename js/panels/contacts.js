@@ -121,13 +121,7 @@ const ContactsPanel = {
      */
     async loadContacts() {
         const saved = SecurityUtils.safeGetStorage('office_contacts');
-        let contacts = saved ? safeJsonParse(saved, []) : [];
-
-        // 未登录时清空数据
-        if (!syncManager.isLoggedIn()) {
-            contacts = [];
-        }
-
+        const contacts = saved ? safeJsonParse(saved, []) : [];
         this.contacts = contacts;
         this.renderContacts(contacts);
     },

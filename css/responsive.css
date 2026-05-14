@@ -25,7 +25,7 @@
     .board-date-label-next-meeting { font-size: 11px; max-width: 360px; -webkit-line-clamp: 2; }
     .board-screenshot-inline-btn { width: 18px; height: 18px; font-size: 12px; }
 
-    .sticky-note-card { position: static; width: auto; max-width: 100%; margin-bottom: var(--spacing-2); transform: none; min-height: auto; }
+    .sticky-note-card { position: static; width: auto; max-width: 100%; margin-bottom: var(--spacing-2); transform: none; min-height: 200px; }
     .sticky-note-lines { min-height: 60px; font-size: 14px; }
 
     .header {
@@ -312,7 +312,7 @@
         -webkit-line-clamp: 2;
     }
 
-    .sticky-note-card { position: static; transform: none; width: auto; max-width: 100%; min-height: auto; }
+    .sticky-note-card { position: static; transform: none; width: auto; max-width: 100%; min-height: 180px; }
     .sticky-note-lines { min-height: 40px; }
 
     .board-screenshot-inline-btn {

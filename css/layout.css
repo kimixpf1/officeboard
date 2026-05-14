@@ -595,17 +595,17 @@
     display: none;
 }
 
-/* 便签卡片 — 正方形，与日期标签同宽，位于其下方 */
+/* 便签卡片 — 宽190px，高为日期卡片1.5倍，位于其下方 */
 .sticky-note-card {
     position: absolute;
     left: 5px;
     width: 190px;
-    min-height: 190px;
+    min-height: 285px;
     z-index: 5;
     background: var(--sticky-bg, #fff9c4);
     border: 1px solid var(--sticky-border, #e6d88a);
     border-radius: 4px;
-    padding: 10px 12px;
+    padding: 10px 12px 40px;
     box-shadow: 2px 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
     transform: rotate(-0.5deg);
     display: flex;
@@ -692,6 +692,44 @@
         transparent, transparent 31px,
         #d4c678 31px, #d4c678 32px
     );
+}
+
+/* 便签翻页导航 — 固定底部 */
+.sticky-note-pages {
+    position: absolute;
+    bottom: 6px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    z-index: 2;
+}
+.sticky-page-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 50%;
+    background: rgba(255,255,255,0.7);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 22px;
+    text-align: center;
+    padding: 0;
+    color: #5d4e37;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.sticky-page-btn:hover { background: rgba(255,255,255,0.95); }
+.sticky-page-btn:active { background: rgba(0,0,0,0.05); }
+.sticky-page-indicator {
+    font-size: 11px;
+    color: #8a7a5a;
+    min-width: 28px;
+    text-align: center;
+    user-select: none;
 }
 
 /* 便签预设颜色 */

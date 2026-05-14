@@ -2720,7 +2720,9 @@ class OfficeDashboard {
         const colorBtn = document.getElementById('stickyColorBtn');
         if (colorBtn) colorBtn.style.background = getComputedStyle(card).getPropertyValue('--sticky-bg').trim();
 
-        linesEl.textContent = SafeStorage.get('office_sticky_note') || '';
+        // 加载便签数据（兼容旧格式迁移）
+        this._stickyData = this._loadStickyData();
+        this._showStickyPage(this._stickyData.currentPage || 0, linesEl);
 
         this._repositionStickyNote();
 
@@ -2742,20 +2744,98 @@ class OfficeDashboard {
                 });
             });
         }
-        // 点击空白关闭颜色选择器
         document.addEventListener('click', () => { if (picker) picker.classList.remove('show'); });
 
+        // 自动保存（800ms 防抖）
         let saveTimer = null;
         const save = () => {
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => {
-                SafeStorage.set('office_sticky_note', linesEl.textContent || '');
+                this._commitStickyPage(linesEl);
+                SafeStorage.set('office_sticky_note', JSON.stringify(this._stickyData));
                 if (syncManager && syncManager.isLoggedIn()) {
                     syncManager.immediateSyncToCloud().catch(() => {});
                 }
             }, 800);
         };
         linesEl.addEventListener('input', save);
+
+        // 翻页按钮
+        const prevBtn = document.getElementById('stickyPrevPage');
+        const nextBtn = document.getElementById('stickyNextPage');
+        const addBtn = document.getElementById('stickyAddPage');
+        if (prevBtn) prevBtn.addEventListener('click', () => {
+            this._commitStickyPage(linesEl);
+            if (this._stickyData.currentPage > 0) {
+                this._stickyData.currentPage--;
+                this._showStickyPage(this._stickyData.currentPage, linesEl);
+                save();
+            }
+        });
+        if (nextBtn) nextBtn.addEventListener('click', () => {
+            this._commitStickyPage(linesEl);
+            if (this._stickyData.currentPage < this._stickyData.pages.length - 1) {
+                this._stickyData.currentPage++;
+                this._showStickyPage(this._stickyData.currentPage, linesEl);
+                save();
+            }
+        });
+        if (addBtn) addBtn.addEventListener('click', () => {
+            this._commitStickyPage(linesEl);
+            this._stickyData.pages.push('');
+            this._stickyData.currentPage = this._stickyData.pages.length - 1;
+            this._showStickyPage(this._stickyData.currentPage, linesEl);
+            save();
+            linesEl.focus();
+        });
+
+        // 右键删除当前页（>1页时）
+        linesEl.addEventListener('contextmenu', (e) => {
+            if (this._stickyData.pages.length <= 1) return;
+            e.preventDefault();
+            this._commitStickyPage(linesEl);
+            this._stickyData.pages.splice(this._stickyData.currentPage, 1);
+            if (this._stickyData.currentPage >= this._stickyData.pages.length) {
+                this._stickyData.currentPage = this._stickyData.pages.length - 1;
+            }
+            this._showStickyPage(this._stickyData.currentPage, linesEl);
+            this._updateStickyPageIndicator();
+            save();
+        });
+    }
+
+    _loadStickyData() {
+        const raw = SafeStorage.get('office_sticky_note') || '';
+        if (!raw) return { pages: [''], currentPage: 0 };
+        // JSON 格式（新）
+        if (raw.startsWith('{')) {
+            try {
+                const data = JSON.parse(raw);
+                if (data.pages && Array.isArray(data.pages) && data.pages.length > 0) {
+                    return { pages: data.pages, currentPage: data.currentPage || 0 };
+                }
+            } catch (_) {}
+        }
+        // 旧格式：纯文本字符串
+        return { pages: [raw], currentPage: 0 };
+    }
+
+    _commitStickyPage(linesEl) {
+        if (!this._stickyData || !this._stickyData.pages) return;
+        this._stickyData.pages[this._stickyData.currentPage] = linesEl.textContent || '';
+    }
+
+    _showStickyPage(pageIdx, linesEl) {
+        if (!this._stickyData || !this._stickyData.pages) return;
+        this._stickyData.currentPage = Math.max(0, Math.min(pageIdx, this._stickyData.pages.length - 1));
+        linesEl.textContent = this._stickyData.pages[this._stickyData.currentPage] || '';
+        this._updateStickyPageIndicator();
+    }
+
+    _updateStickyPageIndicator() {
+        const indicator = document.getElementById('stickyPageIndicator');
+        if (!indicator || !this._stickyData) return;
+        indicator.textContent = (this._stickyData.currentPage + 1) + '/' + this._stickyData.pages.length;
     }
 
     _repositionStickyNote() {
@@ -4068,8 +4148,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-14 v5.2.105';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=71', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=236', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=7', 'themes.css?v=8', 'components.css?v=3', 'responsive.css?v=5', 'crypto.js?v=17'];
+        const version = '2026-05-14 v5.2.106';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=53', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=72', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=2', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=1', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=237', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=9', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

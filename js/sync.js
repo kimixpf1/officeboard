@@ -132,8 +132,11 @@ class SyncManager {
         if (sideData.office_sticky_note !== undefined) {
             SafeStorage.set('office_sticky_note', sideData.office_sticky_note || '');
             const stickyEl = document.querySelector('.sticky-note-lines');
-            if (stickyEl && document.activeElement !== stickyEl && stickyEl.textContent !== (sideData.office_sticky_note || '')) {
-                stickyEl.textContent = sideData.office_sticky_note || '';
+            if (stickyEl && document.activeElement !== stickyEl) {
+                const curContent = this._stickyCurrentContent(sideData.office_sticky_note || '');
+                if (stickyEl.textContent !== curContent) stickyEl.textContent = curContent;
+                const dash = window.dashboard || window.officeDashboard;
+                if (dash && typeof dash._loadStickyData === 'function') dash._stickyData = dash._loadStickyData();
             }
         }
 
@@ -885,7 +888,9 @@ class SyncManager {
                         if (cloudData.data.stickyNote !== localSticky) {
                             SafeStorage.set('office_sticky_note', cloudData.data.stickyNote);
                             const stickyEl = document.querySelector('.sticky-note-lines');
-                            if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = cloudData.data.stickyNote;
+                            if (stickyEl && document.activeElement !== stickyEl) {
+                                stickyEl.textContent = this._stickyCurrentContent(cloudData.data.stickyNote);
+                            }
                         }
                     }
                     // 同步网站
@@ -1116,7 +1121,9 @@ class SyncManager {
             if (cloudData.data.stickyNote !== undefined) {
                 SafeStorage.set('office_sticky_note', cloudData.data.stickyNote);
                 const stickyEl = document.querySelector('.sticky-note-lines');
-                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = cloudData.data.stickyNote;
+                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = this._stickyCurrentContent(cloudData.data.stickyNote);
+                            const dash = window.dashboard || window.officeDashboard;
+                            if (dash && typeof dash._loadStickyData === 'function') dash._stickyData = dash._loadStickyData();
             }
 
             // 同步日程
@@ -1413,7 +1420,9 @@ class SyncManager {
                 if (cloudData.data.stickyNote !== localSticky) {
                     SafeStorage.set('office_sticky_note', cloudData.data.stickyNote);
                     const stickyEl = document.querySelector('.sticky-note-lines');
-                    if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = cloudData.data.stickyNote;
+                    if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = this._stickyCurrentContent(cloudData.data.stickyNote);
+                            const dash = window.dashboard || window.officeDashboard;
+                            if (dash && typeof dash._loadStickyData === 'function') dash._stickyData = dash._loadStickyData();
                 }
             }
 
@@ -1857,7 +1866,9 @@ class SyncManager {
             if (data.data.stickyNote !== undefined) {
                 SafeStorage.set('office_sticky_note', data.data.stickyNote);
                 const stickyEl = document.querySelector('.sticky-note-lines');
-                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = data.data.stickyNote;
+                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = this._stickyCurrentContent(data.data.stickyNote);
+                const dash = window.dashboard || window.officeDashboard;
+                if (dash && typeof dash._loadStickyData === 'function') dash._stickyData = dash._loadStickyData();
             }
 
             // 同步日程
@@ -2341,7 +2352,9 @@ class SyncManager {
             if (data.data.stickyNote !== undefined) {
                 SafeStorage.set('office_sticky_note', data.data.stickyNote);
                 const stickyEl = document.querySelector('.sticky-note-lines');
-                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = data.data.stickyNote;
+                if (stickyEl && document.activeElement !== stickyEl) stickyEl.textContent = this._stickyCurrentContent(data.data.stickyNote);
+                const dash = window.dashboard || window.officeDashboard;
+                if (dash && typeof dash._loadStickyData === 'function') dash._stickyData = dash._loadStickyData();
             }
 
             // 同步日程
@@ -2913,6 +2926,20 @@ class SyncManager {
             console.error('导出备份失败:', e);
             return null;
         }
+    }
+
+    // 从 JSON 格式的便签数据中提取当前页内容（兼容旧纯文本格式）
+    _stickyCurrentContent(raw) {
+        if (!raw) return '';
+        if (raw.startsWith('{')) {
+            try {
+                const data = JSON.parse(raw);
+                if (data.pages && Array.isArray(data.pages)) {
+                    return data.pages[data.currentPage || 0] || '';
+                }
+            } catch (_) {}
+        }
+        return raw;
     }
 }
 
