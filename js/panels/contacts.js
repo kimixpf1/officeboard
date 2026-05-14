@@ -239,17 +239,6 @@ const ContactsPanel = {
 
         if (!list) return;
 
-        if (!syncManager.isLoggedIn()) {
-            const loginTip = document.createElement('div');
-            loginTip.style.textAlign = 'center';
-            loginTip.style.color = 'var(--text-secondary)';
-            loginTip.style.padding = '20px';
-            loginTip.textContent = '请登录后使用通讯录功能';
-            list.replaceChildren(loginTip);
-            if (status) status.textContent = '请登录';
-            return;
-        }
-
         if (contacts.length === 0) {
             const emptyTip = document.createElement('div');
             emptyTip.style.textAlign = 'center';
@@ -308,11 +297,6 @@ const ContactsPanel = {
      * 添加/更新联系人
      */
     async addContact() {
-        if (!syncManager.isLoggedIn()) {
-            alert('请先登录');
-            return;
-        }
-
         const nameInput = document.getElementById('newContactName');
         const phoneInput = document.getElementById('newContactPhone');
         const addBtn = document.getElementById('addContactBtn');
@@ -477,11 +461,6 @@ const ContactsPanel = {
      * 支持自动识别姓名和电话列
      */
     async importContactsFromExcel(file) {
-        if (!syncManager.isLoggedIn()) {
-            alert('请先登录');
-            return;
-        }
-
         if (!file) return;
 
         try {
