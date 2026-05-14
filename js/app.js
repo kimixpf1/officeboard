@@ -4054,7 +4054,7 @@ class OfficeDashboard {
             if (reminderDate) reminderDate.value = '';
             if (reminderTimeAbs) reminderTimeAbs.value = '09:00';
             // 记录初始状态，保存时对比判断是否手动改过
-            this._todoReminderInitial = { mode: 'once', date: '', timeAbs: '09:00' };
+            this._todoReminderInitial = { mode: 'once', date: null, timeAbs: '09:00' };
             // 单次模式默认显示日期选择器
             if (reminderDate) reminderDate.style.display = '';
 
@@ -4297,7 +4297,7 @@ class OfficeDashboard {
                         item.reminderManuallySet = originalItem.reminderManuallySet || hasReminderChanged || false;
                     }
                 } else {
-                    if (this._todoDeadlineInitial && this._todoDeadlineInitial !== newDeadline) {
+                    if (this._todoDeadlineInitial !== undefined && this._todoDeadlineInitial !== newDeadline) {
                         item.deadlineManuallySet = true;
                     }
                     // 只有用户主动改了提醒表单才标记为手动设置
@@ -4306,7 +4306,7 @@ class OfficeDashboard {
                         ? (item.reminderAdvance !== 3 || !!item.reminderTime)
                         : (item.reminderMode !== (initial.mode || '')
                             || item.reminderTimeAbs !== (initial.timeAbs || '')
-                            || (item.reminderDate || null) !== (initial.date || null));
+                            || (item.reminderDate || null) !== (initial.date != null ? initial.date : null));
                     item.reminderManuallySet = reminderChanged;
                 }
                 // 编辑时清除已提醒标记，让提醒重新生效
