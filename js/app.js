@@ -4462,6 +4462,18 @@ class OfficeDashboard {
                                 || (originalItem.reminderDate || null) !== (item.reminderDate || null)
                                 || (originalItem.reminderTimeAbs || null) !== (item.reminderTimeAbs || null));
                         item.reminderManuallySet = originalItem.reminderManuallySet || hasReminderChanged || false;
+                        // 编辑时保留完成状态，不要强制重置
+                        item.completed = !!originalItem.completed;
+                        if (originalItem.completed) {
+                            item.completedAt = originalItem.completedAt;
+                        }
+                        // 仅未完成事项清除已提醒标记，让提醒重新生效
+                        if (!originalItem.completed) {
+                            delete item.reminderDismissedAt;
+                            if (this._dismissedTodoReminderIds) {
+                                this._dismissedTodoReminderIds.delete(parseInt(id));
+                            }
+                        }
                     }
                 } else {
                     if (this._todoDeadlineInitial !== undefined && this._todoDeadlineInitial !== newDeadline) {
@@ -4475,15 +4487,8 @@ class OfficeDashboard {
                             || item.reminderTimeAbs !== (initial.timeAbs || '')
                             || (item.reminderDate || null) !== (initial.date != null ? initial.date : null));
                     item.reminderManuallySet = reminderChanged;
+                    item.completed = false;
                 }
-                // 编辑时清除已提醒标记，让提醒重新生效
-                if (id) {
-                    delete item.reminderDismissedAt;
-                    if (this._dismissedTodoReminderIds) {
-                        this._dismissedTodoReminderIds.delete(parseInt(id));
-                    }
-                }
-                item.completed = false;
 
                 // 周期性任务处理
                 const isRecurring = document.getElementById('isRecurring')?.checked;
