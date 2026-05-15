@@ -114,7 +114,8 @@ class SyncManager {
             dispatchSchedule = false,
             dispatchLinks = false,
             dispatchContacts = false,
-            dispatchCountdown = false
+            dispatchCountdown = false,
+            dispatchTools = false
         } = options;
 
         for (const [key, value] of Object.entries(sideData)) {
@@ -171,6 +172,12 @@ class SyncManager {
         if (sideData.office_alarms !== undefined) {
             document.dispatchEvent(new CustomEvent('alarmsSynced', {
                 detail: { alarms: safeJsonParse(sideData.office_alarms || '[]', []) }
+            }));
+        }
+
+        if (dispatchTools && sideData.office_tools !== undefined) {
+            document.dispatchEvent(new CustomEvent('toolsSynced', {
+                detail: { tools: safeJsonParse(sideData.office_tools || '[]', []) }
             }));
         }
     }
@@ -542,6 +549,8 @@ class SyncManager {
             || hasNonEmptyString('office_sticky_note')
             || hasNonEmptyString('office_links')
             || hasNonEmptyString('office_contacts')
+            || hasNonEmptyString('office_custom_pets')
+            || hasNonEmptyString('office_custom_quotes')
             || hasNonEmptyJson('office_countdown_events', [])
             || hasNonEmptyJson('office_countdown_type_colors', {})
             || hasNonEmptyJson('office_countdown_sort_order', []);
@@ -584,6 +593,8 @@ class SyncManager {
             weatherCity: SafeStorage.get('office_weather_city') || '',
             alarms: SafeStorage.get('office_alarms') || '[]',
             theme: SafeStorage.get('theme') || '',
+            customPets: SafeStorage.get('office_custom_pets') || '',
+            customQuotes: SafeStorage.get('office_custom_quotes') || '',
             device_info: navigator.userAgent
         };
     }
@@ -973,6 +984,8 @@ class SyncManager {
                         }
                     }
                     this._applyCloudTheme(cloudData?.data?.theme);
+                    if (cloudData?.data?.customPets) SafeStorage.set('office_custom_pets', cloudData.data.customPets);
+                    if (cloudData?.data?.customQuotes) SafeStorage.set('office_custom_quotes', cloudData.data.customQuotes);
                     if (
                         cloudData?.data?.countdownEvents !== undefined
                         || cloudData?.data?.countdownTypeColors !== undefined
@@ -1206,6 +1219,9 @@ class SyncManager {
             }
 
             this._applyCloudTheme(cloudData.data.theme);
+
+            if (cloudData.data.customPets) SafeStorage.set('office_custom_pets', cloudData.data.customPets);
+            if (cloudData.data.customQuotes) SafeStorage.set('office_custom_quotes', cloudData.data.customQuotes);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
@@ -1517,6 +1533,9 @@ class SyncManager {
             }
 
             this._applyCloudTheme(cloudData.data.theme);
+
+            if (cloudData.data.customPets) SafeStorage.set('office_custom_pets', cloudData.data.customPets);
+            if (cloudData.data.customQuotes) SafeStorage.set('office_custom_quotes', cloudData.data.customQuotes);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
@@ -1924,6 +1943,9 @@ class SyncManager {
             }
 
             this._applyCloudTheme(data.data.theme);
+
+            if (data.data.customPets) SafeStorage.set('office_custom_pets', data.data.customPets);
+            if (data.data.customQuotes) SafeStorage.set('office_custom_quotes', data.data.customQuotes);
 
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
@@ -2414,6 +2436,9 @@ class SyncManager {
 
             this._applyCloudTheme(data.data.theme);
 
+            if (data.data.customPets) SafeStorage.set('office_custom_pets', data.data.customPets);
+            if (data.data.customQuotes) SafeStorage.set('office_custom_quotes', data.data.customQuotes);
+
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
                     events: safeJsonParse(data.data.countdownEvents || '[]', []),
@@ -2646,7 +2671,14 @@ class SyncManager {
             }
 
             if (data.sideData && typeof data.sideData === 'object') {
-                this._applySideData(data.sideData);
+                this._applySideData(data.sideData, {
+                    dispatchMemo: true,
+                    dispatchSchedule: true,
+                    dispatchLinks: true,
+                    dispatchContacts: true,
+                    dispatchCountdown: true,
+                    dispatchTools: true
+                });
             }
 
             this.clearDeletedItemsMap();
@@ -2836,7 +2868,8 @@ class SyncManager {
     _collectSideDataForBackup() {
         const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
             'office_schedule_content', 'office_sticky_note', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
-            'office_weather_city', 'office_alarms', 'theme'];
+            'office_weather_city', 'office_alarms', 'theme',
+            'office_custom_pets', 'office_custom_quotes'];
         const result = {};
         for (const k of keys) {
             const v = localStorage.getItem(k);
@@ -2891,7 +2924,8 @@ class SyncManager {
                 dispatchSchedule: true,
                 dispatchLinks: true,
                 dispatchContacts: true,
-                dispatchCountdown: true
+                dispatchCountdown: true,
+                dispatchTools: true
             });
             this._resetSyncBaseline(restoreTime);
             this._setImportProtection('restore-backup');

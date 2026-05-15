@@ -193,28 +193,14 @@ const BackupCore = {
             }
 
             if (backup.sideData && typeof backup.sideData === 'object') {
-                Object.entries(backup.sideData).forEach(([key, value]) => {
-                    SafeStorage.set(key, value);
+                syncManager._applySideData(backup.sideData, {
+                    dispatchMemo: true,
+                    dispatchSchedule: true,
+                    dispatchLinks: true,
+                    dispatchContacts: true,
+                    dispatchCountdown: true,
+                    dispatchTools: true
                 });
-                document.dispatchEvent(new CustomEvent('memoSynced', {
-                    detail: { content: SafeStorage.get('office_memo_content') || '' }
-                }));
-                document.dispatchEvent(new CustomEvent('scheduleSynced', {
-                    detail: { content: SafeStorage.get('office_schedule_content') || '' }
-                }));
-                document.dispatchEvent(new CustomEvent('linksSynced', {
-                    detail: { links: safeJsonParse(SafeStorage.get('office_links') || '[]', []) }
-                }));
-                document.dispatchEvent(new CustomEvent('contactsSynced', {
-                    detail: { contacts: safeJsonParse(SafeStorage.get('office_contacts') || '[]', []) }
-                }));
-                document.dispatchEvent(new CustomEvent('countdownSynced', {
-                    detail: {
-                        events: safeJsonParse(SafeStorage.get('office_countdown_events') || '[]', []),
-                        colors: safeJsonParse(SafeStorage.get('office_countdown_type_colors') || '{}', {}),
-                        sortOrder: safeJsonParse(SafeStorage.get('office_countdown_sort_order') || '[]', [])
-                    }
-                }));
             }
 
             await this.loadItems();
