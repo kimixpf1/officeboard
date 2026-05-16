@@ -247,19 +247,8 @@ class OfficeDashboard {
      * 初始化应用
      */
     async init() {
-        // Mixin: 将拆分出的模块方法混入 OfficeDashboard 原型
-        Object.assign(OfficeDashboard.prototype, CountdownPanel);
-        Object.assign(OfficeDashboard.prototype, LinksPanel);
-        Object.assign(OfficeDashboard.prototype, ContactsPanel);
-        Object.assign(OfficeDashboard.prototype, ToolsPanel);
-        Object.assign(OfficeDashboard.prototype, SidePanels);
-        Object.assign(OfficeDashboard.prototype, WeatherPanel);
-        Object.assign(OfficeDashboard.prototype, RecurringCore);
-        Object.assign(OfficeDashboard.prototype, CrossDateCore);
-        Object.assign(OfficeDashboard.prototype, BackupCore);
-        Object.assign(OfficeDashboard.prototype, ContextMenuCore);
-        Object.assign(OfficeDashboard.prototype, IdleBarManager);
-        Object.assign(OfficeDashboard.prototype, AlarmManager);
+        // 阶段1：只混合已加载的模块（首屏只有 utils/db/app-date-view/app）
+        this._applyAvailableMixins();
 
         try {
             window.addEventListener('unhandledrejection', (e) => {
@@ -270,34 +259,93 @@ class OfficeDashboard {
             });
             await db.init();
 
-            this.initializeRecurringFieldOptions();
             this.bindEvents();
 
             await this.loadItems();
-
+        } catch (error) {
+            console.error('初始化失败:', error);
+            this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
+        } finally {
+            // 无论成败都移除骨架屏、启动时钟、加载剩余模块
             const skeleton = document.getElementById('appSkeleton');
             if (skeleton) skeleton.remove();
             document.getElementById('app').style.display = '';
 
-            this.initDatePicker();
+            this.initDatePicker?.();
+            this.updateDateDisplay?.();
+            this.initHeaderClock();
+            this._loadLazyModules();
+        }
+    }
 
-            this.updateDateDisplay();
+    _applyAvailableMixins() {
+        if (typeof CountdownPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, CountdownPanel);
+        if (typeof LinksPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, LinksPanel);
+        if (typeof ContactsPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, ContactsPanel);
+        if (typeof ToolsPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, ToolsPanel);
+        if (typeof SidePanels !== 'undefined') Object.assign(OfficeDashboard.prototype, SidePanels);
+        if (typeof WeatherPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, WeatherPanel);
+        if (typeof RecurringCore !== 'undefined') Object.assign(OfficeDashboard.prototype, RecurringCore);
+        if (typeof CrossDateCore !== 'undefined') Object.assign(OfficeDashboard.prototype, CrossDateCore);
+        if (typeof BackupCore !== 'undefined') Object.assign(OfficeDashboard.prototype, BackupCore);
+        if (typeof ContextMenuCore !== 'undefined') Object.assign(OfficeDashboard.prototype, ContextMenuCore);
+        if (typeof IdleBarManager !== 'undefined') Object.assign(OfficeDashboard.prototype, IdleBarManager);
+        if (typeof AlarmManager !== 'undefined') Object.assign(OfficeDashboard.prototype, AlarmManager);
+    }
 
-            const _ric = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (fn) => setTimeout(fn, 0);
-            _ric(() => {
-                this._loadDismissedReminderIds().then(() => {
-                    this.startTodoReminderLoop();
-                });
-                this.bindTodoReminderComplete();
-                this.initHeaderClock();
-                this.initHeaderWeather();
-                this.initCountdownSystem();
-                this.startMeetingAutoCompleteCheck();
-                this.startDailyBackupSchedule();
-                this.updateDeployVersionBadge();
-                this.initStickyNote();
+    async _loadLazyModules() {
+        const scripts = [
+            'js/sync.js?v=73',
+            'js/panels/countdown.js?v=3',
+            'js/panels/links.js?v=1',
+            'js/panels/contacts.js?v=3',
+            'js/panels/tools.js?v=1',
+            'js/panels/side-panels.js?v=1',
+            'js/weather.js?v=1',
+            'js/core/recurring.js?v=1',
+            'js/core/cross-date.js?v=1',
+            'js/core/backup.js?v=2',
+            'js/core/context-menu.js?v=6',
+            'js/core/idle-bar.js?v=8',
+            'js/core/alarm.js?v=10',
+            'js/core/pet-renderer.js?v=3'
+        ];
+
+        await Promise.all(scripts.map(src => new Promise(resolve => {
+            const el = document.createElement('script');
+            el.src = src;
+            el.onload = resolve;
+            el.onerror = () => { console.warn('模块加载失败:', src); resolve(); };
+            document.head.appendChild(el);
+        })));
+
+        // 所有模块已加载，重新混合
+        this._applyAvailableMixins();
+
+        // 初始化之前跳过的功能
+        this.initializeRecurringFieldOptions?.();
+        this.initContextMenu?.();
+        this.initIdleBar?.();
+        this.initAlarmSystem?.();
+        this.initSidePanels?.();
+        this.bindSyncEvents?.();
+        this.initHeaderWeather?.();
+
+        const _ric = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (fn) => setTimeout(fn, 0);
+        _ric(() => {
+            this._loadDismissedReminderIds?.().then(() => {
+                this.startTodoReminderLoop?.();
             });
+            this.bindTodoReminderComplete?.();
+            this.initCountdownSystem?.();
+            this.startMeetingAutoCompleteCheck?.();
+            this.startDailyBackupSchedule?.();
+            this.updateDeployVersionBadge();
+            this.initStickyNote();
+        });
 
+        // 同步功能（依赖 sync.js）
+        if (typeof syncManager !== 'undefined') {
             syncManager.waitForInit().then(async () => {
                 if (syncManager.isLoggedIn()) {
                     await this.loadItems();
@@ -305,16 +353,13 @@ class OfficeDashboard {
             }).catch(error => {
                 console.warn('同步初始化未完全完成，已跳过阻塞等待:', error?.message || error);
             });
-
-            setTimeout(() => {
-                this.checkApiKey().catch(err => {
-                    console.warn('API密钥检查失败:', err.message);
-                });
-            }, 1000);
-        } catch (error) {
-            console.error('初始化失败:', error);
-            this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
         }
+
+        setTimeout(() => {
+            this.checkApiKey().catch(err => {
+                console.warn('API密钥检查失败:', err.message);
+            });
+        }, 1000);
     }
 
     /**
@@ -422,11 +467,11 @@ class OfficeDashboard {
         this.initDragAndDrop();
 
         // 右键/长按上下文菜单
-        this.initContextMenu();
+        if (typeof ContextMenuCore !== 'undefined') this.initContextMenu?.();
 
         // 空闲态通知栏 + 闹钟系统
-        this.initIdleBar();
-        this.initAlarmSystem();
+        if (typeof IdleBarManager !== 'undefined') this.initIdleBar?.();
+        if (typeof AlarmManager !== 'undefined') this.initAlarmSystem?.();
 
         // 主题切换
         document.getElementById('themeBtn')?.addEventListener('click', (e) => {
@@ -451,7 +496,7 @@ class OfficeDashboard {
         this.loadTheme();
 
         // 同步功能
-        this.bindSyncEvents();
+        if (typeof syncManager !== 'undefined') this.bindSyncEvents?.();
 
         // 流转功能
         this.bindTransferEvents();
@@ -471,7 +516,7 @@ class OfficeDashboard {
         });
 
         // 初始化右侧折叠面板
-        this.initSidePanels();
+        if (typeof SidePanels !== 'undefined') this.initSidePanels?.();
     }
 
     triggerFilePicker(event) {
@@ -566,7 +611,7 @@ class OfficeDashboard {
         }
 
         weatherBtn.addEventListener('click', () => {
-            this.openTool('weather');
+            this.openTool?.('weather');
         });
         this.updateHeaderWeatherDisplay();
         this.refreshHeaderWeather(true).catch(error => {
@@ -1421,7 +1466,7 @@ class OfficeDashboard {
             this.loadTools();
             this.loadContacts();
             this.renderCountdownPanel();
-            this.updateCountdownNotice();
+            this.updateCountdownNotice?.();
             this.updateHeaderWeatherDisplay();
             const weatherBody = document.getElementById('weatherBody');
             if (weatherBody) {
@@ -2687,7 +2732,7 @@ class OfficeDashboard {
     async loadItems() {
         const result = await this.dateViewController.loadItems();
         this._remindersNeedRefresh = true;
-        this.updateCountdownNotice();
+        this.updateCountdownNotice?.();
         return result;
     }
 
@@ -3752,12 +3797,12 @@ class OfficeDashboard {
             } else {
                 this.todoReminderNoticeIndex = 0;
             }
-            this.updateCountdownNotice();
+            this.updateCountdownNotice?.();
             this._refreshNextMeeting();
             if (this._repositionStickyNote) this._repositionStickyNote();
         };
 
-        this.updateCountdownNotice();
+        this.updateCountdownNotice?.();
         this.todoReminderRefreshTimer = window.setInterval(tick, 1000);
     }
 
@@ -4148,7 +4193,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-16 v5.2.110';
+        const version = '2026-05-16 v5.2.111';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=54', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=73', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=240', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;

@@ -1,3 +1,34 @@
+## 2026-05-16 v5.2.110 OCR模块拆分 + 菜单栏优化
+
+### 改动内容
+1. **OCR模块拆分（第一批）**：
+   - `ocr.js` 3946行 → 3231行（减715行，-18%）
+   - 新建 `js/core/ocr-tests.js`（378行）：内置100种测试用例 + runBuiltInTests()
+   - 新建 `js/core/pdf-parser.js`（359行）：11个PDF解析方法
+   - 通过 `Object.assign(OCRManager.prototype, Module)` mixin 模式挂载
+   - HTML中 mixin 文件在 ocr.js 之前加载（defer顺序保证）
+2. **菜单栏CSS优化**（另一会话）：`.header-right .btn-icon` → `.header .btn-icon`
+3. **编辑已完成待办bug修复**：保留原有completed/completedAt，不再重置为未完成
+
+### 当前状态
+- ✅ Code review: APPROVE（安全审查并行，无安全问题）
+- ✅ 已提交推送并合并到 main
+- ✅ 线上部署确认 v5.2.110
+- ✅ 脚本加载顺序验证通过
+
+### 提交记录
+- refactor/ocr-split 分支合并到 main
+- 版本号 v5.2.110, app.js?v=240, ocr.js?v=54
+
+### 验证清单
+- [x] 页面正常加载，无JS报错
+- [x] OCR功能正常（mixin注入正确）
+- [x] 脚本加载顺序正确（pdf-parser → ocr-tests → ocr）
+- [x] 桌面端布局正常
+- [x] 移动端布局正常
+
+---
+
 ## 2026-05-16 v5.2.109 首次加载性能优化（defer+预连接）
 
 ### 改动内容

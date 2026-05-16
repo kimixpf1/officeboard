@@ -104,25 +104,11 @@
         };
     </script>
 
-    <!-- defer 加载：核心依赖链（放在head提前发现下载，defer保证HTML解析完后按序执行） -->
+    <!-- defer 加载：首屏核心依赖链（仅渲染必需，骨架屏移除后再加载其余模块） -->
     <script defer src="js/utils.js?v=5"></script>
     <script defer src="js/db.js?v=30"></script>
-    <script defer src="js/sync.js?v=73"></script>
     <script defer src="js/app-date-view.js?v=14"></script>
-    <script defer src="js/panels/countdown.js?v=3"></script>
-    <script defer src="js/panels/links.js?v=1"></script>
-    <script defer src="js/panels/contacts.js?v=3"></script>
-    <script defer src="js/panels/tools.js?v=1"></script>
-    <script defer src="js/panels/side-panels.js?v=1"></script>
-    <script defer src="js/weather.js?v=1"></script>
-    <script defer src="js/core/recurring.js?v=1"></script>
-    <script defer src="js/core/cross-date.js?v=1"></script>
-    <script defer src="js/core/backup.js?v=2"></script>
-    <script defer src="js/core/context-menu.js?v=6"></script>
-    <script defer src="js/core/idle-bar.js?v=8"></script>
-    <script defer src="js/core/alarm.js?v=10"></script>
-    <script defer src="js/core/pet-renderer.js?v=3"></script>
-    <script defer src="js/app.js?v=239"></script>
+    <script defer src="js/app.js?v=240"></script>
 
     <!-- defer 加载：首屏不需要的模块 -->
     <script defer src="js/crypto.js?v=17"></script>
