@@ -46,12 +46,12 @@
 /* 日期标签白字 */
 [data-theme="default"] .date-weekday-label { color: rgba(255,255,255,0.9); }
 /* header 中图标按钮白底 */
-[data-theme="default"] .header-right .btn-icon {
+[data-theme="default"] .header .btn-icon {
     color: rgba(255,255,255,0.85);
     border-color: rgba(255,255,255,0.3);
     background: rgba(255,255,255,0.08);
 }
-[data-theme="default"] .header-right .btn-icon:hover {
+[data-theme="default"] .header .btn-icon:hover {
     color: #ffffff;
     background: rgba(255,255,255,0.18);
     border-color: rgba(255,255,255,0.5);
@@ -60,7 +60,7 @@
 [data-theme="default"] .btn-text { color: rgba(255,255,255,0.9); }
 [data-theme="default"] .btn-text:hover { color: #ffffff; }
 /* 报告按钮（btn-secondary）保持白底可读 */
-[data-theme="default"] .header-right .btn-secondary {
+[data-theme="default"] .header .btn-secondary {
     background: rgba(255,255,255,0.9);
     color: #4f46e5;
     border-color: rgba(255,255,255,0.3);
