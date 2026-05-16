@@ -179,11 +179,11 @@ class OfficeDateViewController {
 
     getVisibleBoardItems(items) {
         return items.map(item => {
-            if (this.app.isCrossDateDocument(item)) {
-                return this.app.getDocumentItemForSelectedDate(item);
+            if (this.app.isCrossDateDocument?.(item)) {
+                return this.app.getDocumentItemForSelectedDate?.(item) || item;
             }
-            if (this.app.isCrossDateMeeting(item)) {
-                return this.app.getMeetingItemForSelectedDate(item);
+            if (this.app.isCrossDateMeeting?.(item)) {
+                return this.app.getMeetingItemForSelectedDate?.(item) || item;
             }
             return item;
         }).filter(item => !item._hidden);

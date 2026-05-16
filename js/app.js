@@ -4754,7 +4754,7 @@ class OfficeDashboard {
                         });
                         return;
                     }
-                } else if (originalItem && this.isCrossDateDocument(originalItem)) {
+                } else if (originalItem && this.isCrossDateDocument?.(originalItem)) {
                     const choice = await this.showCrossDateDocChoice('编辑', '修改');
                     if (choice === 'cancel') return;
                     
@@ -5087,7 +5087,7 @@ class OfficeDashboard {
                 }
             }
             
-            if (type === ITEM_TYPES.DOCUMENT && this.isCrossDateDocument(originalItem)) {
+            if (type === ITEM_TYPES.DOCUMENT && this.isCrossDateDocument?.(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('完成状态', completed ? '标记完成' : '取消完成');
                 if (choice === 'cancel') return;
 
@@ -5204,7 +5204,7 @@ class OfficeDashboard {
                 }
             }
             
-            if (this.isCrossDateDocument(originalItem)) {
+            if (this.isCrossDateDocument?.(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('置顶状态', pinned ? '置顶' : '取消置顶');
                 if (choice === 'cancel') return;
 
@@ -5282,7 +5282,7 @@ class OfficeDashboard {
                 }
             }
             
-            if (this.isCrossDateDocument(originalItem)) {
+            if (this.isCrossDateDocument?.(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('沉底状态', sunk ? '沉底' : '取消沉底');
                 if (choice === 'cancel') return;
 
@@ -5873,7 +5873,7 @@ class OfficeDashboard {
         // 先检查是否是周期性任务
         const item = await db.getItem(id);
         
-        if (this.isCrossDateDocument(item)) {
+        if (this.isCrossDateDocument?.(item)) {
             const choice = await this.showCrossDateDocDeleteChoice();
             if (choice === 'cancel') {
                 return;
@@ -6050,7 +6050,7 @@ class OfficeDashboard {
                 note
             };
 
-            if (this.isCrossDateDocument(originalItem)) {
+            if (this.isCrossDateDocument?.(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('流转', '流转');
                 if (choice === 'cancel') return;
 
