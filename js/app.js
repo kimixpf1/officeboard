@@ -4193,8 +4193,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-16 v5.2.111';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=54', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=73', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=240', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-05-17 v5.2.112';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=55', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=74', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=241', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
