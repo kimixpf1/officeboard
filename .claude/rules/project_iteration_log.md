@@ -1,3 +1,37 @@
+## 2026-05-18 v5.2.113 通知栏多类型轮播+PDF.js预加载优化
+
+### 改动内容
+1. **通知栏多类型轮播**：闹钟/待办提醒/倒数日同时激活时 4 秒轮播切换，不再只显示一个
+   - `alarm.js`：提取 `_checkAlarmDismissExpiry()`/`_findActiveAlarm()`，新增 `checkAlarmsSilent()` 无 DOM 副作用的静默检查
+   - `alarm.js`：`showAlarmNotice` 中 ✓ 按钮从 `onclick` 改为 `dataset.noticeType` + `dataset.alarmId`
+   - `app.js`：tick 循环改为收集所有类型活跃状态 → 构建活跃数组 → 轮播渲染
+   - `app.js`：新增 `_renderNoticeCarouselItem(type)` 统一调度三种类型的渲染
+   - `app.js`：`bindTodoReminderComplete()` 改为按 `dataset.noticeType` 分派 alarm/todo/countdown
+   - `countdown.js`：`updateCountdownNotice()` 新增轮播活跃守卫防冲突
+2. **PDF.js 预加载**：`_preloadPdfJs()` 在 P1 延迟加载阶段后台预加载（~350KB），避免首次上传 PDF 时长时间等待
+3. **PDF 加载超时**：`loadPdfJs()` 新增 15 秒超时 + 重复 script 标签检测 + 复用已加载标签
+4. **code-reviewer 2 MEDIUM 修复**：倒数日首条被跳过（`_carouselCountdownLastTick` 隐式 0）+ badge 从 0-based 改为 1-based
+
+### 当前状态
+- ✅ 语法检查 4 文件全部通过
+- ✅ Code review: 0C/0H/2M → 2M 已修复
+- ✅ 已提交推送 `5c56b6c`
+
+### 提交记录
+- `5c56b6c` feat: 通知栏多类型轮播+PDF.js预加载优化(v5.2.113)
+
+### 验证清单
+- [ ] 闹钟+待办提醒同时激活时通知栏 4 秒轮换
+- [ ] 三种类型同时激活时按 alarm→todo→countdown 顺序轮播
+- [ ] ✓ 按钮正确关闭当前显示的闹钟/待办提醒
+- [ ] 关闭后自动切换到下一种活跃类型
+- [ ] 只有一种提醒时不轮播，持续显示
+- [ ] 无提醒时正常显示空闲态
+- [ ] PDF 上传首次加载不再长时间转圈
+- [ ] 版本号显示 v5.2.113
+
+---
+
 ## 2026-05-17 v5.2.112 ocr.js + sync.js 代码去重（净减503行）
 
 ### 改动内容
