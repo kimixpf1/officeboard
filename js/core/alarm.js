@@ -115,15 +115,18 @@ const AlarmManager = {
         }
     },
 
-    checkAlarms() {
+    _checkAlarmDismissExpiry() {
         if (this._alarmDismissedAt) {
             const elapsed = Date.now() - this._alarmDismissedAt;
-            if (elapsed < 180000) return false;
+            if (elapsed < 180000) return true;
             this._alarmDismissedAt = null;
             this._dismissedAlarmId = null;
             this._saveAlarmDismissed();
         }
+        return false;
+    },
 
+    _findActiveAlarm() {
         const now = new Date();
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
         const nowSeconds = now.getSeconds();
@@ -136,28 +139,50 @@ const AlarmManager = {
             const diff = alarmMinutes - nowMinutes;
 
             if (diff === 3 && nowSeconds < 2) {
-                this._activeAlarm = alarm;
-                this.showAlarmNotice(alarm, true);
-                return true;
+                return { alarm, justStarted: true };
             }
             if (diff >= 0 && diff <= 3) {
-                if (!this._activeAlarm || this._activeAlarm.id !== alarm.id) {
-                    this._activeAlarm = alarm;
-                }
-                this.showAlarmNotice(alarm, false);
-                return true;
+                return { alarm, justStarted: false };
             }
             // 闹钟激活后持续闪烁直到手动关闭，到点不自动停
             if (diff < 0 && this._activeAlarm && this._activeAlarm.id === alarm.id) {
-                this.showAlarmNotice(alarm, false);
-                return true;
+                return { alarm, justStarted: false };
             }
+        }
+        return null;
+    },
+
+    checkAlarms() {
+        if (this._checkAlarmDismissExpiry()) return false;
+
+        const result = this._findActiveAlarm();
+        if (result) {
+            this._activeAlarm = result.alarm;
+            this.showAlarmNotice(result.alarm, result.justStarted);
+            return true;
         }
         if (this._activeAlarm) {
             this._activeAlarm = null;
             this.hideAlarmNotice();
         }
         return false;
+    },
+
+    /**
+     * 静默检查闹钟状态，不操作DOM（用于轮播模式）
+     */
+    checkAlarmsSilent() {
+        if (this._checkAlarmDismissExpiry()) return { active: false, alarm: null, justStarted: false };
+
+        const result = this._findActiveAlarm();
+        if (result) {
+            this._activeAlarm = result.alarm;
+            return { active: true, alarm: result.alarm, justStarted: result.justStarted };
+        }
+        if (this._activeAlarm) {
+            this._activeAlarm = null;
+        }
+        return { active: false, alarm: null, justStarted: false };
     },
 
     showAlarmNotice(alarm, justStarted) {
@@ -186,7 +211,8 @@ const AlarmManager = {
                 completeBtn.style.display = '';
                 completeBtn.textContent = '✓';
                 completeBtn.title = '关闭闹钟';
-                completeBtn.onclick = (e) => { e.stopPropagation(); this.dismissAlarm(alarm.id); };
+                completeBtn.dataset.noticeType = 'alarm';
+                completeBtn.dataset.alarmId = alarm.id;
             }
         }
 
@@ -223,7 +249,8 @@ const AlarmManager = {
         const completeBtn = document.getElementById('todoReminderCompleteBtn');
         if (completeBtn && !noticeEl.classList.contains('todo-reminder-active')) {
             completeBtn.style.display = 'none';
-            completeBtn.onclick = null;
+            delete completeBtn.dataset.noticeType;
+            delete completeBtn.dataset.alarmId;
         }
     },
 

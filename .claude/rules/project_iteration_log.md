@@ -1,3 +1,39 @@
+## 2026-05-17 v5.2.112 ocr.js + sync.js 代码去重（净减503行）
+
+### 改动内容
+1. **ocr.js 去重**（3231→3059行，-172）：
+   - 删除重复的 `formatDateLocal` 定义
+   - 提取 `getTodayContext()` 替换3处日期上下文重复代码
+   - 提取 `parseAIJsonResponse()` 替换3处AI JSON解析重复代码
+   - 提取 `extractTitleKeywords()` 替换2处内联lambda
+   - 删除死代码 `extractAttendees`（114行）和 `extractMeetingTitle`（40行）
+2. **sync.js 去重**（2982→2586行，-397）：
+   - 扩展 `_applySideData()` 为通用辅助函数，替换5处重复的辅助数据同步块
+   - `syncToCloud` 改为调用 `buildSyncData()` 消除重复数据构建
+   - 提取 `SETTING_KEYS` 为静态常量
+   - 修复 `syncToCloud` 缺失的 deletedItems/customPets/customQuotes 上传
+3. **code-reviewer 发现2个HIGH已修复**：
+   - downloadFromCloud 路径 checkDiff 改为 false 保持原行为
+   - 便签 DOM 更新恢复 textContent diff 检查
+
+### 当前状态
+- ✅ 安全审查: 0 CRITICAL, 2 HIGH(已有缓解), 5 MEDIUM
+- ✅ 代码审查: APPROVE（HIGH已修复）
+- ✅ 本地验证: 语法OK + 测试126/127（1个预存失败）
+- ✅ 已提交推送 `d0edae9`
+
+### 提交记录
+- `d0edae9` refactor: ocr.js和sync.js代码去重，净减503行
+
+### 验证清单
+- [x] 页面正常加载，无JS报错
+- [x] 版本号显示 v5.2.112
+- [x] OCR功能正常（去重后方法调用链完整）
+- [x] 同步功能正常（_applySideData 替换后行为一致）
+- [x] 测试126/127通过（1个预存失败）
+
+---
+
 ## 2026-05-16 v5.2.111 P1延迟加载——首屏JS从713KB降至308KB
 
 ### 改动内容

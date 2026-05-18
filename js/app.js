@@ -296,7 +296,7 @@ class OfficeDashboard {
     async _loadLazyModules() {
         const scripts = [
             'js/sync.js?v=73',
-            'js/panels/countdown.js?v=3',
+            'js/panels/countdown.js?v=4',
             'js/panels/links.js?v=1',
             'js/panels/contacts.js?v=3',
             'js/panels/tools.js?v=1',
@@ -307,7 +307,7 @@ class OfficeDashboard {
             'js/core/backup.js?v=2',
             'js/core/context-menu.js?v=6',
             'js/core/idle-bar.js?v=8',
-            'js/core/alarm.js?v=10',
+            'js/core/alarm.js?v=11',
             'js/core/pet-renderer.js?v=3'
         ];
 
@@ -318,6 +318,9 @@ class OfficeDashboard {
             el.onerror = () => { console.warn('模块加载失败:', src); resolve(); };
             document.head.appendChild(el);
         })));
+
+        // 后台预加载 PDF.js（~350KB），首次PDF识别无需等待下载
+        this._preloadPdfJs();
 
         // 所有模块已加载，重新混合
         this._applyAvailableMixins();
@@ -360,6 +363,20 @@ class OfficeDashboard {
                 console.warn('API密钥检查失败:', err.message);
             });
         }, 1000);
+    }
+
+    /**
+     * 后台预加载 PDF.js（~350KB），避免首次PDF识别时用户长时间等待
+     */
+    _preloadPdfJs() {
+        const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        if (typeof pdfjsLib !== 'undefined' || document.querySelector(`script[src="${PDFJS_URL}"]`)) return;
+        const el = document.createElement('script');
+        el.src = PDFJS_URL;
+        el.crossOrigin = 'anonymous';
+        el.async = true;
+        el.onerror = () => console.warn('PDF.js 预加载失败，将在首次使用时重试');
+        document.head.appendChild(el);
     }
 
     /**
@@ -3726,6 +3743,7 @@ class OfficeDashboard {
         }
         if (completeBtn) {
             completeBtn.style.display = '';
+            completeBtn.dataset.noticeType = 'todo';
             completeBtn.dataset.itemId = current.item.id;
         }
 
@@ -3777,6 +3795,12 @@ class OfficeDashboard {
             }).catch(() => {});
         }
 
+        // 轮播状态初始化
+        this._carouselIndex = 0;
+        this._carouselLastSwitch = 0;
+        this._carouselTypes = [];
+        this._carouselCountdownIdx = 0;
+
         const tick = async () => {
             // 保存后立即刷新 + 每30秒定期刷新全量数据
             const needRefresh = this._remindersNeedRefresh || !this._lastReminderCacheRefresh || Date.now() - this._lastReminderCacheRefresh > 30000;
@@ -3788,16 +3812,78 @@ class OfficeDashboard {
                 } catch (e) { /* 静默失败 */ }
             }
 
-            if (this.checkAlarms && this.checkAlarms()) {
-                return;
-            }
-            const state = this.getTodoReminderNoticeState();
-            if (state.items.length > 1) {
-                this.todoReminderNoticeIndex = (this.todoReminderNoticeIndex + 1) % state.items.length;
+            // 1. 静默收集所有类型的活跃状态
+            const alarmResult = this.checkAlarmsSilent?.() || { active: false, alarm: null, justStarted: false };
+            const todoState = this.getTodoReminderNoticeState();
+            const countdownItems = this.getAllCountdownEvents?.()
+                .filter(item => item.daysLeft >= 0 && item.daysLeft <= 10) || [];
+
+            // 2. 更新待办提醒轮播索引
+            if (todoState.items.length > 1) {
+                this.todoReminderNoticeIndex = (this.todoReminderNoticeIndex + 1) % todoState.items.length;
             } else {
                 this.todoReminderNoticeIndex = 0;
             }
-            this.updateCountdownNotice?.();
+
+            // 3. 构建活跃类型数组
+            const activeTypes = [];
+            if (alarmResult.active && alarmResult.alarm) activeTypes.push('alarm');
+            if (todoState.active) activeTypes.push('todo');
+            if (countdownItems.length > 0) activeTypes.push('countdown');
+
+            // 4. 存储状态供 ✓ 按钮使用
+            this._carouselActiveTypes = activeTypes;
+            this._carouselAlarmResult = alarmResult;
+            this._carouselTodoState = todoState;
+            this._carouselCountdownItems = countdownItems;
+
+            // 5. 无活跃提醒 → 显示空闲态
+            if (activeTypes.length === 0) {
+                this._carouselIndex = 0;
+                this._carouselLastSwitch = 0;
+                this._carouselTypes = [];
+                this._carouselCountdownIdx = 0;
+                this._shownAlarmId = null;
+                const noticeEl = document.getElementById('countdownNotice');
+                if (noticeEl) noticeEl.classList.remove('alarm-active', 'todo-reminder-active', 'todo-reminder-flashing');
+                const completeBtn = document.getElementById('todoReminderCompleteBtn');
+                if (completeBtn) completeBtn.style.display = 'none';
+                this.updateCountdownNotice?.();
+                this._refreshNextMeeting();
+                if (this._repositionStickyNote) this._repositionStickyNote();
+                return;
+            }
+
+            // 6. 轮播切换（4秒每种类型）
+            const now = Date.now();
+            const SWITCH_INTERVAL = 4000;
+
+            if (JSON.stringify(this._carouselTypes) !== JSON.stringify(activeTypes)) {
+                this._carouselTypes = [...activeTypes];
+                this._carouselIndex = 0;
+                this._carouselLastSwitch = now;
+            }
+
+            if (activeTypes.length > 1 && now - this._carouselLastSwitch >= SWITCH_INTERVAL) {
+                this._carouselIndex = (this._carouselIndex + 1) % activeTypes.length;
+                this._carouselLastSwitch = now;
+                this._shownAlarmId = null;
+                const noticeEl = document.getElementById('countdownNotice');
+                if (noticeEl) noticeEl.classList.remove('alarm-active', 'todo-reminder-active', 'todo-reminder-flashing');
+                if (this.countdownNoticeTimer) {
+                    clearInterval(this.countdownNoticeTimer);
+                    this.countdownNoticeTimer = null;
+                }
+            }
+
+            if (activeTypes.length === 1) {
+                this._carouselIndex = 0;
+            }
+
+            // 7. 渲染当前类型
+            const currentType = activeTypes[this._carouselIndex];
+            this._renderNoticeCarouselItem(currentType);
+
             this._refreshNextMeeting();
             if (this._repositionStickyNote) this._repositionStickyNote();
         };
@@ -3806,45 +3892,121 @@ class OfficeDashboard {
         this.todoReminderRefreshTimer = window.setInterval(tick, 1000);
     }
 
+    /**
+     * 轮播模式：渲染指定类型的通知栏内容
+     */
+    _renderNoticeCarouselItem(type) {
+        const noticeEl = document.getElementById('countdownNotice');
+        if (!noticeEl) return;
+
+        this.hideIdleNotice?.();
+        noticeEl.hidden = false;
+
+        switch (type) {
+            case 'alarm': {
+                const alarm = this._carouselAlarmResult?.alarm;
+                if (alarm) this.showAlarmNotice(alarm, false);
+                break;
+            }
+            case 'todo': {
+                noticeEl.classList.remove('alarm-active');
+                this.updateTodoReminderNotice();
+                break;
+            }
+            case 'countdown': {
+                const items = this._carouselCountdownItems || [];
+                if (items.length === 0) break;
+
+                // 每3秒切换倒数日项（与原有行为一致）
+                const nowCD = Date.now();
+                if (this._carouselCountdownIdx == null || this._carouselCountdownIdx >= items.length) {
+                    this._carouselCountdownIdx = 0;
+                }
+                if (this._carouselCountdownLastTick == null) {
+                    this._carouselCountdownLastTick = nowCD;
+                }
+                if (items.length > 1 && nowCD - this._carouselCountdownLastTick >= 3000) {
+                    this._carouselCountdownIdx = (this._carouselCountdownIdx + 1) % items.length;
+                    this._carouselCountdownLastTick = nowCD;
+                }
+                if (items.length === 1) {
+                    this._carouselCountdownIdx = 0;
+                }
+                const item = items[this._carouselCountdownIdx];
+
+                noticeEl.classList.remove('alarm-active', 'todo-reminder-active', 'todo-reminder-flashing');
+                const titleEl = noticeEl.querySelector('.countdown-notice-title');
+                const descEl = noticeEl.querySelector('.countdown-notice-desc');
+                const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
+                const completeBtn = document.getElementById('todoReminderCompleteBtn');
+                if (badgeEl) {
+                    badgeEl.textContent = items.length > 1 ? `倒数日 ${this._carouselCountdownIdx + 1}/${items.length}` : '倒数日';
+                }
+                if (titleEl) titleEl.textContent = item.daysLeft === 0 ? `${item.name} 就在今天` : `${item.name} 还有 ${item.daysLeft} 天`;
+                if (descEl) descEl.textContent = `${item.date} · ${item.metaLabel || '纪念日'}`;
+                if (completeBtn) {
+                    completeBtn.style.display = 'none';
+                }
+                break;
+            }
+        }
+    }
+
     bindTodoReminderComplete() {
         const btn = document.getElementById('todoReminderCompleteBtn');
         if (!btn) return;
 
-        let completing = false;
         btn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (completing) return;
 
-            const itemId = parseInt(btn.dataset.itemId);
-            if (!itemId) return;
+            const noticeType = btn.dataset.noticeType;
 
-            completing = true;
-            btn.textContent = '...';
-            btn.style.pointerEvents = 'none';
-
-            try {
-                // 关闭提醒≠完成待办：内存+DB双重标记，防sync覆盖后复活
-                this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
-                this._dismissedTodoReminderIds.add(itemId);
-                this._persistDismissedReminderIds();
-                const item = await db.getItem(itemId);
-                if (item) {
-                    item.reminderDismissedAt = new Date().toISOString();
-                    await db.putItem(item);
-                    this.items = await db.getAllItems();
-                    // 立即推送云端防sync拉旧数据覆盖
-                    if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
-                        syncManager.immediateSyncToCloud().catch(() => {});
-                    }
+            // 闹钟关闭
+            if (noticeType === 'alarm') {
+                const alarmId = btn.dataset.alarmId;
+                if (alarmId) {
+                    this.dismissAlarm?.(alarmId);
+                    // 轮播自动切下一个
+                    this._carouselLastSwitch = 0;
                 }
-                await this.loadItems(); // 重渲染卡片显示已提醒标记+更新通知栏
-            } catch (err) {
-                console.warn('关闭待办提醒失败:', err);
-            } finally {
-                completing = false;
-                btn.textContent = '✓';
-                btn.style.pointerEvents = '';
+                return;
+            }
+
+            // 待办提醒关闭
+            if (noticeType === 'todo') {
+                const itemId = parseInt(btn.dataset.itemId);
+                if (!itemId) return;
+
+                btn.textContent = '...';
+                btn.style.pointerEvents = 'none';
+
+                try {
+                    this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
+                    this._dismissedTodoReminderIds.add(itemId);
+                    this._persistDismissedReminderIds();
+                    const item = await db.getItem(itemId);
+                    if (item) {
+                        item.reminderDismissedAt = new Date().toISOString();
+                        await db.putItem(item);
+                        this.items = await db.getAllItems();
+                        if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
+                            syncManager.immediateSyncToCloud().catch(() => {});
+                        }
+                    }
+                    await this.loadItems();
+                } catch (err) {
+                    console.warn('关闭待办提醒失败:', err);
+                } finally {
+                    btn.textContent = '✓';
+                    btn.style.pointerEvents = '';
+                }
+                return;
+            }
+
+            // 倒数日不可关闭，跳过到下一个类型
+            if (this._carouselActiveTypes && this._carouselActiveTypes.length > 1) {
+                this._carouselLastSwitch = 0;
             }
         });
     }
@@ -4193,8 +4355,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-17 v5.2.112';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=55', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=74', 'app-date-view.js?v=14', 'countdown.js?v=3', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=10', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=241', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-05-18 v5.2.113';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=55', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=74', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=11', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=242', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

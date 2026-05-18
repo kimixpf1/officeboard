@@ -341,15 +341,38 @@ const PDFParser = {
                 return;
             }
 
+            const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            // 如果已有正在加载的 script 标签，等待它完成
+            const existing = document.querySelector(`script[src="${PDFJS_URL}"]`);
+            if (existing) {
+                if (typeof pdfjsLib !== 'undefined') { resolve(); return; }
+                existing.addEventListener('load', () => {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    resolve();
+                });
+                existing.addEventListener('error', () => {
+                    reject(new Error('PDF解析库加载失败，请检查网络连接'));
+                });
+                return;
+            }
+
             const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            script.src = PDFJS_URL;
             script.crossOrigin = 'anonymous';
+
+            // 15秒超时，避免无限等待
+            const timeout = setTimeout(() => {
+                if (script.parentNode) script.parentNode.removeChild(script);
+                reject(new Error('PDF解析库加载超时，请检查网络后刷新重试'));
+            }, 15000);
+
             script.onload = () => {
-                // 设置worker路径
+                clearTimeout(timeout);
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                 resolve();
             };
             script.onerror = () => {
+                clearTimeout(timeout);
                 console.error('PDF.js加载失败');
                 reject(new Error('PDF解析库加载失败，请检查网络连接'));
             };

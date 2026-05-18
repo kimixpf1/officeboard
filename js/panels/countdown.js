@@ -487,6 +487,11 @@ const CountdownPanel = {
     },
 
     updateCountdownNotice() {
+        // 轮播模式活跃时由 tick 统一调度渲染，不自行操作 DOM
+        if (this._carouselActiveTypes && this._carouselActiveTypes.length > 0) {
+            return;
+        }
+
         const todoReminderActive = this.updateTodoReminderNotice();
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl || todoReminderActive) {
