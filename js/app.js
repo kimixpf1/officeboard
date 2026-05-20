@@ -3967,8 +3967,8 @@ class OfficeDashboard {
                 const alarmId = btn.dataset.alarmId;
                 if (alarmId) {
                     this.dismissAlarm?.(alarmId);
-                    // 轮播自动切下一个
                     this._carouselLastSwitch = 0;
+                    this.updateCountdownNotice?.();
                 }
                 return;
             }
@@ -3978,13 +3978,15 @@ class OfficeDashboard {
                 const itemId = parseInt(btn.dataset.itemId);
                 if (!itemId) return;
 
-                btn.textContent = '...';
                 btn.style.pointerEvents = 'none';
 
                 try {
                     this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
                     this._dismissedTodoReminderIds.add(itemId);
                     this._persistDismissedReminderIds();
+                    // 立即刷新通知栏，不等异步操作
+                    this._carouselLastSwitch = 0;
+                    this.updateCountdownNotice?.();
                     const item = await db.getItem(itemId);
                     if (item) {
                         item.reminderDismissedAt = new Date().toISOString();
@@ -3994,7 +3996,7 @@ class OfficeDashboard {
                             syncManager.immediateSyncToCloud().catch(() => {});
                         }
                     }
-                    await this.loadItems();
+                    this.loadItems().catch(err => console.warn('刷新列表失败:', err));
                 } catch (err) {
                     console.warn('关闭待办提醒失败:', err);
                 } finally {
@@ -4007,6 +4009,7 @@ class OfficeDashboard {
             // 倒数日不可关闭，跳过到下一个类型
             if (this._carouselActiveTypes && this._carouselActiveTypes.length > 1) {
                 this._carouselLastSwitch = 0;
+                this.updateCountdownNotice?.();
             }
         });
     }
