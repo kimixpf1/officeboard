@@ -343,18 +343,15 @@ class SyncManager {
         const cloudAlarms = safeJsonParse(cloudValue || '[]', []);
         if (!cloudAlarms.length) return localValue;
         if (!localAlarms.length) return cloudValue;
+        const app = window.officeDashboard;
+        const recentlyChanged = app?._alarmsChangedAt && Date.now() - app._alarmsChangedAt < 10000;
         const merged = [...localAlarms];
         const localIds = new Set(localAlarms.map(a => a.id));
         for (const alarm of cloudAlarms) {
             if (localIds.has(alarm.id)) {
                 const idx = merged.findIndex(a => a.id === alarm.id);
                 if (idx >= 0) {
-                    // 本地刚编辑过（5秒内），保留本地版本
-                    const app = window.officeDashboard;
-                    if (app?._alarmsChangedAt && Date.now() - app._alarmsChangedAt < 5000) {
-                        continue;
-                    }
-                    // 否则比较 createdAt，保留较新版本
+                    if (recentlyChanged) continue;
                     const localCreatedAt = new Date(merged[idx].createdAt || 0).getTime();
                     const cloudCreatedAt = new Date(alarm.createdAt || 0).getTime();
                     if (cloudCreatedAt > localCreatedAt || (!merged[idx].enabled && alarm.enabled)) {
@@ -362,6 +359,7 @@ class SyncManager {
                     }
                 }
             } else {
+                if (recentlyChanged) continue;
                 merged.push(alarm);
             }
         }

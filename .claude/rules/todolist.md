@@ -2,6 +2,15 @@
 
 ## 已完成
 
+### v5.2.115 备忘录/日程编辑时云端同步覆盖修复
+- [x] sync.js _applySideData 增加 memo/schedule 焦点检测
+- [x] 统一便签模式：localStorage始终写入，只跳过事件派发
+- [x] side-panels.js 双层防护（focus+5s时间窗口）
+- [x] 版本号 v5.2.115
+- [x] Security review: APPROVE（0C/0H/3M/2L）
+- [x] Code review: HIGH已修复
+- [x] 已提交推送 `1f73bbd`
+
 ### v5.2.102 截止时间默认带入+便签卡片
 - [x] datetime-local 修复为 YYYY-MM-DDTHH:MM 格式，日期正确预填
 - [x] 新增便签卡片（boardDateLabel下方，170px，黄底横线便签样式）

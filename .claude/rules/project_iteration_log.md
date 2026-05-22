@@ -1,3 +1,61 @@
+## 2026-05-22 v5.2.115 备忘录/日程编辑时云端同步覆盖修复
+
+### 改动内容
+1. **sync.js `_applySideData` 焦点保护**：memo/schedule 增加焦点检测，用户正在编辑时跳过 DOM 事件派发，避免 textarea 被覆盖
+2. **统一便签模式**：localStorage 始终写入最新云端值（保证 buildSyncData 上传不回退），只在 textarea 获得焦点时跳过事件派发
+3. **side-panels.js 双层防护**（另一会话已完成）：memoSynced/scheduleSynced 事件处理增加 focus + 5s 时间窗口保护
+4. **版本号 v5.2.115**，缓存参数更新（sync.js?v=75, side-panels.js?v=2, app.js?v=243）
+
+### 根因
+`_applySideData` 对 memo/schedule 无条件写入 localStorage 并派发事件，Realtime 回调触发 `silentSyncFromCloud` 时会覆盖用户正在编辑的内容。
+
+### 审查结果
+- ✅ Security review: APPROVE（0C/0H/3M/2L）
+- ✅ Code review: WARNING → HIGH 已修复（统一便签模式解决 buildSyncData 回退问题）
+- ✅ 语法检查通过
+- ✅ 已提交推送
+
+### 提交记录
+- `10f2b78` fix: 备忘录/日程编辑时云端同步覆盖问题
+- `1f73bbd` fix: 统一便签模式——localStorage始终写入，只跳过事件派发
+
+### 验证清单
+- [ ] 备忘录面板：输入内容 → 正常保存 → 500ms 防抖后显示"已同步到云端"
+- [ ] 日程面板：同上
+- [ ] 多设备：A 设备编辑备忘录 → B 设备同步收到更新
+- [ ] 编辑中同步：用户正在编辑时，另一设备更新 → 当前设备 textarea 不被覆盖 → 失焦后同步生效
+- [ ] Ctrl+Shift+R 强刷后版本号显示 v5.2.115
+
+---
+
+## 2026-05-20 v5.2.114 闹钟/待办提醒点√后立即消失
+
+### 改动内容
+1. **闹钟关闭立即刷新**：`dismissAlarm` 后立即调用 `updateCountdownNotice()` 同步刷新通知栏，不等下一次 tick
+2. **待办提醒关闭立即刷新**：先同步更新内存 Set + `_carouselLastSwitch = 0` + `updateCountdownNotice()`，再做异步 DB 持久化（optimistic update 模式）
+3. **去掉按钮中间态**：移除 `btn.textContent = '...'` 避免视觉闪烁
+4. **loadItems fire-and-forget**：`this.loadItems()` 不再 await，加 `.catch()` 防止 unhandled rejection
+
+### 根因
+关闭后只设 `_carouselLastSwitch = 0` 标记，等下一次 tick（1秒）才刷新通知栏，导致旧内容停留约1秒。
+
+### 当前状态
+- ✅ Code review: APPROVE（0C/0H/3M）
+- ✅ 语法检查通过
+- ✅ 已提交推送 `0cbd4a1`
+
+### 提交记录
+- `0cbd4a1` fix: 闹钟/待办提醒点√后立即消失——关闭后同步触发通知栏刷新(v5.2.114)
+
+### 验证清单
+- [ ] 闹钟触发时点击 ✓ → 通知栏立即消失/切换到下一个提醒
+- [ ] 待办提醒触发时点击 ✓ → 通知栏立即消失/切换到下一个提醒
+- [ ] 多种提醒同时激活时，关闭一个立即切换到下一个
+- [ ] 只有一种提醒时，关闭后显示空闲态
+- [ ] 控制台无 JS 错误
+
+---
+
 ## 2026-05-18 v5.2.113 通知栏多类型轮播+PDF.js预加载优化
 
 ### 改动内容

@@ -118,7 +118,7 @@ const AlarmManager = {
     _checkAlarmDismissExpiry() {
         if (this._alarmDismissedAt) {
             const elapsed = Date.now() - this._alarmDismissedAt;
-            if (elapsed < 180000) return true;
+            if (elapsed < 600000) return true;
             this._alarmDismissedAt = null;
             this._dismissedAlarmId = null;
             this._saveAlarmDismissed();
