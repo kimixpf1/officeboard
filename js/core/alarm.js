@@ -153,7 +153,7 @@ const AlarmManager = {
     },
 
     checkAlarms() {
-        if (this._checkAlarmDismissExpiry()) return false;
+        this._checkAlarmDismissExpiry();
 
         const result = this._findActiveAlarm();
         if (result) {
@@ -172,7 +172,7 @@ const AlarmManager = {
      * 静默检查闹钟状态，不操作DOM（用于轮播模式）
      */
     checkAlarmsSilent() {
-        if (this._checkAlarmDismissExpiry()) return { active: false, alarm: null, justStarted: false };
+        this._checkAlarmDismissExpiry();
 
         const result = this._findActiveAlarm();
         if (result) {
