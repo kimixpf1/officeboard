@@ -36,8 +36,11 @@ const SidePanels = {
         });
 
         let saveTimeout = null;
+        let lastScheduleEditTime = 0;
 
         scheduleText.addEventListener('input', () => {
+            lastScheduleEditTime = Date.now();
+
             if (scheduleStatus) {
                 scheduleStatus.textContent = '保存中...';
                 scheduleStatus.classList.add('saving');
@@ -94,6 +97,7 @@ const SidePanels = {
         });
 
         document.addEventListener('scheduleSynced', (e) => {
+            if (document.activeElement === scheduleText || Date.now() - lastScheduleEditTime < 5000) return;
             const newContent = e.detail.content;
             if (newContent !== scheduleText.value) {
                 scheduleText.value = newContent;
@@ -139,8 +143,11 @@ const SidePanels = {
 
         // 自动保存（防抖）+ 云端同步
         let saveTimeout = null;
+        let lastMemoEditTime = 0;
 
         memoText.addEventListener('input', () => {
+            lastMemoEditTime = Date.now();
+
             if (memoStatus) {
                 memoStatus.textContent = '保存中...';
                 memoStatus.classList.add('saving');
@@ -204,6 +211,7 @@ const SidePanels = {
 
         // 监听云端同步事件（其他设备更新时）
         document.addEventListener('memoSynced', (e) => {
+            if (document.activeElement === memoText || Date.now() - lastMemoEditTime < 5000) return;
             const newContent = e.detail.content;
             if (newContent !== memoText.value) {
                 memoText.value = newContent;
