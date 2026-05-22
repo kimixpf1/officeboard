@@ -144,11 +144,9 @@ class SyncManager {
             const cloudVal = cloudData.memo;
             const localVal = SafeStorage.get('office_memo_content') || '';
             if (!checkDiff || cloudVal !== localVal) {
+                SafeStorage.set('office_memo_content', cloudVal);
                 const memoEl = document.getElementById('memoText');
-                if (memoEl && document.activeElement === memoEl) {
-                    // 用户正在编辑备忘录，跳过覆盖
-                } else {
-                    SafeStorage.set('office_memo_content', cloudVal);
+                if (!memoEl || document.activeElement !== memoEl) {
                     document.dispatchEvent(new CustomEvent('memoSynced', {
                         detail: { content: cloudVal }
                     }));
@@ -179,11 +177,9 @@ class SyncManager {
             const cloudVal = cloudData.schedule;
             const localVal = SafeStorage.get('office_schedule_content') || '';
             if (!checkDiff || cloudVal !== localVal) {
+                SafeStorage.set('office_schedule_content', cloudVal);
                 const scheduleEl = document.getElementById('scheduleText');
-                if (scheduleEl && document.activeElement === scheduleEl) {
-                    // 用户正在编辑日程，跳过覆盖
-                } else {
-                    SafeStorage.set('office_schedule_content', cloudVal);
+                if (!scheduleEl || document.activeElement !== scheduleEl) {
                     document.dispatchEvent(new CustomEvent('scheduleSynced', {
                         detail: { content: cloudVal }
                     }));
