@@ -123,20 +123,8 @@ const IdleBarManager = {
         noticeEl.addEventListener('click', (e) => {
             if (e.target.closest('.idle-interact-btn')) return;
             if (e.target.closest('.todo-reminder-complete-btn')) return;
-
-            // 闹钟/待办模式下左键点击通知栏 → 触发 ✓ 按钮关闭提醒
-            if (noticeEl.classList.contains('alarm-active') || noticeEl.classList.contains('todo-reminder-active')) {
-                const completeBtn = document.getElementById('todoReminderCompleteBtn');
-                if (completeBtn && completeBtn.style.display !== 'none') {
-                    completeBtn.click();
-                }
-                return;
-            }
-
-            // 空闲模式下左键 → 切换语录/宠物
-            if (noticeEl.classList.contains('idle-mode')) {
-                this.showIdlePicker();
-            }
+            // 所有模式下左键 → 切换语录/宠物
+            this.showIdlePicker();
         });
 
         // 非闹钟模式下右键 → 打开闹钟设置（闹钟模式由 alarm.js 的 handler 处理）
