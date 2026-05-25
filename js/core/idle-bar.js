@@ -121,22 +121,34 @@ const IdleBarManager = {
         }
 
         noticeEl.addEventListener('click', (e) => {
-            if (!noticeEl.classList.contains('idle-mode')) return;
             if (e.target.closest('.idle-interact-btn')) return;
             if (e.target.closest('.todo-reminder-complete-btn')) return;
-            this.showIdlePicker();
-        });
 
-        noticeEl.addEventListener('contextmenu', (e) => {
+            // 闹钟/待办模式下左键点击通知栏 → 触发 ✓ 按钮关闭提醒
+            if (noticeEl.classList.contains('alarm-active') || noticeEl.classList.contains('todo-reminder-active')) {
+                const completeBtn = document.getElementById('todoReminderCompleteBtn');
+                if (completeBtn && completeBtn.style.display !== 'none') {
+                    completeBtn.click();
+                }
+                return;
+            }
+
+            // 空闲模式下左键 → 切换语录/宠物
             if (noticeEl.classList.contains('idle-mode')) {
-                e.preventDefault();
-                if (typeof this.showAlarmSettings === 'function') this.showAlarmSettings();
+                this.showIdlePicker();
             }
         });
 
+        // 非闹钟模式下右键 → 打开闹钟设置（闹钟模式由 alarm.js 的 handler 处理）
+        noticeEl.addEventListener('contextmenu', (e) => {
+            if (noticeEl.classList.contains('alarm-active')) return;
+            e.preventDefault();
+            if (typeof this.showAlarmSettings === 'function') this.showAlarmSettings();
+        });
+
+        // 所有模式下长按 → 打开闹钟设置
         let longPressTimer = null;
         noticeEl.addEventListener('touchstart', (e) => {
-            if (!noticeEl.classList.contains('idle-mode')) return;
             longPressTimer = setTimeout(() => {
                 longPressTimer = null;
                 if (typeof this.showAlarmSettings === 'function') this.showAlarmSettings();
