@@ -3978,30 +3978,28 @@ class OfficeDashboard {
                 const itemId = parseInt(btn.dataset.itemId);
                 if (!itemId) return;
 
-                btn.style.pointerEvents = 'none';
-
                 try {
                     this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
                     this._dismissedTodoReminderIds.add(itemId);
                     this._persistDismissedReminderIds();
-                    // 立即刷新通知栏，不等异步操作
+                    // 立即刷新通知栏
                     this._carouselLastSwitch = 0;
                     this.updateCountdownNotice?.();
-                    const item = await db.getItem(itemId);
-                    if (item) {
-                        item.reminderDismissedAt = new Date().toISOString();
-                        await db.putItem(item);
-                        this.items = await db.getAllItems();
-                        if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
-                            syncManager.immediateSyncToCloud().catch(() => {});
+                    // DB 持久化 + 同步 + 列表刷新全部后台执行，不阻塞 UI
+                    (async () => {
+                        const item = await db.getItem(itemId);
+                        if (item) {
+                            item.reminderDismissedAt = new Date().toISOString();
+                            await db.putItem(item);
+                            this.items = await db.getAllItems();
+                            if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
+                                syncManager.immediateSyncToCloud().catch(() => {});
+                            }
                         }
-                    }
-                    this.loadItems().catch(err => console.warn('刷新列表失败:', err));
+                        this.loadItems().catch(err => console.warn('刷新列表失败:', err));
+                    })();
                 } catch (err) {
                     console.warn('关闭待办提醒失败:', err);
-                } finally {
-                    btn.textContent = '✓';
-                    btn.style.pointerEvents = '';
                 }
                 return;
             }
