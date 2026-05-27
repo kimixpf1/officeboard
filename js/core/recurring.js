@@ -642,6 +642,7 @@ const RecurringCore = {
         } else {
             // 待办和会议类型使用 deadline
             item.deadline = dateStr;
+            item.date = dateStr;
         }
         
         return item;

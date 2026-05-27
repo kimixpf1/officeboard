@@ -277,7 +277,7 @@ const ContextMenuCore = {
     async _contextMoveToDate(item) {
         const currentDate = item.type === 'meeting' ? item.date
             : item.type === 'document' ? (item.docStartDate || item.docDate || this.selectedDate)
-            : (item.deadline ? item.deadline.split('T')[0] : this.selectedDate);
+            : (item.deadline ? item.deadline.split('T')[0] : item.date || this.selectedDate);
         const newDate = await this._showDatePicker('选择目标日期', currentDate);
         if (!newDate) return;
 
@@ -290,6 +290,7 @@ const ContextMenuCore = {
         } else if (item.type === 'todo') {
             const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
             updates.deadline = `${newDate}T${time}`;
+            updates.date = newDate;
         }
 
         try {
@@ -395,6 +396,7 @@ const ContextMenuCore = {
             } else if (item.type === 'todo') {
                 const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
                 updates.deadline = `${dateVal}T${time}`;
+                updates.date = dateVal;
             }
 
             try {
@@ -530,6 +532,8 @@ const ContextMenuCore = {
                 if (item.deadline) {
                     const time = item.deadline.split('T')[1] || '09:00';
                     clone.deadline = `${targetDate}T${time}`;
+                } else {
+                    clone.date = targetDate;
                 }
                 // 绝对提醒：单次提醒更新日期到目标日期
                 if (!item.deadline && item.reminderMode === 'once' && item.reminderDate) {

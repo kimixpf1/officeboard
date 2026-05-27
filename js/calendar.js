@@ -342,13 +342,17 @@ class CalendarView {
             };
         }
 
-        if (item.type === 'todo' && item.deadline) {
-            const dateStr = item.deadline.split('T')[0];
-            return {
-                startDate: dateStr,
-                endDate: dateStr,
-                skipWeekend: false
-            };
+        if (item.type === 'todo') {
+            const dateStr = item.deadline
+                ? item.deadline.split('T')[0]
+                : item.date || (item.createdAt ? item.createdAt.split('T')[0] : null);
+            if (dateStr) {
+                return {
+                    startDate: dateStr,
+                    endDate: dateStr,
+                    skipWeekend: false
+                };
+            }
         }
 
         if (item.type === 'document') {
@@ -584,7 +588,7 @@ class CalendarView {
 
             const draggedItem = window.officeDashboard.draggedItem;
             const sameCell = draggedItem.type === 'todo'
-                ? draggedItem.deadline?.split('T')[0] === dateStr
+                ? (draggedItem.deadline?.split('T')[0] || draggedItem.date) === dateStr
                 : draggedItem.type === 'meeting'
                     ? draggedItem.date === dateStr
                     : (draggedItem.docStartDate || draggedItem.docDate) === dateStr;
@@ -872,7 +876,7 @@ class CalendarView {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const targetDate = item._viewDate || (item.type === 'todo'
-                ? item.deadline?.split('T')[0]
+                ? (item.deadline?.split('T')[0] || item.date || item.createdAt?.split('T')[0])
                 : item.type === 'meeting'
                     ? item.date
                     : (item.docStartDate || item.docDate || item.createdAt?.split('T')[0]));

@@ -421,7 +421,10 @@
                 row1.appendChild(createInput('开始日期', item.date || item.deadline?.slice?.(0, 10) || item.docDate || item.docStartDate || '', value => {
                     const trimmed = value.trim();
                     if (item.type === 'meeting') item.date = trimmed;
-                    if (item.type === 'todo') item.deadline = trimmed ? `${trimmed}${item.time ? 'T' + item.time : ''}` : '';
+                    if (item.type === 'todo') {
+                        item.deadline = trimmed ? `${trimmed}${item.time ? 'T' + item.time : ''}` : '';
+                        item.date = trimmed || null;
+                    }
                     if (item.type === 'document') {
                         item.docDate = trimmed;
                         item.docStartDate = trimmed;

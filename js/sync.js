@@ -1399,7 +1399,7 @@ class SyncManager {
             if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
                 return `todo:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
             }
-            return `todo:${title}:${item.deadline || ''}`;
+            return `todo:${title}:${item.deadline || item.date || ''}`;
         } else if (item.type === 'document') {
             if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
                 return `doc:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
@@ -2196,7 +2196,8 @@ class SyncManager {
                 const titleMatch = cloudTitle === localTitle ||
                                    cloudTitle.includes(localTitle) ||
                                    localTitle.includes(cloudTitle);
-                if (titleMatch && local.deadline === cloudItem.deadline) {
+                if (titleMatch && local.deadline === cloudItem.deadline
+                    && (!local.deadline && !cloudItem.deadline ? local.date === cloudItem.date : true)) {
                     return { isDuplicate: true, existingItem: local };
                 }
             } else if (cloudItem.type === 'document') {

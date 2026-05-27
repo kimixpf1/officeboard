@@ -4234,12 +4234,12 @@ class OfficeDashboard {
                     const oldType = originalItem.type;
                     const selDate = this.selectedDate;
                     if (oldType === 'todo' && newType === 'meeting') {
-                        updates.date = originalItem.deadline?.split('T')[0] || selDate;
+                        updates.date = originalItem.deadline?.split('T')[0] || originalItem.date || selDate;
                         if (originalItem.deadline?.includes('T')) {
                             updates.time = originalItem.deadline.split('T')[1]?.substring(0, 5) || '';
                         }
                     } else if (oldType === 'todo' && newType === 'document') {
-                        const dateStr = originalItem.deadline?.split('T')[0] || selDate;
+                        const dateStr = originalItem.deadline?.split('T')[0] || originalItem.date || selDate;
                         updates.docDate = dateStr;
                         updates.docStartDate = dateStr;
                         updates.docEndDate = dateStr;
@@ -4256,6 +4256,7 @@ class OfficeDashboard {
                     } else if (oldType === 'document' && newType === 'todo') {
                         const dateStr = originalItem.docStartDate || originalItem.docDate || selDate;
                         updates.deadline = `${dateStr}T09:00`;
+                        updates.date = dateStr;
                     } else if (oldType === 'document' && newType === 'meeting') {
                         updates.date = originalItem.docStartDate || originalItem.docDate || selDate;
                     }
@@ -4304,6 +4305,7 @@ class OfficeDashboard {
         if (originalItem.type === ITEM_TYPES.TODO) {
             const currentTime = originalItem.deadline?.split('T')[1] || '09:00';
             updates.deadline = `${targetDate}T${currentTime}`;
+            updates.date = targetDate;
         } else if (originalItem.type === ITEM_TYPES.MEETING) {
             updates.date = targetDate;
         } else if (originalItem.type === ITEM_TYPES.DOCUMENT) {
@@ -4361,7 +4363,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-27 v5.2.118';
+        const version = '2026-05-27 v5.2.119';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=55', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=245', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;

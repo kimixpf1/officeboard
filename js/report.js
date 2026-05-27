@@ -39,7 +39,7 @@ class ReportGenerator {
         if (!item) return '';
 
         if (item.type === this.itemTypes.TODO) {
-            return item.deadline?.split('T')[0] || item.createdAt?.split('T')[0] || '';
+            return item.deadline?.split('T')[0] || item.date || item.createdAt?.split('T')[0] || '';
         }
 
         if (item.type === this.itemTypes.MEETING) {
