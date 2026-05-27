@@ -1,3 +1,103 @@
+## 2026-05-27 v5.2.118 置顶完成后排序+提醒框✓按钮卡顿
+
+### 改动内容
+1. **getCardPriorityBucket**：`completed` 检查移到 `pinned` 前面，已完成事项无论是否置顶都进入 bucket 3（已完成组）
+2. **非会议排序**：同桶内增加 `pinned` 二级排序，置顶+已完成排在已完成组最上面
+3. **sortMeetingItems**：会议类型桶内也加 pinned 排序
+4. **getItemGroup**：拖拽分组也把 `completed` 检查提前
+5. **bindTodoReminderComplete**：去掉闹钟/待办关闭时重复的 `updateCountdownNotice` 调用，改为重置轮播缓存 `_carouselTypes=[]`，让下次 tick 自动评估，减少 DOM 操作冲突
+
+### 根因
+- Bug1：`getCardPriorityBucket` 中 `pinned` 在 `completed` 前判断，导致已完成的置顶事项仍在 bucket 0（最顶部）
+- Bug2：`dismissAlarm` 内部已调用 `updateCountdownNotice`，点击处理又调用一次，双重 DOM 操作导致视觉卡顿
+
+### 审查结果
+- ✅ Code review: WARNING → 1个HIGH（缓存版本号已确认同步）/ 3个MEDIUM（INFO）/ 2个LOW（死代码）
+- ✅ 语法检查通过
+
+### 提交记录
+- `f22df26` fix: 置顶完成后排序+提醒框✓按钮卡顿(v5.2.118)
+
+### 验证清单
+- [ ] 置顶事项点击完成后排序到「已完成」组最上面
+- [ ] 取消完成后恢复到置顶位置
+- [ ] 闹钟/待办点击✓后不再卡顿
+- [ ] 非置顶事项完成/取消排序不变
+- [ ] 版本号 v5.2.118
+
+---
+
+## 2026-05-25 v5.2.117 通知栏提醒模式下左键/右键/长按无响应
+
+### 改动内容
+1. **idle-bar.js click handler**：去掉 `idle-mode` 独占守卫，所有模式下左键始终切换语录/宠物（showIdlePicker）
+2. **idle-bar.js contextmenu handler**：去掉 `idle-mode` 独占守卫，所有模式下右键打开闹钟设置（alarm-active 排除避免与 alarm.js handler 双重触发）
+3. **idle-bar.js touchstart handler**：去掉 `idle-mode` 独占守卫，所有模式下长按打开闹钟设置
+
+### 根因
+idle-bar.js 的 click/contextmenu/touchstart 三个事件处理器都有 `idle-mode` 模式守卫，只在空闲态响应。闹钟、待办、倒数日模式下全部失效，导致左键右键点了都没反应。
+
+### 交互规则（大飞确认）
+- **左键**：所有模式下始终切换语录/宠物，不管当前是什么提醒
+- **右键**：所有模式下始终打开闹钟设置
+- **✓ 按钮**：只有✓按钮才负责关闭/完成提醒，左键不承担此功能
+
+### 审查结果
+- ✅ Code review: WARNING → 1个MEDIUM（双重contextmenu导致showAlarmSettings开关冲突）已修复
+- ✅ 语法检查通过
+
+### 提交记录
+- `6ad3ad0` fix: 通知栏提醒模式下左键/右键/长按无响应——移除idle-mode守卫(v5.2.117)
+- `e6315c0` fix: 左键始终切换语录/宠物，不要关闭提醒——只有✓按钮才关闭(v5.2.117)
+- `bda0552` fix: 待办提醒✓按钮卡顿——DB操作改为fire-and-forget不阻塞UI(v5.2.117)
+
+### ✓按钮卡顿修复
+- **根因**：待办✓按钮点击后3个串行 await（db.getItem → db.putItem → db.getAllItems）+ loadItems 重新渲染，阻塞 UI
+- **修复**：DB 操作改为 fire-and-forget（不 await），UI 瞬间响应，后台慢慢持久化
+- **闹钟 dismiss 无此问题**：纯同步操作，不涉及 await
+
+### 验证清单
+- [ ] 闹钟提醒时：左键点击通知栏 → 切换语录/宠物
+- [ ] 闹钟提醒时：右键通知栏 → 打开闹钟设置
+- [ ] 待办提醒时：左键点击通知栏 → 切换语录/宠物
+- [ ] 待办提醒时：右键通知栏 → 打开闹钟设置
+- [ ] 倒数日提醒时：右键通知栏 → 打开闹钟设置
+- [ ] 空闲态：左键/右键功能不受影响
+- [ ] 长按（移动端）在所有模式下正常
+- [ ] 控制台无 JS 错误
+
+---
+
+## 2026-05-22 v5.2.116 闹钟删除后被sync回加+dismiss保护窗口
+
+### 改动内容
+1. **_mergeAlarms 删除保护**：本地10秒内编辑过闹钟时，不回加云端"新"闹钟（防止刚删除的被加回来），保护窗口从5秒扩展到10秒
+2. **dismiss 保护窗口**：3分钟→10分钟，确保闹钟触发区间（3分钟）完全在保护范围内
+3. **dismiss 不再短路所有闹钟**：去掉 checkAlarms/checkAlarmsSilent 的早返回，只跳过被关闭的那个闹钟，其他闹钟正常触发
+4. **版本号 v5.2.116**
+
+### 根因
+- 删除闹钟后 `_mergeAlarms` 把云端旧数据的闹钟当"新"加回来
+- dismiss 3分钟窗口等于触发区间3分钟，边界重叠导致关闭后重新提醒
+- dismiss 短路了所有闹钟检查，关闭一个导致其他闹钟也无法触发
+
+### 审查结果
+- ✅ Code review: WARNING → HIGH已修复（dismiss短路问题）
+- ✅ 语法检查通过
+- ✅ 已提交推送
+
+### 提交记录
+- `3fb706f` fix: 闹钟删除后被sync回加+dismiss保护窗口过短
+- `2696c4f` fix: dismiss不再短路所有闹钟检查
+
+### 验证清单
+- [ ] 删除闹钟 → 刷新页面 → 确认没有回来
+- [ ] 关闭闹钟(dismiss) → 10分钟内不重新提醒
+- [ ] 多个闹钟：关闭闹钟A → 闹钟B仍正常触发
+- [ ] Ctrl+Shift+R 强刷后版本号 v5.2.116
+
+---
+
 ## 2026-05-22 v5.2.115 备忘录/日程编辑时云端同步覆盖修复
 
 ### 改动内容
