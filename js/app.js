@@ -2953,8 +2953,8 @@ class OfficeDashboard {
     }
 
     getCardPriorityBucket(item) {
-        if (item.pinned) return 0;
         if (item.completed) return 3;
+        if (item.pinned) return 0;
         if (item.sunk) return 2;
         return 1;
     }
@@ -3008,6 +3008,8 @@ class OfficeDashboard {
 
         [0, 1, 2, 3].forEach(bucket => {
             const bucketItems = buckets.get(bucket) || [];
+            // 同桶内 pinned 排前面
+            bucketItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
             const manualItems = bucketItems
                 .filter(item => hasManualOrder(item))
                 .sort((a, b) => {
@@ -3070,6 +3072,9 @@ class OfficeDashboard {
                 if (priorityA !== priorityB) {
                     return priorityA - priorityB;
                 }
+
+                // 同桶内 pinned 排前面（已完成桶中：置顶的已完成 > 普通已完成）
+                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
 
                 const pWeight = { high: 0, medium: 1, low: 2 };
                 const pwA = pWeight[a.priority] ?? 1;
@@ -3966,9 +3971,9 @@ class OfficeDashboard {
             if (noticeType === 'alarm') {
                 const alarmId = btn.dataset.alarmId;
                 if (alarmId) {
-                    this.dismissAlarm?.(alarmId);
                     this._carouselLastSwitch = 0;
-                    this.updateCountdownNotice?.();
+                    this._carouselTypes = [];
+                    this.dismissAlarm?.(alarmId);
                 }
                 return;
             }
@@ -3982,9 +3987,9 @@ class OfficeDashboard {
                     this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
                     this._dismissedTodoReminderIds.add(itemId);
                     this._persistDismissedReminderIds();
-                    // 立即刷新通知栏
+                    // 强制轮播重新评估，由下次 tick 自动切换
                     this._carouselLastSwitch = 0;
-                    this.updateCountdownNotice?.();
+                    this._carouselTypes = [];
                     // DB 持久化 + 同步 + 列表刷新全部后台执行，不阻塞 UI
                     (async () => {
                         const item = await db.getItem(itemId);
@@ -4356,8 +4361,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-05-22 v5.2.116';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=55', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=244', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-05-27 v5.2.118';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=55', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=245', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=3', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4367,8 +4372,8 @@ class OfficeDashboard {
      * 返回: 'pinned' | 'active' | 'completed'
      */
     getItemGroup(item) {
-        if (item.pinned) return 'pinned';
         if (item.completed) return 'completed';
+        if (item.pinned) return 'pinned';
         return 'active';
     }
 
