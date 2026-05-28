@@ -12,16 +12,6 @@
 
 
 class SyncManager {
-    /** 需要同步的 API Key 设置项键名列表（[dbKey, syncKey]） */
-    static SETTING_KEYS = [
-        ['kimi_api_key_encrypted', 'kimi_api_key_encrypted'],
-        ['kimi_api_key_set', 'kimi_api_key_set'],
-        ['deepseek_api_key_encrypted', 'deepseek_api_key_encrypted'],
-        ['deepseek_api_key_set', 'deepseek_api_key_set'],
-        ['qweather_api_key_encrypted', 'qweather_api_key_encrypted'],
-        ['qweather_api_key_set', 'qweather_api_key_set']
-    ];
-
     constructor() {
         // Supabase配置（anon key 为公开密钥，安全性依赖 RLS 行级安全策略，非 service_role key）
         this.supabaseUrl = 'https://pfomqdegassaqxdyyweo.supabase.co';
@@ -114,228 +104,64 @@ class SyncManager {
         SafeStorage.set('lastCloudSyncTime', timestamp);
     }
 
-    /**
-     * 通用辅助数据写入：将云端数据写入 SafeStorage 并触发 DOM 事件。
-     * @param {Object} cloudData - 云端 data 对象（字段名如 memo, stickyNote, schedule 等）
-     * @param {Object} options
-     * @param {boolean} options.checkDiff - 是否比较本地值再决定写入/派发
-     * @param {boolean} options.applyDeletedItems - 是否合并 deletedItems
-     * @param {boolean} options.updateStickyDashData - 便签是否更新 dashboard._stickyData
-     * @param {boolean} options.dispatchTools - 是否派发 toolsSynced 事件
-     * @param {boolean} options.conditionalCountdown - 是否仅在倒数字段存在时才派发 countdownSynced
-     * @param {string} options.source - 日志来源标识
-     */
-    _applySideData(cloudData, options = {}) {
-        if (!cloudData || typeof cloudData !== 'object') {
+    _applySideData(sideData = {}, options = {}) {
+        if (!sideData || typeof sideData !== 'object') {
             return;
         }
 
         const {
-            checkDiff = false,
-            applyDeletedItems = false,
-            updateStickyDashData = true,
-            dispatchTools = false,
-            conditionalCountdown = false,
-            source = 'unknown'
+            dispatchMemo = false,
+            dispatchSchedule = false,
+            dispatchLinks = false,
+            dispatchContacts = false,
+            dispatchCountdown = false
         } = options;
 
-        // --- 备忘录 ---
-        if (cloudData.memo !== undefined) {
-            const cloudVal = cloudData.memo;
-            const localVal = SafeStorage.get('office_memo_content') || '';
-            if (!checkDiff || cloudVal !== localVal) {
-                SafeStorage.set('office_memo_content', cloudVal);
-                const memoEl = document.getElementById('memoText');
-                if (!memoEl || document.activeElement !== memoEl) {
-                    document.dispatchEvent(new CustomEvent('memoSynced', {
-                        detail: { content: cloudVal }
-                    }));
-                }
+        for (const [key, value] of Object.entries(sideData)) {
+            if (typeof value === 'string') {
+                SafeStorage.set(key, value);
             }
         }
 
-        // --- 便签 ---
-        if (cloudData.stickyNote !== undefined) {
-            const cloudVal = cloudData.stickyNote;
-            const localVal = SafeStorage.get('office_sticky_note') || '';
-            if (!checkDiff || cloudVal !== localVal) {
-                SafeStorage.set('office_sticky_note', cloudVal);
-                const stickyEl = document.querySelector('.sticky-note-lines');
-                if (stickyEl && document.activeElement !== stickyEl) {
-                    const curContent = this._stickyCurrentContent(cloudVal);
-                    if (stickyEl.textContent !== curContent) stickyEl.textContent = curContent;
-                }
-                if (updateStickyDashData) {
-                    const dash = window.dashboard || window.officeDashboard;
-                    if (dash && typeof dash._loadStickyData === 'function') dash._stickyData = dash._loadStickyData();
-                }
-            }
+        if (dispatchMemo && sideData.office_memo_content !== undefined) {
+            document.dispatchEvent(new CustomEvent('memoSynced', {
+                detail: { content: sideData.office_memo_content || '' }
+            }));
         }
 
-        // --- 日程 ---
-        if (cloudData.schedule !== undefined) {
-            const cloudVal = cloudData.schedule;
-            const localVal = SafeStorage.get('office_schedule_content') || '';
-            if (!checkDiff || cloudVal !== localVal) {
-                SafeStorage.set('office_schedule_content', cloudVal);
-                const scheduleEl = document.getElementById('scheduleText');
-                if (!scheduleEl || document.activeElement !== scheduleEl) {
-                    document.dispatchEvent(new CustomEvent('scheduleSynced', {
-                        detail: { content: cloudVal }
-                    }));
-                }
-            }
+        if (dispatchSchedule && sideData.office_schedule_content !== undefined) {
+            document.dispatchEvent(new CustomEvent('scheduleSynced', {
+                detail: { content: sideData.office_schedule_content || '' }
+            }));
         }
 
-        // --- 网站 ---
-        if (cloudData.links !== undefined) {
-            const cloudVal = cloudData.links;
-            const localVal = SafeStorage.get('office_links') || '';
-            if (!checkDiff || cloudVal !== localVal) {
-                SafeStorage.set('office_links', cloudVal);
-                document.dispatchEvent(new CustomEvent('linksSynced', {
-                    detail: { links: safeJsonParse(cloudVal, []) }
-                }));
-            }
+        if (dispatchLinks && sideData.office_links !== undefined) {
+            document.dispatchEvent(new CustomEvent('linksSynced', {
+                detail: { links: safeJsonParse(sideData.office_links || '[]', []) }
+            }));
         }
 
-        // --- 通讯录 ---
-        if (cloudData.contacts !== undefined) {
-            const cloudVal = cloudData.contacts;
-            const localVal = SafeStorage.get('office_contacts') || '';
-            if (!checkDiff || cloudVal !== localVal) {
-                SafeStorage.set('office_contacts', cloudVal);
-                document.dispatchEvent(new CustomEvent('contactsSynced', {
-                    detail: { contacts: safeJsonParse(cloudVal, []) }
-                }));
-            }
+        if (dispatchContacts && sideData.office_contacts !== undefined) {
+            document.dispatchEvent(new CustomEvent('contactsSynced', {
+                detail: { contacts: safeJsonParse(sideData.office_contacts || '[]', []) }
+            }));
         }
 
-        // --- 倒数日（3个字段） ---
-        if (cloudData.countdownEvents !== undefined) {
-            const nextVal = cloudData.countdownEvents || '[]';
-            const curVal = SafeStorage.get('office_countdown_events') || '[]';
-            if (!checkDiff || nextVal !== curVal) {
-                SafeStorage.set('office_countdown_events', nextVal);
-            }
-        }
-        if (cloudData.countdownTypeColors !== undefined) {
-            const nextVal = cloudData.countdownTypeColors || '{}';
-            const curVal = SafeStorage.get('office_countdown_type_colors') || '{}';
-            if (!checkDiff || nextVal !== curVal) {
-                SafeStorage.set('office_countdown_type_colors', nextVal);
-            }
-        }
-        if (cloudData.countdownSortOrder !== undefined) {
-            const nextVal = cloudData.countdownSortOrder || '[]';
-            const curVal = SafeStorage.get('office_countdown_sort_order') || '[]';
-            if (!checkDiff || nextVal !== curVal) {
-                SafeStorage.set('office_countdown_sort_order', nextVal);
-            }
-        }
-
-        // --- 工具 ---
-        if (cloudData.tools !== undefined) {
-            const cloudVal = cloudData.tools;
-            const localVal = SafeStorage.get('office_tools') || '';
-            if (!checkDiff || cloudVal !== localVal) {
-                SafeStorage.set('office_tools', cloudVal);
-                if (dispatchTools) {
-                    document.dispatchEvent(new CustomEvent('toolsSynced', {
-                        detail: { tools: safeJsonParse(cloudVal || '[]', []) }
-                    }));
-                }
-            }
-        }
-
-        // --- 天气城市 ---
-        if (cloudData.weatherCity !== undefined) {
-            const nextVal = cloudData.weatherCity;
-            const curVal = SafeStorage.get('office_weather_city') || '';
-            if (!checkDiff || nextVal !== curVal) {
-                SafeStorage.set('office_weather_city', nextVal);
-            }
-        }
-
-        // --- 闹钟（始终用 _mergeAlarms 合并） ---
-        if (cloudData.alarms !== undefined) {
-            const localAlarms = SafeStorage.get('office_alarms') || '[]';
-            const cloudAlarms = cloudData.alarms;
-            if (!checkDiff || cloudAlarms !== localAlarms) {
-                const merged = this._mergeAlarms(localAlarms, cloudAlarms);
-                SafeStorage.set('office_alarms', merged);
-                document.dispatchEvent(new CustomEvent('alarmsSynced', {
-                    detail: { alarms: safeJsonParse(merged || '[]', []) }
-                }));
-            }
-        }
-
-        // --- 主题 ---
-        this._applyCloudTheme(cloudData.theme);
-
-        // --- 自定义宠物/语录 ---
-        if (cloudData.customPets) SafeStorage.set('office_custom_pets', cloudData.customPets);
-        if (cloudData.customQuotes) SafeStorage.set('office_custom_quotes', cloudData.customQuotes);
-
-        // --- 倒数日事件 ---
-        const shouldDispatchCountdown = conditionalCountdown
-            ? (cloudData.countdownEvents !== undefined || cloudData.countdownTypeColors !== undefined || cloudData.countdownSortOrder !== undefined)
-            : true;
-        if (shouldDispatchCountdown) {
+        if (dispatchCountdown) {
             document.dispatchEvent(new CustomEvent('countdownSynced', {
                 detail: {
-                    events: safeJsonParse(cloudData.countdownEvents || '[]', []),
-                    colors: safeJsonParse(cloudData.countdownTypeColors || '{}', {}),
-                    sortOrder: safeJsonParse(cloudData.countdownSortOrder || '[]', [])
+                    events: safeJsonParse(sideData.office_countdown_events || '[]', []),
+                    colors: safeJsonParse(sideData.office_countdown_type_colors || '{}', {}),
+                    sortOrder: safeJsonParse(sideData.office_countdown_sort_order || '[]', [])
                 }
             }));
         }
 
-        // --- deletedItems ---
-        if (applyDeletedItems && cloudData.deletedItems && typeof cloudData.deletedItems === 'object') {
-            this.deletedItemsMap = { ...this.deletedItemsMap, ...cloudData.deletedItems };
-            this.persistDeletedItemsMap();
+        if (sideData.office_alarms !== undefined) {
+            document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                detail: { alarms: safeJsonParse(sideData.office_alarms || '[]', []) }
+            }));
         }
-    }
-
-    /**
-     * 将备份格式的 sideData（SafeStorage 键名）转换为云端格式并调用 _applySideData。
-     * 用于 importFromFile 和 restoreFromBackup 路径。
-     */
-    _applyBackupSideData(sideData) {
-        if (!sideData || typeof sideData !== 'object') return;
-
-        // 将 SafeStorage 键名映射为云端字段名
-        const cloudFormat = {};
-        const keyMap = {
-            'office_memo_content': 'memo',
-            'office_sticky_note': 'stickyNote',
-            'office_schedule_content': 'schedule',
-            'office_links': 'links',
-            'office_contacts': 'contacts',
-            'office_countdown_events': 'countdownEvents',
-            'office_countdown_type_colors': 'countdownTypeColors',
-            'office_countdown_sort_order': 'countdownSortOrder',
-            'office_tools': 'tools',
-            'office_weather_city': 'weatherCity',
-            'office_alarms': 'alarms',
-            'theme': 'theme',
-            'office_custom_pets': 'customPets',
-            'office_custom_quotes': 'customQuotes'
-        };
-        for (const [storageKey, cloudKey] of Object.entries(keyMap)) {
-            if (sideData[storageKey] !== undefined) {
-                cloudFormat[cloudKey] = sideData[storageKey];
-            }
-        }
-
-        this._applySideData(cloudFormat, {
-            checkDiff: false,
-            applyDeletedItems: false,
-            updateStickyDashData: true,
-            dispatchTools: true,
-            source: 'importRestore'
-        });
     }
 
     _mergeAlarms(localValue, cloudValue) {
@@ -343,23 +169,13 @@ class SyncManager {
         const cloudAlarms = safeJsonParse(cloudValue || '[]', []);
         if (!cloudAlarms.length) return localValue;
         if (!localAlarms.length) return cloudValue;
-        const app = window.officeDashboard;
-        const recentlyChanged = app?._alarmsChangedAt && Date.now() - app._alarmsChangedAt < 10000;
         const merged = [...localAlarms];
         const localIds = new Set(localAlarms.map(a => a.id));
         for (const alarm of cloudAlarms) {
             if (localIds.has(alarm.id)) {
                 const idx = merged.findIndex(a => a.id === alarm.id);
-                if (idx >= 0) {
-                    if (recentlyChanged) continue;
-                    const localCreatedAt = new Date(merged[idx].createdAt || 0).getTime();
-                    const cloudCreatedAt = new Date(alarm.createdAt || 0).getTime();
-                    if (cloudCreatedAt > localCreatedAt || (!merged[idx].enabled && alarm.enabled)) {
-                        merged[idx] = alarm;
-                    }
-                }
+                if (idx >= 0) merged[idx] = alarm;
             } else {
-                if (recentlyChanged) continue;
                 merged.push(alarm);
             }
         }
@@ -446,25 +262,6 @@ class SyncManager {
             changed = true;
         }
         if (changed) this.persistDeletedItemsMap();
-    }
-
-    /**
-     * 云端主题恢复到本地，带本地最近修改保护
-     * 如果用户在 5 秒内刚改过主题，优先保留本地值并上传覆盖云端
-     */
-    _applyCloudTheme(cloudTheme) {
-        if (cloudTheme === undefined) return;
-        const currentValue = SafeStorage.get('theme') || '';
-        if (cloudTheme === currentValue) return;
-
-        const app = window.officeDashboard;
-        if (app?._themeChangedAt && Date.now() - app._themeChangedAt < 5000) {
-            // 用户刚切过主题，上传本地值覆盖云端旧值
-            this.immediateSyncToCloud?.().catch(() => {});
-            return;
-        }
-        SafeStorage.set('theme', cloudTheme);
-        document.documentElement.setAttribute('data-theme', cloudTheme);
     }
 
     getItemDeletionKey(item) {
@@ -700,18 +497,22 @@ class SyncManager {
 
         return hasNonEmptyString('office_memo_content')
             || hasNonEmptyString('office_schedule_content')
-            || hasNonEmptyString('office_sticky_note')
             || hasNonEmptyString('office_links')
             || hasNonEmptyString('office_contacts')
-            || hasNonEmptyString('office_custom_pets')
-            || hasNonEmptyString('office_custom_quotes')
             || hasNonEmptyJson('office_countdown_events', [])
             || hasNonEmptyJson('office_countdown_type_colors', {})
             || hasNonEmptyJson('office_countdown_sort_order', []);
     }
 
     async buildSyncData(items) {
-        const settingKeys = SyncManager.SETTING_KEYS;
+        const settingKeys = [
+            ['kimi_api_key_encrypted', 'kimi_api_key_encrypted'],
+            ['kimi_api_key_set', 'kimi_api_key_set'],
+            ['deepseek_api_key_encrypted', 'deepseek_api_key_encrypted'],
+            ['deepseek_api_key_set', 'deepseek_api_key_set'],
+            ['qweather_api_key_encrypted', 'qweather_api_key_encrypted'],
+            ['qweather_api_key_set', 'qweather_api_key_set']
+        ];
 
         const settingValues = await Promise.all(
             settingKeys.map(([dbKey]) => db.getSetting(dbKey))
@@ -730,7 +531,6 @@ class SyncManager {
             settings,
             memo: SafeStorage.get('office_memo_content') || '',
             schedule: SafeStorage.get('office_schedule_content') || '',
-            stickyNote: SafeStorage.get('office_sticky_note') || '',
             links: SafeStorage.get('office_links') || '',
             contacts: SafeStorage.get('office_contacts') || '',
             countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
@@ -740,8 +540,6 @@ class SyncManager {
             weatherCity: SafeStorage.get('office_weather_city') || '',
             alarms: SafeStorage.get('office_alarms') || '[]',
             theme: SafeStorage.get('theme') || '',
-            customPets: SafeStorage.get('office_custom_pets') || '',
-            customQuotes: SafeStorage.get('office_custom_quotes') || '',
             device_info: navigator.userAgent
         };
     }
@@ -1029,15 +827,117 @@ class SyncManager {
                 }
 
                 if (!localHasModify && !needsUIRefresh) {
-                    // 两边都没变化 - 但仍需同步辅助数据
-                    this._applySideData(cloudData?.data, {
-                        checkDiff: true,
-                        applyDeletedItems: true,
-                        updateStickyDashData: false,
-                        dispatchTools: false,
-                        conditionalCountdown: true,
-                        source: 'smartSync-bothUnchanged'
-                    });
+                    // 两边都没变化 - 但仍需同步备忘录
+                    if (cloudData?.data?.memo !== undefined) {
+                        const localMemo = SafeStorage.get('office_memo_content') || '';
+                        const cloudMemo = cloudData.data.memo;
+                        if (cloudMemo !== localMemo) {
+                            SafeStorage.set('office_memo_content', cloudMemo);
+                            document.dispatchEvent(new CustomEvent('memoSynced', { 
+                                detail: { content: cloudMemo } 
+                            }));
+                        }
+                    }
+                    // 同步网站
+                    if (cloudData?.data?.links !== undefined) {
+                        const localLinks = SafeStorage.get('office_links') || '';
+                        const cloudLinks = cloudData.data.links;
+                        if (cloudLinks !== localLinks) {
+                            SafeStorage.set('office_links', cloudLinks);
+                            document.dispatchEvent(new CustomEvent('linksSynced', { 
+                                detail: { links: safeJsonParse(cloudLinks, []) } 
+                            }));
+                        }
+                    }
+                    // 同步通讯录
+                    if (cloudData?.data?.contacts !== undefined) {
+                        const localContacts = SafeStorage.get('office_contacts') || '';
+                        const cloudContacts = cloudData.data.contacts;
+                        if (cloudContacts !== localContacts) {
+                            SafeStorage.set('office_contacts', cloudContacts);
+                            document.dispatchEvent(new CustomEvent('contactsSynced', {
+                                detail: { contacts: safeJsonParse(cloudContacts, []) }
+                            }));
+                        }
+                    }
+                    // 同步日程
+                    if (cloudData?.data?.schedule !== undefined) {
+                        const localSchedule = SafeStorage.get('office_schedule_content') || '';
+                        const cloudSchedule = cloudData.data.schedule;
+                        if (cloudSchedule !== localSchedule) {
+                            SafeStorage.set('office_schedule_content', cloudSchedule);
+                            document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                                detail: { content: cloudSchedule } 
+                            }));
+                        }
+                    }
+                    if (cloudData?.data?.countdownEvents !== undefined) {
+                        const nextValue = cloudData.data.countdownEvents || '[]';
+                        const currentValue = SafeStorage.get('office_countdown_events') || '[]';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_countdown_events', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.countdownTypeColors !== undefined) {
+                        const nextValue = cloudData.data.countdownTypeColors || '{}';
+                        const currentValue = SafeStorage.get('office_countdown_type_colors') || '{}';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_countdown_type_colors', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.countdownSortOrder !== undefined) {
+                        const nextValue = cloudData.data.countdownSortOrder || '[]';
+                        const currentValue = SafeStorage.get('office_countdown_sort_order') || '[]';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_countdown_sort_order', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.tools !== undefined) {
+                        const nextValue = cloudData.data.tools;
+                        const currentValue = SafeStorage.get('office_tools') || '';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_tools', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.weatherCity !== undefined) {
+                        const nextValue = cloudData.data.weatherCity;
+                        const currentValue = SafeStorage.get('office_weather_city') || '';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('office_weather_city', nextValue);
+                        }
+                    }
+                    if (cloudData?.data?.alarms !== undefined) {
+                        const nextValue = cloudData.data.alarms;
+                        const currentValue = SafeStorage.get('office_alarms') || '[]';
+                        if (nextValue !== currentValue) {
+                            const merged = this._mergeAlarms(currentValue, nextValue);
+                            SafeStorage.set('office_alarms', merged);
+                            document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                                detail: { alarms: safeJsonParse(merged || '[]', []) }
+                            }));
+                        }
+                    }
+                    if (cloudData?.data?.theme !== undefined) {
+                        const nextValue = cloudData.data.theme;
+                        const currentValue = SafeStorage.get('theme') || '';
+                        if (nextValue !== currentValue) {
+                            SafeStorage.set('theme', nextValue);
+                            document.documentElement.setAttribute('data-theme', nextValue);
+                        }
+                    }
+                    if (
+                        cloudData?.data?.countdownEvents !== undefined
+                        || cloudData?.data?.countdownTypeColors !== undefined
+                        || cloudData?.data?.countdownSortOrder !== undefined
+                    ) {
+                        document.dispatchEvent(new CustomEvent('countdownSynced', {
+                            detail: {
+                                events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
+                                colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {}),
+                                sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
+                            }
+                        }));
+                    }
                 }
             }
 
@@ -1162,14 +1062,114 @@ class SyncManager {
             // 同步设置
             await this._restoreSettingsFromCloud(cloudData.data.settings);
 
-            // 写入辅助数据（downloadFromCloud 原为无条件写入，保持一致）
-            this._applySideData(cloudData.data, {
-                checkDiff: false,
-                applyDeletedItems: true,
-                updateStickyDashData: true,
-                dispatchTools: true,
-                source: 'downloadFromCloud'
-            });
+            // 同步备忘录
+            if (cloudData.data.memo !== undefined) {
+                SafeStorage.set('office_memo_content', cloudData.data.memo);
+                document.dispatchEvent(new CustomEvent('memoSynced', { 
+                    detail: { content: cloudData.data.memo } 
+                }));
+            }
+
+            // 同步日程
+            if (cloudData.data.schedule !== undefined) {
+                SafeStorage.set('office_schedule_content', cloudData.data.schedule);
+                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                    detail: { content: cloudData.data.schedule } 
+                }));
+            }
+
+            // 同步网站
+            if (cloudData.data.links !== undefined) {
+                SafeStorage.set('office_links', cloudData.data.links);
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: safeJsonParse(cloudData.data.links, []) }
+                }));
+            }
+
+            // 同步通讯录
+            if (cloudData.data.contacts !== undefined) {
+                SafeStorage.set('office_contacts', cloudData.data.contacts);
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: safeJsonParse(cloudData.data.contacts, []) }
+                }));
+            }
+
+            if (cloudData.data.countdownEvents !== undefined) {
+                const nextValue = cloudData.data.countdownEvents || '[]';
+                const currentValue = SafeStorage.get('office_countdown_events') || '[]';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_countdown_events', nextValue);
+                }
+            }
+
+            if (cloudData.data.countdownTypeColors !== undefined) {
+                const nextValue = cloudData.data.countdownTypeColors || '{}';
+                const currentValue = SafeStorage.get('office_countdown_type_colors') || '{}';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_countdown_type_colors', nextValue);
+                }
+            }
+
+            if (cloudData.data.countdownSortOrder !== undefined) {
+                const nextValue = cloudData.data.countdownSortOrder || '[]';
+                const currentValue = SafeStorage.get('office_countdown_sort_order') || '[]';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_countdown_sort_order', nextValue);
+                }
+            }
+
+            if (cloudData.data.tools !== undefined) {
+                const nextValue = cloudData.data.tools;
+                const currentValue = SafeStorage.get('office_tools') || '';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_tools', nextValue);
+                    document.dispatchEvent(new CustomEvent('toolsSynced', {
+                        detail: { tools: safeJsonParse(nextValue || '[]', []) }
+                    }));
+                }
+            }
+
+            if (cloudData.data.weatherCity !== undefined) {
+                const nextValue = cloudData.data.weatherCity;
+                const currentValue = SafeStorage.get('office_weather_city') || '';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('office_weather_city', nextValue);
+                }
+            }
+
+            if (cloudData.data.alarms !== undefined) {
+                const nextValue = cloudData.data.alarms;
+                const currentValue = SafeStorage.get('office_alarms') || '[]';
+                if (nextValue !== currentValue) {
+                    const merged = this._mergeAlarms(currentValue, nextValue);
+                    SafeStorage.set('office_alarms', merged);
+                    document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                        detail: { alarms: safeJsonParse(merged || '[]', []) }
+                    }));
+                }
+            }
+
+            if (cloudData.data.theme !== undefined) {
+                const nextValue = cloudData.data.theme;
+                const currentValue = SafeStorage.get('theme') || '';
+                if (nextValue !== currentValue) {
+                    SafeStorage.set('theme', nextValue);
+                    document.documentElement.setAttribute('data-theme', nextValue);
+                }
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
+                }
+            }));
+
+            if (cloudData.data.deletedItems && typeof cloudData.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...cloudData.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
 
             // 同步事项（带去重）
             const cloudItems = cloudData.data.items || [];
@@ -1352,14 +1352,125 @@ class SyncManager {
                 }
             }
 
-            // 写入辅助数据（云端优先，带diff检查）
-            this._applySideData(cloudData.data, {
-                checkDiff: true,
-                applyDeletedItems: false,
-                updateStickyDashData: true,
-                dispatchTools: false,
-                source: 'mergeData'
-            });
+            // 同步备忘录（云端优先）
+            if (cloudData.data.memo !== undefined) {
+                const cloudMemo = cloudData.data.memo;
+                const localMemo = SafeStorage.get('office_memo_content') || '';
+                if (cloudMemo !== localMemo) {
+
+                    SafeStorage.set('office_memo_content', cloudMemo);
+                    document.dispatchEvent(new CustomEvent('memoSynced', { 
+                        detail: { content: cloudMemo } 
+                    }));
+                }
+            }
+
+            // 同步日程（云端优先）
+            if (cloudData.data.schedule !== undefined) {
+                const cloudSchedule = cloudData.data.schedule;
+                const localSchedule = SafeStorage.get('office_schedule_content') || '';
+                if (cloudSchedule !== localSchedule) {
+                    SafeStorage.set('office_schedule_content', cloudSchedule);
+                    document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                        detail: { content: cloudSchedule } 
+                    }));
+                }
+            }
+
+            // 同步网站（云端优先）
+            if (cloudData.data.links !== undefined) {
+                const cloudLinks = cloudData.data.links;
+                const localLinks = SafeStorage.get('office_links') || '';
+                if (cloudLinks !== localLinks) {
+
+                    SafeStorage.set('office_links', cloudLinks);
+                    document.dispatchEvent(new CustomEvent('linksSynced', {
+                        detail: { links: safeJsonParse(cloudLinks, []) }
+                    }));
+                }
+            }
+
+            // 同步通讯录（云端优先）
+            if (cloudData.data.contacts !== undefined) {
+                const cloudContacts = cloudData.data.contacts;
+                const localContacts = SafeStorage.get('office_contacts') || '';
+                if (cloudContacts !== localContacts) {
+
+                    SafeStorage.set('office_contacts', cloudContacts);
+                    document.dispatchEvent(new CustomEvent('contactsSynced', {
+                        detail: { contacts: safeJsonParse(cloudContacts, []) }
+                    }));
+                }
+            }
+
+            if (cloudData.data.countdownEvents !== undefined) {
+                const cloudCountdownEvents = cloudData.data.countdownEvents || '[]';
+                const localCountdownEvents = SafeStorage.get('office_countdown_events') || '[]';
+                if (cloudCountdownEvents !== localCountdownEvents) {
+                    SafeStorage.set('office_countdown_events', cloudCountdownEvents);
+                }
+            }
+
+            if (cloudData.data.countdownTypeColors !== undefined) {
+                const cloudCountdownTypeColors = cloudData.data.countdownTypeColors || '{}';
+                const localCountdownTypeColors = SafeStorage.get('office_countdown_type_colors') || '{}';
+                if (cloudCountdownTypeColors !== localCountdownTypeColors) {
+                    SafeStorage.set('office_countdown_type_colors', cloudCountdownTypeColors);
+                }
+            }
+
+            if (cloudData.data.countdownSortOrder !== undefined) {
+                const cloudCountdownSortOrder = cloudData.data.countdownSortOrder || '[]';
+                const localCountdownSortOrder = SafeStorage.get('office_countdown_sort_order') || '[]';
+                if (cloudCountdownSortOrder !== localCountdownSortOrder) {
+                    SafeStorage.set('office_countdown_sort_order', cloudCountdownSortOrder);
+                }
+            }
+
+            if (cloudData.data.tools !== undefined) {
+                const cloudTools = cloudData.data.tools;
+                const localTools = SafeStorage.get('office_tools') || '';
+                if (cloudTools !== localTools) {
+                    SafeStorage.set('office_tools', cloudTools);
+                }
+            }
+
+            if (cloudData.data.weatherCity !== undefined) {
+                const cloudWeatherCity = cloudData.data.weatherCity;
+                const localWeatherCity = SafeStorage.get('office_weather_city') || '';
+                if (cloudWeatherCity !== localWeatherCity) {
+                    SafeStorage.set('office_weather_city', cloudWeatherCity);
+                }
+            }
+
+            if (cloudData.data.alarms !== undefined) {
+                const cloudAlarms = cloudData.data.alarms;
+                const localAlarms = SafeStorage.get('office_alarms') || '[]';
+                if (cloudAlarms !== localAlarms) {
+                    const merged = this._mergeAlarms(localAlarms, cloudAlarms);
+                    SafeStorage.set('office_alarms', merged);
+                    document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                        detail: { alarms: safeJsonParse(merged || '[]', []) }
+                    }));
+                }
+            }
+
+            if (cloudData.data.theme !== undefined) {
+                const cloudTheme = cloudData.data.theme;
+                const localTheme = SafeStorage.get('theme') || '';
+                if (cloudTheme !== localTheme) {
+                    SafeStorage.set('theme', cloudTheme);
+                    document.documentElement.setAttribute('data-theme', cloudTheme);
+                }
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(cloudData.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(cloudData.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(cloudData.data.countdownSortOrder || '[]', [])
+                }
+            }));
 
             // 上传合并后的数据到云端
             await this.uploadToCloud(cloudData);
@@ -1399,7 +1510,7 @@ class SyncManager {
             if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
                 return `todo:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
             }
-            return `todo:${title}:${item.deadline || item.date || ''}`;
+            return `todo:${title}:${item.deadline || ''}`;
         } else if (item.type === 'document') {
             if (item.recurringGroupId && item.occurrenceIndex !== undefined) {
                 return `doc:recurring:${item.recurringGroupId}:${item.occurrenceIndex}`;
@@ -1690,14 +1801,83 @@ class SyncManager {
             // 同步设置
             await this._restoreSettingsFromCloud(data.data.settings);
 
-            // 写入辅助数据
-            this._applySideData(data.data, {
-                checkDiff: false,
-                applyDeletedItems: true,
-                updateStickyDashData: true,
-                dispatchTools: false,
-                source: 'silentSyncFromCloud'
-            });
+            // 同步备忘录
+            if (data.data.memo !== undefined) {
+                SafeStorage.set('office_memo_content', data.data.memo);
+                document.dispatchEvent(new CustomEvent('memoSynced', { 
+                    detail: { content: data.data.memo } 
+                }));
+            }
+
+            // 同步日程
+            if (data.data.schedule !== undefined) {
+                SafeStorage.set('office_schedule_content', data.data.schedule);
+                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                    detail: { content: data.data.schedule } 
+                }));
+            }
+
+            // 同步网站
+            if (data.data.links !== undefined) {
+                SafeStorage.set('office_links', data.data.links);
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: safeJsonParse(data.data.links, []) }
+                }));
+            }
+
+            // 同步通讯录
+            if (data.data.contacts !== undefined) {
+                SafeStorage.set('office_contacts', data.data.contacts);
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: safeJsonParse(data.data.contacts, []) }
+                }));
+            }
+
+            if (data.data.countdownEvents !== undefined) {
+                SafeStorage.set('office_countdown_events', data.data.countdownEvents || '[]');
+            }
+
+            if (data.data.countdownTypeColors !== undefined) {
+                SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
+            }
+
+            if (data.data.countdownSortOrder !== undefined) {
+                SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
+            }
+
+            if (data.data.tools !== undefined) {
+                SafeStorage.set('office_tools', data.data.tools);
+            }
+
+            if (data.data.weatherCity !== undefined) {
+                SafeStorage.set('office_weather_city', data.data.weatherCity);
+            }
+
+            if (data.data.alarms !== undefined) {
+                const mergedAlarms = this._mergeAlarms(SafeStorage.get('office_alarms') || '[]', data.data.alarms);
+                SafeStorage.set('office_alarms', mergedAlarms);
+                document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                    detail: { alarms: safeJsonParse(mergedAlarms || '[]', []) }
+                }));
+            }
+
+            if (data.data.theme !== undefined) {
+                SafeStorage.set('theme', data.data.theme);
+                document.documentElement.setAttribute('data-theme', data.data.theme);
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(data.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(data.data.countdownSortOrder || '[]', [])
+                }
+            }));
+
+            if (data.data.deletedItems && typeof data.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...data.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
 
             // 同步事项 - 使用对账合并，保留本设备未上传的新增
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
@@ -1986,8 +2166,42 @@ class SyncManager {
         try {
             if (progressCallback) progressCallback('正在准备数据...');
             const allItems = await db.getAllItems();
-            const syncData = await this.buildSyncData(allItems);
 
+            // 获取设置数据（包括API Key）
+            const settings = {};
+        const [kimiKeyEnc, kimiKeySet, deepseekKeyEnc, deepseekKeySet, qweatherKeyEncrypted, qweatherKeySet] = await Promise.all([
+            db.getSetting('kimi_api_key_encrypted'),
+            db.getSetting('kimi_api_key_set'),
+            db.getSetting('deepseek_api_key_encrypted'),
+            db.getSetting('deepseek_api_key_set'),
+            db.getSetting('qweather_api_key_encrypted'),
+            db.getSetting('qweather_api_key_set')
+        ]);
+        // crypto_master_key 不再同步到云端（方案A：每设备独立密钥）
+        if (kimiKeyEnc) settings.kimi_api_key_encrypted = kimiKeyEnc;
+        if (kimiKeySet) settings.kimi_api_key_set = kimiKeySet;
+        if (deepseekKeyEnc) settings.deepseek_api_key_encrypted = deepseekKeyEnc;
+        if (deepseekKeySet) settings.deepseek_api_key_set = deepseekKeySet;
+        if (qweatherKeyEncrypted) settings.qweather_api_key_encrypted = qweatherKeyEncrypted;
+        if (qweatherKeySet) settings.qweather_api_key_set = qweatherKeySet;
+
+            const syncData = {
+                sync_time: new Date().toISOString(),
+                items: allItems,
+                settings: settings,
+                memo: SafeStorage.get('office_memo_content') || '',
+                schedule: SafeStorage.get('office_schedule_content') || '',
+                links: SafeStorage.get('office_links') || '',
+                contacts: SafeStorage.get('office_contacts') || '',
+                countdownEvents: SafeStorage.get('office_countdown_events') || '[]',
+                countdownTypeColors: SafeStorage.get('office_countdown_type_colors') || '{}',
+                countdownSortOrder: SafeStorage.get('office_countdown_sort_order') || '[]',
+                tools: SafeStorage.get('office_tools') || '',
+                weatherCity: SafeStorage.get('office_weather_city') || '',
+                alarms: SafeStorage.get('office_alarms') || '[]',
+                theme: SafeStorage.get('theme') || '',
+                device_info: navigator.userAgent
+            };
             if (progressCallback) progressCallback('正在上传到云端...');
 
             const upsertData = {
@@ -2065,17 +2279,90 @@ class SyncManager {
             // 同步设置数据（API Key等）
             await this._restoreSettingsFromCloud(data.data.settings);
 
-            // 写入辅助数据
-            this._applySideData(data.data, {
-                checkDiff: false,
-                applyDeletedItems: true,
-                updateStickyDashData: true,
-                dispatchTools: false,
-                source: 'syncFromCloud'
-            });
+            // 同步备忘录
+            if (data.data.memo !== undefined) {
+                SafeStorage.set('office_memo_content', data.data.memo);
+                document.dispatchEvent(new CustomEvent('memoSynced', { 
+                    detail: { content: data.data.memo } 
+                }));
+
+            }
+
+            // 同步日程
+            if (data.data.schedule !== undefined) {
+                SafeStorage.set('office_schedule_content', data.data.schedule);
+                document.dispatchEvent(new CustomEvent('scheduleSynced', { 
+                    detail: { content: data.data.schedule } 
+                }));
+            }
+
+            // 同步网站
+            if (data.data.links !== undefined) {
+                SafeStorage.set('office_links', data.data.links);
+                document.dispatchEvent(new CustomEvent('linksSynced', {
+                    detail: { links: safeJsonParse(data.data.links, []) }
+                }));
+
+            }
+
+            // 同步通讯录
+            if (data.data.contacts !== undefined) {
+                SafeStorage.set('office_contacts', data.data.contacts);
+                document.dispatchEvent(new CustomEvent('contactsSynced', {
+                    detail: { contacts: safeJsonParse(data.data.contacts, []) }
+                }));
+
+            }
+
+            // 同步倒数日
+            if (data.data.countdownEvents !== undefined) {
+                SafeStorage.set('office_countdown_events', data.data.countdownEvents || '[]');
+            }
+
+            if (data.data.countdownTypeColors !== undefined) {
+                SafeStorage.set('office_countdown_type_colors', data.data.countdownTypeColors || '{}');
+            }
+
+            if (data.data.countdownSortOrder !== undefined) {
+                SafeStorage.set('office_countdown_sort_order', data.data.countdownSortOrder || '[]');
+            }
+
+            if (data.data.tools !== undefined) {
+                SafeStorage.set('office_tools', data.data.tools);
+            }
+
+            if (data.data.weatherCity !== undefined) {
+                SafeStorage.set('office_weather_city', data.data.weatherCity);
+            }
+
+            if (data.data.alarms !== undefined) {
+                const mergedAlarms = this._mergeAlarms(SafeStorage.get('office_alarms') || '[]', data.data.alarms);
+                SafeStorage.set('office_alarms', mergedAlarms);
+                document.dispatchEvent(new CustomEvent('alarmsSynced', {
+                    detail: { alarms: safeJsonParse(mergedAlarms || '[]', []) }
+                }));
+            }
+
+            if (data.data.theme !== undefined) {
+                SafeStorage.set('theme', data.data.theme);
+                document.documentElement.setAttribute('data-theme', data.data.theme);
+            }
+
+            document.dispatchEvent(new CustomEvent('countdownSynced', {
+                detail: {
+                    events: safeJsonParse(data.data.countdownEvents || '[]', []),
+                    colors: safeJsonParse(data.data.countdownTypeColors || '{}', {}),
+                    sortOrder: safeJsonParse(data.data.countdownSortOrder || '[]', [])
+                }
+            }));
 
             // 同步事项数据
             const cloudItems = data.data.items || [];
+
+            if (data.data.deletedItems && typeof data.data.deletedItems === 'object') {
+                this.deletedItemsMap = { ...this.deletedItemsMap, ...data.data.deletedItems };
+                this.persistDeletedItemsMap();
+            }
 
             // 先对云端数据本身去重
             const deduplicatedCloudItems = this.deduplicateItems(cloudItems);
@@ -2196,8 +2483,7 @@ class SyncManager {
                 const titleMatch = cloudTitle === localTitle ||
                                    cloudTitle.includes(localTitle) ||
                                    localTitle.includes(cloudTitle);
-                if (titleMatch && local.deadline === cloudItem.deadline
-                    && (!local.deadline && !cloudItem.deadline ? local.date === cloudItem.date : true)) {
+                if (titleMatch && local.deadline === cloudItem.deadline) {
                     return { isDuplicate: true, existingItem: local };
                 }
             } else if (cloudItem.type === 'document') {
@@ -2294,7 +2580,7 @@ class SyncManager {
             }
 
             if (data.sideData && typeof data.sideData === 'object') {
-                this._applyBackupSideData(data.sideData);
+                this._applySideData(data.sideData);
             }
 
             this.clearDeletedItemsMap();
@@ -2483,9 +2769,8 @@ class SyncManager {
 
     _collectSideDataForBackup() {
         const keys = ['office_tools', 'office_links', 'office_contacts', 'office_memo_content',
-            'office_schedule_content', 'office_sticky_note', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
-            'office_weather_city', 'office_alarms', 'theme',
-            'office_custom_pets', 'office_custom_quotes'];
+            'office_schedule_content', 'office_countdown_events', 'office_countdown_type_colors', 'office_countdown_sort_order',
+            'office_weather_city', 'office_alarms', 'theme'];
         const result = {};
         for (const k of keys) {
             const v = localStorage.getItem(k);
@@ -2535,7 +2820,13 @@ class SyncManager {
                 tx.onabort = () => reject(new Error('恢复备份事务中止'));
             });
             this.clearDeletedItemsMap();
-            this._applyBackupSideData(backup.sideData || {});
+            this._applySideData(backup.sideData || {}, {
+                dispatchMemo: true,
+                dispatchSchedule: true,
+                dispatchLinks: true,
+                dispatchContacts: true,
+                dispatchCountdown: true
+            });
             this._resetSyncBaseline(restoreTime);
             this._setImportProtection('restore-backup');
             db.resetItemsCache();
@@ -2569,20 +2860,6 @@ class SyncManager {
             console.error('导出备份失败:', e);
             return null;
         }
-    }
-
-    // 从 JSON 格式的便签数据中提取当前页内容（兼容旧纯文本格式）
-    _stickyCurrentContent(raw) {
-        if (!raw) return '';
-        if (raw.startsWith('{')) {
-            try {
-                const data = JSON.parse(raw);
-                if (data.pages && Array.isArray(data.pages)) {
-                    return data.pages[data.currentPage || 0] || '';
-                }
-            } catch (_) {}
-        }
-        return raw;
     }
 }
 
