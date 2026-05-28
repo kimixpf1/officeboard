@@ -2,6 +2,25 @@
 
 ## 已完成
 
+### v5.2.119 无deadline待办周/月视图不显示+举一反三16处修复
+- [x] calendar.js 3处：getItemDateSpan fallback + 拖拽 + 点击
+- [x] context-menu.js 4处：移动到+复制+try块修复
+- [x] app.js 3处：类型转换+拖拽移动+document→todo
+- [x] sync.js 2处：哈希+去重
+- [x] report.js 1处：getItemDate fallback
+- [x] upload-flow.js 1处：设deadline同时设date
+- [x] recurring.js 1处：周期任务设deadline同时设date
+- [x] Code review: CRITICAL+HIGH已修复
+- [x] 已提交推送 `c51f6d3`
+
+### v5.2.116 闹钟删除后被sync回加+dismiss保护窗口
+- [x] _mergeAlarms: 本地10秒内编辑过时不回加云端"新"闹钟
+- [x] dismiss保护窗口: 3分钟→10分钟
+- [x] dismiss不再短路所有闹钟检查，只跳过被关闭的那个
+- [x] 版本号 v5.2.116
+- [x] Code review: HIGH已修复（dismiss短路问题）
+- [x] 已提交推送 `2696c4f`
+
 ### v5.2.115 备忘录/日程编辑时云端同步覆盖修复
 - [x] sync.js _applySideData 增加 memo/schedule 焦点检测
 - [x] 统一便签模式：localStorage始终写入，只跳过事件派发

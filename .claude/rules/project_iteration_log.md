@@ -1,3 +1,36 @@
+## 2026-05-27 v5.2.119 无deadline待办周/月视图不显示+举一反三16处修复
+
+### 改动内容
+1. **根因**：`calendar.js` 的 `getItemDateSpan()` 对 todo 只检查 `item.deadline`，v5.2.96起待办可不设截止时间，v5.2.100起会设 `item.date = selectedDate`，但周/月视图缺少 `item.date → item.createdAt` 的 fallback 链，导致无截止时间待办被直接跳过
+2. **修复模式**：凡只检查 `deadline` 的地方补充 `date → createdAt` fallback；凡写入 `deadline` 的地方同时写入 `date`
+3. **影响文件7个，修复点16处**：
+   - `calendar.js`: getItemDateSpan fallback + 拖拽同日判断 + 点击跳转日期（3处）
+   - `context-menu.js`: 移动到日期取值fallback + 写入date + 复制设date + try块修复（4处）
+   - `app.js`: 类型转换fallback + 拖拽移动设date + document→todo设date（3处）
+   - `sync.js`: 哈希含date + 去重比较date（2处）
+   - `report.js`: getItemDate fallback（1处）
+   - `upload-flow.js`: 设deadline同时设date（1处）
+   - `recurring.js`: 周期任务设deadline同时设date（1处）
+
+### 代码审查
+- ✅ Code review: 1 CRITICAL（context-menu.js try块缺失）+ 1 HIGH（document→todo缺date）已修复
+- ✅ 语法检查 7/7 全部通过
+
+### 提交记录
+- `c51f6d3` fix: 无deadline待办周/月视图不显示+举一反三15处同类修复(v5.2.119)
+
+### 验证清单
+- [ ] 无截止时间待办在周视图显示在对应日期
+- [ ] 无截止时间待办在月视图显示在对应日期
+- [ ] 有截止时间待办在周/月视图显示不受影响
+- [ ] 日历拖拽无截止时间待办正常工作
+- [ ] 右键"移动到日期"正常写入
+- [ ] 右键复制无截止时间待办到新日期正常
+- [ ] 类型转换日期不丢失
+- [ ] 版本号 v5.2.119
+
+---
+
 ## 2026-05-27 v5.2.118 置顶完成后排序+提醒框✓按钮卡顿
 
 ### 改动内容

@@ -79,32 +79,94 @@ class CalendarView {
     }
 
     /**
-     * 排序事项：未完成优先，再按类型（待办→会议→文件），再按时间
+     * 排序事项：与日视图保持一致的四桶排序
+     * pinned(0) → normal(1) → sunk(2) → completed(3)
      */
     sortItems(items) {
-        const typeOrder = { todo: 1, meeting: 2, document: 3 };
+        const dashboardApp = this.getDashboardApp();
+        const getBucket = (item) => {
+            if (this.isItemCompleted(item)) return 3;
+            if (item.pinned) return 0;
+            if (item.sunk) return 2;
+            return 1;
+        };
 
-        return items.sort((a, b) => {
-            const completedA = this.isItemCompleted(a) ? 1 : 0;
-            const completedB = this.isItemCompleted(b) ? 1 : 0;
-            if (completedA !== completedB) {
-                return completedA - completedB;
-            }
+        const hasManualOrder = (item) => item.order !== undefined && item.order !== null && item.manualOrder === true;
 
-            const typeA = typeOrder[a.type] || 99;
-            const typeB = typeOrder[b.type] || 99;
-            if (typeA !== typeB) {
-                return typeA - typeB;
-            }
-
-            if (a.type === 'meeting' && b.type === 'meeting') {
-                return this.compareMeetingsByBoardOrder(a, b);
-            }
-
-            const timeA = this.getItemTime(a);
-            const timeB = this.getItemTime(b);
-            return timeA.localeCompare(timeB);
+        // 分桶
+        const buckets = new Map([[0, []], [1, []], [2, []], [3, []]]);
+        items.forEach(item => {
+            const b = getBucket(item);
+            buckets.get(b).push(item);
         });
+
+        const sorted = [];
+        [0, 1, 2, 3].forEach(bucket => {
+            const bucketItems = buckets.get(bucket);
+
+            // 同桶内 pinned 排前面（与日视图 sortMeetingItems 一致）
+            bucketItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+            // 分离会议和非会议
+            const meetings = bucketItems.filter(i => i.type === 'meeting');
+            const others = bucketItems.filter(i => i.type !== 'meeting');
+
+            // 会议：与日视图 sortMeetingItems 逻辑一致
+            if (meetings.length > 0) {
+                const cmpDefault = (a, b) => dashboardApp ? dashboardApp.compareMeetingsByDefaultOrder(a, b) : this.compareMeetingsByBoardOrder(a, b);
+                const manualItems = meetings.filter(i => hasManualOrder(i))
+                    .sort((a, b) => {
+                        if (a.order !== b.order) return a.order - b.order;
+                        return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
+                    });
+                const insertItems = meetings.filter(i => !hasManualOrder(i))
+                    .sort(cmpDefault);
+
+                if (manualItems.length === 0) {
+                    sorted.push(...insertItems);
+                } else if (insertItems.length === 0) {
+                    sorted.push(...manualItems);
+                } else {
+                    const merged = [];
+                    let mi = 0, ii = 0;
+                    while (mi < manualItems.length && ii < insertItems.length) {
+                        if (cmpDefault(insertItems[ii], manualItems[mi]) < 0) {
+                            merged.push(insertItems[ii++]);
+                        } else {
+                            merged.push(manualItems[mi++]);
+                        }
+                    }
+                    merged.push(...manualItems.slice(mi), ...insertItems.slice(ii));
+                    sorted.push(...merged);
+                }
+            }
+
+            // 非会议：与日视图 renderColumn 非会议排序一致
+            others.sort((a, b) => {
+                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+
+                const pw = { high: 0, medium: 1, low: 2 };
+                const pwA = pw[a.priority] ?? 1;
+                const pwB = pw[b.priority] ?? 1;
+                if (pwA !== pwB) return pwA - pwB;
+
+                const aHas = a.order !== undefined && a.order !== null;
+                const bHas = b.order !== undefined && b.order !== null;
+                if (aHas && bHas) {
+                    if (a.order !== b.order) return a.order - b.order;
+                    return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
+                }
+                if (aHas && !bHas) return -1;
+                if (bHas && !aHas) return 1;
+
+                const timeA = this.getItemTime(a);
+                const timeB = this.getItemTime(b);
+                return timeA.localeCompare(timeB);
+            });
+            sorted.push(...others);
+        });
+
+        return sorted;
     }
 
     /**
