@@ -1780,7 +1780,7 @@ class SyncManager {
             throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
         }
 
-        const email = `${username}@office.local`;
+        const email = `${username}@officeboard.app`;
 
 
         try {
@@ -1848,7 +1848,7 @@ class SyncManager {
             throw new Error(errorMsg);
         }
 
-        const email = `${username}@office.local`;
+        const email = `${username}@officeboard.app`;
 
         try {
             const { data, error } = await this.supabase.auth.signInWithPassword({
@@ -1909,7 +1909,7 @@ class SyncManager {
             throw new Error('网络服务不可用，请检查网络连接后刷新页面重试');
         }
 
-        const email = `${username}@office.local`;
+        const email = `${username}@officeboard.app`;
 
         try {
             // 1. 先验证原密码（尝试登录）
