@@ -79,77 +79,96 @@ class CalendarView {
     }
 
     /**
-     * 排序事项：与日视图保持一致的四桶排序
-     * pinned(0) → normal(1) → sunk(2) → completed(3)
+     * 排序事项：先按类型分组（待办→会议→办文），每组内按日视图排序
      */
     sortItems(items) {
         const dashboardApp = this.getDashboardApp();
-        const getBucket = (item) => {
-            if (this.isItemCompleted(item)) return 3;
-            if (item.pinned) return 0;
-            if (item.sunk) return 2;
-            return 1;
-        };
-
+        const typeOrder = { todo: 0, meeting: 1, document: 2 };
         const hasManualOrder = (item) => item.order !== undefined && item.order !== null && item.manualOrder === true;
 
-        // 分桶
-        const buckets = new Map([[0, []], [1, []], [2, []], [3, []]]);
+        // 按类型分组
+        const groups = { todo: [], meeting: [], document: [] };
         items.forEach(item => {
-            const b = getBucket(item);
-            buckets.get(b).push(item);
+            const g = groups[item.type];
+            if (g) g.push(item);
         });
 
         const sorted = [];
-        [0, 1, 2, 3].forEach(bucket => {
-            const bucketItems = buckets.get(bucket);
 
-            // 同桶内 pinned 排前面（与日视图 sortMeetingItems 一致）
-            bucketItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+        // 每个类型内按日视图排序
+        ['todo', 'meeting', 'document'].forEach(type => {
+            const groupItems = groups[type];
 
-            // 分离会议和非会议
-            const meetings = bucketItems.filter(i => i.type === 'meeting');
-            const others = bucketItems.filter(i => i.type !== 'meeting');
-
-            // 会议：与日视图 sortMeetingItems 逻辑一致
-            if (meetings.length > 0) {
+            // 会议：与日视图 sortMeetingItems 一致——四桶+手动排序+领导优先级合并
+            if (type === 'meeting' && groupItems.length > 0) {
+                const getBucket = (item) => {
+                    if (this.isItemCompleted(item)) return 3;
+                    if (item.pinned) return 0;
+                    if (item.sunk) return 2;
+                    return 1;
+                };
                 const cmpDefault = (a, b) => dashboardApp ? dashboardApp.compareMeetingsByDefaultOrder(a, b) : this.compareMeetingsByBoardOrder(a, b);
-                const manualItems = meetings.filter(i => hasManualOrder(i))
-                    .sort((a, b) => {
-                        if (a.order !== b.order) return a.order - b.order;
-                        return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
-                    });
-                const insertItems = meetings.filter(i => !hasManualOrder(i))
-                    .sort(cmpDefault);
 
-                if (manualItems.length === 0) {
-                    sorted.push(...insertItems);
-                } else if (insertItems.length === 0) {
-                    sorted.push(...manualItems);
-                } else {
-                    const merged = [];
-                    let mi = 0, ii = 0;
-                    while (mi < manualItems.length && ii < insertItems.length) {
-                        if (cmpDefault(insertItems[ii], manualItems[mi]) < 0) {
-                            merged.push(insertItems[ii++]);
-                        } else {
-                            merged.push(manualItems[mi++]);
+                const buckets = new Map([[0, []], [1, []], [2, []], [3, []]]);
+                groupItems.forEach(item => buckets.get(getBucket(item)).push(item));
+
+                [0, 1, 2, 3].forEach(bucket => {
+                    const bucketItems = buckets.get(bucket);
+                    // 同桶内 pinned 排前面
+                    bucketItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+                    const manualItems = bucketItems.filter(i => hasManualOrder(i))
+                        .sort((a, b) => {
+                            if (a.order !== b.order) return a.order - b.order;
+                            return this.getComparableTimestamp(a.createdAt) - this.getComparableTimestamp(b.createdAt);
+                        });
+                    const insertItems = bucketItems.filter(i => !hasManualOrder(i))
+                        .sort(cmpDefault);
+
+                    if (manualItems.length === 0) {
+                        sorted.push(...insertItems);
+                    } else if (insertItems.length === 0) {
+                        sorted.push(...manualItems);
+                    } else {
+                        const merged = [];
+                        let mi = 0, ii = 0;
+                        while (mi < manualItems.length && ii < insertItems.length) {
+                            if (cmpDefault(insertItems[ii], manualItems[mi]) < 0) {
+                                merged.push(insertItems[ii++]);
+                            } else {
+                                merged.push(manualItems[mi++]);
+                            }
                         }
+                        merged.push(...manualItems.slice(mi), ...insertItems.slice(ii));
+                        sorted.push(...merged);
                     }
-                    merged.push(...manualItems.slice(mi), ...insertItems.slice(ii));
-                    sorted.push(...merged);
-                }
+                });
+                return;
             }
 
-            // 非会议：与日视图 renderColumn 非会议排序一致
-            others.sort((a, b) => {
+            // 非会议（todo/document）：与日视图 renderColumn 非会议排序一致
+            groupItems.sort((a, b) => {
+                // 四桶：pinned→normal→sunk→completed
+                const getBucket = (item) => {
+                    if (this.isItemCompleted(item)) return 3;
+                    if (item.pinned) return 0;
+                    if (item.sunk) return 2;
+                    return 1;
+                };
+                const bucketA = getBucket(a);
+                const bucketB = getBucket(b);
+                if (bucketA !== bucketB) return bucketA - bucketB;
+
+                // 同桶内 pinned 排前面
                 if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
 
+                // priority 权重
                 const pw = { high: 0, medium: 1, low: 2 };
                 const pwA = pw[a.priority] ?? 1;
                 const pwB = pw[b.priority] ?? 1;
                 if (pwA !== pwB) return pwA - pwB;
 
+                // 手动 order
                 const aHas = a.order !== undefined && a.order !== null;
                 const bHas = b.order !== undefined && b.order !== null;
                 if (aHas && bHas) {
@@ -159,11 +178,12 @@ class CalendarView {
                 if (aHas && !bHas) return -1;
                 if (bHas && !aHas) return 1;
 
+                // 按时间
                 const timeA = this.getItemTime(a);
                 const timeB = this.getItemTime(b);
                 return timeA.localeCompare(timeB);
             });
-            sorted.push(...others);
+            sorted.push(...groupItems);
         });
 
         return sorted;
