@@ -2,6 +2,30 @@
 
 ## 已完成
 
+### v5.2.122 周/月视图排序先按类型分组再桶排序
+- [x] sortItems() 重构：先按类型分组(待办→会议→办文)再各自桶排序
+- [x] 会议组：四桶+手动排序+领导优先级合并
+- [x] 待办/办文组：四桶+priority+order+时间
+- [x] Code review: APPROVE(0C/0H/2M/1L)
+- [x] 已提交推送 `bbe29c6`
+
+### v5.2.121 Supabase数据库迁移——带宽超限二次触发
+- [x] 新建Supabase项目 pfomqdegassaqxdyyweo
+- [x] 执行建表SQL（user_data + RLS 4策略 + 触发器）
+- [x] 更新 sync.js URL + anon key（3个文件）
+- [x] 旧项目引用全清除
+- [x] Code review: APPROVE
+- [x] 已提交推送 `0519c7f`
+- [ ] 用户重新注册验证
+
+### v5.2.120 周/月视图排序与日视图不一致修复
+- [x] calendar.js sortItems() 复刻日视图四桶排序：pinned(0)→normal(1)→sunk(2)→completed(3)
+- [x] 会议：手动排序+领导优先级合并（同sortMeetingItems）
+- [x] 非会议：pinned→priority权重→order→createdAt（同renderColumn）
+- [x] 用getDashboardApp()+null保护替代裸app引用
+- [x] Code review: 2 HIGH已修复（裸app引用+缺pinned子排序）
+- [x] 已提交推送 `01d31b6`
+
 ### v5.2.119 无deadline待办周/月视图不显示+举一反三16处修复
 - [x] calendar.js 3处：getItemDateSpan fallback + 拖拽 + 点击
 - [x] context-menu.js 4处：移动到+复制+try块修复
