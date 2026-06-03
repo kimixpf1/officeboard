@@ -2665,3 +2665,30 @@ mark.highlight {
     margin-top: 4px;
 }
 /* ========== 右键/长按上下文菜单结束 ========== */
+
+/* ========== 截图识别遮罩 ========== */
+.screenshot-hint {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 100000;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.screenshot-size {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 100001;
+}
+/* ========== 截图识别遮罩结束 ========== */
