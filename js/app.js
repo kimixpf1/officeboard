@@ -429,10 +429,20 @@ class OfficeDashboard {
         document.getElementById('fileInput')?.addEventListener('change', (e) => this.handleFileUpload(e));
 
         // 右键上传按钮 → 截图识别
-        document.getElementById('uploadBtn')?.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            this.startScreenCapture();
-        });
+        const uploadBtn = document.getElementById('uploadBtn');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[截图] 右键上传按钮触发，开始截图识别');
+                this.startScreenCapture().catch(err => {
+                    console.error('[截图] startScreenCapture 失败:', err);
+                    this.showToast('截图失败: ' + err.message, 'error');
+                });
+            });
+        } else {
+            console.warn('[截图] uploadBtn 元素未找到');
+        }
 
         // 视图切换
         document.querySelectorAll('.view-btn').forEach(btn => {
@@ -4551,8 +4561,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-04 v5.2.125';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=248', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-06-04 v5.2.126';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=249', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
