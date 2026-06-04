@@ -437,7 +437,7 @@ class OfficeDashboard {
                 console.log('[截图] 右键上传按钮触发，开始截图识别');
                 this.startScreenCapture().catch(err => {
                     console.error('[截图] startScreenCapture 失败:', err);
-                    this.showToast('截图失败: ' + err.message, 'error');
+                    this.showMessage('截图失败: ' + err.message, 'error');
                 });
             });
         } else {
@@ -2597,7 +2597,7 @@ class OfficeDashboard {
             const target = document.body;
             let html2canvasLib = window.html2canvas;
             if (!html2canvasLib) {
-                this.showToast('正在加载截图引擎...', 'info');
+                this.showMessage('正在加载截图引擎...', 'info');
                 await new Promise((resolve, reject) => {
                     const script = document.createElement('script');
                     script.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
@@ -2731,7 +2731,7 @@ class OfficeDashboard {
                 cleanup();
 
                 if (w < 20 || h < 20) {
-                    this.showToast('选区太小，请重新截图框选', 'warning');
+                    this.showMessage('选区太小，请重新截图框选', 'info');
                     return;
                 }
 
@@ -2746,7 +2746,7 @@ class OfficeDashboard {
                 );
 
                 cropCanvas.toBlob(async (blob) => {
-                    if (!blob) { this.showToast('截图处理失败', 'error'); return; }
+                    if (!blob) { this.showMessage('截图处理失败', 'error'); return; }
                     const file = new File([blob], 'screenshot_' + Date.now() + '.png', { type: 'image/png' });
                     const dt = new DataTransfer();
                     dt.items.add(file);
@@ -2766,7 +2766,7 @@ class OfficeDashboard {
             document.addEventListener('keydown', onKeyDown);
         } catch (err) {
             console.error('截图失败:', err);
-            this.showToast('截图失败: ' + err.message, 'error');
+            this.showMessage('截图失败: ' + err.message, 'error');
         }
     }
 
@@ -4561,7 +4561,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-04 v5.2.126';
+        const version = '2026-06-04 v5.2.127';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=249', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
