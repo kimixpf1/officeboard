@@ -2579,17 +2579,28 @@ class OfficeDashboard {
     }
 
     /**
-     * 右键上传按钮 → 截图识别
-     */
-    /**
      * 右键上传按钮 → 截图识别（像微信Alt+A，直接框选当前页面区域）
      */
     async startScreenCapture() {
         try {
-            // 用html2canvas截取当前页面
+            // 用html2canvas截取当前页面（复用已加载实例，避免重复下载）
             const target = document.body;
-            const html2canvas = (await import('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')).default;
-            const fullCanvas = await html2canvas(target, {
+            let html2canvasLib = window.html2canvas;
+            if (!html2canvasLib) {
+                this.showToast('正在加载截图引擎...', 'info');
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('截图库加载失败，请检查网络'));
+                    document.head.appendChild(script);
+                });
+                html2canvasLib = window.html2canvas;
+            }
+            if (!html2canvasLib) {
+                throw new Error('html2canvas 加载失败');
+            }
+            const fullCanvas = await html2canvasLib(target, {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: null,
@@ -4525,8 +4536,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-03 v5.2.123';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=246', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-06-04 v5.2.124';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=247', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
