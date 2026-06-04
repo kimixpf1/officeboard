@@ -2600,13 +2600,28 @@ class OfficeDashboard {
             if (!html2canvasLib) {
                 throw new Error('html2canvas 加载失败');
             }
-            const fullCanvas = await html2canvasLib(target, {
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: null,
-                scale: 1,
-                logging: false
-            });
+
+            // 先弹 loading 遮罩，告诉用户正在截图
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;cursor:wait;';
+            const loadingBox = document.createElement('div');
+            loadingBox.style.cssText = 'background:rgba(0,0,0,0.8);color:#fff;padding:16px 32px;border-radius:8px;font-size:15px;';
+            loadingBox.textContent = '📷 正在截取页面...';
+            loadingOverlay.appendChild(loadingBox);
+            document.body.appendChild(loadingOverlay);
+
+            let fullCanvas;
+            try {
+                fullCanvas = await html2canvasLib(target, {
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null,
+                    scale: 1,
+                    logging: false
+                });
+            } finally {
+                loadingOverlay.remove();
+            }
 
             // 创建全屏遮罩
             const overlay = document.createElement('div');
@@ -4536,8 +4551,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-04 v5.2.124';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=247', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-06-04 v5.2.125';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=248', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
