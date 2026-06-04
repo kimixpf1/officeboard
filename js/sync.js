@@ -885,10 +885,10 @@ class SyncManager {
 
 
 
-            // 2. 获取云端数据和时间戳
+            // 2. 获取云端数据和时间戳（只读必要字段，减少传输量）
             const { data: cloudData, error } = await this.supabase
                 .from('user_data')
-                .select('*')
+                .select('data,updated_at')
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 
@@ -1089,11 +1089,16 @@ class SyncManager {
                 }
             }
 
-            const { data: existingRow } = await this.supabase
-                .from('user_data')
-                .select('*')
-                .eq('user_id', this.currentUser.id)
-                .maybeSingle();
+            // 合并双重select：优先复用已有的existingCloudData，避免重复查询
+            let existingRow = existingCloudData;
+            if (!existingRow) {
+                const { data } = await this.supabase
+                    .from('user_data')
+                    .select('data,updated_at')
+                    .eq('user_id', this.currentUser.id)
+                    .maybeSingle();
+                existingRow = data;
+            }
 
             if (existingRow?.data?.deletedItems && typeof existingRow.data.deletedItems === 'object') {
                 this.deletedItemsMap = { ...this.deletedItemsMap, ...existingRow.data.deletedItems };
@@ -1493,12 +1498,12 @@ class SyncManager {
             clearInterval(this.periodicSyncTimer);
         }
 
-        // 每20秒检查一次，缩短跨设备同步延迟，并兼容移动端实时通道失活场景
+        // 每5分钟检查一次兜底同步（Realtime做主同步，定时仅兜底，大幅减少带宽）
         this.periodicSyncTimer = setInterval(async () => {
             if (this.isLoggedIn() && !this.isSyncing) {
                 await this.smartSync();
             }
-        }, 30000);
+        }, 300000);
     }
 
     /**
@@ -1616,11 +1621,18 @@ class SyncManager {
         }
 
         this.lifecycleHandlersBound = true;
+        this._lastLifecycleSync = 0;
 
         const resumeSync = async () => {
             if (!this.isLoggedIn() || this.isSyncing) {
                 return;
             }
+            // 节流：30秒内只允许一次生命周期触发的同步（防 visibilitychange+focus+pageshow 叠加风暴）
+            const now = Date.now();
+            if (now - this._lastLifecycleSync < 30000) {
+                return;
+            }
+            this._lastLifecycleSync = now;
             try {
                 this.initRealtimeSubscription();
                 await this.smartSync();
@@ -1668,7 +1680,7 @@ class SyncManager {
         try {
             const { data, error } = await this.supabase
                 .from('user_data')
-                .select('*')
+                .select('data,updated_at')
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 
@@ -2041,7 +2053,7 @@ class SyncManager {
             // 查询当前用户数据
             const { data, error } = await this.supabase
                 .from('user_data')
-                .select('*')
+                .select('data,updated_at')
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
 

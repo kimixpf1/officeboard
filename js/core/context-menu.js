@@ -146,7 +146,7 @@ const ContextMenuCore = {
             if (!html2canvasLib) {
                 await new Promise((resolve, reject) => {
                     const script = document.createElement('script');
-                    script.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+                    script.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js';
                     script.onload = resolve;
                     script.onerror = () => reject(new Error('截图库加载失败'));
                     document.head.appendChild(script);

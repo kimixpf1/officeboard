@@ -1704,6 +1704,10 @@ class OCRManager {
                     throw new Error('PDF中未检测到文字，可能是扫描件。请尝试截图后上传图片。');
                 }
 
+                // 确保 API Key 已从加密存储恢复到内存（图片分支有此步骤，PDF分支之前遗漏）
+                if (!this.getApiKey()) {
+                    await this.loadApiKeysFromDB();
+                }
                 // AI解析
                 if (progressCallback) progressCallback('正在用AI分析内容...');
                 items = await this.parseWithOCRAndAI(text, file.name, progressCallback);
