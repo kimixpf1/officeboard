@@ -2581,54 +2581,54 @@ class OfficeDashboard {
     /**
      * 右键上传按钮 → 截图识别
      */
+    /**
+     * 右键上传按钮 → 截图识别（像微信Alt+A，直接框选当前页面区域）
+     */
     async startScreenCapture() {
-        if (!navigator.mediaDevices?.getDisplayMedia) {
-            this.showToast('当前浏览器不支持截图功能', 'error');
-            return;
-        }
-
         try {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'never' } });
-            const track = stream.getVideoTracks()[0];
-            const imageCapture = new ImageCapture(track);
-            const bitmap = await imageCapture.grabFrame();
-            track.stop();
+            // 用html2canvas截取当前页面
+            const target = document.body;
+            const html2canvas = (await import('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')).default;
+            const fullCanvas = await html2canvas(target, {
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: null,
+                scale: 1,
+                logging: false
+            });
 
-            // 创建全屏遮罩Canvas
+            // 创建全屏遮罩
             const overlay = document.createElement('div');
-            overlay.className = 'screenshot-overlay';
             overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;cursor:crosshair;';
 
-            const canvas = document.createElement('canvas');
-            canvas.width = window.innerWidth * devicePixelRatio;
-            canvas.height = window.innerHeight * devicePixelRatio;
-            canvas.style.cssText = 'width:100vw;height:100vh;';
-
-            const ctx = canvas.getContext('2d');
-            // 绘制截图缩放到视口大小
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            // 底层：截图 + 半透明遮罩
+            const bgCanvas = document.createElement('canvas');
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+            bgCanvas.style.cssText = 'width:100vw;height:100vh;';
+            const bgCtx = bgCanvas.getContext('2d');
+            // 将html2canvas的完整截图绘制到底层Canvas（缩放到视口大小）
+            bgCtx.drawImage(fullCanvas, 0, 0, bgCanvas.width, bgCanvas.height);
             // 半透明遮罩
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            bgCtx.fillStyle = 'rgba(0,0,0,0.4)';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            overlay.appendChild(bgCanvas);
 
-            overlay.appendChild(canvas);
+            // 上层：选区（拖拽时从原图绘制清晰区域 + 边框）
+            const selCanvas = document.createElement('canvas');
+            selCanvas.width = bgCanvas.width;
+            selCanvas.height = bgCanvas.height;
+            selCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100vw;height:100vh;pointer-events:none;';
+            overlay.appendChild(selCanvas);
+            const selCtx = selCanvas.getContext('2d');
 
             // 提示文字
             const hint = document.createElement('div');
             hint.className = 'screenshot-hint';
-            hint.textContent = '拖拽选择要识别的区域，按 Esc 取消';
+            hint.textContent = '按住鼠标拖拽选择要识别的区域，按 Esc 取消';
             overlay.appendChild(hint);
 
-            // 选区Canvas（叠加在遮罩上方）
-            const selCanvas = document.createElement('canvas');
-            selCanvas.width = canvas.width;
-            selCanvas.height = canvas.height;
-            selCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100vw;height:100vh;pointer-events:none;';
-            overlay.appendChild(selCanvas);
-
-            const selCtx = selCanvas.getContext('2d');
-
-            // 选区尺寸标签
+            // 尺寸标签
             const sizeLabel = document.createElement('div');
             sizeLabel.className = 'screenshot-size';
             sizeLabel.style.display = 'none';
@@ -2636,8 +2636,19 @@ class OfficeDashboard {
 
             document.body.appendChild(overlay);
 
+            // 截图缩放比例（html2canvas输出可能比视口大或小）
+            const scaleX = fullCanvas.width / window.innerWidth;
+            const scaleY = fullCanvas.height / window.innerHeight;
+
             let startX = 0, startY = 0, dragging = false;
-            const dpr = devicePixelRatio;
+
+            const cleanup = () => {
+                overlay.removeEventListener('mousedown', onMouseDown);
+                overlay.removeEventListener('mousemove', onMouseMove);
+                overlay.removeEventListener('mouseup', onMouseUp);
+                document.removeEventListener('keydown', onKeyDown);
+                overlay.remove();
+            };
 
             const onMouseDown = (e) => {
                 startX = e.clientX;
@@ -2653,25 +2664,23 @@ class OfficeDashboard {
                 const h = Math.abs(e.clientY - startY);
 
                 selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-                // 清晰显示选中区域（从原图绘制）
-                selCtx.drawImage(
-                    bitmap,
-                    x * dpr, y * dpr, w * dpr, h * dpr,
-                    x * dpr, y * dpr, w * dpr, h * dpr
+                // 从原图绘制清晰选区
+                selCtx.drawImage(fullCanvas,
+                    x * scaleX, y * scaleY, w * scaleX, h * scaleY,
+                    x, y, w, h
                 );
-
-                // 选区边框
+                // 蓝色虚线边框
                 selCtx.strokeStyle = '#4f8ff7';
-                selCtx.lineWidth = 2 * dpr;
-                selCtx.setLineDash([6 * dpr, 3 * dpr]);
-                selCtx.strokeRect(x * dpr, y * dpr, w * dpr, h * dpr);
+                selCtx.lineWidth = 2;
+                selCtx.setLineDash([6, 3]);
+                selCtx.strokeRect(x, y, w, h);
                 selCtx.setLineDash([]);
 
                 // 尺寸标签
                 sizeLabel.style.display = 'block';
-                sizeLabel.style.left = `${e.clientX + 10}px`;
-                sizeLabel.style.top = `${e.clientY + 10}px`;
-                sizeLabel.textContent = `${w} × ${h}`;
+                sizeLabel.style.left = (e.clientX + 10) + 'px';
+                sizeLabel.style.top = (e.clientY + 10) + 'px';
+                sizeLabel.textContent = w + ' × ' + h;
             };
 
             const onMouseUp = async (e) => {
@@ -2690,18 +2699,19 @@ class OfficeDashboard {
                     return;
                 }
 
-                // 裁剪选中区域
+                // 裁剪选中区域（从html2canvas原图裁剪，保证清晰度）
                 const cropCanvas = document.createElement('canvas');
-                cropCanvas.width = w * dpr;
-                cropCanvas.height = h * dpr;
+                cropCanvas.width = w * scaleX;
+                cropCanvas.height = h * scaleY;
                 const cropCtx = cropCanvas.getContext('2d');
-                cropCtx.drawImage(bitmap, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
+                cropCtx.drawImage(fullCanvas,
+                    x * scaleX, y * scaleY, w * scaleX, h * scaleY,
+                    0, 0, cropCanvas.width, cropCanvas.height
+                );
 
-                // 转为File对象
                 cropCanvas.toBlob(async (blob) => {
                     if (!blob) { this.showToast('截图处理失败', 'error'); return; }
-                    const file = new File([blob], `screenshot_${Date.now()}.png`, { type: 'image/png' });
-                    // 构造DataTransfer传给handleFileUpload
+                    const file = new File([blob], 'screenshot_' + Date.now() + '.png', { type: 'image/png' });
                     const dt = new DataTransfer();
                     dt.items.add(file);
                     const fileInput = document.getElementById('fileInput');
@@ -2714,23 +2724,13 @@ class OfficeDashboard {
                 if (e.key === 'Escape') cleanup();
             };
 
-            const cleanup = () => {
-                overlay.removeEventListener('mousedown', onMouseDown);
-                overlay.removeEventListener('mousemove', onMouseMove);
-                overlay.removeEventListener('mouseup', onMouseUp);
-                document.removeEventListener('keydown', onKeyDown);
-                overlay.remove();
-            };
-
             overlay.addEventListener('mousedown', onMouseDown);
             overlay.addEventListener('mousemove', onMouseMove);
             overlay.addEventListener('mouseup', onMouseUp);
             document.addEventListener('keydown', onKeyDown);
         } catch (err) {
-            if (err.name !== 'NotAllowedError') {
-                console.error('截图失败:', err);
-                this.showToast('截图失败: ' + err.message, 'error');
-            }
+            console.error('截图失败:', err);
+            this.showToast('截图失败: ' + err.message, 'error');
         }
     }
 
