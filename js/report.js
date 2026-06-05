@@ -329,12 +329,19 @@ class ReportGenerator {
                 });
             }
 
-            const canvas = await html2canvas(container, {
-                scale: 2, // 高清
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
-            });
+            const app = window.officeDashboard;
+            const colorFixes = app ? app._prepareScreenshotColors(container) : [];
+            let canvas;
+            try {
+                canvas = await html2canvas(container, {
+                    scale: 2, // 高清
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+            } finally {
+                if (app) app._restoreScreenshotColors(colorFixes);
+            }
 
             // 下载图片
             const url = canvas.toDataURL('image/png');

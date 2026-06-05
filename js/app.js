@@ -2589,6 +2589,41 @@ class OfficeDashboard {
     }
 
     /**
+     * 截图前预处理：将浏览器computed style中的color()等现代CSS颜色函数转为html2canvas可识别的hex/rgba
+     * 避免html2canvas遇到color()函数时报 "Attempting to parse an unsupported color function" 错误
+     */
+    _prepareScreenshotColors(root = document) {
+        const fixes = [];
+        const ctx = document.createElement('canvas').getContext('2d');
+        const colorProps = ['color', 'background-color', 'border-color', 'outline-color', 'box-shadow'];
+        root.querySelectorAll('*').forEach(el => {
+            const computed = getComputedStyle(el);
+            colorProps.forEach(prop => {
+                const val = computed.getPropertyValue(prop);
+                if (val && val.includes('color(')) {
+                    const fixed = val.replace(/color\([^)]*\)/g, (m) => {
+                        try { ctx.fillStyle = '#000'; ctx.fillStyle = m; return ctx.fillStyle; }
+                        catch(e) { return 'rgba(0,0,0,0)'; }
+                    });
+                    if (fixed !== val) {
+                        fixes.push({ el, prop, orig: el.style.getPropertyValue(prop), origP: el.style.getPropertyPriority(prop) });
+                        el.style.setProperty(prop, fixed, 'important');
+                    }
+                }
+            });
+        });
+        return fixes;
+    }
+
+    /** 截图后恢复原始颜色 */
+    _restoreScreenshotColors(fixes) {
+        fixes.forEach(({ el, prop, orig, origP }) => {
+            if (orig) el.style.setProperty(prop, orig, origP || '');
+            else el.style.removeProperty(prop);
+        });
+    }
+
+    /**
      * 右键上传按钮 → 截图识别（像微信Alt+A，直接框选当前页面区域）
      */
     async startScreenCapture() {
@@ -2621,6 +2656,7 @@ class OfficeDashboard {
             document.body.appendChild(loadingOverlay);
 
             let fullCanvas;
+            const colorFixes = this._prepareScreenshotColors();
             try {
                 fullCanvas = await html2canvasLib(target, {
                     useCORS: true,
@@ -2631,6 +2667,7 @@ class OfficeDashboard {
                 });
             } finally {
                 loadingOverlay.remove();
+                this._restoreScreenshotColors(colorFixes);
             }
 
             // 创建全屏遮罩

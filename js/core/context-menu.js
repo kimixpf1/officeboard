@@ -154,12 +154,18 @@ const ContextMenuCore = {
                 html2canvasLib = window.html2canvas;
             }
 
-            const canvas = await html2canvasLib(container, {
-                scale: 2,
-                backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim() || '#ffffff',
-                useCORS: true,
-                logging: false
-            });
+            const colorFixes = this._prepareScreenshotColors(container);
+            let canvas;
+            try {
+                canvas = await html2canvasLib(container, {
+                    scale: 2,
+                    backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim() || '#ffffff',
+                    useCORS: true,
+                    logging: false
+                });
+            } finally {
+                this._restoreScreenshotColors(colorFixes);
+            }
 
             if (/Mobi|Android|iPhone/i.test(navigator.userAgent) && navigator.share) {
                 canvas.toBlob(async (blob) => {
