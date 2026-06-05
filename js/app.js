@@ -434,9 +434,7 @@ class OfficeDashboard {
             uploadBtn.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[截图] 右键上传按钮触发，开始截图识别');
                 this.startScreenCapture().catch(err => {
-                    console.error('[截图] startScreenCapture 失败:', err);
                     this.showMessage('截图失败: ' + err.message, 'error');
                 });
             });
@@ -2696,57 +2694,76 @@ class OfficeDashboard {
     }
 
     /**
-     * 右键上传按钮 → 截图识别（像微信Alt+A，直接框选当前页面区域）
+     * 右键上传按钮 → 全屏截图识别（像微信Alt+A，可截取任意屏幕/窗口/标签页）
+     * 使用浏览器原生 getDisplayMedia API，无需第三方库
+     * 注：此方法不再依赖 html2canvas，但 report.js 和 context-menu.js 仍使用 html2canvas
      */
     async startScreenCapture() {
+        // 前置检查：浏览器是否支持屏幕捕获
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            this.showMessage('您的浏览器不支持屏幕截图，请使用 Chrome/Edge 浏览器', 'error');
+            return;
+        }
+
+        let stream = null;
         try {
-            // 用html2canvas截取当前页面（多CDN fallback + 本地兜底）
-            const target = document.body;
-            this.showMessage('正在加载截图引擎...', 'info');
-            const html2canvasLib = await this._loadHtml2Canvas();
-
-            // 先弹 loading 遮罩，告诉用户正在截图
-            const loadingOverlay = document.createElement('div');
-            loadingOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;cursor:wait;';
-            const loadingBox = document.createElement('div');
-            loadingBox.style.cssText = 'background:rgba(0,0,0,0.8);color:#fff;padding:16px 32px;border-radius:8px;font-size:15px;';
-            loadingBox.textContent = '📷 正在截取页面...';
-            loadingOverlay.appendChild(loadingBox);
-            document.body.appendChild(loadingOverlay);
-
-            let fullCanvas;
-            const colorFixes = this._prepareScreenshotColors();
+            // 1. 调用系统屏幕选择器（用户选择：全屏/窗口/标签页）
             try {
-                fullCanvas = await html2canvasLib(target, {
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: null,
-                    scale: 1,
-                    logging: false
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: 'never' },
+                    audio: false
                 });
-            } finally {
-                loadingOverlay.remove();
-                this._restoreScreenshotColors(colorFixes);
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    console.log('[截图] 用户取消屏幕选择');
+                    return; // 用户取消，静默返回
+                }
+                throw new Error('无法获取屏幕内容: ' + err.message);
             }
 
-            // 创建全屏遮罩
+            // 2. 从视频流取一帧画面到 Canvas
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.muted = true;
+            await video.play();
+
+            // 等待视频准备好（最多3秒）
+            await new Promise((resolve, reject) => {
+                if (video.readyState >= 2) { resolve(); return; }
+                const timer = setTimeout(() => {
+                    video.removeEventListener('loadeddata', onReady);
+                    if (video.readyState >= 2) resolve();
+                    else reject(new Error('视频流就绪超时，请重试'));
+                }, 3000);
+                const onReady = () => { clearTimeout(timer); resolve(); };
+                video.addEventListener('loadeddata', onReady, { once: true });
+            });
+
+            const fullCanvas = document.createElement('canvas');
+            fullCanvas.width = video.videoWidth;
+            fullCanvas.height = video.videoHeight;
+            const ctx = fullCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            // 立即停止视频流（释放屏幕共享）
+            stream.getTracks().forEach(t => t.stop());
+            stream = null; // 标记已释放
+            video.srcObject = null;
+
+            // 3. 创建全屏框选遮罩（保留原有交互逻辑）
             const overlay = document.createElement('div');
             overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;cursor:crosshair;';
 
-            // 底层：截图 + 半透明遮罩
             const bgCanvas = document.createElement('canvas');
             bgCanvas.width = window.innerWidth;
             bgCanvas.height = window.innerHeight;
             bgCanvas.style.cssText = 'width:100vw;height:100vh;';
             const bgCtx = bgCanvas.getContext('2d');
-            // 将html2canvas的完整截图绘制到底层Canvas（缩放到视口大小）
             bgCtx.drawImage(fullCanvas, 0, 0, bgCanvas.width, bgCanvas.height);
-            // 半透明遮罩
             bgCtx.fillStyle = 'rgba(0,0,0,0.4)';
             bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
             overlay.appendChild(bgCanvas);
 
-            // 上层：选区（拖拽时从原图绘制清晰区域 + 边框）
             const selCanvas = document.createElement('canvas');
             selCanvas.width = bgCanvas.width;
             selCanvas.height = bgCanvas.height;
@@ -2754,13 +2771,11 @@ class OfficeDashboard {
             overlay.appendChild(selCanvas);
             const selCtx = selCanvas.getContext('2d');
 
-            // 提示文字
             const hint = document.createElement('div');
             hint.className = 'screenshot-hint';
             hint.textContent = '按住鼠标拖拽选择要识别的区域，按 Esc 取消';
             overlay.appendChild(hint);
 
-            // 尺寸标签
             const sizeLabel = document.createElement('div');
             sizeLabel.className = 'screenshot-size';
             sizeLabel.style.display = 'none';
@@ -2768,7 +2783,7 @@ class OfficeDashboard {
 
             document.body.appendChild(overlay);
 
-            // 截图缩放比例（html2canvas输出可能比视口大或小）
+            // 缩放比例（截屏分辨率 vs 视口大小）
             const scaleX = fullCanvas.width / window.innerWidth;
             const scaleY = fullCanvas.height / window.innerHeight;
 
@@ -2796,23 +2811,20 @@ class OfficeDashboard {
                 const h = Math.abs(e.clientY - startY);
 
                 selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-                // 从原图绘制清晰选区
                 selCtx.drawImage(fullCanvas,
                     x * scaleX, y * scaleY, w * scaleX, h * scaleY,
                     x, y, w, h
                 );
-                // 蓝色虚线边框
                 selCtx.strokeStyle = '#4f8ff7';
                 selCtx.lineWidth = 2;
                 selCtx.setLineDash([6, 3]);
                 selCtx.strokeRect(x, y, w, h);
                 selCtx.setLineDash([]);
 
-                // 尺寸标签
                 sizeLabel.style.display = 'block';
                 sizeLabel.style.left = (e.clientX + 10) + 'px';
                 sizeLabel.style.top = (e.clientY + 10) + 'px';
-                sizeLabel.textContent = w + ' × ' + h;
+                sizeLabel.textContent = Math.round(w * scaleX) + ' × ' + Math.round(h * scaleY);
             };
 
             const onMouseUp = async (e) => {
@@ -2831,7 +2843,7 @@ class OfficeDashboard {
                     return;
                 }
 
-                // 裁剪选中区域（从html2canvas原图裁剪，保证清晰度）
+                // 裁剪选中区域（从原始截屏裁剪，保证清晰度）
                 const cropCanvas = document.createElement('canvas');
                 cropCanvas.width = w * scaleX;
                 cropCanvas.height = h * scaleY;
@@ -2842,13 +2854,18 @@ class OfficeDashboard {
                 );
 
                 cropCanvas.toBlob(async (blob) => {
-                    if (!blob) { this.showMessage('截图处理失败', 'error'); return; }
-                    const file = new File([blob], 'screenshot_' + Date.now() + '.png', { type: 'image/png' });
-                    const dt = new DataTransfer();
-                    dt.items.add(file);
-                    const fileInput = document.getElementById('fileInput');
-                    fileInput.files = dt.files;
-                    await this.handleFileUpload({ target: fileInput });
+                    try {
+                        if (!blob) { this.showMessage('截图处理失败', 'error'); return; }
+                        const file = new File([blob], 'screenshot_' + Date.now() + '.png', { type: 'image/png' });
+                        const dt = new DataTransfer();
+                        dt.items.add(file);
+                        const fileInput = document.getElementById('fileInput');
+                        fileInput.files = dt.files;
+                        await this.handleFileUpload({ target: fileInput });
+                    } catch (err) {
+                        console.error('[截图] 文件处理失败:', err);
+                        this.showMessage('截图处理失败: ' + err.message, 'error');
+                    }
                 }, 'image/png');
             };
 
@@ -2861,6 +2878,10 @@ class OfficeDashboard {
             overlay.addEventListener('mouseup', onMouseUp);
             document.addEventListener('keydown', onKeyDown);
         } catch (err) {
+            // 异常路径也要确保释放视频流
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
             console.error('截图失败:', err);
             this.showMessage('截图失败: ' + err.message, 'error');
         }
@@ -4657,7 +4678,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-05 v5.2.128';
+        const version = '2026-06-05 v5.2.129';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=249', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
