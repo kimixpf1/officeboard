@@ -2589,6 +2589,78 @@ class OfficeDashboard {
     }
 
     /**
+     * 加载 html2canvas-pro 库（多CDN fallback + 本地兜底）
+     * 2个CDN源顺序尝试，最后fallback到本地vendor目录
+     * 支持并发去重：多次调用共享同一个Promise
+     */
+    async _loadHtml2Canvas() {
+        // 已加载则直接返回
+        if (window.html2canvas) return window.html2canvas;
+
+        // 并发去重：多次调用共享同一个 Promise
+        if (this._html2canvasPromise) return this._html2canvasPromise;
+
+        this._html2canvasPromise = this._doLoadHtml2Canvas();
+        try {
+            return await this._html2canvasPromise;
+        } catch (e) {
+            this._html2canvasPromise = null; // 失败后允许重试
+            throw e;
+        }
+    }
+
+    async _doLoadHtml2Canvas() {
+        const CDN_SOURCES = [
+            'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js',
+            'https://unpkg.com/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js'
+        ];
+        const LOCAL_FALLBACK = 'vendor/html2canvas-pro.min.js';
+        const TIMEOUT_MS = 10000; // 单个源最多等10秒
+
+        // 依次尝试各CDN
+        for (const src of CDN_SOURCES) {
+            try {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    const timer = setTimeout(() => {
+                        script.onerror = null;
+                        script.remove();
+                        reject(new Error('CDN超时: ' + src));
+                    }, TIMEOUT_MS);
+                    script.onload = () => { clearTimeout(timer); script.remove(); resolve(); };
+                    script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('CDN加载失败: ' + src)); };
+                    document.head.appendChild(script);
+                });
+                if (window.html2canvas) return window.html2canvas;
+            } catch (e) {
+                console.warn('[截图] CDN失败:', src, e.message);
+            }
+        }
+
+        // 最终fallback到本地文件
+        try {
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = LOCAL_FALLBACK;
+                const timer = setTimeout(() => {
+                    script.onerror = null;
+                    script.remove();
+                    reject(new Error('本地文件超时'));
+                }, TIMEOUT_MS);
+                script.onload = () => { clearTimeout(timer); script.remove(); resolve(); };
+                script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('本地文件加载失败')); };
+                document.head.appendChild(script);
+            });
+            if (window.html2canvas) return window.html2canvas;
+        } catch (e) {
+            console.error('[截图] 本地fallback也失败:', e.message);
+        }
+
+        throw new Error('截图引擎加载失败，请刷新页面重试');
+    }
+
+    /**
      * 截图前预处理：将浏览器computed style中的color()等现代CSS颜色函数转为html2canvas可识别的hex/rgba
      * 避免html2canvas遇到color()函数时报 "Attempting to parse an unsupported color function" 错误
      */
@@ -2628,23 +2700,10 @@ class OfficeDashboard {
      */
     async startScreenCapture() {
         try {
-            // 用html2canvas截取当前页面（复用已加载实例，避免重复下载）
+            // 用html2canvas截取当前页面（多CDN fallback + 本地兜底）
             const target = document.body;
-            let html2canvasLib = window.html2canvas;
-            if (!html2canvasLib) {
-                this.showMessage('正在加载截图引擎...', 'info');
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js';
-                    script.onload = resolve;
-                    script.onerror = () => reject(new Error('截图库加载失败，请检查网络'));
-                    document.head.appendChild(script);
-                });
-                html2canvasLib = window.html2canvas;
-            }
-            if (!html2canvasLib) {
-                throw new Error('html2canvas 加载失败');
-            }
+            this.showMessage('正在加载截图引擎...', 'info');
+            const html2canvasLib = await this._loadHtml2Canvas();
 
             // 先弹 loading 遮罩，告诉用户正在截图
             const loadingOverlay = document.createElement('div');
@@ -4598,7 +4657,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-04 v5.2.127';
+        const version = '2026-06-05 v5.2.128';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=249', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;

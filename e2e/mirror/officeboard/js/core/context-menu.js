@@ -278,7 +278,7 @@ const ContextMenuCore = {
     async _contextMoveToDate(item) {
         const currentDate = item.type === 'meeting' ? item.date
             : item.type === 'document' ? (item.docStartDate || item.docDate || this.selectedDate)
-            : (item.deadline ? item.deadline.split('T')[0] : item.date || this.selectedDate);
+            : (item.deadline ? item.deadline.split('T')[0] : this.selectedDate);
         const newDate = await this._showDatePicker('选择目标日期', currentDate);
         if (!newDate) return;
 
@@ -291,7 +291,6 @@ const ContextMenuCore = {
         } else if (item.type === 'todo') {
             const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
             updates.deadline = `${newDate}T${time}`;
-            updates.date = newDate;
         }
 
         try {
@@ -397,7 +396,6 @@ const ContextMenuCore = {
             } else if (item.type === 'todo') {
                 const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
                 updates.deadline = `${dateVal}T${time}`;
-                updates.date = dateVal;
             }
 
             try {
@@ -516,35 +514,17 @@ const ContextMenuCore = {
             delete clone.updatedAt;
             delete clone.recurringGroupId;
             delete clone.occurrenceIndex;
-            delete clone.isRecurring;
-            delete clone.recurringRule;
-            delete clone.recurringCount;
-            delete clone.dayStates;
             delete clone.pinned;
             delete clone.sunk;
             delete clone.manualOrder;
             delete clone.completed;
-            delete clone.reminderDismissedAt;
             clone.source = 'copy';
 
             if (item.type === 'meeting') clone.date = targetDate;
             else if (item.type === 'document') { clone.docStartDate = targetDate; clone.docEndDate = targetDate; }
             else if (item.type === 'todo') {
-                if (item.deadline) {
-                    const time = item.deadline.split('T')[1] || '09:00';
-                    clone.deadline = `${targetDate}T${time}`;
-                } else {
-                    clone.date = targetDate;
-                }
-                // 绝对提醒：单次提醒更新日期到目标日期
-                if (!item.deadline && item.reminderMode === 'once' && item.reminderDate) {
-                    clone.reminderDate = targetDate;
-                }
-                // 副本提醒属性与原事项完全一致：原事项没有手动设过提醒/截止，副本也不应有
-                if (!item.reminderManuallySet && !item.deadlineManuallySet) {
-                    clone.deadlineManuallySet = false;
-                    clone.reminderManuallySet = false;
-                }
+                const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
+                clone.deadline = `${targetDate}T${time}`;
             }
 
             try {
@@ -690,10 +670,9 @@ const ContextMenuCore = {
                 box.style.top = '50%';
                 box.style.transform = 'translate(-50%, -50%)';
             }
-            const esc = (s) => (typeof SecurityUtils !== 'undefined' ? SecurityUtils.escapeHtml(String(s)) : String(s));
             box.innerHTML = `
-                <div style="margin-bottom:12px;font-weight:600;">${esc(title)}</div>
-                <input type="date" value="${esc(defaultDate || '')}" style="font-size:16px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;width:100%;">
+                <div style="margin-bottom:12px;font-weight:600;">${title}</div>
+                <input type="date" value="${defaultDate || ''}" style="font-size:16px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;width:100%;">
                 <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
                     <button class="btn-secondary btn-sm" data-action="cancel">取消</button>
                     <button class="btn-primary btn-sm" data-action="confirm">确认</button>

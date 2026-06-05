@@ -319,21 +319,17 @@ class ReportGenerator {
         document.body.appendChild(container);
 
         try {
-            if (typeof html2canvas === 'undefined') {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js';
-                    script.onload = resolve;
-                    script.onerror = () => reject(new Error('图片导出组件加载失败，请检查网络'));
-                    document.head.appendChild(script);
-                });
+            // 复用 app.js 的多CDN fallback 加载方法
+            const app = window.officeDashboard;
+            const html2canvasLib = app ? await app._loadHtml2Canvas() : null;
+            if (!html2canvasLib) {
+                throw new Error('图片导出组件加载失败，请检查网络');
             }
 
-            const app = window.officeDashboard;
             const colorFixes = app ? app._prepareScreenshotColors(container) : [];
             let canvas;
             try {
-                canvas = await html2canvas(container, {
+                canvas = await html2canvasLib(container, {
                     scale: 2, // 高清
                     useCORS: true,
                     logging: false,
