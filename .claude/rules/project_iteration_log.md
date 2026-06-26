@@ -1,3 +1,120 @@
+## 2026-06-26 v5.2.131 周/月视图截图显示每天完整事项——截图前临时解除高度折叠
+
+### 改动内容
+1. **根因**：周/月视图相机截图(📷)用 html2canvas 直接对当前可见状态截图，而 CSS 限制了高度——
+   - `.week-view` 外层 `height: calc(100vh - 140px)` 固定视口高度
+   - `.week-cell` `max-height: calc(100vh-220px); overflow-y:auto`
+   - `.month-cell` `max-height: 400px; overflow-y:auto`
+   - 事项多时超出部分被滚动折叠，html2canvas 拍不到（JS 全量 forEach 渲染无 slice，事项都在 DOM 里只是被裁掉）
+2. **修复**（最小侵入，复用现有 _prepareScreenshotColors/_restoreScreenshotColors 模式）：
+   - `context-menu.js shareCalendarScreenshot`：截图前调 `_expandForScreenshot(container)` 加 screenshot-mode 类，finally 里恢复
+   - 新增 `_expandForScreenshot(container)`：加类 + `void container.offsetHeight` 强制 reflow + 返回移除类的恢复函数
+   - `layout.css`：新增 `.week-view/.month-view.screenshot-mode` 规则，`!important` 解除外层 height/min-height 与单元格 max-height/overflow
+   - 镜像副本 `e2e/mirror/officeboard/` 下 layout.css + context-menu.js 同步相同改动
+3. **版本号** v5.2.131，缓存参数 context-menu.js?v=7、layout.css?v=9、app.js?v=254
+
+### 影响边界
+- 日常浏览零影响：screenshot-mode 类仅在截图瞬间添加、finally 移除，无持久化副作用
+- 不碰数据层（符合 P3-31 渲染层铁律），仅 CSS class toggle + JS 加减类
+- finally 覆盖所有异常路径（html2canvas 抛错/return/reject 均恢复）
+
+### 代码审查
+- ✅ Code review: APPROVE（0 CRITICAL / 0 HIGH / 1 MEDIUM-info / 2 LOW-note）
+- ✅ 语法检查 3/3 通过（context-menu.js 主+镜像、app.js）
+
+### 提交记录
+- `6db33c1` fix: 周/月视图截图显示每天完整事项——截图前临时解除高度折叠(v5.2.131)
+
+### 验证清单
+- [ ] 周视图某天事项多（>10条）时点📷截图，截图包含该天全部事项（无折叠）
+- [ ] 月视图某天事项多时点📷截图，截图包含该天全部事项
+- [ ] 截图后页面日常视图高度/滚动恢复正常（screenshot-mode 类已移除）
+- [ ] 截图失败（如断网）时页面也恢复正常（finally 兜底）
+- [ ] 移动端 navigator.share 分支正常
+- [ ] 版本号 v5.2.131
+
+### 遗留/注意
+- code-reviewer MEDIUM(info)：极端数据量(30+条/天)全展开+scale:2 理论上可能触达 html2canvas 单画布上限，大飞正常办公数据量远达不到，非阻塞；如线上偶遇可降月视图 scale
+
+---
+
+## 2026-06-05 v5.2.129 截图识别改用原生getDisplayMedia API——支持全屏/窗口/标签页截图
+
+### 改动内容
+1. **重写 `startScreenCapture()` 方法**：
+   - 用浏览器原生 `navigator.mediaDevices.getDisplayMedia()` 替代 `html2canvas`
+   - 用户可选择截取：全屏 / 任意窗口 / 任意标签页（像微信截图 Alt+A）
+   - 零第三方依赖，无需加载 html2canvas 库
+2. **流程变化**：
+   - 旧：html2canvas截取document.body → 框选 → OCR
+   - 新：getDisplayMedia获取屏幕流 → 取一帧到Canvas → 立即释放流 → 框选 → OCR
+3. **保留原有框选交互**：全屏遮罩 + 鼠标拖拽 + 蓝色虚线边框 + 尺寸标签 + Esc取消
+4. **代码审查修复**：
+   - CRITICAL: toBlob async回调加try-catch防unhandled rejection
+   - HIGH: 视频就绪竞态条件 → 超时后检查readyState
+   - HIGH: API兼容性前置检查 → 不支持时友好提示
+   - HIGH: 异常路径视频流释放 → catch块中stop stream
+   - MEDIUM: 清理调试日志
+5. **版本号** v5.2.129，缓存参数 app.js?v=252
+
+### 兼容性说明
+- Chrome/Edge: 完全支持
+- Firefox 66+: 支持
+- iOS Safari: 不支持（会提示"请使用Chrome/Edge"）
+- 微信内置浏览器: 可能不支持
+
+### 代码审查
+- ✅ Code review: 1C+3H+2M 已全部修复
+- ✅ 语法检查通过
+
+### 提交记录
+- `65690b9` feat: 截图识别改用原生getDisplayMedia API——支持全屏/窗口/标签页截图(v5.2.129)
+
+### 验证清单
+- [ ] 右键上传按钮弹出系统屏幕选择器
+- [ ] 可选择全屏/窗口/标签页
+- [ ] 框选后AI OCR识别正常
+- [ ] Esc取消无报错
+- [ ] 版本号 v5.2.129
+
+---
+## 2026-06-05 v5.2.128 截图引擎CDN多源fallback+本地兜底+并发去重
+
+### 改动内容
+1. **新增 `_loadHtml2Canvas()` + `_doLoadHtml2Canvas()` 双方法**：
+   - 2个CDN源顺序fallback：jsdelivr → unpkg
+   - 最终fallback到本地 `vendor/html2canvas-pro.min.js`（新增210KB）
+   - 并发去重：多次调用共享同一个 Promise（`_html2canvasPromise`）
+   - 失败后清空 Promise 允许重试
+   - 每个源10秒超时保护，避免长时间卡死
+   - script 标签加载完成后自动 `remove()` 清理DOM
+2. **`startScreenCapture()`**：改用 `_loadHtml2Canvas()` 替代原单一CDN硬编码
+3. **`context-menu.js shareCalendarScreenshot()`**：改用 `app._loadHtml2Canvas()` 
+4. **`report.js` 图片导出**：改用 `app._loadHtml2Canvas()`
+5. **镜像副本 `context-menu.js`**：同步修复 + 补上缺失的 colorFixes 包裹
+6. **版本号** v5.2.128，缓存参数 app.js?v=251, report.js?v=17
+
+### Supabase用量检查
+- 新项目 pfomqdegassaqxdyyweo（5/28迁移）user_data 表为空
+- 6月刚开始，5GB/月带宽限额不会超
+- 旧项目 ejeiuqcmkznfbglvbkbe 已弃用
+
+### 代码审查
+- ✅ Code review: 3 HIGH 已修复（并发去重+cdnjs无效链接移除+镜像colorFixes补齐）
+- ✅ 语法检查 4/4 全部通过
+
+### 提交记录
+- `c9f6c5f` fix: 截图引擎CDN多源fallback+本地兜底+并发去重+超时保护(v5.2.128)
+
+### 验证清单
+- [ ] 右键上传按钮截图框选正常（不再报"截图库加载失败"）
+- [ ] 框选后AI OCR识别正常
+- [ ] 周/月视图📷截图分享正常
+- [ ] 报告导出图片正常
+- [ ] 版本号 v5.2.128
+
+---
+
 ## 2026-05-28 v5.2.122 周/月视图排序先按类型分组再桶排序
 
 ### 改动内容

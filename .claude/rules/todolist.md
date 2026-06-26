@@ -2,6 +2,16 @@
 
 ## 已完成
 
+### v5.2.131 周/月视图截图显示每天完整事项——截图前临时解除高度折叠
+- [x] 根因定位：.week-view height:calc(100vh-140px) + .week-cell/.month-cell max-height+overflow-y:auto 折叠，截图函数未展开直接截可见状态
+- [x] context-menu.js: shareCalendarScreenshot 截图前调 _expandForScreenshot 加 screenshot-mode 类，finally 恢复；新增 _expandForScreenshot 方法
+- [x] layout.css: 新增 .week-view/.month-view.screenshot-mode 规则(!important 解除 height/max-height/overflow)
+- [x] 镜像副本 e2e/mirror 同步(layout.css + context-menu.js)
+- [x] 缓存版本: context-menu.js?v=7, layout.css?v=9, app.js?v=254
+- [x] Code review: APPROVE(0C/0H/1M-info/2L-note)
+- [x] 语法检查 3/3 通过
+- [x] 已提交推送 `6db33c1`，GitHub API 验证远程 HEAD 对齐、文件无截断(CRLF差异正常)
+
 ### v5.2.122 周/月视图排序先按类型分组再桶排序
 - [x] sortItems() 重构：先按类型分组(待办→会议→办文)再各自桶排序
 - [x] 会议组：四桶+手动排序+领导优先级合并
