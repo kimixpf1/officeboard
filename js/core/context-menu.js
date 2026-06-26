@@ -150,6 +150,9 @@ const ContextMenuCore = {
             }
 
             const colorFixes = this._prepareScreenshotColors(container);
+            // 截图前临时展开被折叠的事项（解除单元格 max-height 与外层容器固定高度），
+            // 让每天完整工作活动都进入截图，截完由 finally 恢复
+            const restoreExpand = this._expandForScreenshot(container);
             let canvas;
             try {
                 canvas = await html2canvasLib(container, {
@@ -160,6 +163,7 @@ const ContextMenuCore = {
                 });
             } finally {
                 this._restoreScreenshotColors(colorFixes);
+                if (restoreExpand) restoreExpand();
             }
 
             if (/Mobi|Android|iPhone/i.test(navigator.userAgent) && navigator.share) {
@@ -179,6 +183,19 @@ const ContextMenuCore = {
             console.error('截图失败:', error);
             this.showError('截图失败: ' + error.message);
         }
+    },
+
+    /**
+     * 截图前展开周/月视图被折叠的事项：给容器加 screenshot-mode 类，临时解除
+     * 单元格 max-height/overflow 与外层容器固定高度，使每天完整工作活动都进入截图。
+     * 返回恢复函数，须在截图结束后（finally）调用以移除该类、还原日常浏览布局。
+     */
+    _expandForScreenshot(container) {
+        if (!container) return null;
+        container.classList.add('screenshot-mode');
+        // 强制 reflow，确保 html2canvas 读取到展开后的真实尺寸
+        void container.offsetHeight;
+        return () => container.classList.remove('screenshot-mode');
     },
 
     _downloadCanvas(canvas, title) {

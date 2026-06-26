@@ -305,7 +305,7 @@ class OfficeDashboard {
             'js/core/recurring.js?v=1',
             'js/core/cross-date.js?v=1',
             'js/core/backup.js?v=2',
-            'js/core/context-menu.js?v=6',
+            'js/core/context-menu.js?v=7',
             'js/core/idle-bar.js?v=8',
             'js/core/alarm.js?v=11',
             'js/core/pet-renderer.js?v=3'
@@ -428,20 +428,20 @@ class OfficeDashboard {
         document.getElementById('uploadBtn')?.addEventListener('click', (e) => this.triggerFilePicker(e));
         document.getElementById('fileInput')?.addEventListener('change', (e) => this.handleFileUpload(e));
 
-        // 右键上传按钮 → 截图识别（右键=页面内框选，Shift+右键=全屏截图）
+        // 右键上传按钮 → 截图识别（右键=截屏幕上任意窗口，Shift+右键=页面内框选）
         const uploadBtn = document.getElementById('uploadBtn');
         if (uploadBtn) {
             uploadBtn.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (e.shiftKey) {
-                    // Shift+右键 → 全屏截图（可截取任意屏幕/窗口）
-                    this._captureFullScreen().catch(err => {
+                    // Shift+右键 → 页面内框选（html2canvas）
+                    this.startScreenCapture().catch(err => {
                         this.showMessage('截图失败: ' + err.message, 'error');
                     });
                 } else {
-                    // 普通右键 → 页面内框选（html2canvas）
-                    this.startScreenCapture().catch(err => {
+                    // 普通右键 → 截屏幕上任意窗口（getDisplayMedia）
+                    this._captureFullScreen().catch(err => {
                         this.showMessage('截图失败: ' + err.message, 'error');
                     });
                 }
@@ -2702,7 +2702,7 @@ class OfficeDashboard {
     }
 
     /**
-     * 右键上传按钮 → 截图识别（html2canvas框选页面内区域，像微信截图）
+     * 页面内框选截图（Shift+右键触发，html2canvas截取当前网页）
      * 保留原有交互：截取当前页面 → 框选 → OCR识别
      */
     async startScreenCapture() {
@@ -4715,8 +4715,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-05 v5.2.130';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=6', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=249', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=8', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-06-26 v5.2.131';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=7', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=254', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

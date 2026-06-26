@@ -304,6 +304,11 @@
     background: color-mix(in srgb, #ef4444 20%, var(--bg-primary));
 }
 
+/* 闪烁时✓按钮保持常亮可见 */
+.countdown-notice.todo-reminder-flashing .todo-reminder-complete-btn {
+    animation: none;
+    opacity: 1 !important;
+}
 
 /* 空闲态通知栏 */
 .countdown-notice.idle-mode {
@@ -478,7 +483,7 @@
 /* 日视图 */
 .board-view {
     display: none;
-    padding: var(--spacing-3) var(--spacing-5) var(--spacing-2) 210px;
+    padding: var(--spacing-3) var(--spacing-6) var(--spacing-2);
     min-height: calc(100vh - 148px);
     height: calc(100vh - 130px);
     overflow: hidden;
@@ -501,29 +506,20 @@
     margin: 0;
 }
 
-/* 日期标签 — 方形卡片，浮于最左边 padding 区，后续可堆叠更多卡片 */
 .board-date-label {
     position: absolute;
-    top: var(--spacing-3);
-    left: 5px;
+    top: var(--spacing-2);
+    left: var(--spacing-6);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
+    gap: 2px;
     z-index: 5;
     pointer-events: none;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 10px 12px;
-    box-shadow: var(--shadow);
-    width: 190px;
-    min-height: 190px;
 }
 
 .board-date-label-date {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 700;
     color: var(--gray-800);
     white-space: nowrap;
@@ -531,213 +527,12 @@
 }
 
 .board-date-label-week {
-    font-size: 18px;
+    font-size: 19px;
     font-weight: 600;
     color: var(--gray-600);
     white-space: nowrap;
     line-height: 1.3;
 }
-
-.board-date-label-week-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    pointer-events: auto;
-}
-
-.board-screenshot-inline-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-size: 14px;
-    opacity: 0.45;
-    transition: opacity 0.2s;
-    padding: 0;
-    line-height: 1;
-    flex-shrink: 0;
-}
-
-.board-screenshot-inline-btn:hover {
-    opacity: 1;
-}
-
-.board-date-label-summary {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--gray-500);
-    line-height: 1.4;
-    text-align: center;
-}
-
-.board-date-label-summary:empty {
-    display: none;
-}
-
-.board-date-label-next-meeting {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--gray-500);
-    line-height: 1.5;
-    text-align: center;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: break-word;
-}
-
-.board-date-label-next-meeting:empty {
-    display: none;
-}
-
-/* 便签卡片 — 宽190px，高为日期卡片1.5倍，位于其下方 */
-.sticky-note-card {
-    position: absolute;
-    left: 5px;
-    width: 190px;
-    min-height: 285px;
-    z-index: 5;
-    background: var(--sticky-bg, #fff9c4);
-    border: 1px solid var(--sticky-border, #e6d88a);
-    border-radius: 4px;
-    padding: 10px 12px 40px;
-    box-shadow: 2px 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
-    transform: rotate(-0.5deg);
-    display: flex;
-    flex-direction: column;
-}
-
-.sticky-note-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    margin-bottom: 6px;
-}
-
-.sticky-note-title {
-    font-size: 18px;
-    user-select: none;
-    pointer-events: none;
-}
-
-.sticky-note-color-btn {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid rgba(0,0,0,0.15);
-    cursor: pointer;
-    background: #fff9c4;
-    flex-shrink: 0;
-    transition: transform 0.15s;
-}
-.sticky-note-color-btn:hover { transform: scale(1.15); }
-
-.sticky-note-color-picker {
-    position: absolute;
-    top: 36px;
-    right: 8px;
-    display: none;
-    gap: 4px;
-    background: var(--bg-primary, #fff);
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 8px;
-    padding: 6px;
-    z-index: 10;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-.sticky-note-color-picker.show { display: flex; }
-
-.sticky-note-color-dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: border-color 0.15s;
-}
-.sticky-note-color-dot:hover,
-.sticky-note-color-dot.active { border-color: var(--gray-600, #666); }
-
-.sticky-note-lines {
-    font-size: 16px;
-    line-height: 2;
-    color: #5d4e37;
-    flex: 1;
-    overflow-y: auto;
-    outline: none;
-    cursor: text;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: 'KaiTi', 'STKaiti', '楷体', serif;
-    background: repeating-linear-gradient(
-        transparent, transparent 31px,
-        #e6d88a 31px, #e6d88a 32px
-    );
-}
-
-.sticky-note-lines:empty::before {
-    content: attr(placeholder);
-    color: #b8a85a;
-    font-style: italic;
-}
-
-.sticky-note-lines:focus {
-    background: repeating-linear-gradient(
-        transparent, transparent 31px,
-        #d4c678 31px, #d4c678 32px
-    );
-}
-
-/* 便签翻页导航 — 固定底部 */
-.sticky-note-pages {
-    position: absolute;
-    bottom: 6px;
-    left: 8px;
-    right: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    flex-shrink: 0;
-    z-index: 2;
-}
-.sticky-page-btn {
-    width: 24px;
-    height: 24px;
-    border: 1px solid rgba(0,0,0,0.15);
-    border-radius: 50%;
-    background: rgba(255,255,255,0.7);
-    cursor: pointer;
-    font-size: 12px;
-    line-height: 22px;
-    text-align: center;
-    padding: 0;
-    color: #5d4e37;
-    transition: background 0.15s;
-    flex-shrink: 0;
-}
-.sticky-page-btn:hover { background: rgba(255,255,255,0.95); }
-.sticky-page-btn:active { background: rgba(0,0,0,0.05); }
-.sticky-page-indicator {
-    font-size: 11px;
-    color: #8a7a5a;
-    min-width: 28px;
-    text-align: center;
-    user-select: none;
-}
-
-/* 便签预设颜色 */
-.sticky-note-card[data-color="yellow"] { --sticky-bg: #fff9c4; --sticky-border: #e6d88a; }
-.sticky-note-card[data-color="pink"] { --sticky-bg: #fce4ec; --sticky-border: #f48fb1; }
-.sticky-note-card[data-color="blue"] { --sticky-bg: #e3f2fd; --sticky-border: #90caf9; }
-.sticky-note-card[data-color="green"] { --sticky-bg: #e8f5e9; --sticky-border: #a5d6a7; }
-.sticky-note-card[data-color="white"] { --sticky-bg: #fafafa; --sticky-border: #e0e0e0; }
 
 .board-container {
     display: grid;
@@ -1326,29 +1121,7 @@
 
 .week-cell.today {
     background: var(--primary-light);
-    border-top: 3px solid var(--primary-color);
 }
-
-/* 日历日期活性圆点 */
-.calendar-date-dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    margin-left: 6px;
-    flex-shrink: 0;
-}
-
-.calendar-date-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    display: inline-block;
-    opacity: 0.75;
-}
-
-.calendar-date-dot.todo { background: #ef4444; }
-.calendar-date-dot.meeting { background: #3b82f6; }
-.calendar-date-dot.document { background: #22c55e; }
 
 /* 月视图 */
 .month-view {
