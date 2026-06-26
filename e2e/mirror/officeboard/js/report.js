@@ -39,7 +39,7 @@ class ReportGenerator {
         if (!item) return '';
 
         if (item.type === this.itemTypes.TODO) {
-            return item.deadline?.split('T')[0] || item.date || item.createdAt?.split('T')[0] || '';
+            return item.deadline?.split('T')[0] || item.createdAt?.split('T')[0] || '';
         }
 
         if (item.type === this.itemTypes.MEETING) {
@@ -319,35 +319,30 @@ class ReportGenerator {
         document.body.appendChild(container);
 
         try {
-            // 复用 app.js 的多CDN fallback 加载方法
-            const app = window.officeDashboard;
-            const html2canvasLib = app ? await app._loadHtml2Canvas() : null;
-            if (!html2canvasLib) {
-                throw new Error('图片导出组件加载失败，请检查网络');
+            if (typeof html2canvas === 'undefined') {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('图片导出组件加载失败，请检查网络'));
+                    document.head.appendChild(script);
+                });
             }
 
-            const colorFixes = app ? app._prepareScreenshotColors(container) : [];
-            // 年报等内容过多时 container 极高，固定 scale:2 会使 canvas 超出浏览器
-            // 尺寸上限(~32767px)导致 html2canvas 渲染失败、导出 0kb。按实际高度动态降 scale。
+            // 年报等内容过多时 container 极高，固定 scale:2 会使 canvas 超出浏览器尺寸上限
+            // (~32767px)导致 html2canvas 渲染失败、导出 0kb。按实际高度动态降 scale。
             const containerHeight = container.offsetHeight || container.scrollHeight || 0;
             const SAFE_CANVAS_HEIGHT = 16000;
             let scale = 2;
             if (containerHeight > 0 && containerHeight * scale > SAFE_CANVAS_HEIGHT) {
                 scale = Math.max(1, Math.floor(SAFE_CANVAS_HEIGHT / containerHeight));
             }
-            let canvas;
-            try {
-                canvas = await html2canvasLib(container, {
-                    scale, // 高清（年报自动降级）
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#ffffff'
-                });
-            } finally {
-                if (app) app._restoreScreenshotColors(colorFixes);
-            }
-
-            // 校验 canvas 有效，防止极端情况下导出 0kb 空图
+            const canvas = await html2canvas(container, {
+                scale,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
             if (!canvas || canvas.width === 0 || canvas.height === 0) {
                 throw new Error('报告内容过长，图片生成失败，请尝试缩小报告范围（如改用月报/季报）');
             }
