@@ -247,8 +247,19 @@ class OfficeDashboard {
      * 初始化应用
      */
     async init() {
-        // 阶段1：只混合已加载的模块（首屏只有 utils/db/app-date-view/app）
-        this._applyAvailableMixins();
+        // Mixin: 将拆分出的模块方法混入 OfficeDashboard 原型
+        Object.assign(OfficeDashboard.prototype, CountdownPanel);
+        Object.assign(OfficeDashboard.prototype, LinksPanel);
+        Object.assign(OfficeDashboard.prototype, ContactsPanel);
+        Object.assign(OfficeDashboard.prototype, ToolsPanel);
+        Object.assign(OfficeDashboard.prototype, SidePanels);
+        Object.assign(OfficeDashboard.prototype, WeatherPanel);
+        Object.assign(OfficeDashboard.prototype, RecurringCore);
+        Object.assign(OfficeDashboard.prototype, CrossDateCore);
+        Object.assign(OfficeDashboard.prototype, BackupCore);
+        Object.assign(OfficeDashboard.prototype, ContextMenuCore);
+        Object.assign(OfficeDashboard.prototype, IdleBarManager);
+        Object.assign(OfficeDashboard.prototype, AlarmManager);
 
         try {
             window.addEventListener('unhandledrejection', (e) => {
@@ -259,96 +270,31 @@ class OfficeDashboard {
             });
             await db.init();
 
+            this.initializeRecurringFieldOptions();
             this.bindEvents();
 
             await this.loadItems();
-        } catch (error) {
-            console.error('初始化失败:', error);
-            this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
-        } finally {
-            // 无论成败都移除骨架屏、启动时钟、加载剩余模块
+
             const skeleton = document.getElementById('appSkeleton');
             if (skeleton) skeleton.remove();
             document.getElementById('appRoot').style.display = '';
 
-            this.initDatePicker?.();
-            this.updateDateDisplay?.();
-            this.initHeaderClock();
-            this._loadLazyModules();
-        }
-    }
+            this.initDatePicker();
 
-    _applyAvailableMixins() {
-        if (typeof CountdownPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, CountdownPanel);
-        if (typeof LinksPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, LinksPanel);
-        if (typeof ContactsPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, ContactsPanel);
-        if (typeof ToolsPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, ToolsPanel);
-        if (typeof SidePanels !== 'undefined') Object.assign(OfficeDashboard.prototype, SidePanels);
-        if (typeof WeatherPanel !== 'undefined') Object.assign(OfficeDashboard.prototype, WeatherPanel);
-        if (typeof RecurringCore !== 'undefined') Object.assign(OfficeDashboard.prototype, RecurringCore);
-        if (typeof CrossDateCore !== 'undefined') Object.assign(OfficeDashboard.prototype, CrossDateCore);
-        if (typeof BackupCore !== 'undefined') Object.assign(OfficeDashboard.prototype, BackupCore);
-        if (typeof ContextMenuCore !== 'undefined') Object.assign(OfficeDashboard.prototype, ContextMenuCore);
-        if (typeof IdleBarManager !== 'undefined') Object.assign(OfficeDashboard.prototype, IdleBarManager);
-        if (typeof AlarmManager !== 'undefined') Object.assign(OfficeDashboard.prototype, AlarmManager);
-    }
+            this.updateDateDisplay();
 
-    async _loadLazyModules() {
-        const scripts = [
-            'js/sync.js?v=73',
-            'js/panels/countdown.js?v=4',
-            'js/panels/links.js?v=1',
-            'js/panels/contacts.js?v=3',
-            'js/panels/tools.js?v=1',
-            'js/panels/side-panels.js?v=1',
-            'js/weather.js?v=1',
-            'js/core/recurring.js?v=1',
-            'js/core/cross-date.js?v=1',
-            'js/core/backup.js?v=2',
-            'js/core/context-menu.js?v=7',
-            'js/core/idle-bar.js?v=8',
-            'js/core/alarm.js?v=11',
-            'js/core/pet-renderer.js?v=3'
-        ];
-
-        await Promise.all(scripts.map(src => new Promise(resolve => {
-            const el = document.createElement('script');
-            el.src = src;
-            el.onload = resolve;
-            el.onerror = () => { console.warn('模块加载失败:', src); resolve(); };
-            document.head.appendChild(el);
-        })));
-
-        // 后台预加载 PDF.js（~350KB），首次PDF识别无需等待下载
-        this._preloadPdfJs();
-
-        // 所有模块已加载，重新混合
-        this._applyAvailableMixins();
-
-        // 初始化之前跳过的功能
-        this.initializeRecurringFieldOptions?.();
-        this.initContextMenu?.();
-        this.initIdleBar?.();
-        this.initAlarmSystem?.();
-        this.initSidePanels?.();
-        this.bindSyncEvents?.();
-        this.initHeaderWeather?.();
-
-        const _ric = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (fn) => setTimeout(fn, 0);
-        _ric(() => {
-            this._loadDismissedReminderIds?.().then(() => {
-                this.startTodoReminderLoop?.();
+            const _ric = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (fn) => setTimeout(fn, 0);
+            _ric(() => {
+                this.startTodoReminderLoop();
+                this.bindTodoReminderComplete();
+                this.initHeaderClock();
+                this.initHeaderWeather();
+                this.initCountdownSystem();
+                this.startMeetingAutoCompleteCheck();
+                this.startDailyBackupSchedule();
+                this.updateDeployVersionBadge();
             });
-            this.bindTodoReminderComplete?.();
-            this.initCountdownSystem?.();
-            this.startMeetingAutoCompleteCheck?.();
-            this.startDailyBackupSchedule?.();
-            this.updateDeployVersionBadge();
-            this.initStickyNote();
-        });
 
-        // 同步功能（依赖 sync.js）
-        if (typeof syncManager !== 'undefined') {
             syncManager.waitForInit().then(async () => {
                 if (syncManager.isLoggedIn()) {
                     await this.loadItems();
@@ -356,27 +302,16 @@ class OfficeDashboard {
             }).catch(error => {
                 console.warn('同步初始化未完全完成，已跳过阻塞等待:', error?.message || error);
             });
+
+            setTimeout(() => {
+                this.checkApiKey().catch(err => {
+                    console.warn('API密钥检查失败:', err.message);
+                });
+            }, 1000);
+        } catch (error) {
+            console.error('初始化失败:', error);
+            this.showError('应用初始化失败: ' + error.message + '。请刷新页面重试。');
         }
-
-        setTimeout(() => {
-            this.checkApiKey().catch(err => {
-                console.warn('API密钥检查失败:', err.message);
-            });
-        }, 1000);
-    }
-
-    /**
-     * 后台预加载 PDF.js（~350KB），避免首次PDF识别时用户长时间等待
-     */
-    _preloadPdfJs() {
-        const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        if (typeof pdfjsLib !== 'undefined' || document.querySelector(`script[src="${PDFJS_URL}"]`)) return;
-        const el = document.createElement('script');
-        el.src = PDFJS_URL;
-        el.crossOrigin = 'anonymous';
-        el.async = true;
-        el.onerror = () => console.warn('PDF.js 预加载失败，将在首次使用时重试');
-        document.head.appendChild(el);
     }
 
     /**
@@ -427,28 +362,6 @@ class OfficeDashboard {
         // 文件上传
         document.getElementById('uploadBtn')?.addEventListener('click', (e) => this.triggerFilePicker(e));
         document.getElementById('fileInput')?.addEventListener('change', (e) => this.handleFileUpload(e));
-
-        // 右键上传按钮 → 截图识别（右键=截屏幕上任意窗口，Shift+右键=页面内框选）
-        const uploadBtn = document.getElementById('uploadBtn');
-        if (uploadBtn) {
-            uploadBtn.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (e.shiftKey) {
-                    // Shift+右键 → 页面内框选（html2canvas）
-                    this.startScreenCapture().catch(err => {
-                        this.showMessage('截图失败: ' + err.message, 'error');
-                    });
-                } else {
-                    // 普通右键 → 截屏幕上任意窗口（getDisplayMedia）
-                    this._captureFullScreen().catch(err => {
-                        this.showMessage('截图失败: ' + err.message, 'error');
-                    });
-                }
-            });
-        } else {
-            console.warn('[截图] uploadBtn 元素未找到');
-        }
 
         // 视图切换
         document.querySelectorAll('.view-btn').forEach(btn => {
@@ -506,11 +419,11 @@ class OfficeDashboard {
         this.initDragAndDrop();
 
         // 右键/长按上下文菜单
-        if (typeof ContextMenuCore !== 'undefined') this.initContextMenu?.();
+        this.initContextMenu();
 
         // 空闲态通知栏 + 闹钟系统
-        if (typeof IdleBarManager !== 'undefined') this.initIdleBar?.();
-        if (typeof AlarmManager !== 'undefined') this.initAlarmSystem?.();
+        this.initIdleBar();
+        this.initAlarmSystem();
 
         // 主题切换
         document.getElementById('themeBtn')?.addEventListener('click', (e) => {
@@ -535,7 +448,7 @@ class OfficeDashboard {
         this.loadTheme();
 
         // 同步功能
-        if (typeof syncManager !== 'undefined') this.bindSyncEvents?.();
+        this.bindSyncEvents();
 
         // 流转功能
         this.bindTransferEvents();
@@ -555,7 +468,7 @@ class OfficeDashboard {
         });
 
         // 初始化右侧折叠面板
-        if (typeof SidePanels !== 'undefined') this.initSidePanels?.();
+        this.initSidePanels();
     }
 
     triggerFilePicker(event) {
@@ -650,7 +563,7 @@ class OfficeDashboard {
         }
 
         weatherBtn.addEventListener('click', () => {
-            this.openTool?.('weather');
+            this.openTool('weather');
         });
         this.updateHeaderWeatherDisplay();
         this.refreshHeaderWeather(true).catch(error => {
@@ -1505,7 +1418,7 @@ class OfficeDashboard {
             this.loadTools();
             this.loadContacts();
             this.renderCountdownPanel();
-            this.updateCountdownNotice?.();
+            this.updateCountdownNotice();
             this.updateHeaderWeatherDisplay();
             const weatherBody = document.getElementById('weatherBody');
             if (weatherBody) {
@@ -1749,7 +1662,6 @@ class OfficeDashboard {
      * 设置主题
      */
     setTheme(theme, { sync = true } = {}) {
-        this._themeChangedAt = Date.now();
         document.documentElement.setAttribute('data-theme', theme);
         SecurityUtils.safeSetStorage('theme', theme);
 
@@ -1772,11 +1684,7 @@ class OfficeDashboard {
      * 加载保存的主题
      */
     loadTheme() {
-        let savedTheme = SecurityUtils.safeGetStorage('theme') || 'default';
-        // 兼容旧版多主题 → 现在只有 default 和 dark
-        if (savedTheme !== 'default' && savedTheme !== 'dark') {
-            savedTheme = 'default';
-        }
+        const savedTheme = SecurityUtils.safeGetStorage('theme') || 'default';
         this.setTheme(savedTheme, { sync: false });
     }
 
@@ -2595,336 +2503,6 @@ class OfficeDashboard {
     }
 
     /**
-     * 加载 html2canvas-pro 库（多CDN fallback + 本地兜底）
-     * 2个CDN源顺序尝试，最后fallback到本地vendor目录
-     * 支持并发去重：多次调用共享同一个Promise
-     */
-    async _loadHtml2Canvas() {
-        // 已加载则直接返回
-        if (window.html2canvas) return window.html2canvas;
-
-        // 并发去重：多次调用共享同一个 Promise
-        if (this._html2canvasPromise) return this._html2canvasPromise;
-
-        this._html2canvasPromise = this._doLoadHtml2Canvas();
-        try {
-            return await this._html2canvasPromise;
-        } catch (e) {
-            this._html2canvasPromise = null; // 失败后允许重试
-            throw e;
-        }
-    }
-
-    async _doLoadHtml2Canvas() {
-        const CDN_SOURCES = [
-            'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js',
-            'https://unpkg.com/html2canvas-pro@1.5.13/dist/html2canvas-pro.min.js'
-        ];
-        const LOCAL_FALLBACK = 'vendor/html2canvas-pro.min.js';
-        const TIMEOUT_MS = 10000; // 单个源最多等10秒
-
-        // 依次尝试各CDN
-        for (const src of CDN_SOURCES) {
-            try {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = src;
-                    const timer = setTimeout(() => {
-                        script.onerror = null;
-                        script.remove();
-                        reject(new Error('CDN超时: ' + src));
-                    }, TIMEOUT_MS);
-                    script.onload = () => { clearTimeout(timer); script.remove(); resolve(); };
-                    script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('CDN加载失败: ' + src)); };
-                    document.head.appendChild(script);
-                });
-                if (window.html2canvas) return window.html2canvas;
-            } catch (e) {
-                console.warn('[截图] CDN失败:', src, e.message);
-            }
-        }
-
-        // 最终fallback到本地文件
-        try {
-            await new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = LOCAL_FALLBACK;
-                const timer = setTimeout(() => {
-                    script.onerror = null;
-                    script.remove();
-                    reject(new Error('本地文件超时'));
-                }, TIMEOUT_MS);
-                script.onload = () => { clearTimeout(timer); script.remove(); resolve(); };
-                script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('本地文件加载失败')); };
-                document.head.appendChild(script);
-            });
-            if (window.html2canvas) return window.html2canvas;
-        } catch (e) {
-            console.error('[截图] 本地fallback也失败:', e.message);
-        }
-
-        throw new Error('截图引擎加载失败，请刷新页面重试');
-    }
-
-    /**
-     * 截图前预处理：将浏览器computed style中的color()等现代CSS颜色函数转为html2canvas可识别的hex/rgba
-     * 避免html2canvas遇到color()函数时报 "Attempting to parse an unsupported color function" 错误
-     */
-    _prepareScreenshotColors(root = document) {
-        const fixes = [];
-        const ctx = document.createElement('canvas').getContext('2d');
-        const colorProps = ['color', 'background-color', 'border-color', 'outline-color', 'box-shadow'];
-        root.querySelectorAll('*').forEach(el => {
-            const computed = getComputedStyle(el);
-            colorProps.forEach(prop => {
-                const val = computed.getPropertyValue(prop);
-                if (val && val.includes('color(')) {
-                    const fixed = val.replace(/color\([^)]*\)/g, (m) => {
-                        try { ctx.fillStyle = '#000'; ctx.fillStyle = m; return ctx.fillStyle; }
-                        catch(e) { return 'rgba(0,0,0,0)'; }
-                    });
-                    if (fixed !== val) {
-                        fixes.push({ el, prop, orig: el.style.getPropertyValue(prop), origP: el.style.getPropertyPriority(prop) });
-                        el.style.setProperty(prop, fixed, 'important');
-                    }
-                }
-            });
-        });
-        return fixes;
-    }
-
-    /** 截图后恢复原始颜色 */
-    _restoreScreenshotColors(fixes) {
-        fixes.forEach(({ el, prop, orig, origP }) => {
-            if (orig) el.style.setProperty(prop, orig, origP || '');
-            else el.style.removeProperty(prop);
-        });
-    }
-
-    /**
-     * 页面内框选截图（Shift+右键触发，html2canvas截取当前网页）
-     * 保留原有交互：截取当前页面 → 框选 → OCR识别
-     */
-    async startScreenCapture() {
-        try {
-            const target = document.body;
-            this.showMessage('正在加载截图引擎...', 'info');
-            const html2canvasLib = await this._loadHtml2Canvas();
-
-            const loadingOverlay = document.createElement('div');
-            loadingOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;cursor:wait;';
-            const loadingBox = document.createElement('div');
-            loadingBox.style.cssText = 'background:rgba(0,0,0,0.8);color:#fff;padding:16px 32px;border-radius:8px;font-size:15px;';
-            loadingBox.textContent = '📷 正在截取页面...';
-            loadingOverlay.appendChild(loadingBox);
-            document.body.appendChild(loadingOverlay);
-
-            let fullCanvas;
-            const colorFixes = this._prepareScreenshotColors();
-            try {
-                fullCanvas = await html2canvasLib(target, {
-                    useCORS: true, allowTaint: true, backgroundColor: null, scale: 1, logging: false
-                });
-            } finally {
-                loadingOverlay.remove();
-                this._restoreScreenshotColors(colorFixes);
-            }
-
-            this._showCropOverlay(fullCanvas);
-        } catch (err) {
-            console.error('截图失败:', err);
-            this.showMessage('截图失败: ' + err.message, 'error');
-        }
-    }
-
-    /**
-     * 全屏截图识别（getDisplayMedia，可截取任意屏幕/窗口/标签页）
-     * 通过 Shift+右键 或长按触发
-     */
-    async _captureFullScreen() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            this.showMessage('您的浏览器不支持屏幕截图，请使用 Chrome/Edge 浏览器', 'error');
-            return;
-        }
-
-        let stream = null;
-        try {
-            try {
-                stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: 'never' }, audio: false
-                });
-            } catch (err) {
-                if (err.name === 'NotAllowedError') return; // 用户取消，静默返回
-                throw new Error('无法获取屏幕内容: ' + err.message);
-            }
-
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.muted = true;
-            await video.play();
-
-            await new Promise((resolve, reject) => {
-                if (video.readyState >= 2) { resolve(); return; }
-                const timer = setTimeout(() => {
-                    video.removeEventListener('loadeddata', onReady);
-                    if (video.readyState >= 2) resolve();
-                    else reject(new Error('视频流就绪超时，请重试'));
-                }, 3000);
-                const onReady = () => { clearTimeout(timer); resolve(); };
-                video.addEventListener('loadeddata', onReady, { once: true });
-            });
-
-            const fullCanvas = document.createElement('canvas');
-            fullCanvas.width = video.videoWidth;
-            fullCanvas.height = video.videoHeight;
-            fullCanvas.getContext('2d').drawImage(video, 0, 0);
-
-            stream.getTracks().forEach(t => t.stop());
-            stream = null;
-            video.srcObject = null;
-
-            this._showCropOverlay(fullCanvas);
-        } catch (err) {
-            if (stream) stream.getTracks().forEach(t => t.stop());
-            console.error('全屏截图失败:', err);
-            this.showMessage('截图失败: ' + err.message, 'error');
-        }
-    }
-
-    /**
-     * 共用框选遮罩（html2canvas 和 getDisplayMedia 截图后都用这个）
-     * 拖拽选择区域 → 裁剪 → 生成File → handleFileUpload → OCR识别
-     */
-    _showCropOverlay(fullCanvas) {
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;cursor:crosshair;';
-
-            const bgCanvas = document.createElement('canvas');
-            bgCanvas.width = window.innerWidth;
-            bgCanvas.height = window.innerHeight;
-            bgCanvas.style.cssText = 'width:100vw;height:100vh;';
-            const bgCtx = bgCanvas.getContext('2d');
-            bgCtx.drawImage(fullCanvas, 0, 0, bgCanvas.width, bgCanvas.height);
-            bgCtx.fillStyle = 'rgba(0,0,0,0.4)';
-            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-            overlay.appendChild(bgCanvas);
-
-            const selCanvas = document.createElement('canvas');
-            selCanvas.width = bgCanvas.width;
-            selCanvas.height = bgCanvas.height;
-            selCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100vw;height:100vh;pointer-events:none;';
-            overlay.appendChild(selCanvas);
-            const selCtx = selCanvas.getContext('2d');
-
-            const hint = document.createElement('div');
-            hint.className = 'screenshot-hint';
-            hint.textContent = '按住鼠标拖拽选择要识别的区域，按 Esc 取消';
-            overlay.appendChild(hint);
-
-            const sizeLabel = document.createElement('div');
-            sizeLabel.className = 'screenshot-size';
-            sizeLabel.style.display = 'none';
-            overlay.appendChild(sizeLabel);
-
-            document.body.appendChild(overlay);
-
-            // 缩放比例（截屏分辨率 vs 视口大小）
-            const scaleX = fullCanvas.width / window.innerWidth;
-            const scaleY = fullCanvas.height / window.innerHeight;
-
-            let startX = 0, startY = 0, dragging = false;
-
-            const cleanup = () => {
-                overlay.removeEventListener('mousedown', onMouseDown);
-                overlay.removeEventListener('mousemove', onMouseMove);
-                overlay.removeEventListener('mouseup', onMouseUp);
-                document.removeEventListener('keydown', onKeyDown);
-                overlay.remove();
-            };
-
-            const onMouseDown = (e) => {
-                startX = e.clientX;
-                startY = e.clientY;
-                dragging = true;
-            };
-
-            const onMouseMove = (e) => {
-                if (!dragging) return;
-                const x = Math.min(startX, e.clientX);
-                const y = Math.min(startY, e.clientY);
-                const w = Math.abs(e.clientX - startX);
-                const h = Math.abs(e.clientY - startY);
-
-                selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-                selCtx.drawImage(fullCanvas,
-                    x * scaleX, y * scaleY, w * scaleX, h * scaleY,
-                    x, y, w, h
-                );
-                selCtx.strokeStyle = '#4f8ff7';
-                selCtx.lineWidth = 2;
-                selCtx.setLineDash([6, 3]);
-                selCtx.strokeRect(x, y, w, h);
-                selCtx.setLineDash([]);
-
-                sizeLabel.style.display = 'block';
-                sizeLabel.style.left = (e.clientX + 10) + 'px';
-                sizeLabel.style.top = (e.clientY + 10) + 'px';
-                sizeLabel.textContent = Math.round(w * scaleX) + ' × ' + Math.round(h * scaleY);
-            };
-
-            const onMouseUp = async (e) => {
-                if (!dragging) return;
-                dragging = false;
-
-                const x = Math.min(startX, e.clientX);
-                const y = Math.min(startY, e.clientY);
-                const w = Math.abs(e.clientX - startX);
-                const h = Math.abs(e.clientY - startY);
-
-                cleanup();
-
-                if (w < 20 || h < 20) {
-                    this.showMessage('选区太小，请重新截图框选', 'info');
-                    return;
-                }
-
-                // 裁剪选中区域（从原始截屏裁剪，保证清晰度）
-                const cropCanvas = document.createElement('canvas');
-                cropCanvas.width = w * scaleX;
-                cropCanvas.height = h * scaleY;
-                const cropCtx = cropCanvas.getContext('2d');
-                cropCtx.drawImage(fullCanvas,
-                    x * scaleX, y * scaleY, w * scaleX, h * scaleY,
-                    0, 0, cropCanvas.width, cropCanvas.height
-                );
-
-                cropCanvas.toBlob(async (blob) => {
-                    try {
-                        if (!blob) { this.showMessage('截图处理失败', 'error'); return; }
-                        const file = new File([blob], 'screenshot_' + Date.now() + '.png', { type: 'image/png' });
-                        const dt = new DataTransfer();
-                        dt.items.add(file);
-                        const fileInput = document.getElementById('fileInput');
-                        fileInput.files = dt.files;
-                        await this.handleFileUpload({ target: fileInput });
-                    } catch (err) {
-                        console.error('[截图] 文件处理失败:', err);
-                        this.showMessage('截图处理失败: ' + err.message, 'error');
-                    }
-                }, 'image/png');
-            };
-
-            const onKeyDown = (e) => {
-                if (e.key === 'Escape') cleanup();
-            };
-
-            overlay.addEventListener('mousedown', onMouseDown);
-            overlay.addEventListener('mousemove', onMouseMove);
-            overlay.addEventListener('mouseup', onMouseUp);
-            document.addEventListener('keydown', onKeyDown);
-    }
-
-    /**
      * 处理文件上传
      */
     async handleFileUpload(event) {
@@ -3100,168 +2678,8 @@ class OfficeDashboard {
      */
     async loadItems() {
         const result = await this.dateViewController.loadItems();
-        this._remindersNeedRefresh = true;
-        this.updateCountdownNotice?.();
+        this.updateCountdownNotice();
         return result;
-    }
-
-    _refreshNextMeeting() {
-        if (this.currentView !== 'board') return;
-        const el = document.querySelector('.board-date-label-next-meeting');
-        if (!el) return;
-        if (!Array.isArray(this.items)) return;
-
-        const now = new Date();
-        const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        const upcoming = this.items
-            .filter(item => item.type === 'meeting' && !item.completed && item.time && item.time > nowTime)
-            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-
-        const nextText = upcoming.length > 0 ? `⏰ ${upcoming[0].time} ${upcoming[0].title}` : '';
-        if (el.textContent !== nextText) {
-            el.textContent = nextText;
-        }
-    }
-
-    initStickyNote() {
-        const card = document.getElementById('stickyNoteCard');
-        const linesEl = document.querySelector('.sticky-note-lines');
-        if (!card || !linesEl) return;
-
-        // 恢复保存的颜色
-        const savedColor = SafeStorage.get('office_sticky_note_color') || 'yellow';
-        card.setAttribute('data-color', savedColor);
-        const colorBtn = document.getElementById('stickyColorBtn');
-        if (colorBtn) colorBtn.style.background = getComputedStyle(card).getPropertyValue('--sticky-bg').trim();
-
-        // 加载便签数据（兼容旧格式迁移）
-        this._stickyData = this._loadStickyData();
-        this._showStickyPage(this._stickyData.currentPage || 0, linesEl);
-
-        this._repositionStickyNote();
-
-        // 颜色选择
-        const picker = document.getElementById('stickyColorPicker');
-        if (colorBtn && picker) {
-            colorBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                picker.classList.toggle('show');
-            });
-            picker.querySelectorAll('.sticky-note-color-dot').forEach(dot => {
-                dot.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const color = dot.dataset.color;
-                    card.setAttribute('data-color', color);
-                    SafeStorage.set('office_sticky_note_color', color);
-                    colorBtn.style.background = getComputedStyle(card).getPropertyValue('--sticky-bg').trim();
-                    picker.classList.remove('show');
-                });
-            });
-        }
-        document.addEventListener('click', () => { if (picker) picker.classList.remove('show'); });
-
-        // 自动保存（800ms 防抖）
-        let saveTimer = null;
-        const save = () => {
-            clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => {
-                this._commitStickyPage(linesEl);
-                SafeStorage.set('office_sticky_note', JSON.stringify(this._stickyData));
-                if (syncManager && syncManager.isLoggedIn()) {
-                    syncManager.immediateSyncToCloud().catch(() => {});
-                }
-            }, 800);
-        };
-        linesEl.addEventListener('input', save);
-
-        // 翻页按钮
-        const prevBtn = document.getElementById('stickyPrevPage');
-        const nextBtn = document.getElementById('stickyNextPage');
-        const addBtn = document.getElementById('stickyAddPage');
-        if (prevBtn) prevBtn.addEventListener('click', () => {
-            this._commitStickyPage(linesEl);
-            if (this._stickyData.currentPage > 0) {
-                this._stickyData.currentPage--;
-                this._showStickyPage(this._stickyData.currentPage, linesEl);
-                save();
-            }
-        });
-        if (nextBtn) nextBtn.addEventListener('click', () => {
-            this._commitStickyPage(linesEl);
-            if (this._stickyData.currentPage < this._stickyData.pages.length - 1) {
-                this._stickyData.currentPage++;
-                this._showStickyPage(this._stickyData.currentPage, linesEl);
-                save();
-            }
-        });
-        if (addBtn) addBtn.addEventListener('click', () => {
-            this._commitStickyPage(linesEl);
-            this._stickyData.pages.push('');
-            this._stickyData.currentPage = this._stickyData.pages.length - 1;
-            this._showStickyPage(this._stickyData.currentPage, linesEl);
-            save();
-            linesEl.focus();
-        });
-
-        // 右键删除当前页（>1页时）
-        linesEl.addEventListener('contextmenu', (e) => {
-            if (this._stickyData.pages.length <= 1) return;
-            e.preventDefault();
-            this._commitStickyPage(linesEl);
-            this._stickyData.pages.splice(this._stickyData.currentPage, 1);
-            if (this._stickyData.currentPage >= this._stickyData.pages.length) {
-                this._stickyData.currentPage = this._stickyData.pages.length - 1;
-            }
-            this._showStickyPage(this._stickyData.currentPage, linesEl);
-            this._updateStickyPageIndicator();
-            save();
-        });
-    }
-
-    _loadStickyData() {
-        const raw = SafeStorage.get('office_sticky_note') || '';
-        if (!raw) return { pages: [''], currentPage: 0 };
-        // JSON 格式（新）
-        if (raw.startsWith('{')) {
-            try {
-                const data = JSON.parse(raw);
-                if (data.pages && Array.isArray(data.pages) && data.pages.length > 0) {
-                    return { pages: data.pages, currentPage: data.currentPage || 0 };
-                }
-            } catch (_) {}
-        }
-        // 旧格式：纯文本字符串
-        return { pages: [raw], currentPage: 0 };
-    }
-
-    _commitStickyPage(linesEl) {
-        if (!this._stickyData || !this._stickyData.pages) return;
-        this._stickyData.pages[this._stickyData.currentPage] = linesEl.textContent || '';
-    }
-
-    _showStickyPage(pageIdx, linesEl) {
-        if (!this._stickyData || !this._stickyData.pages) return;
-        this._stickyData.currentPage = Math.max(0, Math.min(pageIdx, this._stickyData.pages.length - 1));
-        linesEl.textContent = this._stickyData.pages[this._stickyData.currentPage] || '';
-        this._updateStickyPageIndicator();
-    }
-
-    _updateStickyPageIndicator() {
-        const indicator = document.getElementById('stickyPageIndicator');
-        if (!indicator || !this._stickyData) return;
-        indicator.textContent = (this._stickyData.currentPage + 1) + '/' + this._stickyData.pages.length;
-    }
-
-    _repositionStickyNote() {
-        const card = document.getElementById('stickyNoteCard');
-        const dateLabel = document.getElementById('boardDateLabel');
-        if (!card || !dateLabel) return;
-        if (this.currentView !== 'board') {
-            card.style.display = 'none';
-            return;
-        }
-        card.style.display = '';
-        card.style.top = (dateLabel.offsetTop + dateLabel.offsetHeight + 16) + 'px';
     }
 
     /**
@@ -3305,8 +2723,8 @@ class OfficeDashboard {
     }
 
     getCardPriorityBucket(item) {
-        if (item.completed) return 3;
         if (item.pinned) return 0;
+        if (item.completed) return 3;
         if (item.sunk) return 2;
         return 1;
     }
@@ -3360,8 +2778,6 @@ class OfficeDashboard {
 
         [0, 1, 2, 3].forEach(bucket => {
             const bucketItems = buckets.get(bucket) || [];
-            // 同桶内 pinned 排前面
-            bucketItems.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
             const manualItems = bucketItems
                 .filter(item => hasManualOrder(item))
                 .sort((a, b) => {
@@ -3424,9 +2840,6 @@ class OfficeDashboard {
                 if (priorityA !== priorityB) {
                     return priorityA - priorityB;
                 }
-
-                // 同桶内 pinned 排前面（已完成桶中：置顶的已完成 > 普通已完成）
-                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
 
                 const pWeight = { high: 0, medium: 1, low: 2 };
                 const pwA = pWeight[a.priority] ?? 1;
@@ -3757,36 +3170,19 @@ class OfficeDashboard {
         switch (item.type) {
             case ITEM_TYPES.TODO:
                 document.getElementById('todoPriority').value = item.priority || 'medium';
-                const todoDeadline = document.getElementById('todoDeadline');
-                todoDeadline.value = item.deadline || '';
-                const hasDeadline = !!item.deadline;
-
-                // 切换提醒模式
-                const reminderRelative = document.getElementById('reminderRelative');
-                const reminderAbsolute = document.getElementById('reminderAbsolute');
-                if (reminderRelative && reminderAbsolute) {
-                    reminderRelative.style.display = hasDeadline ? '' : 'none';
-                    reminderAbsolute.style.display = hasDeadline ? 'none' : '';
-                }
-
-                if (hasDeadline) {
-                    // 相对提醒回填
-                    document.getElementById('todoReminderAdvance').value = item.reminderAdvance || 3;
-                    const reminderTimeEl = document.getElementById('todoReminderTime');
-                    const reminderTimeGroup = document.getElementById('reminderTimeGroup');
-                    reminderTimeEl.value = item.reminderTime || '09:00';
-                    reminderTimeGroup.style.display = (item.reminderAdvance || 3) >= 1440 ? '' : 'none';
+                document.getElementById('todoDeadline').value = item.deadline || '';
+                document.getElementById('todoReminderAdvance').value = item.reminderAdvance || 3;
+                const reminderTimeEl = document.getElementById('todoReminderTime');
+                const reminderTimeGroup = document.getElementById('reminderTimeGroup');
+                if (item.reminderTime) {
+                    reminderTimeEl.value = item.reminderTime;
                 } else {
-                    // 绝对提醒回填：仅当原事项有提醒配置时才回填，避免污染无提醒旧事项
-                    const absMode = document.getElementById('todoReminderMode');
-                    const absDate = document.getElementById('todoReminderDate');
-                    const absTime = document.getElementById('todoReminderTimeAbs');
-                    if (absMode) absMode.value = item.reminderMode || '';
-                    if (absDate) {
-                        absDate.value = item.reminderDate || '';
-                        absDate.style.display = (item.reminderMode === 'once') ? '' : 'none';
-                    }
-                    if (absTime) absTime.value = item.reminderTimeAbs || '';
+                    reminderTimeEl.value = '09:00';
+                }
+                if (parseInt(document.getElementById('todoReminderAdvance').value) >= 1440) {
+                    reminderTimeGroup.style.display = '';
+                } else {
+                    reminderTimeGroup.style.display = 'none';
                 }
                 
                 // 周期性任务设置
@@ -3927,14 +3323,13 @@ class OfficeDashboard {
 
     getTodoReminderItems(items = []) {
         const now = Date.now();
-        const baseFilter = item => item?.type === ITEM_TYPES.TODO && !item.completed && !item.reminderDismissedAt && !(this._dismissedTodoReminderIds && this._dismissedTodoReminderIds.has(item.id)) && (item.deadlineManuallySet || item.reminderManuallySet);
-
-        // 相对提醒：有截止时间
-        const relativeItems = items
-            .filter(item => baseFilter(item) && item.deadline)
+        return items
+            .filter(item => item?.type === ITEM_TYPES.TODO && item.deadline && !item.completed && !item.reminderDismissedAt && !(this._dismissedTodoReminderIds && this._dismissedTodoReminderIds.has(item.id)) && (item.deadlineManuallySet || item.reminderManuallySet))
             .map(item => {
                 const deadlineDate = new Date(item.deadline);
-                if (Number.isNaN(deadlineDate.getTime())) return null;
+                if (Number.isNaN(deadlineDate.getTime())) {
+                    return null;
+                }
                 const advanceMin = item.reminderAdvance || 3;
                 let windowMs = advanceMin * 60000;
                 if (item.reminderTime && advanceMin >= 1440) {
@@ -3951,46 +3346,16 @@ class OfficeDashboard {
                     item,
                     deadlineDate,
                     overdueMs: now - deadlineDate.getTime(),
-                    windowMs,
-                    isAbsolute: false
+                    windowMs
                 };
             })
             .filter(Boolean)
-            .filter(entry => entry.overdueMs >= -entry.windowMs);
-
-        // 绝对提醒：无截止时间，用 reminderMode + reminderTimeAbs
-        const absoluteItems = items
-            .filter(item => baseFilter(item) && !item.deadline && item.reminderMode && item.reminderTimeAbs)
-            .map(item => {
-                let targetDate;
-                if (item.reminderMode === 'once') {
-                    if (!item.reminderDate) return null;
-                    targetDate = new Date(`${item.reminderDate}T${item.reminderTimeAbs}`);
-                } else {
-                    const today = new Date();
-                    const [h, m] = item.reminderTimeAbs.split(':').map(Number);
-                    targetDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, 0, 0);
-                }
-                if (Number.isNaN(targetDate.getTime())) return null;
-                const windowMs = 3 * 60000;
-                return {
-                    item,
-                    deadlineDate: targetDate,
-                    overdueMs: now - targetDate.getTime(),
-                    windowMs,
-                    isAbsolute: true
-                };
-            })
-            .filter(Boolean)
-            .filter(entry => entry.overdueMs >= -entry.windowMs);
-
-        return [...relativeItems, ...absoluteItems]
+            .filter(entry => entry.overdueMs >= -entry.windowMs)
             .sort((a, b) => a.deadlineDate - b.deadlineDate);
     }
 
     getTodoReminderNoticeState() {
-        const allItems = this._allItemsForReminders || this.items || [];
-        const reminderItems = this.getTodoReminderItems(allItems);
+        const reminderItems = this.getTodoReminderItems(this.items || []);
         return {
             active: reminderItems.length > 0,
             items: reminderItems,
@@ -4021,29 +3386,9 @@ class OfficeDashboard {
         return `已超时 ${minutes}分钟`;
     }
 
-    formatTodoReminderAbsolute(targetDate) {
-        if (!(targetDate instanceof Date) || Number.isNaN(targetDate.getTime())) {
-            return '';
-        }
-        const now = new Date();
-        const timeStr = targetDate.toTimeString().slice(0, 5);
-        const isToday = targetDate.toDateString() === now.toDateString();
-        if (isToday) {
-            return `今天 ${timeStr}`;
-        }
-        const month = targetDate.getMonth() + 1;
-        const day = targetDate.getDate();
-        return `${month}月${day}日 ${timeStr}`;
-    }
-
     updateTodoReminderNotice() {
         const noticeEl = document.getElementById('countdownNotice');
         if (!noticeEl) {
-            return false;
-        }
-
-        // 闹钟激活时不干扰——避免 toggle('todo-reminder-flashing', false) 覆盖掉 showAlarmNotice 刚加的 class
-        if (noticeEl.classList.contains('alarm-active')) {
             return false;
         }
 
@@ -4077,64 +3422,23 @@ class OfficeDashboard {
         }
         if (titleEl) {
             const title = current.item.title || '';
-            if (current.isAbsolute) {
-                titleEl.textContent = `${title} [提醒]`;
-                titleEl.title = `${title} [提醒]`;
-            } else {
-                const overdue = current.overdueMs >= 0;
-                const label = overdue ? '已到期' : '即将到期';
-                titleEl.textContent = `${title} ${label}`;
-                titleEl.title = `${title} ${label}`;
-            }
+            const overdue = current.overdueMs >= 0;
+            const label = overdue ? '已到期' : '即将到期';
+            titleEl.textContent = `${title} ${label}`;
+            titleEl.title = `${title} ${label}`;
         }
         if (descEl) {
-            if (current.isAbsolute) {
-                const absText = this.formatTodoReminderAbsolute(current.deadlineDate);
-                descEl.textContent = absText;
-                descEl.title = absText;
-            } else {
-                const relative = this.formatTodoReminderRelative(current.deadlineDate);
-                descEl.textContent = relative;
-                descEl.title = relative;
-            }
+            const relative = this.formatTodoReminderRelative(current.deadlineDate);
+            descEl.textContent = relative;
+            descEl.title = relative;
         }
         if (completeBtn) {
             completeBtn.style.display = '';
-            completeBtn.dataset.noticeType = 'todo';
             completeBtn.dataset.itemId = current.item.id;
         }
 
         noticeEl.hidden = false;
         return true;
-    }
-
-    /**
-     * 从 DB 回填已关闭的待办提醒 ID（防刷新后复活）
-     */
-    async _loadDismissedReminderIds() {
-        this._dismissedTodoReminderIds = new Set();
-        try {
-            // 优先从 SafeStorage 恢复（比 DB 更可靠，不会被 sync 覆盖）
-            const raw = SecurityUtils.safeGetStorage('office_dismissed_reminders');
-            if (raw) {
-                const arr = JSON.parse(raw);
-                if (Array.isArray(arr)) arr.forEach(id => this._dismissedTodoReminderIds.add(id));
-            }
-            // 同时从 DB 补充（有些可能是 sync 带回来的已提醒标记）
-            const allItems = await db.getAllItems();
-            for (const item of allItems) {
-                if (item.reminderDismissedAt) {
-                    this._dismissedTodoReminderIds.add(item.id);
-                }
-            }
-            this._persistDismissedReminderIds();
-        } catch (e) { /* 非关键路径 */ }
-    }
-
-    _persistDismissedReminderIds() {
-        if (!this._dismissedTodoReminderIds) return;
-        SecurityUtils.safeSetStorage('office_dismissed_reminders',
-            JSON.stringify([...this._dismissedTodoReminderIds]));
     }
 
     startTodoReminderLoop() {
@@ -4143,228 +3447,57 @@ class OfficeDashboard {
             this.todoReminderRefreshTimer = null;
         }
 
-        this._allItemsForReminders = this.items || [];
-        // 首次立即从DB加载全量数据用于提醒
-        if (typeof db !== 'undefined') {
-            db.getAllItems().then(items => {
-                this._allItemsForReminders = items || [];
-                this._lastReminderCacheRefresh = Date.now();
-            }).catch(() => {});
-        }
-
-        // 轮播状态初始化
-        this._carouselIndex = 0;
-        this._carouselLastSwitch = 0;
-        this._carouselTypes = [];
-        this._carouselCountdownIdx = 0;
-
-        const tick = async () => {
-            // 保存后立即刷新 + 每30秒定期刷新全量数据
-            const needRefresh = this._remindersNeedRefresh || !this._lastReminderCacheRefresh || Date.now() - this._lastReminderCacheRefresh > 30000;
-            if (needRefresh && typeof db !== 'undefined') {
-                try {
-                    this._allItemsForReminders = await db.getAllItems();
-                    this._lastReminderCacheRefresh = Date.now();
-                    this._remindersNeedRefresh = false;
-                } catch (e) { /* 静默失败 */ }
+        const tick = () => {
+            if (this.checkAlarms && this.checkAlarms()) {
+                return;
             }
-
-            // 1. 静默收集所有类型的活跃状态
-            const alarmResult = this.checkAlarmsSilent?.() || { active: false, alarm: null, justStarted: false };
-            const todoState = this.getTodoReminderNoticeState();
-            const countdownItems = this.getAllCountdownEvents?.()
-                .filter(item => item.daysLeft >= 0 && item.daysLeft <= 10) || [];
-
-            // 2. 更新待办提醒轮播索引
-            if (todoState.items.length > 1) {
-                this.todoReminderNoticeIndex = (this.todoReminderNoticeIndex + 1) % todoState.items.length;
+            const state = this.getTodoReminderNoticeState();
+            if (state.items.length > 1) {
+                this.todoReminderNoticeIndex = (this.todoReminderNoticeIndex + 1) % state.items.length;
             } else {
                 this.todoReminderNoticeIndex = 0;
             }
-
-            // 3. 构建活跃类型数组
-            const activeTypes = [];
-            if (alarmResult.active && alarmResult.alarm) activeTypes.push('alarm');
-            if (todoState.active) activeTypes.push('todo');
-            if (countdownItems.length > 0) activeTypes.push('countdown');
-
-            // 4. 存储状态供 ✓ 按钮使用
-            this._carouselActiveTypes = activeTypes;
-            this._carouselAlarmResult = alarmResult;
-            this._carouselTodoState = todoState;
-            this._carouselCountdownItems = countdownItems;
-
-            // 5. 无活跃提醒 → 显示空闲态
-            if (activeTypes.length === 0) {
-                this._carouselIndex = 0;
-                this._carouselLastSwitch = 0;
-                this._carouselTypes = [];
-                this._carouselCountdownIdx = 0;
-                this._shownAlarmId = null;
-                const noticeEl = document.getElementById('countdownNotice');
-                if (noticeEl) noticeEl.classList.remove('alarm-active', 'todo-reminder-active', 'todo-reminder-flashing');
-                const completeBtn = document.getElementById('todoReminderCompleteBtn');
-                if (completeBtn) completeBtn.style.display = 'none';
-                this.updateCountdownNotice?.();
-                this._refreshNextMeeting();
-                if (this._repositionStickyNote) this._repositionStickyNote();
-                return;
-            }
-
-            // 6. 轮播切换（4秒每种类型）
-            const now = Date.now();
-            const SWITCH_INTERVAL = 4000;
-
-            if (JSON.stringify(this._carouselTypes) !== JSON.stringify(activeTypes)) {
-                this._carouselTypes = [...activeTypes];
-                this._carouselIndex = 0;
-                this._carouselLastSwitch = now;
-            }
-
-            if (activeTypes.length > 1 && now - this._carouselLastSwitch >= SWITCH_INTERVAL) {
-                this._carouselIndex = (this._carouselIndex + 1) % activeTypes.length;
-                this._carouselLastSwitch = now;
-                this._shownAlarmId = null;
-                const noticeEl = document.getElementById('countdownNotice');
-                if (noticeEl) noticeEl.classList.remove('alarm-active', 'todo-reminder-active', 'todo-reminder-flashing');
-                if (this.countdownNoticeTimer) {
-                    clearInterval(this.countdownNoticeTimer);
-                    this.countdownNoticeTimer = null;
-                }
-            }
-
-            if (activeTypes.length === 1) {
-                this._carouselIndex = 0;
-            }
-
-            // 7. 渲染当前类型
-            const currentType = activeTypes[this._carouselIndex];
-            this._renderNoticeCarouselItem(currentType);
-
-            this._refreshNextMeeting();
-            if (this._repositionStickyNote) this._repositionStickyNote();
+            this.updateCountdownNotice();
         };
 
-        this.updateCountdownNotice?.();
+        this.updateCountdownNotice();
         this.todoReminderRefreshTimer = window.setInterval(tick, 1000);
-    }
-
-    /**
-     * 轮播模式：渲染指定类型的通知栏内容
-     */
-    _renderNoticeCarouselItem(type) {
-        const noticeEl = document.getElementById('countdownNotice');
-        if (!noticeEl) return;
-
-        this.hideIdleNotice?.();
-        noticeEl.hidden = false;
-
-        switch (type) {
-            case 'alarm': {
-                const alarm = this._carouselAlarmResult?.alarm;
-                if (alarm) this.showAlarmNotice(alarm, false);
-                break;
-            }
-            case 'todo': {
-                noticeEl.classList.remove('alarm-active');
-                this.updateTodoReminderNotice();
-                break;
-            }
-            case 'countdown': {
-                const items = this._carouselCountdownItems || [];
-                if (items.length === 0) break;
-
-                // 每3秒切换倒数日项（与原有行为一致）
-                const nowCD = Date.now();
-                if (this._carouselCountdownIdx == null || this._carouselCountdownIdx >= items.length) {
-                    this._carouselCountdownIdx = 0;
-                }
-                if (this._carouselCountdownLastTick == null) {
-                    this._carouselCountdownLastTick = nowCD;
-                }
-                if (items.length > 1 && nowCD - this._carouselCountdownLastTick >= 3000) {
-                    this._carouselCountdownIdx = (this._carouselCountdownIdx + 1) % items.length;
-                    this._carouselCountdownLastTick = nowCD;
-                }
-                if (items.length === 1) {
-                    this._carouselCountdownIdx = 0;
-                }
-                const item = items[this._carouselCountdownIdx];
-
-                noticeEl.classList.remove('alarm-active', 'todo-reminder-active', 'todo-reminder-flashing');
-                const titleEl = noticeEl.querySelector('.countdown-notice-title');
-                const descEl = noticeEl.querySelector('.countdown-notice-desc');
-                const badgeEl = noticeEl.querySelector('.countdown-notice-badge');
-                const completeBtn = document.getElementById('todoReminderCompleteBtn');
-                if (badgeEl) {
-                    badgeEl.textContent = items.length > 1 ? `倒数日 ${this._carouselCountdownIdx + 1}/${items.length}` : '倒数日';
-                }
-                if (titleEl) titleEl.textContent = item.daysLeft === 0 ? `${item.name} 就在今天` : `${item.name} 还有 ${item.daysLeft} 天`;
-                if (descEl) descEl.textContent = `${item.date} · ${item.metaLabel || '纪念日'}`;
-                if (completeBtn) {
-                    completeBtn.style.display = 'none';
-                }
-                break;
-            }
-        }
     }
 
     bindTodoReminderComplete() {
         const btn = document.getElementById('todoReminderCompleteBtn');
         if (!btn) return;
 
+        let completing = false;
         btn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (completing) return;
 
-            const noticeType = btn.dataset.noticeType;
+            const itemId = parseInt(btn.dataset.itemId);
+            if (!itemId) return;
 
-            // 闹钟关闭
-            if (noticeType === 'alarm') {
-                const alarmId = btn.dataset.alarmId;
-                if (alarmId) {
-                    this._carouselLastSwitch = 0;
-                    this._carouselTypes = [];
-                    this.dismissAlarm?.(alarmId);
+            completing = true;
+            btn.textContent = '...';
+            btn.style.pointerEvents = 'none';
+
+            try {
+                // 关闭提醒≠完成待办：内存+DB双重标记，防sync覆盖后复活
+                this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
+                this._dismissedTodoReminderIds.add(itemId);
+                const item = await db.getItem(itemId);
+                if (item) {
+                    item.reminderDismissedAt = new Date().toISOString();
+                    await db.putItem(item);
+                    this.items = await db.getAllItems();
                 }
-                return;
-            }
-
-            // 待办提醒关闭
-            if (noticeType === 'todo') {
-                const itemId = parseInt(btn.dataset.itemId);
-                if (!itemId) return;
-
-                try {
-                    this._dismissedTodoReminderIds = this._dismissedTodoReminderIds || new Set();
-                    this._dismissedTodoReminderIds.add(itemId);
-                    this._persistDismissedReminderIds();
-                    // 强制轮播重新评估，由下次 tick 自动切换
-                    this._carouselLastSwitch = 0;
-                    this._carouselTypes = [];
-                    // DB 持久化 + 同步 + 列表刷新全部后台执行，不阻塞 UI
-                    (async () => {
-                        const item = await db.getItem(itemId);
-                        if (item) {
-                            item.reminderDismissedAt = new Date().toISOString();
-                            await db.putItem(item);
-                            this.items = await db.getAllItems();
-                            if (typeof syncManager !== 'undefined' && syncManager.isLoggedIn?.()) {
-                                syncManager.immediateSyncToCloud().catch(() => {});
-                            }
-                        }
-                        this.loadItems().catch(err => console.warn('刷新列表失败:', err));
-                    })();
-                } catch (err) {
-                    console.warn('关闭待办提醒失败:', err);
-                }
-                return;
-            }
-
-            // 倒数日不可关闭，跳过到下一个类型
-            if (this._carouselActiveTypes && this._carouselActiveTypes.length > 1) {
-                this._carouselLastSwitch = 0;
-                this.updateCountdownNotice?.();
+                await this.loadItems(); // 重渲染卡片显示已提醒标记+更新通知栏
+            } catch (err) {
+                console.warn('关闭待办提醒失败:', err);
+            } finally {
+                completing = false;
+                btn.textContent = '✓';
+                btn.style.pointerEvents = '';
             }
         });
     }
@@ -4586,12 +3719,12 @@ class OfficeDashboard {
                     const oldType = originalItem.type;
                     const selDate = this.selectedDate;
                     if (oldType === 'todo' && newType === 'meeting') {
-                        updates.date = originalItem.deadline?.split('T')[0] || originalItem.date || selDate;
+                        updates.date = originalItem.deadline?.split('T')[0] || selDate;
                         if (originalItem.deadline?.includes('T')) {
                             updates.time = originalItem.deadline.split('T')[1]?.substring(0, 5) || '';
                         }
                     } else if (oldType === 'todo' && newType === 'document') {
-                        const dateStr = originalItem.deadline?.split('T')[0] || originalItem.date || selDate;
+                        const dateStr = originalItem.deadline?.split('T')[0] || selDate;
                         updates.docDate = dateStr;
                         updates.docStartDate = dateStr;
                         updates.docEndDate = dateStr;
@@ -4608,7 +3741,6 @@ class OfficeDashboard {
                     } else if (oldType === 'document' && newType === 'todo') {
                         const dateStr = originalItem.docStartDate || originalItem.docDate || selDate;
                         updates.deadline = `${dateStr}T09:00`;
-                        updates.date = dateStr;
                     } else if (oldType === 'document' && newType === 'meeting') {
                         updates.date = originalItem.docStartDate || originalItem.docDate || selDate;
                     }
@@ -4657,7 +3789,6 @@ class OfficeDashboard {
         if (originalItem.type === ITEM_TYPES.TODO) {
             const currentTime = originalItem.deadline?.split('T')[1] || '09:00';
             updates.deadline = `${targetDate}T${currentTime}`;
-            updates.date = targetDate;
         } else if (originalItem.type === ITEM_TYPES.MEETING) {
             updates.date = targetDate;
         } else if (originalItem.type === ITEM_TYPES.DOCUMENT) {
@@ -4715,8 +3846,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-06-26 v5.2.133';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=56', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=76', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=7', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'app.js?v=256', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-05-12 v5.2.85';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=51', 'upload-flow.js?v=9', 'calendar.js?v=41', 'sync.js?v=68', 'app-date-view.js?v=13', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=1', 'tools.js?v=1', 'side-panels.js?v=1', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'app.js?v=222', 'db.js?v=29', 'base.css?v=1', 'layout.css?v=2', 'themes.css?v=3', 'components.css?v=2', 'responsive.css?v=1', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -4726,8 +3857,8 @@ class OfficeDashboard {
      * 返回: 'pinned' | 'active' | 'completed'
      */
     getItemGroup(item) {
-        if (item.completed) return 'completed';
         if (item.pinned) return 'pinned';
+        if (item.completed) return 'completed';
         return 'active';
     }
 
@@ -4766,37 +3897,10 @@ class OfficeDashboard {
         const timeStr = now.toTimeString().slice(0, 5);
 
         if (type === ITEM_TYPES.TODO) {
-            // 截止时间选填，默认留空（datetime-local无法实现日期填入+时间留空）
             const deadlineEl = document.getElementById('todoDeadline');
-            if (deadlineEl) deadlineEl.value = '';
-            this._todoDeadlineInitial = '';
 
-            // 截止时间为空→显示绝对提醒；有截止时间→显示相对提醒
-            const reminderRelative = document.getElementById('reminderRelative');
-            const reminderAbsolute = document.getElementById('reminderAbsolute');
-            const hasDeadlineInit = !!document.getElementById('todoDeadline')?.value;
-            if (reminderRelative) reminderRelative.style.display = hasDeadlineInit ? '' : 'none';
-            if (reminderAbsolute) reminderAbsolute.style.display = hasDeadlineInit ? 'none' : '';
-
-            // 重置绝对提醒字段默认值
-            const reminderMode = document.getElementById('todoReminderMode');
-            const reminderDate = document.getElementById('todoReminderDate');
-            const reminderTimeAbs = document.getElementById('todoReminderTimeAbs');
-            if (reminderMode) reminderMode.value = 'once';
-            if (reminderDate) reminderDate.value = '';
-            if (reminderTimeAbs) reminderTimeAbs.value = '09:00';
-            // 记录初始状态，保存时对比判断是否手动改过
-            this._todoReminderInitial = { mode: 'once', date: null, timeAbs: '09:00' };
-            // 单次模式默认显示日期选择器
-            if (reminderDate) reminderDate.style.display = '';
-
-            // 重置相对提醒默认值
-            const reminderAdvance = document.getElementById('todoReminderAdvance');
-            const reminderTime = document.getElementById('todoReminderTime');
-            const reminderTimeGroup = document.getElementById('reminderTimeGroup');
-            if (reminderAdvance) reminderAdvance.value = '3';
-            if (reminderTime) reminderTime.value = '09:00';
-            if (reminderTimeGroup) reminderTimeGroup.style.display = 'none';
+            if (deadlineEl) deadlineEl.value = `${dateStr}T${timeStr}`;
+            this._todoDeadlineInitial = `${dateStr}T${timeStr}`;
 
             // 重置周期性选项
             const recurringFields = document.getElementById('recurringFields');
@@ -4840,7 +3944,7 @@ class OfficeDashboard {
             description: `${dateStr} 要新增什么类型的事项？`,
             maxWidth: '420px',
             buttons: [
-                { label: '待办事项', subLabel: '截止时间留空，可设提醒', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: ITEM_TYPES.TODO },
+                { label: '待办事项', subLabel: '默认带入该日期和当前时间', className: 'btn-primary', subStyle: 'font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;', value: ITEM_TYPES.TODO },
                 { label: '会议活动', subLabel: '默认带入该日期和当前时间', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: ITEM_TYPES.MEETING },
                 { label: '办文情况', subLabel: '默认带入该日期作为开始日期', className: 'btn-secondary', subStyle: 'font-size: 12px; color: #999; margin-top: 4px;', value: ITEM_TYPES.DOCUMENT },
                 { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
@@ -4928,28 +4032,6 @@ class OfficeDashboard {
                 reminderTimeGroup.style.display = parseInt(e.target.value) >= 1440 ? '' : 'none';
             };
         }
-
-        // === 截止时间变化 → 切换相对/绝对提醒模式 ===
-        const todoDeadline = document.getElementById('todoDeadline');
-        const reminderRelative = document.getElementById('reminderRelative');
-        const reminderAbsolute = document.getElementById('reminderAbsolute');
-        if (todoDeadline && reminderRelative && reminderAbsolute) {
-            todoDeadline.onchange = () => {
-                const hasDeadline = !!todoDeadline.value;
-                reminderRelative.style.display = hasDeadline ? '' : 'none';
-                reminderAbsolute.style.display = hasDeadline ? 'none' : '';
-            };
-            todoDeadline.oninput = todoDeadline.onchange;
-        }
-
-        // === 绝对提醒模式切换 → 单次显示日期，每天隐藏日期 ===
-        const todoReminderMode = document.getElementById('todoReminderMode');
-        const todoReminderDate = document.getElementById('todoReminderDate');
-        if (todoReminderMode && todoReminderDate) {
-            todoReminderMode.onchange = (e) => {
-                todoReminderDate.style.display = e.target.value === 'once' ? '' : 'none';
-            };
-        }
     }
 
     /**
@@ -4975,87 +4057,43 @@ class OfficeDashboard {
             case ITEM_TYPES.TODO:
                 item.priority = document.getElementById('todoPriority').value;
                 const newDeadline = document.getElementById('todoDeadline').value;
-                item.deadline = newDeadline || null;
-                // 锚定日期：有截止时间用截止日期，否则用当前查看日期
-                item.date = newDeadline || this.selectedDate;
-                const hasDeadline = !!newDeadline;
-
-                if (hasDeadline) {
-                    // 相对提醒：截止前 N 分钟
-                    const newReminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
-                    const reminderTimeVal = document.getElementById('todoReminderTime').value;
-                    item.reminderAdvance = newReminderAdvance;
-                    if (newReminderAdvance >= 1440 && reminderTimeVal) {
-                        item.reminderTime = reminderTimeVal;
-                    } else {
-                        item.reminderTime = null;
-                    }
-                    // 清除绝对提醒字段
-                    item.reminderMode = null;
-                    item.reminderDate = null;
-                    item.reminderTimeAbs = null;
+                item.deadline = newDeadline;
+                const newReminderAdvance = parseInt(document.getElementById('todoReminderAdvance').value) || 3;
+                const reminderTimeVal = document.getElementById('todoReminderTime').value;
+                item.reminderAdvance = newReminderAdvance;
+                if (item.reminderAdvance >= 1440 && reminderTimeVal) {
+                    item.reminderTime = reminderTimeVal;
                 } else {
-                    // 绝对提醒：无截止时间，在指定日期/时间提醒
-                    item.reminderAdvance = 0;
                     item.reminderTime = null;
-                    const absMode = document.getElementById('todoReminderMode')?.value || '';
-                    const absDate = document.getElementById('todoReminderDate')?.value || '';
-                    const absTime = document.getElementById('todoReminderTimeAbs')?.value || '';
-                    if (absMode && absTime) {
-                        item.reminderMode = absMode;
-                        item.reminderDate = (absMode === 'once' && absDate) ? absDate : null;
-                        item.reminderTimeAbs = absTime;
-                    } else {
-                        item.reminderMode = null;
-                        item.reminderDate = null;
-                        item.reminderTimeAbs = null;
-                    }
                 }
-
                 if (id) {
                     const originalItem = await db.getItem(parseInt(id));
                     if (originalItem) {
                         // 截止时间手动改过
-                        if ((originalItem.deadline || null) !== (newDeadline || null)) {
+                        if (originalItem.deadline !== newDeadline) {
                             item.deadlineManuallySet = true;
                         } else {
                             item.deadlineManuallySet = originalItem.deadlineManuallySet || false;
                         }
                         // 提醒时间手动改过
-                        const hasReminderChanged = hasDeadline
-                            ? (originalItem.reminderAdvance !== item.reminderAdvance
-                                || (originalItem.reminderTime || null) !== (item.reminderTime || null))
-                            : (originalItem.reminderMode !== item.reminderMode
-                                || (originalItem.reminderDate || null) !== (item.reminderDate || null)
-                                || (originalItem.reminderTimeAbs || null) !== (item.reminderTimeAbs || null));
-                        item.reminderManuallySet = originalItem.reminderManuallySet || hasReminderChanged || false;
-                        // 编辑时保留完成状态，不要强制重置
-                        item.completed = !!originalItem.completed;
-                        if (originalItem.completed) {
-                            item.completedAt = originalItem.completedAt;
-                        }
-                        // 仅未完成事项清除已提醒标记，让提醒重新生效
-                        if (!originalItem.completed) {
-                            delete item.reminderDismissedAt;
-                            if (this._dismissedTodoReminderIds) {
-                                this._dismissedTodoReminderIds.delete(parseInt(id));
-                            }
-                        }
+                        const reminderChanged = originalItem.reminderAdvance !== newReminderAdvance
+                            || (originalItem.reminderTime || null) !== (item.reminderTime || null);
+                        item.reminderManuallySet = originalItem.reminderManuallySet || reminderChanged || false;
                     }
                 } else {
-                    if (this._todoDeadlineInitial !== undefined && this._todoDeadlineInitial !== newDeadline) {
+                    if (this._todoDeadlineInitial && this._todoDeadlineInitial !== newDeadline) {
                         item.deadlineManuallySet = true;
                     }
-                    // 只有用户主动改了提醒表单才标记为手动设置
-                    const initial = this._todoReminderInitial || {};
-                    const reminderChanged = hasDeadline
-                        ? (item.reminderAdvance !== 3 || !!item.reminderTime)
-                        : (item.reminderMode !== (initial.mode || '')
-                            || item.reminderTimeAbs !== (initial.timeAbs || '')
-                            || (item.reminderDate || null) !== (initial.date != null ? initial.date : null));
-                    item.reminderManuallySet = reminderChanged;
-                    item.completed = false;
+                    item.reminderManuallySet = newReminderAdvance !== 3 || !!item.reminderTime;
                 }
+                // 编辑时清除已提醒标记，让提醒重新生效
+                if (id) {
+                    delete item.reminderDismissedAt;
+                    if (this._dismissedTodoReminderIds) {
+                        this._dismissedTodoReminderIds.delete(parseInt(id));
+                    }
+                }
+                item.completed = false;
 
                 // 周期性任务处理
                 const isRecurring = document.getElementById('isRecurring')?.checked;
@@ -5276,7 +4314,7 @@ class OfficeDashboard {
                         });
                         return;
                     }
-                } else if (originalItem && this.isCrossDateDocument?.(originalItem)) {
+                } else if (originalItem && this.isCrossDateDocument(originalItem)) {
                     const choice = await this.showCrossDateDocChoice('编辑', '修改');
                     if (choice === 'cancel') return;
                     
@@ -5609,7 +4647,7 @@ class OfficeDashboard {
                 }
             }
             
-            if (type === ITEM_TYPES.DOCUMENT && this.isCrossDateDocument?.(originalItem)) {
+            if (type === ITEM_TYPES.DOCUMENT && this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('完成状态', completed ? '标记完成' : '取消完成');
                 if (choice === 'cancel') return;
 
@@ -5726,7 +4764,7 @@ class OfficeDashboard {
                 }
             }
             
-            if (this.isCrossDateDocument?.(originalItem)) {
+            if (this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('置顶状态', pinned ? '置顶' : '取消置顶');
                 if (choice === 'cancel') return;
 
@@ -5804,7 +4842,7 @@ class OfficeDashboard {
                 }
             }
             
-            if (this.isCrossDateDocument?.(originalItem)) {
+            if (this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('沉底状态', sunk ? '沉底' : '取消沉底');
                 if (choice === 'cancel') return;
 
@@ -6395,7 +5433,7 @@ class OfficeDashboard {
         // 先检查是否是周期性任务
         const item = await db.getItem(id);
         
-        if (this.isCrossDateDocument?.(item)) {
+        if (this.isCrossDateDocument(item)) {
             const choice = await this.showCrossDateDocDeleteChoice();
             if (choice === 'cancel') {
                 return;
@@ -6572,7 +5610,7 @@ class OfficeDashboard {
                 note
             };
 
-            if (this.isCrossDateDocument?.(originalItem)) {
+            if (this.isCrossDateDocument(originalItem)) {
                 const choice = await this.showCrossDateDocChoice('流转', '流转');
                 if (choice === 'cancel') return;
 
