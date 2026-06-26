@@ -2,6 +2,14 @@
 
 ## 已完成
 
+### v5.2.132 修复报告自定义类型 toggleCustomDateRange 报错
+- [x] 根因定位：index.html onchange="app.xxx()" 中 app 被浏览器映射为 <div id="app"> 元素(index.html:155)
+- [x] 修复：主+镜像 index.html 各5处 app.toggleCustomDateRange() → officeDashboard.toggleCustomDateRange()
+- [x] Code review: APPROVE(0C/0H/0M/1L-note)
+- [x] 语法检查通过 + 线上验证(customDateRangeGroup显示block + 0 pageerror)
+- [x] 已提交推送 `ac1de1e`
+- 附：CRUD精简验证全通过(13项右键菜单齐全+子菜单展开+0错误)
+
 ### v5.2.131 周/月视图截图显示每天完整事项——截图前临时解除高度折叠
 - [x] 根因定位：.week-view height:calc(100vh-140px) + .week-cell/.month-cell max-height+overflow-y:auto 折叠，截图函数未展开直接截可见状态
 - [x] context-menu.js: shareCalendarScreenshot 截图前调 _expandForScreenshot 加 screenshot-mode 类，finally 恢复；新增 _expandForScreenshot 方法

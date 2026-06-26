@@ -1,3 +1,33 @@
+## 2026-06-26 v5.2.132 修复报告自定义类型报错 toggleCustomDateRange——app引用改为officeDashboard实例
+
+### 改动内容
+1. **根因**：index.html 报告类型 radio 的 `onchange="app.toggleCustomDateRange()"` 中 `app` 是错误引用——页面有 `<div id="app">`(index.html:155)，浏览器把 `app` 自动映射为该 div 元素，导致 `app.toggleCustomDateRange is not a function`（选"自定义"报告类型时报错）。真正实例是 `window.officeDashboard`(app.js:6910)，方法 `toggleCustomDateRange` 定义在 app.js:6670(一直存在、本身没问题)。
+2. **修复**：index.html(主+镜像 e2e/mirror) 各5处 `onchange="app.toggleCustomDateRange()"` → `onchange="officeDashboard.toggleCustomDateRange()"`
+3. **版本号** v5.2.132，缓存参数 app.js?v=255
+
+### 触发场景
+线上并行测试(智能体5)发现：报告弹窗选"自定义"类型时控制台报错，自定义日期段不显示。
+
+### 代码审查
+- ✅ Code review: APPROVE（0C/0H/0M/1L-note）
+- ✅ 语法检查 app.js 通过
+- ✅ 线上验证：选"自定义" → customDateRangeGroup 显示 block + 0 pageerror + 无 toggleCustomDateRange 错误
+
+### 提交记录
+- `ac1de1e` fix: 报告自定义类型toggleCustomDateRange报错——app引用改为officeDashboard实例(v5.2.132)
+
+### 验证清单
+- [x] 线上版本 v5.2.132
+- [x] 报告选"自定义" → customDateRangeGroup 显示 block（日期段出现）
+- [x] 控制台无 toggleCustomDateRange 错误
+- [x] 0 pageerror
+
+### 遗留/注意
+- LOW(code-reviewer)：`<div id="app">` 仍占用 `window.app`，项目内若再用 `app.xxx()` inline handler 会踩同一坑。建议：inline handler 统一用 officeDashboard；或后续考虑改这个 div 的 id。
+- 附：本轮补跑的 CRUD 精简验证全通过(13项右键菜单齐全+移动到子菜单展开+0错误)，证明 CRUD 功能本身正常（智能体3之前卡在选择器探索，非功能问题）。
+
+---
+
 ## 2026-06-26 v5.2.131 周/月视图截图显示每天完整事项——截图前临时解除高度折叠
 
 ### 改动内容
