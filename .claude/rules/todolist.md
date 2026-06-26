@@ -2,6 +2,20 @@
 
 ## 已完成
 
+### v5.2.134 修复月报待办undefined + 年报图片0kb
+- [x] bug1: report.js todo.text→todo.title（待办字段修正，月报不再undefined）
+- [x] bug2: report.js 动态scale防canvas超限 + canvas校验（年报不再0kb）
+- [x] 镜像report.js同步两处
+- [x] 线上验证：月报待办显示正确标题 + 年报canvas 1600×1808非0kb
+- [x] 已提交推送 `212e044`
+
+### v5.2.133 根治window.app污染——div id=app改为appRoot
+- [x] 排查：HTML2处定义+JS2处引用+CSS 0处
+- [x] 修复：主+镜像 index.html id + app.js getElementById 共4处 app→appRoot
+- [x] Code review: APPROVE(0漏改/0白屏风险)
+- [x] 线上验证：appRoot显示不白屏 + window.app=undefined彻底根治 + 0错误
+- [x] 已提交推送 `8e52893`
+
 ### v5.2.132 修复报告自定义类型 toggleCustomDateRange 报错
 - [x] 根因定位：index.html onchange="app.xxx()" 中 app 被浏览器映射为 <div id="app"> 元素(index.html:155)
 - [x] 修复：主+镜像 index.html 各5处 app.toggleCustomDateRange() → officeDashboard.toggleCustomDateRange()

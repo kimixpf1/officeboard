@@ -1,3 +1,41 @@
+## 2026-06-26 v5.2.134 修复月报待办undefined + 年报图片0kb
+
+### 改动内容
+1. **bug1 月报待办undefined**：report.js:159 待办渲染用 `todo.text`（不存在的字段），月报/年报等待办显示 "undefined"。修复：`todo.text` → `todo.title`（项目事项实际字段）。
+2. **bug2 年报图片0kb**：年报全年数据内容极多，report.js exportToImage 固定 `scale:2` 使 html2canvas canvas 超浏览器尺寸上限(~32767px)，渲染失败导出 0kb。修复：按 container 实际高度**动态降 scale**(保 canvas 高≤16000) + canvas 有效性校验(失败给明确提示)。
+3. 镜像 report.js 同步两处。版本号 v5.2.134，report.js?v=18，app.js?v=257
+
+### 触发场景
+大飞反馈：年报生成图片 0kb 显示错误；月报里待办都是 undefined。
+
+### 验证
+- ✅ 语法检查 report.js(主+镜像)+app.js 通过
+- ✅ 线上验证：月报待办显示正确标题(无 undefined) + 年报 canvas 1600×1808 非0kb(dataURL 311778字节)
+
+### 提交记录
+- `212e044` fix: 月报待办undefined+年报图片0kb(v5.2.134)
+
+### 附带发现(非阻塞)
+- html2canvas 加载时 jsdelivr 源被 CSP 阻止(console error)，但 fallback 到 unpkg/本地成功，导出正常。建议后续加 jsdelivr 到 CSP 白名单消除 warning。
+
+---
+
+## 2026-06-26 v5.2.133 根治 window.app 污染——div id=app 改为 appRoot
+
+### 改动内容
+1. **根因**：`<div id="app">`(index.html:155) 被浏览器自动映射为 `window.app`，污染全局命名空间，inline handler `app.xxx()` 会误指向该 div 报错（v5.2.132 已修报告类型调用，但污染源 id="app" 仍在）。
+2. **修复**：`id="app"` → `id="appRoot"`(主+镜像 index.html)，同步 app.js `getElementById('app')`→`getElementById('appRoot')`(主:272+镜像:280)。CSS 无 #app 引用(0处)。
+3. 版本号 v5.2.133，app.js?v=256
+
+### 代码审查 + 验证
+- ✅ Code review: APPROVE（0C/0H/0M/0L），4处改动零漏改零白屏风险，主镜像一致
+- ✅ 线上验证：appRoot 显示(不白屏) + 旧 id=app 消失 + `window.app` 类型=undefined(彻底根治) + 视图切换正常 + 0错误
+
+### 提交记录
+- `8e52893` fix: 根治window.app污染——div id=app改为appRoot(v5.2.133)
+
+---
+
 ## 2026-06-26 v5.2.132 修复报告自定义类型报错 toggleCustomDateRange——app引用改为officeDashboard实例
 
 ### 改动内容
