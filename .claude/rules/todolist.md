@@ -2,6 +2,11 @@
 
 ## 已完成
 
+### v5.2.135 CSP加jsdelivr白名单消除html2canvas加载warning
+- [x] CSP script-src 加 https://cdn.jsdelivr.net（主+镜像index.html）
+- [x] 线上验证：html2canvas加载OK + CSP错误0 + 全部console错误0
+- [x] 已提交推送 `7ff42fd`
+
 ### v5.2.134 修复月报待办undefined + 年报图片0kb
 - [x] bug1: report.js todo.text→todo.title（待办字段修正，月报不再undefined）
 - [x] bug2: report.js 动态scale防canvas超限 + canvas校验（年报不再0kb）

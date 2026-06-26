@@ -1,3 +1,18 @@
+## 2026-06-26 v5.2.135 CSP加jsdelivr白名单——html2canvas加载不再被阻止
+
+### 改动内容
+1. **根因**：html2canvas-pro 多CDN fallback 首源 jsdelivr(`cdn.jsdelivr.net`) 不在 CSP `script-src` 白名单，加载被浏览器阻止(console error)，fallback 到 unpkg 成功。导出功能正常但有 warning + 多一次失败尝试(略慢)。
+2. **修复**：CSP `script-src` 加 `https://cdn.jsdelivr.net`(主+镜像 index.html)。
+3. 版本号 v5.2.135，app.js?v=258
+
+### 验证
+- ✅ 线上验证：html2canvas 加载 OK + CSP/jsdelivr 错误 0 + 全部 console 错误 0
+
+### 提交记录
+- `7ff42fd` fix: CSP加jsdelivr白名单消除html2canvas加载warning(v5.2.135)
+
+---
+
 ## 2026-06-26 v5.2.134 修复月报待办undefined + 年报图片0kb
 
 ### 改动内容
