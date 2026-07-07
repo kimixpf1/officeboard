@@ -348,6 +348,64 @@
         return container;
     }
 
+    // 从任意类型 item 提取统一的日期/时间中间表示（类型切换时字段映射用）
+    function extractDateAndTime(item) {
+        let dateStr = '';
+        let timeStr = '';
+        if (item.type === 'todo') {
+            dateStr = (item.deadline && item.deadline.slice(0, 10)) || item.date || '';
+            timeStr = (item.deadline && item.deadline.slice(11, 16)) || item.time || '';
+        } else if (item.type === 'meeting') {
+            dateStr = item.date || '';
+            timeStr = item.time || '';
+        } else if (item.type === 'document') {
+            dateStr = item.docStartDate || item.docDate || '';
+        }
+        return { dateStr, timeStr };
+    }
+
+    // 切换 item 类型并做日期/时间字段映射（todo/meeting/document 三类互转）
+    // 仅处理类型特有字段，通用字段 date/endDate/time/location/attendees/title 按新类型复用
+    function convertItemType(item, newType) {
+        if (!item || item.type === newType) return;
+        const oldType = item.type;
+        const { dateStr, timeStr } = extractDateAndTime(item);
+
+        // 清理旧类型特有字段；通用字段(date/endDate/time/location/attendees/priority)保留，
+        // 既作新类型默认值，也支持来回切换类型时不丢失已填数据（少量跨类型冗余字段无害落库）
+        if (oldType === 'todo') {
+            delete item.deadline;
+        } else if (oldType === 'document') {
+            delete item.docStartDate;
+            delete item.docEndDate;
+            delete item.docDate;
+            delete item.docNumber;
+            delete item.source;
+            delete item.progress;
+        }
+
+        item.type = newType;
+
+        // 按新类型回填日期/时间/状态字段
+        if (newType === 'todo') {
+            item.date = dateStr || null;
+            item.deadline = dateStr ? (dateStr + (timeStr ? 'T' + timeStr : '')) : '';
+            if (!item.priority) item.priority = 'medium';
+        } else if (newType === 'meeting') {
+            item.date = dateStr || null;
+            if (timeStr) item.time = timeStr;
+        } else if (newType === 'document') {
+            if (dateStr) {
+                item.docDate = dateStr;
+                item.docStartDate = dateStr;
+            }
+            if (!item.progress) item.progress = 'pending';
+        }
+
+        // 显示标题跟随新类型（与标题输入框 onChange 行为一致，用纯标题）
+        item.displayTitle = item.title || '';
+    }
+
     function renderEditablePreview(body, fileName, workingResult) {
         body.innerHTML = '';
 
@@ -398,8 +456,31 @@
                 const top = document.createElement('div');
                 top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;';
                 const head = document.createElement('div');
-                head.style.cssText = 'font-weight:600;color:var(--gray-800);';
-                head.textContent = `${index + 1}. ${item.type === 'meeting' ? '会议' : item.type === 'document' ? '办文' : '待办'}`;
+                head.style.cssText = 'display:flex;align-items:center;gap:8px;font-weight:600;color:var(--gray-800);';
+                const indexLabel = document.createElement('span');
+                indexLabel.textContent = `${index + 1}.`;
+                head.appendChild(indexLabel);
+                // 类型选择器：识别错误时可在此手动切换 待办/会议/办文，切换后自动映射日期/时间字段
+                const typeSelect = document.createElement('select');
+                typeSelect.title = '修改事项类型';
+                typeSelect.style.cssText = 'padding:4px 8px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;background:var(--bg-primary,#fff);color:var(--gray-800);font-weight:600;cursor:pointer;font-size:13px;';
+                const typeOptions = [
+                    { value: 'todo', label: '待办' },
+                    { value: 'meeting', label: '会议' },
+                    { value: 'document', label: '办文' }
+                ];
+                typeOptions.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    option.textContent = opt.label;
+                    if (opt.value === item.type) option.selected = true;
+                    typeSelect.appendChild(option);
+                });
+                typeSelect.addEventListener('change', () => {
+                    convertItemType(item, typeSelect.value);
+                    renderEditablePreview(body, fileName, workingResult);
+                });
+                head.appendChild(typeSelect);
                 const del = document.createElement('button');
                 del.type = 'button';
                 del.className = 'btn-secondary';
