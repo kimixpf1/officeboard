@@ -2,6 +2,17 @@
 
 ## 已完成
 
+### v5.2.136 识别确认面板支持修改事项类型——类型下拉选择器
+- [x] 根因：确认面板类型是纯只读文本(upload-flow.js:402)，整个文件无修改入口
+- [x] 修复：卡片头部加 select 下拉(待办/会议/办文)，change时 convertItemType 字段映射+重渲染
+- [x] 新增 extractDateAndTime/convertItemType 辅助函数(todo/meeting/document 三类互转)
+- [x] 微信端补漏：wechat-upload.html upload-flow.js?v=9→10(回归核查发现)
+- [x] 版本号 v5.2.136，upload-flow.js?v=10、app.js?v=259
+- [x] Code review: APPROVE(0C/0H/0M/2L)
+- [x] 回归核查: 6项全过，补漏微信端
+- [x] 语法检查通过(主+镜像upload-flow.js+app.js)
+- [x] 已提交推送 `515b176`
+
 ### v5.2.135 CSP加jsdelivr白名单消除html2canvas加载warning
 - [x] CSP script-src 加 https://cdn.jsdelivr.net（主+镜像index.html）
 - [x] 线上验证：html2canvas加载OK + CSP错误0 + 全部console错误0

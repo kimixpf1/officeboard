@@ -1,3 +1,49 @@
+## 2026-07-07 v5.2.136 识别确认面板支持修改事项类型——类型下拉选择器
+
+### 改动内容
+1. **根因**：图片/PDF识别后的"识别前预览确认"弹框，"待新增事项"卡片的类型(待办/会议/办文)是纯只读文本标签(upload-flow.js:402)，整个文件无任何修改入口。识别把会议误判成待办时，用户无法在面板纠正，只能取消重来。
+2. **修复**：卡片头部把只读文本改成 `<select>` 下拉(待办/会议/办文)，change时调 `convertItemType(item,newType)` 做日期/时间字段映射并重渲染(复用"删除此条"按钮的重渲染模式)。
+3. **新增辅助函数**(upload-flow.js)：`extractDateAndTime(item)` 归一日期/时间为 `{dateStr,timeStr}`；`convertItemType(item,newType)` 三类互转字段映射(todo↔meeting↔document)，通用字段保留支持来回切换不丢数据。
+4. **落库链路无需改动**：`buildFinalPreviewResult` 透传 items + `applyRecognitionActionPlan` 原样写库，改 type 真正落库生效。
+5. **微信端补漏**(回归核查发现)：`wechat-upload.html` 也加载 upload-flow.js，补缓存参数 ?v=9→10。
+6. 版本号 v5.2.136，缓存参数 upload-flow.js?v=10、app.js?v=259。镜像同步(镜像upload-flow.js历史未纳入git，本地改动保留)。
+
+### 触发场景
+大飞反馈：图片/PDF识别新增会议活动时，有时会把会议误识别成待办错误放进待办列表，且在确认面板无法修改类型。
+
+### 影响边界(回归核查结论)
+- 改动严格限制在 upload-flow.js 预览渲染层，未波及 ocr.js/app.js/sync.js/db.js 数据逻辑
+- `renderEditablePreview` 调用方仅 `showRecognitionPreviewModal` + 4处就地重渲染，封闭在预览路径
+- mutation 安全：workingResult.items 引用透传，cleanPreviewMeta 浅拷贝 mutate 后对象，无旧值覆盖/重复push
+- 落库字段缺失有 falsy 容错(db.normalizeItemForStorage/generateHash/matchItemDateRange)
+- 可接受瑕疵：长列表切换类型滚动位置重置顶部；编辑中切类型丢焦点(已输入内容不丢)；跨类型残留无害冗余字段(已加注释)
+
+### 代码审查 + 验证
+- ✅ Code review: APPROVE（0C/0H/0M/2L，均为脏数据/历史遗留）
+- ✅ 回归核查：6项全过，补漏 wechat-upload.html
+- ✅ 语法检查：主+镜像 upload-flow.js + app.js 通过
+- ✅ diff 确认主镜像本次改动一致(504行历史差异非本次引入)
+
+### 提交记录
+- `515b176` fix: 识别确认面板支持修改事项类型——类型下拉选择器(v5.2.136)
+
+### 验证清单
+- [ ] 上传图片/PDF识别 → 确认面板"待新增"卡片头部有类型下拉
+- [ ] 会议→待办：切换后日期/时间迁移到deadline，保存后出现在待办列
+- [ ] 待办→会议：deadline拆成date+time，保存后出现在会议列
+- [ ] X→办文：docStartDate正确，保存后出现在办文列
+- [ ] 改类型后再编辑标题/日期正常
+- [ ] 删除此条/合并/跳过卡片仍正常(回归)
+- [ ] 微信端 wechat-upload.html 识别确认也能改类型
+- [ ] 版本号 v5.2.136
+
+### 遗留
+- LOW: 跨类型切换残留无害冗余字段(priority/time等)落库，已加注释说明有意保留(支持来回切换不丢数据)
+- 未碰识别逻辑(ocr.js prompt/parseWithRules)，识别误判从源头未改——本次靠"面板可改类型"做兜底；如需降误判率可后续单独优化 prompt
+- 镜像 .trae/rules/ 已落后至5月12日(既有技术债)，本次仅更新 .claude/rules/
+
+---
+
 ## 2026-06-26 v5.2.135 CSP加jsdelivr白名单——html2canvas加载不再被阻止
 
 ### 改动内容
