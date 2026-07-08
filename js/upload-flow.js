@@ -649,6 +649,15 @@
 
     function showRecognitionPreviewModal(fileName, result, options = {}) {
         const preparedResult = ensurePreviewIds(result);
+        // 文件识别的所有"新增"条目默认设为会议（用户主要上传会议活动安排表）；
+        // 少数实际为待办/办文的条目，可在面板用类型下拉手动改。复用 convertItemType 做字段映射。
+        if (Array.isArray(preparedResult.items)) {
+            preparedResult.items.forEach(item => {
+                if (item && item.type && item.type !== 'meeting') {
+                    convertItemType(item, 'meeting');
+                }
+            });
+        }
         const hasActions = (preparedResult.items?.length || 0) > 0 || (preparedResult.mergedItems?.length || 0) > 0 || (preparedResult.skippedItems?.length || 0) > 0;
 
         return new Promise((resolve) => {
