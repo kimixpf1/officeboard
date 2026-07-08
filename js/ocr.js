@@ -1714,6 +1714,9 @@ class OCRManager {
             }
 
             const existingItems = await db.getAllItems();
+            // 用户主要上传会议活动安排表：识别条目统一归一为会议后再去重，
+            // 避免 LLM 把会议误判成待办/办文时，因去重按 type 分组而与库里会议跨类型不比对（即"名称一样却未匹配"）
+            this.normalizeItemsToMeeting(items);
             const actionPlan = this.buildRecognitionActionPlan(items, existingItems, file.name);
 
             if (options.previewOnly) {
@@ -1738,6 +1741,41 @@ class OCRManager {
         } catch (error) {
             console.error('文档分析失败:', error);
             throw error;
+        }
+    }
+
+    /**
+     * 把识别出的条目统一归一为会议类型（用户主要上传会议活动安排表）。
+     * 在去重前调用，确保与库里会议同类型比对；todo/document 转 meeting 时做日期/时间字段映射。
+     * 仅在 analyzeDocument(文件识别) 调用，不影响自然语言解析等其他链路。
+     */
+    normalizeItemsToMeeting(items) {
+        if (!Array.isArray(items)) return;
+        for (const item of items) {
+            if (!item || item.type === 'meeting') continue;
+            const data = item.data || (item.data = {});
+            if (item.type === 'todo') {
+                // 待办 deadline(YYYY-MM-DDTHH:MM) → 会议 date + time
+                const deadline = typeof data.deadline === 'string' ? data.deadline : '';
+                if (deadline) {
+                    if (!data.date) data.date = deadline.slice(0, 10);
+                    if (!data.time) data.time = deadline.slice(11, 16);
+                }
+                delete data.deadline;
+                delete data.priority;
+            } else if (item.type === 'document') {
+                // 办文 docStartDate/docDate → 会议 date
+                if (!data.date) data.date = data.docStartDate || data.docDate || '';
+                delete data.docStartDate;
+                delete data.docEndDate;
+                delete data.docDate;
+                delete data.docNumber;
+                delete data.source;
+                delete data.progress;
+            }
+            item.type = 'meeting';
+            // 重置显示标题为纯标题（与确认面板 convertItemType 行为一致，避免落库 todo/document 风格的 displayTitle）
+            data.displayTitle = data.title || '';
         }
     }
 
