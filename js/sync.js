@@ -1106,8 +1106,17 @@ class SyncManager {
                 syncData.deletedItems = this.deletedItemsMap;
             }
 
-            if (existingRow?.data?.dailyBackups) {
-                syncData.dailyBackups = existingRow.data.dailyBackups;
+            // dailyBackups 迁移：若云端 user_data.data 残留旧 dailyBackups，尝试一次性迁到 user_backups 表；
+            // 成功则 syncData 不含 dailyBackups（清除，省后续 select 带宽）；失败（表未建）则保留避免历史备份丢失
+            const cloudBackups = existingRow?.data?.dailyBackups;
+            if (Array.isArray(cloudBackups) && cloudBackups.length > 0) {
+                try {
+                    await this.saveCloudBackupList(cloudBackups);
+                    console.info('已将历史 dailyBackups 迁移到 user_backups 表，后续从 user_data.data 清除');
+                } catch (e) {
+                    syncData.dailyBackups = cloudBackups;
+                    console.warn('user_backups 表未就绪，保留旧 dailyBackups（请先在 Supabase 执行建表 SQL）:', e.message);
+                }
             }
 
             const cloudItems = Array.isArray(existingRow?.data?.items) ? existingRow.data.items : [];
@@ -1127,23 +1136,24 @@ class SyncManager {
             const syncTime = new Date().toISOString();
             syncData.sync_time = syncTime;
 
-            const { data: upsertResult, error } = await this.supabase
+            const { error } = await this.supabase
                 .from('user_data')
                 .upsert({
                     user_id: this.currentUser.id,
                     data: syncData,
                     updated_at: syncTime
-                }, { onConflict: 'user_id' })
-                .select()
-                .single();
+                }, { onConflict: 'user_id' });
 
             if (error) {
                 console.error('上传失败:', error);
                 return { success: false, error: error.message };
             }
 
-            const actualSyncTime = upsertResult?.updated_at || syncTime;
+            // 删 .select().single() 回读省下行带宽；actualSyncTime 用本地 syncTime（Supabase 触发器会设 NOW()，差几毫秒不影响）
+            const actualSyncTime = syncTime;
             this.lastCloudSyncTime = actualSyncTime;
+            // 记录本次上传的 sync_time，供 Realtime 回环跳过比较（sync_time 在 data 内不被触发器覆盖，比 updated_at 可靠）
+            this._lastUploadSyncTime = syncTime;
             SafeStorage.set('lastCloudSyncTime', actualSyncTime);
             
 
@@ -1462,18 +1472,30 @@ class SyncManager {
 
         this.recordLocalModify();
 
-        if (this.syncTimeout) {
-            clearTimeout(this.syncTimeout);
-            this.syncTimeout = null;
+        // 防抖：3秒内的多次调用合并为一次上传（批量勾选/连续拖拽不再每次全量上传，省带宽）
+        if (this._immediateSyncTimer) {
+            clearTimeout(this._immediateSyncTimer);
         }
 
-        this._pendingUpload = (async () => {
+        // 共享一次上传 Promise：防抖窗口内的调用与 silentSyncFromCloud 都 await 同一个；
+        // 上传完成后清空，下次调用创建新的
+        if (!this._pendingUpload) {
+            this._pendingUpload = new Promise((resolve) => {
+                this._immediateSyncResolve = resolve;
+            }).finally(() => {
+                this._pendingUpload = null;
+            });
+        }
+
+        this._immediateSyncTimer = setTimeout(async () => {
+            this._immediateSyncTimer = null;
+            let result = null;
             let lastError = null;
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
-                    const result = await this.uploadToCloud();
+                    result = await this.uploadToCloud();
                     if (result?.success) {
-                        return result;
+                        break;
                     }
                     lastError = result?.error || '同步失败';
                     if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
@@ -1482,10 +1504,17 @@ class SyncManager {
                     if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
             }
-            console.error('上传重试3次仍失败:', lastError);
-            document.dispatchEvent(new CustomEvent('syncError', { detail: { source: 'upload', message: '数据同步失败，请检查网络连接' } }));
-            return { success: false, error: lastError };
-        })();
+            if (!result?.success) {
+                console.error('上传重试3次仍失败:', lastError);
+                document.dispatchEvent(new CustomEvent('syncError', { detail: { source: 'upload', message: '数据同步失败，请检查网络连接' } }));
+                result = { success: false, error: lastError };
+            }
+            if (this._immediateSyncResolve) {
+                const resolveFn = this._immediateSyncResolve;
+                this._immediateSyncResolve = null;
+                resolveFn(result);
+            }
+        }, 3000);
 
         return this._pendingUpload;
     }
@@ -1540,20 +1569,34 @@ class SyncManager {
                 },
                 async (payload) => {
                     this.realtimeReconnectAttempts = 0;
+                    // 跳过自己刚上传触发的回环（用 data.sync_time 比较——updated_at 被 BEFORE UPDATE 触发器覆盖成 NOW() 不可靠）
+                    if (payload.new?.data?.sync_time && payload.new.data.sync_time === this._lastUploadSyncTime) {
+                        return;
+                    }
                     if (this.isSyncing) {
                         this._pendingRealtimeSync = true;
                         return;
                     }
-                    try {
-                        const result = await this.silentSyncFromCloud();
-                        if (result?.success) {
-                            document.dispatchEvent(new CustomEvent('syncDataLoaded', {
-                                detail: { itemCount: result.itemCount, source: 'realtime' }
-                            }));
+                    // 防抖：5秒内多个Realtime事件只执行一次同步
+                    if (this._realtimeDebounceTimer) clearTimeout(this._realtimeDebounceTimer);
+                    this._realtimeDebounceTimer = setTimeout(async () => {
+                        this._realtimeDebounceTimer = null;
+                        if (this.isSyncing) {
+                            this._pendingRealtimeSync = true;
+                            return;
                         }
-                    } catch (e) {
-                        console.warn('实时同步处理失败:', e);
-                    }
+                        try {
+                            // 直接用 payload.new 跳过额外全量 SELECT（payload.new 已含最新整行数据）
+                            const result = await this.silentSyncFromCloud(payload.new);
+                            if (result?.success) {
+                                document.dispatchEvent(new CustomEvent('syncDataLoaded', {
+                                    detail: { itemCount: result.itemCount, source: 'realtime' }
+                                }));
+                            }
+                        } catch (e) {
+                            console.warn('实时同步处理失败:', e);
+                        }
+                    }, 5000);
                 }
             )
             .subscribe(async (status) => {
@@ -1641,30 +1684,24 @@ class SyncManager {
             }
         };
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                resumeSync();
-            }
-        });
-
+        // online 恢复：完整 resumeSync（重连 Realtime + smartSync）
         window.addEventListener('online', () => {
             this._offlineNotified = false;
             resumeSync();
         });
 
-        window.addEventListener('focus', () => {
-            resumeSync();
-        });
-
-        window.addEventListener('pageshow', () => {
-            resumeSync();
+        // 切回前台只轻量重连 Realtime 通道（不 smartSync，省带宽）；手机后台 WebSocket 易被 OS 省电断开
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this.isLoggedIn()) {
+                this.initRealtimeSubscription();
+            }
         });
     }
 
     /**
      * 静默从云端同步（无进度提示，用于实时更新）
      */
-    async silentSyncFromCloud() {
+    async silentSyncFromCloud(cloudRow = null) {
         if (!this.supabase || !this.currentUser) {
             return { success: false };
         }
@@ -1678,14 +1715,18 @@ class SyncManager {
         }
 
         try {
-            const { data, error } = await this.supabase
-                .from('user_data')
-                .select('data,updated_at')
-                .eq('user_id', this.currentUser.id)
-                .maybeSingle();
-
-            if (error || !data || !data.data) {
-                return { success: false };
+            // 优先用传入的 cloudRow(Realtime payload.new)，避免重复全量 SELECT 省下行带宽
+            let data = cloudRow;
+            if (!data) {
+                const resp = await this.supabase
+                    .from('user_data')
+                    .select('data,updated_at')
+                    .eq('user_id', this.currentUser.id)
+                    .maybeSingle();
+                data = resp.data;
+                if (resp.error || !data || !data.data) {
+                    return { success: false };
+                }
             }
 
             const localItems = await db.getAllItems();
@@ -2426,12 +2467,12 @@ class SyncManager {
         if (!this.isLoggedIn()) return [];
         try {
             const { data, error } = await this.supabase
-                .from('user_data')
-                .select('data')
+                .from('user_backups')
+                .select('backups')
                 .eq('user_id', this.currentUser.id)
                 .maybeSingle();
-            if (error || !data?.data) return [];
-            return data.data.dailyBackups || [];
+            if (error || !data) return [];
+            return data.backups || [];
         } catch (e) {
             console.warn('获取云端备份列表失败:', e);
             return [];
@@ -2441,17 +2482,14 @@ class SyncManager {
     async saveCloudBackupList(backups) {
         if (!this.isLoggedIn()) return;
         try {
-            const { data: existing, error: fetchErr } = await this.supabase
-                .from('user_data')
-                .select('data')
-                .eq('user_id', this.currentUser.id)
-                .maybeSingle();
-            const cloudData = (existing?.data) || {};
-            cloudData.dailyBackups = backups;
+            // 备份存独立 user_backups 表（每用户一行），不再混进 user_data.data，
+            // 避免业务同步每次 select('data') 连带下载几 MB 历史快照
             const { error } = await this.supabase
-                .from('user_data')
-                .update({ data: cloudData })
-                .eq('user_id', this.currentUser.id);
+                .from('user_backups')
+                .upsert({
+                    user_id: this.currentUser.id,
+                    backups: backups
+                }, { onConflict: 'user_id' });
             if (error) throw error;
         } catch (e) {
             console.warn('保存云端备份列表失败:', e);

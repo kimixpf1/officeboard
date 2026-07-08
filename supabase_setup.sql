@@ -87,6 +87,25 @@ FROM pg_policies
 WHERE tablename = 'user_data';
 
 -- ============================================================
+-- 10. user_backups 表（v5.2.139：每日备份独立存储，不再混进 user_data.data）
+-- 目的：避免业务同步 select('data') 每次连带下载 30 份历史全量快照（几 MB）
+-- 大飞需在 Supabase 控制台 SQL Editor 执行本段（user_data 已有则只执行这段）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_backups (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    backups JSONB NOT NULL DEFAULT '[]',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_backups_user_id ON user_backups(user_id);
+
+ALTER TABLE user_backups ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can manage own backups" ON user_backups;
+CREATE POLICY "Users can manage own backups" ON user_backups
+    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- ============================================================
 -- 执行完成！
 -- 
 -- 数据安全说明：
