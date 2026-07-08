@@ -2,6 +2,16 @@
 
 ## 已完成
 
+### v5.2.137 文件识别新增条目默认设为会议
+- [x] 根因：识别配 Key 走 LLM 仍出待办，或 fallback 正则默认 todo
+- [x] 修复：showRecognitionPreviewModal 渲染前遍历新增条目统一 convertItemType(item,'meeting')
+- [x] 复用 v5.2.136 convertItemType 做字段映射（todo/document→meeting 日期时间不丢）
+- [x] 版本号 v5.2.137，upload-flow.js?v=11、app.js?v=260
+- [x] Code review: APPROVE(0C/0H/0M/1L)
+- [x] 语法检查通过
+- [x] 已提交推送 `189f691`
+- [ ] 大飞本地强刷验证：确认面板新增条目默认会议 + 登录 Failed to fetch 排查
+
 ### v5.2.136 识别确认面板支持修改事项类型——类型下拉选择器
 - [x] 根因：确认面板类型是纯只读文本(upload-flow.js:402)，整个文件无修改入口
 - [x] 修复：卡片头部加 select 下拉(待办/会议/办文)，change时 convertItemType 字段映射+重渲染

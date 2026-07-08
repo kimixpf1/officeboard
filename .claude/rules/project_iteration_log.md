@@ -1,3 +1,42 @@
+## 2026-07-08 v5.2.137 文件识别新增条目默认设为会议
+
+### 改动内容
+1. **背景**：v5.2.136 加了类型选择器(可手动改)，但大飞反馈"根本问题没解决"——识别后很多条目默认成了待办。大飞主要上传会议活动安排表，期望默认都是会议。
+2. **根因**：识别两条链路——配 DeepSeek Key 走 LLM（prompt ocr.js:2850 强会议导向）、无 Key/LLM 失败走 parseWithRules 正则兜底（默认 todo, ocr.js:775）。大飞配了 Key 但仍有待办，说明 LLM 仍判出 todo 或偶发 fallback。
+3. **修复**：`showRecognitionPreviewModal`（upload-flow.js:650）渲染确认面板前，遍历 `preparedResult.items`（新增条目），对每个 `type!=='meeting'` 的调 `convertItemType(item,'meeting')` 统一设为会议（复用 v5.2.136 的 convertItemType 做字段映射）。合并/跳过条目（已有事项）不动。
+4. **效果**：文件识别的所有新增条目默认会议；少数实际待办/办文用类型下拉手动改。
+5. 版本号 v5.2.137，缓存参数 upload-flow.js?v=11、app.js?v=260。同步镜像+微信端。
+
+### 触发场景
+大飞反馈：识别的 pdf/图片应该默认都是会议，现在很多默认待办要手动改，烦。
+
+### 影响边界(回归确认)
+- 改动 7 行，只动 upload-flow.js showRecognitionPreviewModal，不碰 ocr.js 识别逻辑/数据层/合并跳过
+- convertItemType 对已是 meeting 的 item 无害（双守卫）；只影响新增条目（preparedResult.items）
+- mutation 正确透传落库（code-reviewer 确认 ensurePreviewIds 深拷贝 + buildFinalPreviewResult 覆盖 createItems）
+- 微信端 wechat-upload.js 也走同一函数，行为一致（预期）
+- 字段映射：todo→meeting 从 deadline 提取 date/time；document→meeting 从 docStartDate 提取 date，不丢
+
+### 代码审查 + 验证
+- ✅ Code review: APPROVE（0C/0H/0M/1L，LOW 为微信端补回归验证建议）
+- ✅ 语法检查：主+镜像 upload-flow.js + app.js 通过
+
+### 提交记录
+- `189f691` fix: 文件识别新增条目默认设为会议(v5.2.137)
+
+### 验证清单
+- [ ] 上传会议安排表图片/PDF → 确认面板所有新增条目默认显示"会议"
+- [ ] 少数实际待办/办文用类型下拉手动改
+- [ ] 日期/时间正确（原 todo 的 deadline → meeting 的 date+time）
+- [ ] 微信端识别确认也默认会议
+- [ ] 版本号 v5.2.137
+
+### 遗留
+- **问题B（登录 Failed to fetch）**：CSP 已放行 supabase.co，是网络层问题（国内访问 supabase.co 不稳/项目可能暂停），非代码 bug，已给大飞排查步骤（F12 Network / 换网络 / 查 supabase 项目状态）
+- 本次是"全部默认会议"的粗暴策略；若以后大飞上传待办清单为主，可考虑加"默认识别类型"设置开关
+
+---
+
 ## 2026-07-07 v5.2.136 识别确认面板支持修改事项类型——类型下拉选择器
 
 ### 改动内容
