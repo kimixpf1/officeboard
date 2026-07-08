@@ -2,6 +2,25 @@
 
 ## 已完成
 
+### v5.2.139 Supabase 带宽优化 Tier1 + dailyBackups 分离
+- [x] 3 个并行 agent 诊断：6 个带宽炸弹（dailyBackups 膨胀最大/Realtime 回环/uploadToCloud 双读/无防抖/生命周期/未压缩），估算 5.7GB/月
+- [x] A: Realtime 用 payload.new 跳过 SELECT + 回环跳过用 sync_time
+- [x] B: uploadToCloud 删 .select().single() 回读
+- [x] C: immediateSyncToCloud 加 3 秒防抖（共享 Promise）
+- [x] D: 删生命周期 smartSync，保留 visibilitychange 轻量重连
+- [x] E: dailyBackups 分离到 user_backups 表（E1 建表 SQL/E2 读写改表/E3 附带+自动迁移防丢）
+- [x] Code review WARNING 2HIGH 已修（数据丢失+回环失效）
+- [x] 版本号 v5.2.139，sync.js?v=77、app.js?v=261
+- [x] 语法检查通过
+- [x] 已提交推送 `1d1df1c`
+- [ ] 大飞本地测试 + 执行 user_backups 建表 SQL
+
+### v5.2.138 修复会议去重失效——识别条目去重前归一为会议
+- [x] 根因：LLM 识别成 todo + 去重按 type 分组 + v5.2.137 默认会议在去重后
+- [x] 修复：analyzeDocument 去 buildRecognitionActionPlan 前调 normalizeItemsToMeeting
+- [x] Code review APPROVE(0C/0H/1M/1L)
+- [x] 已提交推送 `3aad91f`
+
 ### v5.2.137 文件识别新增条目默认设为会议
 - [x] 根因：识别配 Key 走 LLM 仍出待办，或 fallback 正则默认 todo
 - [x] 修复：showRecognitionPreviewModal 渲染前遍历新增条目统一 convertItemType(item,'meeting')

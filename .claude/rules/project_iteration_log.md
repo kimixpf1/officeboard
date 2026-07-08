@@ -1,3 +1,48 @@
+## 2026-07-08 v5.2.139 Supabase 带宽优化 Tier1 + dailyBackups 分离
+
+### 改动内容（3 个并行 agent 诊断 + plan 批准，5 项优化 A-E）
+**根因**：迁移新项目后带宽又超 1 次（暂停到今天）。3 个 agent 诊断 sync.js：全量同步模式未改，6 个炸弹——dailyBackups 30 份快照混在 user_data.data 每次 select 连带下载几 MB(最大)、Realtime 回环、uploadToCloud 双读、immediateSyncToCloud 无防抖(app.js 43 处调用)、生命周期触发、未压缩。估算 5.7GB/月。
+
+1. **A. Realtime 用 payload.new**：silentSyncFromCloud(cloudRow) 加可选参数，Realtime 回调传 payload.new 跳过额外 SELECT；回环跳过用 data.sync_time 比较（updated_at 被 BEFORE UPDATE 触发器覆盖成 NOW() 不可靠）
+2. **B. uploadToCloud 删回读**：删 .select().single()，actualSyncTime 用本地 syncTime
+3. **C. immediateSyncToCloud 加 3 秒防抖**：共享 Promise 设计，合并连续上传，保留 _pendingUpload 供 silentSyncFromCloud await
+4. **D. 删生命周期 smartSync**：删 visibilitychange/focus/pageshow 的 smartSync；保留 visibilitychange 触发 initRealtimeSubscription(轻量重连,不 smartSync) + online 完整 resumeSync
+5. **E. dailyBackups 分离**：E1 新建 user_backups 表(大飞执行 SQL)；E2 get/saveCloudBackupList 改读写 user_backups 表；E3 uploadToCloud 不再附带 dailyBackups + 自动迁移逻辑(检测云端旧 dailyBackups 迁到 user_backups,失败则保留防丢)
+
+### 代码审查
+- ✅ Code review: WARNING(0C/2H/2M/1L)，2 个 HIGH 已修：
+  - HIGH-1(数据丢失风险)：dailyBackups 迁移逻辑——表未建则保留不清除，不会丢历史备份
+  - HIGH-2(回环跳过失效)：改用 data.sync_time 比较（updated_at 被触发器覆盖）
+- MEDIUM-2(visibilitychange)：保留轻量重连 initRealtimeSubscription
+- MEDIUM-1(lastCloudSyncTime 时钟偏差)：不丢数据(对账后不写)，Realtime 兜底，接受
+- ✅ 语法检查通过
+
+### 提交记录
+- `1d1df1c` perf: Supabase 带宽优化 Tier1+dailyBackups 分离(v5.2.139)
+
+### 大飞要做的
+- 在 Supabase 控制台 SQL Editor 执行 user_backups 建表 SQL（见 supabase_setup.sql 第 10 段）。**不建也不丢数据**（旧 dailyBackups 保留），但建了才能省带宽（下次同步自动迁移清除）
+
+### 遗留
+- MEDIUM-1：lastCloudSyncTime 用本地 syncTime，smartSync 的 cloudHasUpdate 可能误判(时钟偏差)，但对账后不写不丢数据，Realtime 兜底
+- 镜像 sync.js 整体落后(既有技术债)，本轮未同步
+- items 多行表重写(降 95% 带宽)留作 v6，本轮 Tier1+E 预计降到 1-2GB/月
+
+---
+
+## 2026-07-08 v5.2.138 修复会议去重失效——识别条目去重前归一为会议
+
+### 改动内容
+1. **根因**：大飞上传会议安排表 PDF，已新增的会议再次上传没去重。诊断：LLM 把会议识别成待办(todo)，去重 buildRecognitionActionPlan 严格按 type 分组（库里 meeting 只和今天 meeting 比，不和 todo 比），识别成 todo 的会议不和库里 meeting 去重（依据"未匹配到同标题同截止日期的待办"印证）。v5.2.137 默认会议在确认面板(去重后)没帮上去重。
+2. **修复**：ocr.js analyzeDocument 在 buildRecognitionActionPlan 前调 normalizeItemsToMeeting——把所有识别条目统一设 meeting（todo 从 deadline 提取 date/time，document 从 docStartDate 提取 date；清理跨类型字段；重置 displayTitle）。去重时和库里 meeting 同类型比对，名称+日期相同就跳过。
+3. 仅 analyzeDocument(文件识别)调用，不影响自然语言解析。版本 v5.2.138，ocr.js?v=57。
+
+### 代码审查 + 提交
+- ✅ Code review: APPROVE(0C/0H/1M/1L，M 建议已采纳)
+- `3aad91f` fix: 修复会议去重失效——识别条目去重前归一为会议(v5.2.138)
+
+---
+
 ## 2026-07-08 v5.2.137 文件识别新增条目默认设为会议
 
 ### 改动内容
