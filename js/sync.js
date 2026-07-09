@@ -14,6 +14,7 @@
 class SyncManager {
     /** 需要同步的 API Key 设置项键名列表（[dbKey, syncKey]） */
     static SETTING_KEYS = [
+        ['crypto_master_key', 'crypto_master_key'],  // 主密钥随账号上云：换设备/清浏览器后可恢复密文，靠RLS保护
         ['kimi_api_key_encrypted', 'kimi_api_key_encrypted'],
         ['kimi_api_key_set', 'kimi_api_key_set'],
         ['deepseek_api_key_encrypted', 'deepseek_api_key_encrypted'],
@@ -127,6 +128,11 @@ class SyncManager {
      */
     _applySideData(cloudData, options = {}) {
         if (!cloudData || typeof cloudData !== 'object') {
+            return;
+        }
+        // 本地有待上传改动时（_pendingUpload 存在），云端仍是旧值，跳过下行覆盖，
+        // 避免刚新增的网站/通讯录/便签/日程等被云端旧值盖掉（修复“新增一秒后消失”）
+        if (this._pendingUpload) {
             return;
         }
 
@@ -414,9 +420,16 @@ class SyncManager {
             settingWrites.push(db.setSetting('qweather_api_key_set', settings.qweather_api_key_set));
             SafeStorage.set('qweatherApiKeySet', settings.qweather_api_key_set);
         }
+        // 主密钥本地优先：仅当本地无主密钥时才从云端取（换设备/清浏览器后恢复）；
+        // 本地已有则保留，避免云端旧值覆盖导致本地密文解不开。随后 buildSyncData 会把本地值上传收敛
         if (settings.crypto_master_key) {
-            SafeStorage.set('crypto_master_key', settings.crypto_master_key);
-            settingWrites.push(db.setSetting('crypto_master_key', settings.crypto_master_key));
+            const localMasterKey = await db.getSetting('crypto_master_key');
+            if (!localMasterKey) {
+                settingWrites.push(db.setSetting('crypto_master_key', settings.crypto_master_key));
+                if (typeof cryptoManager !== 'undefined' && typeof cryptoManager.invalidateMasterKeyCache === 'function') {
+                    cryptoManager.invalidateMasterKeyCache();
+                }
+            }
         }
         if (settingWrites.length > 0) await Promise.all(settingWrites);
         if (typeof ocrManager !== 'undefined' && typeof ocrManager.loadApiKeysFromDB === 'function') {
@@ -722,7 +735,7 @@ class SyncManager {
             if (settingValues[i]) settings[settingKeys[i][1]] = settingValues[i];
         }
 
-        // crypto_master_key 不再同步到云端（方案A：每设备独立密钥）
+        // crypto_master_key 随账号上云（已在 SETTING_KEYS 中）：换设备/清浏览器后可恢复密文
         return {
             sync_time: new Date().toISOString(),
             items: Array.isArray(items) ? items : [],
@@ -741,8 +754,8 @@ class SyncManager {
             alarms: SafeStorage.get('office_alarms') || '[]',
             theme: SafeStorage.get('theme') || '',
             customPets: SafeStorage.get('office_custom_pets') || '',
-            customQuotes: SafeStorage.get('office_custom_quotes') || '',
-            device_info: navigator.userAgent
+            customQuotes: SafeStorage.get('office_custom_quotes') || ''
+            // device_info 已移除：不再上传 navigator.userAgent 设备指纹
         };
     }
 
@@ -1821,8 +1834,8 @@ class SyncManager {
         if (!username || username.length < 2) {
             throw new Error('用户名至少需要2个字符');
         }
-        if (!password || password.length < 6) {
-            throw new Error('密码至少需要6个字符');
+        if (!password || password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+            throw new Error('密码至少8位，且需同时包含字母和数字');
         }
 
         if (!this.isOnline()) {
@@ -1852,7 +1865,7 @@ class SyncManager {
                     throw new Error('用户名已存在');
                 }
                 if (error.message.includes('password')) {
-                    throw new Error('密码强度不足，请使用更复杂的密码（至少6位，包含字母和数字）');
+                    throw new Error('密码强度不足，请使用更复杂的密码（至少8位，且包含字母和数字）');
                 }
                 throw new Error('注册失败: ' + error.message);
             }
@@ -1950,8 +1963,8 @@ class SyncManager {
             throw new Error('请填写完整信息');
         }
 
-        if (newPassword.length < 6) {
-            throw new Error('新密码至少需要6位');
+        if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+            throw new Error('新密码至少8位，且需同时包含字母和数字');
         }
 
         if (!this.isOnline()) {

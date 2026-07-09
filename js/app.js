@@ -295,7 +295,7 @@ class OfficeDashboard {
 
     async _loadLazyModules() {
         const scripts = [
-            'js/sync.js?v=77',
+            'js/sync.js?v=78',
             'js/panels/countdown.js?v=4',
             'js/panels/links.js?v=1',
             'js/panels/contacts.js?v=3',
@@ -304,7 +304,7 @@ class OfficeDashboard {
             'js/weather.js?v=1',
             'js/core/recurring.js?v=1',
             'js/core/cross-date.js?v=1',
-            'js/core/backup.js?v=2',
+            'js/core/backup.js?v=3',
             'js/core/context-menu.js?v=7',
             'js/core/idle-bar.js?v=8',
             'js/core/alarm.js?v=11',
@@ -1376,6 +1376,13 @@ class OfficeDashboard {
      */
     async handleLogin() {
         if (this._loginBusy) return;
+        // 登录失败锁定（前端防暴力破解：5次失败锁15分钟；Supabase Auth 后端亦有保护，此为额外层）
+        const _lockUntil = parseInt((typeof SafeStorage !== 'undefined' ? SafeStorage.get('office_login_lock_until') : '') || '0', 10);
+        if (_lockUntil && Date.now() < _lockUntil) {
+            const _mins = Math.ceil((_lockUntil - Date.now()) / 60000);
+            this.showError(`登录失败次数过多，请 ${_mins} 分钟后再试`);
+            return;
+        }
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
         const rememberPassword = document.getElementById('rememberPassword')?.checked;
@@ -1390,6 +1397,11 @@ class OfficeDashboard {
 
         try {
             const result = await syncManager.login(username, password);
+            // 登录成功：清零失败计数与锁定
+            if (typeof SafeStorage !== 'undefined') {
+                SafeStorage.remove('office_login_fail_count');
+                SafeStorage.remove('office_login_lock_until');
+            }
             this.showSuccess(result.message);
             this.updateLoginUI({ isLoggedIn: true, username: username });
 
@@ -1422,6 +1434,19 @@ class OfficeDashboard {
             await this.loadItems(); // 刷新数据
             this.showSuccess(`登录成功！${syncResult.message}`);
         } catch (error) {
+            // 密码错误类失败计数（网络/服务错误不计数，避免误锁）
+            const _msg = (error && error.message) || '';
+            if (_msg.includes('密码') || _msg.includes('Invalid login') || _msg.includes('用户名或密码')) {
+                if (typeof SafeStorage !== 'undefined') {
+                    let _failCount = parseInt(SafeStorage.get('office_login_fail_count') || '0', 10) + 1;
+                    SafeStorage.set('office_login_fail_count', String(_failCount));
+                    if (_failCount >= 5) {
+                        SafeStorage.set('office_login_lock_until', String(Date.now() + 15 * 60 * 1000));
+                        this.showError('登录连续失败 5 次，已锁定 15 分钟，请稍后再试');
+                        return;
+                    }
+                }
+            }
             this.showError(error.message);
         } finally {
             this.showLoading(false);
@@ -1442,8 +1467,8 @@ class OfficeDashboard {
             return;
         }
 
-        if (password.length < 6) {
-            this.showError('密码至少需要6位');
+        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+            this.showError('密码至少8位，且需同时包含字母和数字');
             return;
         }
 
@@ -1595,8 +1620,8 @@ class OfficeDashboard {
             return;
         }
 
-        if (newPassword.length < 6) {
-            this.showError('新密码至少需要6位');
+        if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+            this.showError('新密码至少8位，且需同时包含字母和数字');
             return;
         }
 
@@ -4715,7 +4740,7 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-07-08 v5.2.139';
+        const version = '2026-07-09 v5.2.140';
         const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=7', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=261', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;

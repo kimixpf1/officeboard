@@ -48,14 +48,16 @@ class CryptoManager {
                     ['encrypt', 'decrypt']
                 );
             } else {
-                this.masterKey = await crypto.subtle.generateKey(
+                const newKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 },
                     true,
                     ['encrypt', 'decrypt']
                 );
 
-                const exported = await crypto.subtle.exportKey('raw', this.masterKey);
+                const exported = await crypto.subtle.exportKey('raw', newKey);
+                // 先持久化、成功后才赋值给内存，避免“内存有主密钥、磁盘无”导致下次刷新重新生成、旧密文解不开
                 await db.setSetting('crypto_master_key', this.arrayBufferToBase64(exported));
+                this.masterKey = newKey;
             }
 
             return this.masterKey;
@@ -63,6 +65,15 @@ class CryptoManager {
             console.error('获取主密钥失败:', error);
             throw new Error('加密功能初始化失败，请使用HTTPS或检查浏览器兼容性');
         }
+    }
+
+    /**
+     * 失效主密钥内存缓存，强制下次 getMasterKey 从 IndexedDB 重新读取
+     * （用于 sync 从云端恢复主密钥后，让后续加解密使用新主密钥）
+     */
+    invalidateMasterKeyCache() {
+        this.masterKey = null;
+        this._masterKeyPromise = null;
     }
 
     /**

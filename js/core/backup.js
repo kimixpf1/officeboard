@@ -5,10 +5,14 @@
 const BackupCore = {
 
     async exportData() {
+        // 默认引导加密导出（含事项、通讯录等敏感数据）；用户可留空明文导出
+        const password = await this.showPasswordPrompt('导出加密密码', '建议设置密码加密导出文件（含事项、通讯录等）。留空则明文导出，不推荐。');
+        if (password === null) return;  // 用户取消
+
         this.showLoading(true, '正在导出...');
 
         try {
-            const result = await syncManager.exportToFile();
+            const result = await syncManager.exportToFile(password || null);
             this.showSuccess(result.message);
         } catch (error) {
             this.showError('导出失败: ' + error.message);

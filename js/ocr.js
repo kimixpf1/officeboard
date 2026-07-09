@@ -51,15 +51,18 @@ class OCRManager {
      */
     async setApiKey(key) {
         this.deepseekApiKey = key;
-        SafeStorage.set('deepseekApiKey', key);
+        // 不再写 localStorage 明文，统一走加密存储；并清理可能的历史明文残留
+        if (typeof SafeStorage !== 'undefined') SafeStorage.remove('deepseekApiKey');
         if (typeof cryptoManager !== 'undefined' && key) {
-            const encrypted = await cryptoManager.secureStoreSecret('deepseek_api_key', key);
-            if (encrypted) {
-                SafeStorage.remove('deepseekApiKey');
+            const ok = await cryptoManager.secureStoreSecret('deepseek_api_key', key);
+            if (!ok) {
+                // 加密失败：保留内存值供本次会话用，不持久化明文
+                console.warn('DeepSeek key 加密存储失败，本次会话有效，刷新后需重新输入');
             }
         }
         if (typeof db !== 'undefined') {
             await db.setSetting('deepseek_api_key_set', key ? new Date().toISOString() : null);
+            await db.setSetting('deepseek_api_key', null);  // 清 IndexedDB legacy 明文（去明文加固）
         }
     }
 
@@ -67,7 +70,8 @@ class OCRManager {
      * 获取DeepSeek API Key
      */
     getApiKey() {
-        return this.deepseekApiKey || SafeStorage.get('deepseekApiKey') || null;
+        // 仅返回内存值（由 loadApiKeyAsync/loadApiKeysFromDB 异步填充），不再回退 localStorage 明文
+        return this.deepseekApiKey || null;
     }
 
     async loadApiKeyAsync() {
@@ -84,15 +88,17 @@ class OCRManager {
      */
     async setKimiApiKey(key) {
         this.kimiApiKey = key;
-        SafeStorage.set('kimiApiKey', key);
+        // 不再写 localStorage 明文，统一走加密存储；并清理可能的历史明文残留
+        if (typeof SafeStorage !== 'undefined') SafeStorage.remove('kimiApiKey');
         if (typeof cryptoManager !== 'undefined' && key) {
-            const encrypted = await cryptoManager.secureStoreSecret('kimi_api_key', key);
-            if (encrypted) {
-                SafeStorage.remove('kimiApiKey');
+            const ok = await cryptoManager.secureStoreSecret('kimi_api_key', key);
+            if (!ok) {
+                console.warn('Kimi key 加密存储失败，本次会话有效，刷新后需重新输入');
             }
         }
         if (typeof db !== 'undefined') {
             await db.setSetting('kimi_api_key_set', key ? new Date().toISOString() : null);
+            await db.setSetting('kimi_api_key', null);  // 清 IndexedDB legacy 明文（去明文加固）
         }
     }
 
@@ -100,7 +106,8 @@ class OCRManager {
      * 获取Kimi API Key
      */
     getKimiApiKey() {
-        return this.kimiApiKey || SafeStorage.get('kimiApiKey') || null;
+        // 仅返回内存值，不再回退 localStorage 明文
+        return this.kimiApiKey || null;
     }
 
     async loadKimiApiKeyAsync() {
@@ -125,27 +132,39 @@ class OCRManager {
         }
         const legacyDeepseek = await db.getSetting('deepseek_api_key');
         if (legacyDeepseek && !this.deepseekApiKey) {
-            this.deepseekApiKey = legacyDeepseek;
             if (typeof cryptoManager !== 'undefined') {
-                await cryptoManager.secureStoreSecret('deepseek_api_key', legacyDeepseek);
-                await db.setSetting('deepseek_api_key', null);
+                // 仅加密成功才清除旧明文，避免加密失败时 key 永久丢失
+                const ok = await cryptoManager.secureStoreSecret('deepseek_api_key', legacyDeepseek);
+                this.deepseekApiKey = legacyDeepseek;
+                if (ok) await db.setSetting('deepseek_api_key', null);
+            } else {
+                this.deepseekApiKey = legacyDeepseek;
             }
         }
         const legacyKimi = await db.getSetting('kimi_api_key');
         if (legacyKimi && !this.kimiApiKey) {
-            this.kimiApiKey = legacyKimi;
             if (typeof cryptoManager !== 'undefined') {
-                await cryptoManager.secureStoreSecret('kimi_api_key', legacyKimi);
-                await db.setSetting('kimi_api_key', null);
+                const ok = await cryptoManager.secureStoreSecret('kimi_api_key', legacyKimi);
+                this.kimiApiKey = legacyKimi;
+                if (ok) await db.setSetting('kimi_api_key', null);
+            } else {
+                this.kimiApiKey = legacyKimi;
             }
         }
-        if (!this.deepseekApiKey && typeof SafeStorage !== 'undefined') {
+        // 兼容：旧的 localStorage 明文 key 迁移到加密存储后清除明文（一次性，不丢用户现有 key）
+        if (!this.deepseekApiKey && typeof SafeStorage !== 'undefined' && typeof cryptoManager !== 'undefined') {
             const ssDeepseek = SafeStorage.get('deepseekApiKey');
-            if (ssDeepseek) this.deepseekApiKey = ssDeepseek;
+            if (ssDeepseek) {
+                const ok = await cryptoManager.secureStoreSecret('deepseek_api_key', ssDeepseek);
+                if (ok) { this.deepseekApiKey = ssDeepseek; SafeStorage.remove('deepseekApiKey'); }
+            }
         }
-        if (!this.kimiApiKey && typeof SafeStorage !== 'undefined') {
+        if (!this.kimiApiKey && typeof SafeStorage !== 'undefined' && typeof cryptoManager !== 'undefined') {
             const ssKimi = SafeStorage.get('kimiApiKey');
-            if (ssKimi) this.kimiApiKey = ssKimi;
+            if (ssKimi) {
+                const ok = await cryptoManager.secureStoreSecret('kimi_api_key', ssKimi);
+                if (ok) { this.kimiApiKey = ssKimi; SafeStorage.remove('kimiApiKey'); }
+            }
         }
     }
 
