@@ -305,7 +305,8 @@ class OfficeDashboard {
             'js/core/recurring.js?v=1',
             'js/core/cross-date.js?v=1',
             'js/core/backup.js?v=3',
-            'js/core/context-menu.js?v=8',
+            'js/core/context-menu.js?v=9',
+            'js/core/undo-describe.js?v=1',
             'js/core/idle-bar.js?v=8',
             'js/core/alarm.js?v=11',
             'js/core/pet-renderer.js?v=3'
@@ -4601,8 +4602,21 @@ class OfficeDashboard {
         orderedIds = [...new Set(orderedIds)];
 
         try {
-            if (originalItem) {
-                this.saveUndoHistory('update', { item: originalItem });
+            if (isSameColumn) {
+                // 同列排序：快照整列 order，撤回时整体恢复（仅存 draggedItem 会丢失其他项顺序）
+                const beforeSnap = [];
+                for (const oid of orderedIds) {
+                    const it = await db.getItem(oid);
+                    if (it) beforeSnap.push({ id: it.id, order: it.order, manualOrder: it.manualOrder });
+                }
+                this.saveUndoHistory('reorder', {
+                    type: newType,
+                    typeLabel: this._itemTypeLabel(newType),
+                    before: beforeSnap,
+                    afterOrder: orderedIds
+                }, '调整' + this._itemTypeLabel(newType) + '顺序');
+            } else if (originalItem) {
+                this.saveUndoHistory('update', { item: originalItem }, '移动「' + (originalItem.title || '事项') + '」');
             }
 
             if (!isSameColumn) {
@@ -4696,7 +4710,7 @@ class OfficeDashboard {
         }
 
         try {
-            this.saveUndoHistory('update', { item: originalItem });
+            this.saveUndoHistory('update', { item: originalItem }, '移动「' + (originalItem.title || '事项') + '」');
             await db.updateItem(draggedId, updates);
             await this.loadItems();
             if (syncManager.isLoggedIn()) {
@@ -4740,8 +4754,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-07-14 v5.2.141';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=8', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=262', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-07-14 v5.2.142';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=9', 'undo-describe.js?v=1', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=263', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -5535,6 +5549,25 @@ class OfficeDashboard {
         });
     }
 
+    /**
+     * 撤回前确认弹窗：显示将撤回的操作摘要，确认后才执行
+     */
+    showUndoConfirmDialog(description) {
+        return this._createChoiceModal({
+            title: '确认撤回',
+            description: '将撤回：' + description,
+            maxWidth: '420px',
+            buttons: [
+                { label: '确认撤回', className: 'btn-primary', value: 'confirm' },
+                { label: '取消', className: 'btn-text', style: 'width: 100%; padding: 8px;', value: 'cancel' }
+            ]
+        });
+    }
+
+    _itemTypeLabel(type) {
+        return ({ todo: '待办', meeting: '会议', document: '办文' })[type] || '事项';
+    }
+
     showRecurringEditChoice() {
         return this._createChoiceModal({
             title: '修改周期性任务',
@@ -5888,10 +5921,11 @@ class OfficeDashboard {
     /**
      * 保存操作历史（用于撤回）
      */
-    saveUndoHistory(action, data) {
+    saveUndoHistory(action, data, label) {
         this.undoHistory.push({
             action,
             data: JSON.parse(JSON.stringify(data)),
+            label: label || '',
             timestamp: Date.now()
         });
 
@@ -5914,7 +5948,15 @@ class OfficeDashboard {
             return;
         }
 
-        const lastAction = this.undoHistory.pop();
+        // 撤回前提示：先 peek 末项生成摘要，确认后才出栈（取消则历史不变、不影响 redo）
+        const lastAction = this.undoHistory[this.undoHistory.length - 1];
+        const desc = (typeof describeUndoAction === 'function')
+            ? describeUndoAction(lastAction)
+            : '上一步操作';
+        const choice = await this.showUndoConfirmDialog(desc);
+        if (choice !== 'confirm') return;
+
+        this.undoHistory.pop();
         this.redoStack.push(lastAction);
 
         try {
@@ -5980,6 +6022,14 @@ class OfficeDashboard {
                     // 撤回沉底
                     await db.updateItem(lastAction.data.id, { sunk: lastAction.data.oldValue });
                     this.showSuccess('已撤回：取消沉底');
+                    break;
+
+                case 'reorder':
+                    // 撤回排序：恢复整列 order 快照
+                    for (const it of lastAction.data.before) {
+                        await db.updateItem(it.id, { order: it.order, manualOrder: it.manualOrder });
+                    }
+                    this.showSuccess('已撤回：恢复顺序');
                     break;
 
                 default:
@@ -6079,6 +6129,11 @@ class OfficeDashboard {
                     await db.updateItem(action.data.id, { sunk: !action.data.oldValue });
                     this.showSuccess('已恢复：沉底状态');
                     break;
+                case 'reorder':
+                    await db.updateItemOrder(action.data.type, action.data.afterOrder);
+                    this.showSuccess('已恢复：重新排序');
+                    break;
+
                 default:
                     this.showError('无法恢复此操作');
             }
