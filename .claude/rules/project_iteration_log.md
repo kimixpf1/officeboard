@@ -1,3 +1,43 @@
+## 2026-07-14 v5.2.142 撤回前提示内容+补全复制/排序撤回
+
+### 触发场景
+大飞反馈：撤回按钮只能撤回部分操作；希望①撤回仍单步（上一步）②所有操作都能撤回 ③撤回前提示撤回的是什么内容。
+
+### 现状调查结论（含修正过程）
+- 机制：undoHistory 栈(20步)+redo，按钮+Ctrl+Z，单步撤回 ✓
+- 已可撤回：删除/修改(编辑/批量/移动到/类型转换)/新增/完成标记/置顶/沉底/拖拽移动（均经 update/delete/add action）
+- 初判 complete/pin/sink 是死代码 → **修正**：toggleItemComplete/Pin/Sink 已存 saveUndoHistory('update')，实际可撤回
+- 真正缺失：**复制到**(完全没记录) + **同列排序**(只存 draggedItem，整列 order 恢复不全)
+- 撤回前**无提示**：直接执行，只事后 toast
+
+### 改动
+1. 撤回前提示（核心）：undoLastAction 改 peek 末项 → describeUndoAction 生成摘要 → showUndoConfirmDialog 弹窗（复用 _createChoiceModal）→ 确认才 pop 执行，取消则历史不变；Ctrl+Z 也走此入口（按钮+快捷键都提示）
+2. 新增 js/core/undo-describe.js：describeUndoAction 纯函数（优先 label 否则按 action 推导"删除/修改/新增/调整顺序「标题」"）
+3. saveUndoHistory(action, data, label) 加可选 label
+4. 补复制撤回：_contextCopyTo 存 saveUndoHistory('add', {id}, label)，撤回=删副本
+5. 补同列排序撤回：handleDrop 同列分支快照整列 order，新增 reorder 动作(before+afterOrder)，undo 恢复整列/redo 重放顺序
+6. 拖拽移动/复制加精准 label（"移动「XX」"/"复制「XX」到X日"）
+7. version v5.2.142；loader+badge：undo-describe.js?v=1 新增、context-menu.js?v=9、app.js?v=263（双对齐，上次 v5.2.141 漏改 loader 教训未复发）
+
+### code-reviewer 结论
+APPROVE（0C/0H/2M/4L），6 项重点全过，未破坏现有拖拽/撤回行为
+- MEDIUM：handleDrop N+1 查询（本地库影响有限，建议后续批量取）；Ctrl+Z 连按 zombie Promise（_createChoiceModal 既有缺陷，未恶化）
+- LOW：badge/loader 4 处历史不一致（非本次）；fallback 文案；undo-describe 空数组边缘；reorder 无 label 分支当前 dead code（兜底）
+- 唯一值得排期：**redo 对 add 类操作失效**（只存 id，redo 读 data.item=undefined）——既有通病，本次未恶化，建议后续统一修（存完整 clone）
+
+### 提交记录
+- `21e7164` feat: 撤回前提示操作内容+补全复制/排序撤回(v5.2.142)
+
+### 验证清单（大飞强刷 Ctrl+Shift+R）
+- [ ] 版本号 v5.2.142
+- [ ] 撤回按钮/Ctrl+Z → 弹窗"将撤回:XX"+确认/取消；取消则不撤回
+- [ ] 复制到某天 → 可撤回（删副本），提示"复制「XX」到X日"
+- [ ] 同列拖动排序 → 可撤回（整列顺序恢复），提示"调整待办顺序"
+- [ ] 完成/置顶/沉底/编辑/删除 → 撤回正常，提示对应内容
+- [ ] redo（重做）非 add 类正常
+
+---
+
 ## 2026-07-14 v5.2.141 修复"移动到"待办凭空填09:00截止时间触发闹钟
 
 ### 触发场景

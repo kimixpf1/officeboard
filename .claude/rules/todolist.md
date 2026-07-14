@@ -2,6 +2,16 @@
 
 ## 已完成
 
+### v5.2.142 撤回前提示内容+补全复制/排序撤回
+- [x] 调查：撤回已支持 delete/update/add/完成/置顶/沉底/拖拽移动；缺复制+同列排序；撤回前无提示
+- [x] 核心：undoLastAction peek+弹窗确认（按钮/Ctrl+Z 都提示）；新增 undo-describe.js 摘要
+- [x] 补复制撤回(add)；补同列排序撤回(reorder 整列快照)；拖拽/复制精准 label
+- [x] version v5.2.142；loader+badge 双对齐（undo-describe.js?v=1, context-menu?v=9, app.js?v=263）
+- [x] node --check 三文件过 + code-reviewer APPROVE(0C/0H/2M/4L)
+- [x] 已提交推送 `21e7164`
+- [ ] 大飞强刷验证
+- 待办：redo 对 add 类操作失效（既有通病）后续单独修
+
 ### v5.2.141 修复"移动到"待办凭空填09:00截止时间触发闹钟
 - [x] 根因：_contextMoveTo/_contextMoveToDate 对无deadline待办也填 deadline=目标日T09:00 → 进入相对提醒触发闹钟
 - [x] 修复：todo分支有deadline带过(保留时间)、无不新增、once绝对提醒reminderDate跟随（与复制对齐）
