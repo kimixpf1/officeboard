@@ -305,7 +305,7 @@ class OfficeDashboard {
             'js/core/recurring.js?v=1',
             'js/core/cross-date.js?v=1',
             'js/core/backup.js?v=3',
-            'js/core/context-menu.js?v=9',
+            'js/core/context-menu.js?v=10',
             'js/core/undo-describe.js?v=1',
             'js/core/idle-bar.js?v=8',
             'js/core/alarm.js?v=11',
@@ -4603,12 +4603,14 @@ class OfficeDashboard {
 
         try {
             if (isSameColumn) {
-                // 同列排序：快照整列 order，撤回时整体恢复（仅存 draggedItem 会丢失其他项顺序）
-                const beforeSnap = [];
-                for (const oid of orderedIds) {
-                    const it = await db.getItem(oid);
-                    if (it) beforeSnap.push({ id: it.id, order: it.order, manualOrder: it.manualOrder });
-                }
+                // 同列排序：快照整列 order，撤回时整体恢复（批量取避免 N+1 查询）
+                db.resetItemsCache();  // 强制读最新 order，避免缓存陈旧
+                const colItems = await db.getItemsByType(newType);
+                const itemMap = new Map(colItems.map(it => [it.id, it]));
+                const beforeSnap = orderedIds
+                    .map(oid => itemMap.get(oid))
+                    .filter(Boolean)
+                    .map(it => ({ id: it.id, order: it.order, manualOrder: it.manualOrder }));
                 this.saveUndoHistory('reorder', {
                     type: newType,
                     typeLabel: this._itemTypeLabel(newType),
@@ -4754,8 +4756,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-07-14 v5.2.142';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=9', 'undo-describe.js?v=1', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=263', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-07-14 v5.2.143';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=10', 'undo-describe.js?v=1', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=264', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }
@@ -5446,14 +5448,13 @@ class OfficeDashboard {
                     if (recurringItems.length > 0) {
                         const addedIds = [];
                         for (const recurringItem of recurringItems) {
-
-                            const addedItem = await db.addItem(recurringItem);
-                            if (addedItem && addedItem.id) {
-                                addedIds.push(addedItem.id);
+                            const newId = await db.addItem(recurringItem);
+                            if (newId) {
+                                addedIds.push(newId);
                             }
                         }
-                        // 保存历史用于撤回
-                        this.saveUndoHistory('add', { ids: addedIds });
+                        // 保存历史用于撤回（addItem 返回数字 id；存 items 供 redo 恢复）
+                        this.saveUndoHistory('add', { ids: addedIds, items: recurringItems });
                         this.showSuccess(`已生成 ${recurringItems.length} 个周期性任务`);
                     } else {
                         console.error('未生成任何周期性任务');
@@ -5461,10 +5462,10 @@ class OfficeDashboard {
                         return;
                     }
                 } else {
-                    const addedItem = await db.addItem(item);
-                    // 保存历史用于撤回
-                    if (addedItem && addedItem.id) {
-                        this.saveUndoHistory('add', { id: addedItem.id });
+                    const newId = await db.addItem(item);
+                    // 保存历史用于撤回（addItem 返回数字 id；存完整 item 供 redo 恢复）
+                    if (newId) {
+                        this.saveUndoHistory('add', { id: newId, item: { ...item, id: newId } });
                     }
                 }
             }
@@ -5491,13 +5492,18 @@ class OfficeDashboard {
 
     _createChoiceModal({ title, description, maxWidth, buttons }) {
         return new Promise((resolve) => {
+            // 若有活动弹窗：先 resolve 其 Promise 为 cancel（避免连按导致 zombie Promise），再移除
             if (this._activeChoiceModal) {
+                if (typeof this._activeChoiceModal._undoResolve === 'function') {
+                    this._activeChoiceModal._undoResolve('cancel');
+                }
                 this._activeChoiceModal.remove();
                 this._activeChoiceModal = null;
             }
 
             const modal = document.createElement('div');
             modal.className = 'modal active';
+            modal._undoResolve = resolve;  // 挂到 modal，供被新弹窗取代时 resolve cancel
             this._activeChoiceModal = modal;
             const content = document.createElement('div');
             content.className = 'modal-content';
@@ -6074,14 +6080,18 @@ class OfficeDashboard {
             switch (action.action) {
                 case 'add':
                     if (Array.isArray(action.data.ids)) {
+                        const newIds = [];
                         for (const item of action.data.items || []) {
-                            await db.addItem(item);
+                            const nid = await db.addItem(item);
+                            if (nid) newIds.push(nid);
                             if (syncManager.isLoggedIn()) {
                                 syncManager.clearDeletedMarker(item);
                             }
                         }
-                    } else {
-                        await db.addItem(action.data.item);
+                        action.data.ids = newIds;  // 更新为 redo 后实际 id，供再次 undo
+                    } else if (action.data.item) {
+                        const actualId = await db.addItem(action.data.item);
+                        if (actualId) action.data.id = actualId;  // 防御性回写实际 id，与批量分支对齐
                         if (syncManager.isLoggedIn()) {
                             syncManager.clearDeletedMarker(action.data.item);
                         }

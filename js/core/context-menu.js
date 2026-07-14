@@ -579,9 +579,9 @@ const ContextMenuCore = {
             }
 
             try {
-                const addedItem = await db.addItem(clone);
-                if (addedItem && addedItem.id) {
-                    this.saveUndoHistory('add', { id: addedItem.id }, '复制「' + (item.title || '事项') + '」到' + targetDate);
+                const newId = await db.addItem(clone);
+                if (newId) {
+                    this.saveUndoHistory('add', { id: newId, item: { ...clone, id: newId } }, '复制「' + (item.title || '事项') + '」到' + targetDate);
                 }
                 this.showSuccess(`已复制到 ${targetDate}`);
                 await this.loadItems();
