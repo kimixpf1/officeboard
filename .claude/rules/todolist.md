@@ -2,6 +2,25 @@
 
 ## 已完成
 
+### v5.2.141 修复"移动到"待办凭空填09:00截止时间触发闹钟
+- [x] 根因：_contextMoveTo/_contextMoveToDate 对无deadline待办也填 deadline=目标日T09:00 → 进入相对提醒触发闹钟
+- [x] 修复：todo分支有deadline带过(保留时间)、无不新增、once绝对提醒reminderDate跟随（与复制对齐）
+- [x] 举一反三：主文件复制已正确(v5.2.95/96)；镜像复制是旧版有同bug但不上线(历史债)
+- [x] code-reviewer: 逻辑APPROVE 8项 + 扢出CRITICAL(_loadLazyModules loader版本号漏改已修)
+- [x] 版本号v5.2.141，context-menu.js?v=8(loader+badge双对)
+- [x] 语法检查通过
+- [x] 已提交推送 `77fe738`
+- [ ] 大飞强刷验证
+
+### v5.2.140 修复网站新增消失+apikey丢失，安全加固
+- [x] Bug A: sync.js _applySideData 加 pending 守卫（修复网站/通讯录/便签等同族被云端旧值覆盖）
+- [x] Bug B: 主密钥随账号上云(本地优先不覆盖)+crypto持久化回滚+缓存失效，根治apikey刷新丢失
+- [x] 安全: ocr去APIkey明文兜底+历史明文迁移；密码8位+锁定；导出默认加密；wechat补CSP；删device_info+AI告知
+- [x] 语法5/5 + code-reviewer(WARNING,HIGH已修) + security-reviewer(可发布)
+- [x] 不增Supabase带宽(主密钥同payload+44B)，不影响现有功能
+- [x] 已提交推送 a2d711b
+- [ ] 大飞强刷验证（版本v5.2.140 + 网站新增不消失 + apikey刷新不丢 + 登录正常）
+
 ### v5.2.139 Supabase 带宽优化 Tier1 + dailyBackups 分离
 - [x] 3 个并行 agent 诊断：6 个带宽炸弹（dailyBackups 膨胀最大/Realtime 回环/uploadToCloud 双读/无防抖/生命周期/未压缩），估算 5.7GB/月
 - [x] A: Realtime 用 payload.new 跳过 SELECT + 回环跳过用 sync_time

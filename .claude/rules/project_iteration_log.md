@@ -1,3 +1,100 @@
+## 2026-07-14 v5.2.141 修复"移动到"待办凭空填09:00截止时间触发闹钟
+
+### 触发场景
+大飞反馈：右键待办"移动到"某天后，自动被填了截止时间 09:00 并触发到点提醒（闹钟）。要求：本来有截止时间的事项移动/复制应带过去，没有的不应默认新增截止时间。
+
+### 根因
+`context-menu.js` 两处移动逻辑（`_contextMoveTo` 快捷子菜单 + `_contextMoveToDate` 自定义日期）对 todo 统一执行：
+```js
+const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
+updates.deadline = `${dateVal}T${time}`;
+```
+无 deadline 的待办也被填 `deadline=目标日期T09:00`。该待办若曾设过提醒（reminderManuallySet=true），便满足 `getTodoReminderItems` 的 baseFilter 并进入"相对提醒"分支（app.js:3958，要求 item.deadline 存在），目标日期 09:00 一过即 `overdueMs>=-windowMs` → 触发闹钟。
+
+### 修复（与"复制到"逻辑对齐）
+todo 分支改为：
+- 有 deadline：原样带过，只改日期、保留时间（`updates.deadline=新日期+原时间`）
+- 无 deadline + reminderMode==='once' + reminderDate：提醒日期随目标日期（updates.reminderDate），不新增 deadline
+- 无 deadline（daily/无提醒）：只锚定 updates.date，绝不新增 deadline
+
+### 举一反三（复制到）
+- 主文件 `_contextCopyTo`（v5.2.95/96 已修）：逻辑正确（有 deadline 才带、无则只设 date），本次无需改动
+- 镜像 `e2e/mirror/officeboard/js/core/context-menu.js`：复制仍是旧版（无 deadline 填 09:00），且整体落后 v5.2.119+（连 date 锚定都没有）。镜像不上线，属历史技术债，本次未同步
+
+### code-reviewer 结论
+- 逻辑修复 8 项逐条 APPROVE（有 deadline 带过 / 无不新增 / reminderDate 跟随 / meeting-document 不受影响 / 与复制一致 / 提醒链路不再误触发 / 边界兜底）
+- **CRITICAL（已修）**：app.js `_loadLazyModules`(308行) 才是 createElement 加载入口，初版只改了 badge 显示用的 scriptVersions，loader 里 `context-menu.js?v=7` 没同步 → 修复代码进不了浏览器。已改 loader 为 v=8。印证 [[officeboard-pages-deploy-verify]]：push≠生效，必须 headless 实测实际请求 URL
+- MEDIUM（非阻塞）：`_contextMoveTo` 与 `_contextMoveToDate` 的 todo 分支重复，建议后续抽 `_buildTodoDateUpdates` 辅助函数
+- LOW（历史债）：loader 数组与 badge scriptVersions 多处不一致（sync 78/77、backup 3/2、alarm 11/12 等），建议后续统一为单一常量源
+
+### 提交记录
+- `77fe738` fix: 修复移动到待办凭空填09:00截止时间触发闹钟(v5.2.141)
+
+### 验证清单（大飞强刷 Ctrl+Shift+R）
+- [ ] 版本号 v5.2.141
+- [ ] 无截止时间待办 → 右键"移动到"某天 → 不出现 09:00 截止时间、不触发闹钟
+- [ ] 有截止时间待办（如 14:00）→ 移动到另一天 → 截止时间保留为 14:00、日期更新
+- [ ] 无截止时间+单次绝对提醒待办 → 移动 → 提醒日期跟随到目标日期
+- [ ] 复制到（有/无 deadline）行为不变
+
+---
+
+## 2026-07-09 v5.2.140 修复网站新增消失+apikey丢失，安全加固（主密钥上云/去明文/CSP/密码/导出加密）
+
+### 触发场景
+大飞反馈：① 右侧网站新增网页显示成功但1秒后消失；② 昨天输入的apikey今早刷新全没了；③ 要求安全审查提升等级但不影响现有功能、不突破 Supabase 5G 带宽（含优化也不增带宽）。
+
+### 诊断（3 并行 agent + 双重审查，全程静态分析不触 Supabase）
+- Bug A：sync.js `_applySideData` 下行覆盖辅助数据只做字符串 diff 无新旧判定；新增网站→本地写→3秒防抖上传，但初始 smartSync 约1秒返回用云端旧 links 覆盖本地新 links → 消失。
+- Bug B：主密钥"每设备独立不上云"(725) 与 `_restoreSettingsFromCloud` 把云端主密钥写回本地(417-419) 矛盾 → 云端旧主密钥覆盖本机 → 密文解不开；清浏览器数据主密钥丢则密文永久不可解。
+- 安全：无 CRITICAL；HIGH=APIkey 明文兜底/wechat 缺 CSP/CDN 无 SRI。
+
+### 改动（7文件 +119 -45）
+**Bug修复**：
+1. sync.js `_applySideData` 入口加 `if(this._pendingUpload) return;` 守卫——本地待上传时跳过下行覆盖，一次性修掉网站/通讯录/便签/日程/倒数日/工具同族。
+2. 主密钥随账号上云根治：SETTING_KEYS 加 crypto_master_key；`_restoreSettingsFromCloud` 改"本地无才取云端，本地有则保留"+invalidateMasterKeyCache；crypto.js `_loadOrGenerateMasterKey` 持久化失败回滚 masterKey 赋值；新增 invalidateMasterKeyCache()。
+
+**安全加固**：
+3. ocr.js 去 API key 明文兜底：set*不写 localStorage 明文；get*去 SafeStorage 回退；loadApiKeysFromDB 历史明文(IndexedDB+localStorage)迁移加密存储后清除（仅加密成功才清）；set* 清 IndexedDB legacy 明文。
+4. 密码：register/changePassword/handleChangePassword 全升级 8位+字母+数字；handleLogin 加失败锁定(5次锁15分钟，只对密码错误计数，成功清零)。
+5. backup.js exportData 默认 showPasswordPrompt 引导加密导出。
+6. index.html apiKeyModal 加 AI 外发(Kimi/DeepSeek)告知；wechat-upload.html 补 CSP。
+7. sync.js buildSyncData 删 device_info 上传。
+
+### 带宽影响
+不增 Supabase 请求/带宽：主密钥仅同次 upsert payload +约44字节；删 device_info 反而略减；无新增 SELECT/循环。
+
+### 代码审查
+- ✅ 语法检查 5/5
+- ✅ code-reviewer: WARNING(0C/1H/1M/3L)，HIGH(legacy迁移未检查加密返回值→丢key)已修，MEDIUM(CSP对齐)/LOW(register一致性)已修
+- ✅ security-reviewer: **可以发布**。7项功能影响核对全过，不增带宽，8项安全维度到位
+
+### 提交记录
+- `a2d711b` fix: 修复网站新增消失+apikey刷新丢失，安全加固 v5.2.140
+- `6566c04` fix: 加 .nojekyll 禁用 Jekyll 构建，修复 Pages 不部署最新代码
+- `14c1360` chore: 触发 Pages 重新部署（空commit，.nojekyll 之前无效）
+
+### Pages 部署事故（2026-07-09 补记）
+push a2d711b(140) 后线上一直 v5.2.139 不更新（headless 实测 app.js 内容=139 确认，非缓存）。**根因：仓库缺 `.nojekyll`，GitHub Pages 走 Jekyll 构建，处理 test-ocr.png(1.5MB)/中文文件名/.cjs 时构建失败/超时，Pages 停在最后一个能构建成功的旧版**。空 commit 触发重建无效。修复：加 `.nojekyll`(6566c04)，Pages 跳过 Jekyll 直接部署静态文件，2 分钟后线上=v5.2.140。
+**教训（已记入 [[officeboard-pages-deploy-verify]]）**：①纯静态站必须有 .nojekyll，绝不能删；②push 后必须 headless 实测线上 app.js 版本号，不能只看 git ls-remote；③本次发版漏了"实测线上"这步，以为 push=上线，教训深刻。
+
+### 验证清单（大飞强刷 Ctrl+Shift+R）
+- [ ] 版本号显示 v5.2.140
+- [ ] 右侧网站新增网页 → 不再1秒后消失，刷新仍在
+- [ ] 输入 apikey → 刷新/换设备后 key 仍在（主密钥上云恢复）
+- [ ] 登录正常（密码对不触发锁定）；注册/改密要求8位+字母+数字（现有账号登录不受影响）
+- [ ] 导出备份默认弹密码框引导加密
+- [ ] 微信上传页图片识别正常（CSP 不阻断 Kimi）
+- [ ] 控制台无 JS 错误
+
+### 遗留
+- CDN 无 SRI(HIGH-3)：大飞选暂不动，记录为已知供应链风险，建议后续专项自托管 vendor/
+- L2: SimpleEncrypt 用 SHA-256 无 PBKDF2（导出加密强度偏弱，pre-existing）
+- I1: backup.js restoreCloudBackup 调 _applySideData 键名格式错误（恢复云端备份辅助数据失效，pre-existing，另起任务）
+- 镜像 e2e/mirror 未同步（既有技术债）
+
+---
+
 ## 2026-07-08 v5.2.139 Supabase 带宽优化 Tier1 + dailyBackups 分离
 
 ### 改动内容（3 个并行 agent 诊断 + plan 批准，5 项优化 A-E）
