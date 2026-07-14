@@ -1,3 +1,43 @@
+## 2026-07-14 v5.2.143 修复撤回遗留-add类撤回失效根因+N+1+zombie Promise
+
+### 触发场景
+大飞要求修复 v5.2.142 code-reviewer 指出的遗留问题（redo对add类失效 + N+1 + zombie Promise），且不能影响现有功能。
+
+### 根因发现（比预期更深）
+`db.addItem` 返回数字 id（`resolve(addRequest.result)`），但原代码用 `addedItem.id`（数字.id=undefined）→ `if(addedItem && addedItem.id)` 恒 false：
+- 单个新增、批量周期新增：saveUndoHistory 从未调用，**撤回从未生效**（不止 redo，undo 也坏）
+- v5.2.142 的复制撤回：同 bug，也失效
+
+### 改动
+1. **add 类撤回根因修复**（3 处调用点）：`addedItem.id`→`newId` + 存完整 item 供 redo 恢复
+   - 单个新增：`{id:newId, item:{...item, id:newId}}`
+   - 批量周期：`{ids:addedIds, items:recurringItems}`
+   - 复制：`{id:newId, item:{...clone, id:newId}}`
+2. **redo add 分支**：批量 addItem 收集 newIds 并 `action.data.ids=newIds`（供 redo 后再 undo）；else 分支加 `if(item)` 防御 addItem(undefined) + actualId 回写对齐批量
+3. **N+1**：handleDrop 同列排序改 `db.getItemsByType` 批量取 + Map 查找 + `resetItemsCache` 避免缓存陈旧
+4. **zombie Promise**：`_createChoiceModal` 取代旧弹窗时 `resolve('cancel')`（modal._undoResolve 挂 resolve），杜绝连按 Ctrl+Z 死弹窗
+5. version v5.2.143；loader+badge：context-menu.js?v=10、app.js?v=264（双对齐）
+
+### code-reviewer 结论
+APPROVE（0C/0H本次范围/3M/1L），6 处核心改动闭环验证通过，未破坏现有撤回/弹窗/拖拽
+- 采纳 3 个防御建议：cache reset、redo id 回写、redo item 存在性保护
+- HIGH（范围外）：编辑转周期撤回（5400-5412）同根因 + 复合操作（originalItem 已 deleteItem，updateItem 处理不了），需新 action，本次未动维持现状，单独修
+
+### 提交记录
+- `51c8f98` fix: 修复撤回遗留-add类撤回失效根因+N+1+zombie Promise(v5.2.143)
+
+### 验证清单（大飞强刷 Ctrl+Shift+R）
+- [ ] 版本号 v5.2.143
+- [ ] 新增单个事项 → 撤回能删除（**之前完全不能撤！**）
+- [ ] 新增批量周期任务 → 撤回能全部删除
+- [ ] 复制到某天 → 撤回能删副本（v5.2.142 其实没生效，本次修好）
+- [ ] 撤回 → redo → 再撤回 闭环正确
+- [ ] 连按 Ctrl+Z 不再卡死（旧弹窗被取消）
+- [ ] 同列拖动排序撤回正常
+- [ ] 现有弹窗（周期任务选择/跨日期选择/确认删除）行为不变
+
+---
+
 ## 2026-07-14 v5.2.142 撤回前提示内容+补全复制/排序撤回
 
 ### 触发场景

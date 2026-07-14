@@ -2,6 +2,17 @@
 
 ## 已完成
 
+### v5.2.143 修复撤回遗留-add类撤回失效根因+N+1+zombie Promise
+- [x] 根因：db.addItem 返回数字id，addedItem.id 恒undefined → 单个/批量新增撤回从未生效（含 v5.2.142 复制撤回）
+- [x] 修复：add 调用点存完整item+真实id；redo 批量更新ids+防御 addItem(undefined)+id回写
+- [x] N+1：同列排序改 getItemsByType 批量取 + resetItemsCache
+- [x] zombie：_createChoiceModal 取代旧弹窗 resolve cancel
+- [x] version v5.2.143；loader+badge 双对齐（context-menu?v=10, app.js?v=264）
+- [x] node --check 三文件过 + code-reviewer APPROVE(0C/0H/3M/1L)
+- [x] 已提交推送 `51c8f98`
+- [ ] 大飞强刷验证
+- 待办：编辑转周期撤回（复合操作，需新action）单独修
+
 ### v5.2.142 撤回前提示内容+补全复制/排序撤回
 - [x] 调查：撤回已支持 delete/update/add/完成/置顶/沉底/拖拽移动；缺复制+同列排序；撤回前无提示
 - [x] 核心：undoLastAction peek+弹窗确认（按钮/Ctrl+Z 都提示）；新增 undo-describe.js 摘要
