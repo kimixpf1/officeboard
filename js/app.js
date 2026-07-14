@@ -305,7 +305,7 @@ class OfficeDashboard {
             'js/core/recurring.js?v=1',
             'js/core/cross-date.js?v=1',
             'js/core/backup.js?v=3',
-            'js/core/context-menu.js?v=7',
+            'js/core/context-menu.js?v=8',
             'js/core/idle-bar.js?v=8',
             'js/core/alarm.js?v=11',
             'js/core/pet-renderer.js?v=3'
@@ -4740,8 +4740,8 @@ class OfficeDashboard {
             return;
         }
 
-        const version = '2026-07-09 v5.2.140';
-        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=7', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=261', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
+        const version = '2026-07-14 v5.2.141';
+        const scriptVersions = ['utils.js?v=5', 'ocr.js?v=57', 'upload-flow.js?v=11', 'calendar.js?v=41', 'sync.js?v=77', 'app-date-view.js?v=14', 'countdown.js?v=4', 'links.js?v=1', 'contacts.js?v=3', 'tools.js?v=1', 'side-panels.js?v=2', 'weather.js?v=1', 'recurring.js?v=1', 'cross-date.js?v=1', 'pdf-parser.js?v=2', 'context-menu.js?v=8', 'backup.js?v=2', 'alarm.js?v=12', 'idle-bar.js?v=8', 'pet-renderer.js?v=3', 'report.js?v=18', 'app.js?v=262', 'db.js?v=30', 'base.css?v=2', 'layout.css?v=9', 'themes.css?v=10', 'components.css?v=4', 'responsive.css?v=6', 'crypto.js?v=17'];
         badge.textContent = `部署版本：${version}`;
         badge.dataset.version = version;
         badge.title = `当前页面部署版本：${version}\n资源：${scriptVersions.join(' / ')}`;    }

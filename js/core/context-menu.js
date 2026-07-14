@@ -306,8 +306,15 @@ const ContextMenuCore = {
             updates.docStartDate = newDate;
             updates.docEndDate = newDate;
         } else if (item.type === 'todo') {
-            const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
-            updates.deadline = `${newDate}T${time}`;
+            if (item.deadline) {
+                // 有截止时间：原样带过去，只改日期、保留时间
+                const time = item.deadline.split('T')[1] || '09:00';
+                updates.deadline = `${newDate}T${time}`;
+            } else if (item.reminderMode === 'once' && item.reminderDate) {
+                // 无截止时间但设了单次绝对提醒：提醒日期随目标日期（与复制一致）
+                updates.reminderDate = newDate;
+            }
+            // 无截止时间绝不新增 deadline，否则会凭空填 09:00 并触发到点提醒
             updates.date = newDate;
         }
 
@@ -412,8 +419,15 @@ const ContextMenuCore = {
                 updates.docStartDate = dateVal;
                 updates.docEndDate = dateVal;
             } else if (item.type === 'todo') {
-                const time = item.deadline ? (item.deadline.split('T')[1] || '09:00') : '09:00';
-                updates.deadline = `${dateVal}T${time}`;
+                if (item.deadline) {
+                    // 有截止时间：原样带过去，只改日期、保留时间
+                    const time = item.deadline.split('T')[1] || '09:00';
+                    updates.deadline = `${dateVal}T${time}`;
+                } else if (item.reminderMode === 'once' && item.reminderDate) {
+                    // 无截止时间但设了单次绝对提醒：提醒日期随目标日期（与复制一致）
+                    updates.reminderDate = dateVal;
+                }
+                // 无截止时间绝不新增 deadline，否则会凭空填 09:00 并触发到点提醒
                 updates.date = dateVal;
             }
 
